@@ -8,6 +8,11 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    ignore:
+      # A new TypeScript major waits until typescript-eslint, which the lint relies on,
+      # supports it (8.72 accepts TypeScript below 6.1).
+      - dependency-name: typescript
+        update-types: ['version-update:semver-major']
     groups:
       minor-and-patch:
         patterns: ['*']
