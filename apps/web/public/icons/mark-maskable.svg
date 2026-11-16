@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- The mark for icons the system crops to its own shape: the background fills the square
+       and the route stays inside the middle circle that every crop keeps. -->
+  <defs>
+    <linearGradient id="route" x1="60" y1="0" x2="452" y2="0" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffab1f" />
+      <stop offset="1" stop-color="#ff5a1f" />
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" fill="#0b111c" />
+  <g transform="translate(256 256) scale(0.78) translate(-256 -245)">
+    <path
+      d="M77 197 L130 302 L168 222 L210 302 L256 190 L302 302 L344 222 L382 302 L435 197"
+      fill="none"
+      stroke="url(#route)"
+      stroke-width="38"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    />
+    <circle cx="77" cy="197" r="28" fill="#ffab1f" />
+    <circle cx="77" cy="197" r="11" fill="#ffffff" />
+    <circle cx="435" cy="197" r="28" fill="#ff5a1f" />
+    <circle cx="435" cy="197" r="11" fill="#ffffff" />
+  </g>
+</svg>

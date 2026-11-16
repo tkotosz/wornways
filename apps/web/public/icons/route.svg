@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="44 164 424 162">
+  <!-- The route of the mark without its tile, for beside the wordmark on the app's own page. -->
+  <defs>
+    <linearGradient id="route" x1="60" y1="0" x2="452" y2="0" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffab1f" />
+      <stop offset="1" stop-color="#ff5a1f" />
+    </linearGradient>
+  </defs>
+  <path
+    d="M77 197 L130 302 L168 222 L210 302 L256 190 L302 302 L344 222 L382 302 L435 197"
+    fill="none"
+    stroke="url(#route)"
+    stroke-width="38"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+  <circle cx="77" cy="197" r="28" fill="#ffab1f" />
+  <circle cx="77" cy="197" r="11" fill="#ffffff" />
+  <circle cx="435" cy="197" r="28" fill="#ff5a1f" />
+  <circle cx="435" cy="197" r="11" fill="#ffffff" />
+</svg>

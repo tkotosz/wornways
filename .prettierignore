@@ -1,0 +1,9 @@
+dist/
+node_modules/
+package-lock.json
+coverage/
+data/
+out/
+test-results/
+playwright-report/
+apps/web/public/fonts/

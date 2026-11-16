@@ -1,0 +1,16 @@
+node_modules/
+dist/
+coverage/
+*.log
+.DS_Store
+.env
+*.tsbuildinfo
+# Local activity exports and rendered videos (personal data), wherever they are written
+*.mp4
+*.webm
+data/
+out/
+
+# Browser test output
+test-results/
+playwright-report/

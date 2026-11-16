@@ -1,0 +1,25 @@
+{
+  "name": "@wornways/web",
+  "version": "0.0.0",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vue-tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "phone": "WORNWAYS_PHONE=1 vite build && WORNWAYS_PHONE=1 vite preview --host"
+  },
+  "dependencies": {
+    "@wornways/engine": "0.0.0",
+    "maplibre-gl": "6.18.0",
+    "mediabunny": "1.65.0",
+    "vue": "3.5.44"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-basic-ssl": "2.3.0",
+    "@vitejs/plugin-vue": "6.0.10",
+    "vite": "8.3.5",
+    "vue-tsc": "3.3.14"
+  }
+}

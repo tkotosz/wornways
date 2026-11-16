@@ -1,0 +1,26 @@
+# Dependabot (a GitHub service, not a workflow) opens pull requests that update the npm
+# packages and the GitHub Actions above, once a week, minor and patch updates grouped
+# into one pull request each. New releases wait a few days first, so a broken release
+# can be pulled before it reaches the project.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      minor-and-patch:
+        patterns: ['*']
+        update-types: [minor, patch]
+    cooldown:
+      default-days: 7
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ['*']
+    cooldown:
+      default-days: 7

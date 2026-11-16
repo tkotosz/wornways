@@ -1,0 +1,14 @@
+{
+  "name": "@wornways/cli",
+  "version": "0.0.0",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "wornways": "./dist/main.js"
+  },
+  "dependencies": {
+    "@wornways/engine": "0.0.0",
+    "@napi-rs/canvas": "1.1.0"
+  }
+}

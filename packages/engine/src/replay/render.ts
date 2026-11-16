@@ -1,0 +1,861 @@
+import { drawBasemap, type Basemap, type MapLabel } from '../map/basemap.ts';
+import { levelsFor, mapLevelViews, type CameraPath } from './camera.ts';
+import { drawEndCard, endCardFrames } from './end-card.ts';
+import { drawWatermark } from './mark.ts';
+import { composeHeat, createHeatRamp, decodeHeat, heatStyle, saturationFromHeat } from './heat.ts';
+import { projectTrack, type Projected } from './project.ts';
+import type { Timeline } from './timeline.ts';
+import type { Track } from '../track/types.ts';
+import { fitView, type View } from './view.ts';
+
+// The engine draws through this minimal subset of the Canvas 2D API so the same code runs
+// on an OffscreenCanvas in a worker and on a native canvas in Node.
+export interface GradientLike {
+  addColorStop(offset: number, color: string): void;
+}
+
+export interface Context2DLike {
+  globalCompositeOperation: string;
+  globalAlpha: number;
+  lineWidth: number;
+  lineCap: string;
+  lineJoin: string;
+  strokeStyle: unknown;
+  fillStyle: unknown;
+  font: string;
+  textAlign: string;
+  textBaseline: string;
+  setTransform(a: number, b: number, c: number, d: number, e: number, f: number): void;
+  beginPath(): void;
+  closePath(): void;
+  moveTo(x: number, y: number): void;
+  lineTo(x: number, y: number): void;
+  arc(x: number, y: number, radius: number, startAngle: number, endAngle: number): void;
+  stroke(): void;
+  fill(): void;
+  fillRect(x: number, y: number, w: number, h: number): void;
+  fillText(text: string, x: number, y: number): void;
+  strokeText(text: string, x: number, y: number): void;
+  measureText(text: string): { width: number };
+  drawImage(image: unknown, dx: number, dy: number): void;
+  getImageData(
+    sx: number,
+    sy: number,
+    sw: number,
+    sh: number,
+  ): { data: Uint8ClampedArray; width: number; height: number };
+  putImageData(imageData: unknown, dx: number, dy: number): void;
+  createRadialGradient(
+    x0: number,
+    y0: number,
+    r0: number,
+    x1: number,
+    y1: number,
+    r1: number,
+  ): GradientLike;
+  createLinearGradient(x0: number, y0: number, x1: number, y1: number): GradientLike;
+}
+
+export interface CanvasLike {
+  width: number;
+  height: number;
+  getContext(type: '2d', options?: { willReadFrequently?: boolean }): unknown;
+}
+
+export type CanvasFactory = (width: number, height: number) => CanvasLike;
+
+/** A value the metrics card can show. */
+export type Metric = 'time' | 'distance' | 'pace' | 'elevation' | 'date' | 'count';
+export const METRICS: readonly Metric[] = [
+  'time',
+  'distance',
+  'pace',
+  'elevation',
+  'date',
+  'count',
+];
+
+/** Where on the frame a block of text sits: an edge, then the side or the middle. */
+export type Position =
+  | 'top-left'
+  | 'top-center'
+  | 'top-right'
+  | 'middle-left'
+  | 'middle-center'
+  | 'middle-right'
+  | 'bottom-left'
+  | 'bottom-center'
+  | 'bottom-right';
+/** Every position, row by row: the top, the middle and the bottom of the frame. */
+export const POSITIONS: readonly Position[] = [
+  'top-left',
+  'top-center',
+  'top-right',
+  'middle-left',
+  'middle-center',
+  'middle-right',
+  'bottom-left',
+  'bottom-center',
+  'bottom-right',
+];
+
+export type RenderOptions = {
+  width: number;
+  height: number;
+  fps: number;
+  /**
+   * Ask for CPU-backed canvases where pixels are read back every frame (the heat layers).
+   * Browsers otherwise keep them on the GPU, where each read stalls. Default true.
+   */
+  readbackHint?: boolean;
+  /** Pass count shown as the hottest colour; by default a high percentile of the final heatmap. */
+  heatSaturation?: number;
+  background?: string;
+  /** Where the tracks sit in the frame; defaults to `fitView(tracks, width, height)`. */
+  view?: View;
+  /** Moving camera from `followCamera`. Without one the frame stays on `view`. */
+  camera?: CameraPath;
+  /** Street map drawn under the heatmap, with one level per entry of `mapLevelViews`. */
+  basemap?: Basemap;
+  title?: string;
+  /** Singular and plural noun for the counter, e.g. ["ride", "rides"]. */
+  countLabel?: [string, string];
+  /** Race mode: what the activities are doing while under way, e.g. "riding". */
+  movingLabel?: string;
+  /** "single": one activity with its own elapsed time and distance as live stats. */
+  overlay?: 'auto' | 'single';
+  /**
+   * The values of the metrics card in order, the first one large; empty: no card. A value
+   * the video cannot show is left out: pace exists for a single activity only, count for
+   * several activities only, the date not when all play at once, elevation only when
+   * recorded. Default: what suits the video (see `defaultMetrics`).
+   */
+  metrics?: Metric[];
+  /** Where the metrics card sits; default bottom-left. */
+  metricsPosition?: Position;
+  /** Where the title sits; default top-left. */
+  titlePosition?: Position;
+  /** Scales the title; default 1. */
+  titleScale?: number;
+  /** Scales the metrics card; default 1. */
+  metricsScale?: number;
+  /** End the video with the Wornways card (see end-card.ts), after the replay. Default false. */
+  endCard?: boolean;
+  /** Draw the small Wornways mark on the map credit's line. Default false. */
+  watermark?: boolean;
+  fontFamily?: string;
+  /** BCP 47 locale for the date counter. */
+  locale?: string;
+};
+
+export type Renderer = {
+  /** Holds the most recently rendered frame. */
+  readonly canvas: CanvasLike;
+  /** Every frame of the video: the replay's, then the end card's. */
+  readonly frameCount: number;
+  /** The replay's frames; the end card's follow them. */
+  readonly replayFrames: number;
+  /** Pass count that shows as the hottest colour. */
+  readonly heatSaturation: number;
+  /** Frames must be rendered in order starting from 0: the heatmap only ever grows. */
+  renderFrame(index: number): void;
+  /**
+   * Moves on to frame `index` without drawing the frames before it: their routes are added
+   * to the heatmap, nothing is drawn. Then `renderFrame(index)` draws that frame exactly as
+   * if every frame before it had been drawn. Used to show a single moment, such as the end.
+   */
+  skipTo(index: number): void;
+};
+
+type Prepared = Projected & {
+  date: string;
+  // Drawing state
+  /** Index of the last point the head has passed. */
+  idx: number;
+  headX: number;
+  headY: number;
+  metres: number;
+  /** Metres climbed so far. */
+  climbed: number;
+  started: boolean;
+  done: boolean;
+  /** Video time at which the track finished drawing. */
+  doneAt: number;
+};
+
+type Rect = { x0: number; y0: number; x1: number; y1: number };
+
+/**
+ * The scene at one zoom level. Level pixel q shows base-view pixel q / k + (ox, oy).
+ * Routes accumulate as pass counts on `heat`; `composed` is the map with the coloured heat
+ * on top, brought up to date lazily for the rectangles in `dirty`.
+ */
+type Level = {
+  width: number;
+  height: number;
+  k: number;
+  ox: number;
+  oy: number;
+  heatCtx: Context2DLike;
+  composed: CanvasLike;
+  composedCtx: Context2DLike;
+  map: Uint8ClampedArray;
+  labels: MapLabel[];
+  dirty: Rect[];
+};
+
+const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
+const clockText = (s: number) =>
+  `${Math.floor(s / 3600)}:${String(Math.floor((s % 3600) / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
+const smoothstep = (f: number) => f * f * (3 - 2 * f);
+/** The horizontal part of a position: the side it is on, or the middle. */
+const sideOf = (position: Position) =>
+  position.endsWith('left') ? 'left' : position.endsWith('right') ? 'right' : 'center';
+/** The vertical part of a position: the frame's top, middle or bottom. */
+const rowOf = (position: Position) =>
+  position.startsWith('top') ? 'top' : position.startsWith('middle') ? 'middle' : 'bottom';
+const wholeNumber = (n: number) => Math.round(n).toLocaleString('en-US');
+
+/** Sports whose speed is told as minutes per kilometre. */
+const isOnFoot = (sport: string) => /run|walk|hike/.test(sport);
+
+/** Average pace ("5:32 /km") or, off foot, speed ("24.3 km/h") over the distance so far. */
+function paceText(sport: string, seconds: number, metres: number): string {
+  const moving = seconds > 0 && metres >= 20;
+  if (!isOnFoot(sport))
+    return `${moving ? (metres / 1000 / (seconds / 3600)).toFixed(1) : '0.0'} km/h`;
+  if (!moving) return '–:–– /km';
+  const perKm = Math.round(seconds / (metres / 1000));
+  return `${Math.floor(perKm / 60)}:${String(perKm % 60).padStart(2, '0')} /km`;
+}
+
+/**
+ * What the overlay describes: one activity, a race of every activity on one clock, or
+ * groups of activities one after another.
+ */
+export type OverlayKind = 'single' | 'race' | 'groups';
+
+/** The metrics a video shows when none are asked for, the first one large. */
+export function defaultMetrics(kind: OverlayKind): Metric[] {
+  if (kind === 'single') return ['time', 'distance', 'date'];
+  if (kind === 'race') return ['time', 'count', 'distance'];
+  return ['date', 'count', 'distance'];
+}
+
+export function createRenderer(
+  tracks: Track[],
+  timeline: Timeline,
+  createCanvas: CanvasFactory,
+  options: RenderOptions,
+): Renderer {
+  if (tracks.length === 0) throw new Error('No tracks to render');
+
+  const { width: W, height: H, fps, camera, basemap } = options;
+  const background = options.background ?? '#090b10';
+  const fontFamily =
+    options.fontFamily ?? '"Inter", "Noto Sans", "Helvetica Neue", Arial, sans-serif';
+  const [singular, plural] = options.countLabel ?? ['activity', 'activities'];
+  const movingLabel = options.movingLabel ?? 'moving';
+  const kind: OverlayKind =
+    options.overlay === 'single' ? 'single' : timeline.clock ? 'race' : 'groups';
+  const metrics = options.metrics ?? defaultMetrics(kind);
+  const corner = options.metricsPosition ?? 'bottom-left';
+  const titleCorner = options.titlePosition ?? 'top-left';
+  const titleScale = options.titleScale ?? 1;
+  const metricsScale = options.metricsScale ?? 1;
+  const unit = Math.min(W, H) / 1080; // scales strokes and type with the output size
+  const dateFormat = new Intl.DateTimeFormat(options.locale ?? 'en-GB', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  });
+  const replayFrames = Math.round(timeline.duration * fps);
+  const frameCount = replayFrames + (options.endCard ? endCardFrames(fps) : 0);
+  if (camera && camera.zoom.length < replayFrames)
+    throw new Error('Camera path is shorter than the video');
+
+  const view = options.view ?? fitView(tracks, W, H);
+  const readback = options.readbackHint === false ? undefined : { willReadFrequently: true };
+  const levelViews = basemap ? basemap.levels.map((l) => l.view) : mapLevelViews(view, camera);
+  if (!camera && levelViews.length !== 1)
+    throw new Error('A fixed camera takes a basemap with one level');
+
+  // Points closer than a third of a pixel add nothing, at the closest the camera gets.
+  const prepared: Prepared[] = tracks.map((track) => ({
+    ...projectTrack(track, view, 0.35 / (camera?.maxZoom ?? 1)),
+    date: dateFormat.format(track.startTime),
+    idx: 0,
+    headX: 0,
+    headY: 0,
+    metres: 0,
+    climbed: 0,
+    started: false,
+    done: false,
+    doneAt: Infinity,
+  }));
+
+  // One pass adds 1 at the centre of a route, less in its glow.
+  const strokes = [
+    { width: 9 * unit, style: heatStyle(0.12) },
+    { width: 4.5 * unit, style: heatStyle(0.18) },
+    { width: 1.7 * unit, style: heatStyle(0.7) },
+  ];
+  const pad = strokes[0].width / 2 + 2;
+
+  const prepareHeat = (c: Context2DLike, w: number, h: number) => {
+    // Opaque black, so the counts read back exactly (no premultiplied alpha).
+    c.fillStyle = '#000';
+    c.fillRect(0, 0, w, h);
+    c.globalCompositeOperation = 'lighter';
+    // Butt caps let each frame's new piece meet the previous one without overlapping it,
+    // which would otherwise count the joint twice.
+    c.lineCap = 'butt';
+    c.lineJoin = 'round';
+  };
+
+  // --- Heat scale: render the finished heatmap once to find how busy the busiest roads get. ---
+  let saturation = options.heatSaturation ?? 0;
+  if (!saturation) {
+    const probe = createCanvas(W, H);
+    const pc = probe.getContext('2d', readback) as Context2DLike;
+    prepareHeat(pc, W, H);
+    for (const tr of prepared) {
+      pc.beginPath();
+      pc.moveTo(tr.xy[0], tr.xy[1]);
+      for (let i = 1; i < tr.count; i++) pc.lineTo(tr.xy[i * 2], tr.xy[i * 2 + 1]);
+      for (const s of strokes) {
+        pc.lineWidth = s.width;
+        pc.strokeStyle = s.style;
+        pc.stroke();
+      }
+    }
+    const passes = new Float32Array(W * H);
+    decodeHeat(pc.getImageData(0, 0, W, H).data, passes);
+    saturation = saturationFromHeat(passes);
+  }
+  const ramp = createHeatRamp(saturation);
+
+  // --- Levels: map drawn once each, heat accumulated on each ---
+  const labelFont = (size: number) => `500 ${Math.round(size)}px ${fontFamily}`;
+  const levels: Level[] = levelViews.map((lv, index) => {
+    const k = lv.scale / view.scale;
+    const ox = view.offX - lv.offX / k;
+    const oy = view.offY - lv.offY / k;
+    const composed = createCanvas(lv.width, lv.height);
+    const composedCtx = composed.getContext('2d', readback) as Context2DLike;
+    composedCtx.fillStyle = background;
+    composedCtx.fillRect(0, 0, lv.width, lv.height);
+
+    const labels: MapLabel[] = [];
+    if (basemap) {
+      const places = drawBasemap(composedCtx, lv, basemap.levels[index].tiles, unit);
+      // Keep the most important place names that fit without touching each other.
+      const limit = 28 * Math.max(1, (lv.width * lv.height) / (W * H));
+      const boxes: Rect[] = [];
+      for (const place of places) {
+        if (labels.length >= limit) break;
+        composedCtx.font = labelFont(place.size);
+        const halfW = composedCtx.measureText(place.text).width / 2 + 10 * unit;
+        const halfH = place.size * 0.7 + 4 * unit;
+        const box = {
+          x0: place.x - halfW,
+          y0: place.y - halfH,
+          x1: place.x + halfW,
+          y1: place.y + halfH,
+        };
+        if (!camera && (box.x0 < 0 || box.x1 > W)) continue; // a fixed frame would cut it off
+        if (boxes.some((o) => box.x0 < o.x1 && box.x1 > o.x0 && box.y0 < o.y1 && box.y1 > o.y0))
+          continue;
+        boxes.push(box);
+        labels.push({ ...place, x: place.x / k + ox, y: place.y / k + oy });
+      }
+    }
+    const map = composedCtx.getImageData(0, 0, lv.width, lv.height).data;
+
+    const heat = createCanvas(lv.width, lv.height);
+    const heatCtx = heat.getContext('2d', readback) as Context2DLike;
+    prepareHeat(heatCtx, lv.width, lv.height);
+    heatCtx.setTransform(k, 0, 0, k, -ox * k, -oy * k);
+    return {
+      width: lv.width,
+      height: lv.height,
+      k,
+      ox,
+      oy,
+      heatCtx,
+      composed,
+      composedCtx,
+      map,
+      labels,
+      dirty: [],
+    };
+  });
+
+  const frame = createCanvas(W, H);
+  const ctx = frame.getContext('2d') as Context2DLike;
+  // Gradients that darken the map behind the counters and the title.
+  const bottomShade = ctx.createLinearGradient(0, H * 0.76, 0, H * 0.9);
+  bottomShade.addColorStop(0, 'rgba(5, 6, 9, 0)');
+  bottomShade.addColorStop(1, 'rgba(5, 6, 9, 0.88)');
+  const topShade = ctx.createLinearGradient(0, 0, 0, H * 0.12);
+  topShade.addColorStop(0, 'rgba(5, 6, 9, 0.88)');
+  topShade.addColorStop(1, 'rgba(5, 6, 9, 0)');
+
+  // Title and metrics card
+  const margin = W * 0.07;
+  /** Where text with this alignment starts. */
+  const xOf = (side: 'left' | 'center' | 'right') =>
+    side === 'left' ? margin : side === 'right' ? W - margin : W / 2;
+  const titleFont = `600 ${Math.round(44 * unit * titleScale)}px ${fontFamily}`;
+  const headlineFont = `600 ${Math.round(60 * unit * metricsScale)}px ${fontFamily}`;
+  const statusFont = `400 ${Math.round(32 * unit * metricsScale)}px ${fontFamily}`;
+  const statusGap = 50 * unit * metricsScale; // from the large value down to the first line under it
+  const statusStep = 42 * unit * metricsScale; // between the lines under it
+  const cardRow = rowOf(corner);
+  const cardOnTop = cardRow === 'top';
+  const cardSide = sideOf(corner);
+  const titleRow = rowOf(titleCorner);
+  const titleOnTop = titleRow === 'top';
+  const titleSide = sideOf(titleCorner);
+  /**
+   * Whether the title and the card would meet: in the same row, on the same side or with
+   * either in the middle. Then they stack, the title first.
+   */
+  const stacked =
+    !!options.title &&
+    cardRow === titleRow &&
+    (cardSide === titleSide || cardSide === 'center' || titleSide === 'center');
+  const hasElevation = prepared.some((tr) => tr.hasElevation);
+
+  const headFade = 0.35; // seconds a head dot lingers after its track finishes
+  const headRadius = 15 * unit;
+  let nextFrame = 0;
+
+  function markDirty(level: Level, r: Rect): void {
+    const x0 = Math.max(0, Math.floor(r.x0));
+    const y0 = Math.max(0, Math.floor(r.y0));
+    const x1 = Math.min(level.width, Math.ceil(r.x1));
+    const y1 = Math.min(level.height, Math.ceil(r.y1));
+    if (x0 >= x1 || y0 >= y1) return;
+    // Merge with an overlapping rectangle so busy areas are recoloured once, not per track.
+    for (const d of level.dirty) {
+      if (x0 <= d.x1 && x1 >= d.x0 && y0 <= d.y1 && y1 >= d.y0) {
+        d.x0 = Math.min(d.x0, x0);
+        d.y0 = Math.min(d.y0, y0);
+        d.x1 = Math.max(d.x1, x1);
+        d.y1 = Math.max(d.y1, y1);
+        return;
+      }
+    }
+    level.dirty.push({ x0, y0, x1, y1 });
+  }
+
+  /** Recolours what changed on a level since it was last shown. */
+  function flush(level: Level): void {
+    for (const r of level.dirty) {
+      const w = r.x1 - r.x0;
+      const h = r.y1 - r.y0;
+      const image = level.heatCtx.getImageData(r.x0, r.y0, w, h);
+      composeHeat(ramp, image.data, w, h, level.map, level.width, r.x0, r.y0);
+      level.composedCtx.putImageData(image, r.x0, r.y0);
+    }
+    level.dirty.length = 0;
+  }
+
+  /** Moves every head to where it is at time `t` and adds the new piece of route to every level. */
+  function advance(t: number): void {
+    const piece: number[] = [];
+    for (let k = 0; k < prepared.length; k++) {
+      const tr = prepared[k];
+      if (tr.done) continue;
+      const progress = timeline.progress(k, t);
+      // In a race, and in a single-activity replay, riders wait at the start until the clock runs.
+      if (progress <= 0 && timeline.mode !== 'race' && options.overlay !== 'single') continue;
+      if (!tr.started) {
+        tr.started = true;
+        tr.headX = tr.xy[0];
+        tr.headY = tr.xy[1];
+      }
+
+      piece.length = 0;
+      piece.push(tr.headX, tr.headY);
+      let i = tr.idx;
+      while (i + 1 < tr.count && tr.u[i + 1] <= progress) {
+        i++;
+        piece.push(tr.xy[i * 2], tr.xy[i * 2 + 1]);
+      }
+      tr.idx = i;
+      if (i + 1 < tr.count) {
+        // The head sits part-way along the next segment.
+        const f = (progress - tr.u[i]) / (tr.u[i + 1] - tr.u[i]);
+        tr.headX = tr.xy[i * 2] + f * (tr.xy[i * 2 + 2] - tr.xy[i * 2]);
+        tr.headY = tr.xy[i * 2 + 1] + f * (tr.xy[i * 2 + 3] - tr.xy[i * 2 + 1]);
+        tr.metres = tr.dist[i] + f * (tr.dist[i + 1] - tr.dist[i]);
+        tr.climbed = tr.climb[i] + f * (tr.climb[i + 1] - tr.climb[i]);
+        piece.push(tr.headX, tr.headY);
+      } else {
+        tr.headX = tr.xy[i * 2];
+        tr.headY = tr.xy[i * 2 + 1];
+        tr.metres = tr.dist[i];
+        tr.climbed = tr.climb[i];
+        tr.done = true;
+        tr.doneAt = t;
+      }
+      if (piece.length < 4) continue;
+
+      let bx0 = Infinity,
+        by0 = Infinity,
+        bx1 = -Infinity,
+        by1 = -Infinity;
+      for (let j = 0; j < piece.length; j += 2) {
+        bx0 = Math.min(bx0, piece[j]);
+        bx1 = Math.max(bx1, piece[j]);
+        by0 = Math.min(by0, piece[j + 1]);
+        by1 = Math.max(by1, piece[j + 1]);
+      }
+      if (bx0 === bx1 && by0 === by1) continue; // standing still
+
+      for (const level of levels) {
+        // Bounding box of the piece in level pixels, with room for the glow.
+        const rect = {
+          x0: (bx0 - level.ox) * level.k - pad,
+          y0: (by0 - level.oy) * level.k - pad,
+          x1: (bx1 - level.ox) * level.k + pad,
+          y1: (by1 - level.oy) * level.k + pad,
+        };
+        if (rect.x1 < 0 || rect.y1 < 0 || rect.x0 > level.width || rect.y0 > level.height) continue;
+        const c = level.heatCtx;
+        c.beginPath();
+        c.moveTo(piece[0], piece[1]);
+        for (let j = 2; j < piece.length; j += 2) c.lineTo(piece[j], piece[j + 1]);
+        for (const s of strokes) {
+          c.lineWidth = s.width / level.k; // the same width on screen at every level
+          c.strokeStyle = s.style;
+          c.stroke();
+        }
+        markDirty(level, rect);
+      }
+    }
+  }
+
+  /** The map and heat at the camera's zoom, cross-fading between the two nearest levels. */
+  function drawScene(zoom: number, tx: number, ty: number): void {
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = background;
+    ctx.fillRect(0, 0, W, H);
+    const [a, b, frac] = levelsFor(zoom, levels.length - 1);
+    const drawLevel = (level: Level, alpha: number) => {
+      flush(level);
+      const s = zoom / level.k;
+      ctx.setTransform(s, 0, 0, s, tx + level.ox * zoom, ty + level.oy * zoom);
+      ctx.globalAlpha = alpha;
+      ctx.drawImage(level.composed, 0, 0);
+    };
+    drawLevel(levels[a], 1);
+    if (b !== a) drawLevel(levels[b], smoothstep(frac));
+    ctx.globalAlpha = 1;
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+  }
+
+  /** The text of every metric this video can show, at video time `t`. */
+  function metricTexts(t: number): Map<Metric, string> {
+    let started = 0;
+    let moving = 0;
+    let metres = 0;
+    let climbed = 0;
+    let date = prepared[0].date;
+    for (const tr of prepared) {
+      if (!tr.done) moving++;
+      if (!tr.started) continue;
+      started++;
+      metres += tr.metres;
+      climbed += tr.climbed;
+      date = tr.date;
+    }
+    const lastSecond = (track: Track) => track.points[track.points.length - 1];
+    const texts = new Map<Metric, string>();
+    if (kind === 'single') {
+      // One activity: its own elapsed time and distance so far.
+      const elapsed = Math.floor(lastSecond(tracks[0]) * timeline.progress(0, t));
+      texts.set('time', clockText(elapsed));
+      texts.set('distance', `${(metres / 1000).toFixed(1)} km`);
+      texts.set('pace', paceText(tracks[0].sport, elapsed, metres));
+      texts.set('date', prepared[0].date);
+    } else if (timeline.clock) {
+      // All at once: one shared clock, and how many are still out.
+      texts.set('time', clockText(Math.floor(timeline.clock(t))));
+      texts.set('count', moving > 0 ? `${moving} still ${movingLabel}` : 'all finished');
+      texts.set('distance', `${wholeNumber(metres / 1000)} km`);
+    } else {
+      if (metrics.includes('time')) {
+        let seconds = 0;
+        tracks.forEach((track, k) => (seconds += lastSecond(track) * timeline.progress(k, t)));
+        texts.set('time', clockText(Math.floor(seconds)));
+      }
+      texts.set('date', timeline.label?.(t) ?? date);
+      texts.set('count', `${started} ${started === 1 ? singular : plural}`);
+      texts.set('distance', `${wholeNumber(metres / 1000)} km`);
+    }
+    if (hasElevation) texts.set('elevation', `↑${wholeNumber(climbed)} m`);
+    return texts;
+  }
+
+  type Card = {
+    /** The large value and the baseline it sits on. */
+    headline: string;
+    headlineY: number;
+    /** The other values, on as many lines as the frame's width needs. */
+    lines: string[];
+    /** Lowest pixel row the card reaches. */
+    bottom: number;
+  };
+
+  /** What the metrics card shows at video time `t` and where; null when there is no card. */
+  function layoutCard(t: number): Card | null {
+    const texts = metricTexts(t);
+    const shown = metrics.flatMap((metric) => texts.get(metric) ?? []);
+    if (shown.length === 0) return null;
+    const [headline, ...rest] = shown;
+
+    ctx.font = statusFont;
+    const lines: string[] = [];
+    for (const text of rest) {
+      const last = lines[lines.length - 1];
+      if (last === undefined) lines.push(text);
+      else if (ctx.measureText(`${last}  ·  ${text}`).width > W - 2 * margin) lines.push(text);
+      else lines[lines.length - 1] = `${last}  ·  ${text}`;
+    }
+
+    const below = lines.length > 0 ? statusGap + (lines.length - 1) * statusStep : 0;
+    let headlineY: number;
+    if (cardOnTop) {
+      // Under the title when both are in the same corner.
+      const underTitle = stacked ? 78 * unit * titleScale : 0;
+      headlineY = H * 0.075 + underTitle;
+    } else if (cardRow === 'middle') {
+      // The large value and the lines under it, centred on the frame's middle.
+      headlineY = H * 0.5 - below / 2 + 22 * unit * metricsScale;
+    } else {
+      // Raised when it has more lines, to stay clear of the bottom edge.
+      headlineY = Math.min(H * 0.875, H * 0.955 - below);
+    }
+    return { headline, headlineY, lines, bottom: headlineY + below + 14 * unit * metricsScale };
+  }
+
+  /**
+   * The baseline the title sits on. At the top it keeps its place and a card in the same
+   * corner goes under it; at the bottom it goes above a card in the same corner.
+   */
+  function titleY(card: Card | null): number {
+    if (titleOnTop) return H * 0.075;
+    if (card && stacked) return card.headlineY - (60 * metricsScale + 30 * titleScale) * unit;
+    if (titleRow === 'middle') return H * 0.5 + 16 * unit * titleScale;
+    return H * 0.93;
+  }
+
+  /**
+   * The rows the title and the card take in the middle of the frame, with room for a shade
+   * around them; null when neither sits in the middle.
+   */
+  function middleRows(
+    card: Card | null,
+    title: { y: number; top: number } | null,
+  ): { top: number; bottom: number } | null {
+    const rows: [number, number][] = [];
+    if (card && cardRow === 'middle')
+      rows.push([card.headlineY - 60 * unit * metricsScale, card.bottom]);
+    if (title && titleRow === 'middle') rows.push([title.top, title.y + 12 * unit * titleScale]);
+    if (rows.length === 0) return null;
+    const room = H * 0.06;
+    return {
+      top: Math.min(...rows.map(([top]) => top)) - room,
+      bottom: Math.max(...rows.map(([, bottom]) => bottom)) + room,
+    };
+  }
+
+  const creditFont = `400 ${Math.round(19 * unit)}px ${fontFamily}`;
+
+  function drawOverlay(t: number, zoom: number, tx: number, ty: number): void {
+    const card = layoutCard(t);
+    const title = options.title ? { y: titleY(card), top: 0 } : null;
+    if (title) title.top = title.y - 44 * unit * titleScale;
+    /** Where the shade at the bottom starts: higher when the title sits down there. */
+    const bottomStart =
+      title && titleRow === 'bottom' ? Math.min(H * 0.76, title.top - H * 0.06) : H * 0.76;
+    /** The rows text in the middle of the frame takes, with room around; null when none. */
+    const middleBand = middleRows(card, title);
+    if (basemap) {
+      if (bottomStart === H * 0.76) ctx.fillStyle = bottomShade;
+      else {
+        const shade = ctx.createLinearGradient(0, bottomStart, 0, bottomStart + H * 0.14);
+        shade.addColorStop(0, 'rgba(5, 6, 9, 0)');
+        shade.addColorStop(1, 'rgba(5, 6, 9, 0.88)');
+        ctx.fillStyle = shade;
+      }
+      ctx.fillRect(0, bottomStart, W, H - bottomStart);
+      if (card && cardOnTop) {
+        // Dark behind the whole card, fading out below it.
+        const shade = ctx.createLinearGradient(0, card.bottom, 0, card.bottom + H * 0.1);
+        shade.addColorStop(0, 'rgba(5, 6, 9, 0.88)');
+        shade.addColorStop(1, 'rgba(5, 6, 9, 0)');
+        ctx.fillStyle = shade;
+        ctx.fillRect(0, 0, W, card.bottom + H * 0.1);
+      } else if (title && titleOnTop) {
+        ctx.fillStyle = topShade;
+        ctx.fillRect(0, 0, W, H * 0.12);
+      }
+      if (middleBand) {
+        // Dark behind text in the middle, fading out above and below it.
+        const { top, bottom } = middleBand;
+        const shade = ctx.createLinearGradient(0, top, 0, bottom);
+        shade.addColorStop(0, 'rgba(5, 6, 9, 0)');
+        shade.addColorStop(0.3, 'rgba(5, 6, 9, 0.7)');
+        shade.addColorStop(0.7, 'rgba(5, 6, 9, 0.7)');
+        shade.addColorStop(1, 'rgba(5, 6, 9, 0)');
+        ctx.fillStyle = shade;
+        ctx.fillRect(0, top, W, bottom - top);
+      }
+      ctx.font = creditFont;
+      ctx.textAlign = 'right';
+      ctx.textBaseline = 'alphabetic';
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+      ctx.fillText(basemap.attribution, W - W * 0.03, H - H * 0.012);
+
+      // Place names sit above the routes so they stay readable on busy roads. Each zoom
+      // level has its own selection; names fade as the camera moves between levels.
+      const [a, b, frac] = levelsFor(zoom, levels.length - 1);
+      const mix = smoothstep(frac);
+      const visible = new Map<string, { x: number; y: number; size: number; alpha: number }>();
+      const collect = (level: Level, weight: number) => {
+        for (const label of level.labels) {
+          const x = label.x * zoom + tx;
+          const y = label.y * zoom + ty;
+          if (x < -200 * unit || x > W + 200 * unit || y < 0 || y > H * 0.82) continue;
+          const seen = visible.get(label.text);
+          if (seen) seen.alpha = Math.min(1, seen.alpha + weight);
+          else visible.set(label.text, { x, y, size: label.size, alpha: weight });
+        }
+      };
+      collect(levels[a], b === a ? 1 : 1 - mix);
+      if (b !== a) collect(levels[b], mix);
+
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.lineJoin = 'round';
+      ctx.lineWidth = 5 * unit;
+      ctx.strokeStyle = 'rgba(6, 8, 12, 0.75)';
+      ctx.fillStyle = 'rgba(214, 222, 236, 0.72)';
+      const topLimit =
+        card && cardOnTop ? card.bottom + H * 0.01 : H * (title && titleOnTop ? 0.09 : 0.02);
+      const bottomLimit = Math.min(H * 0.8, bottomStart + H * 0.04);
+      for (const [text, label] of visible) {
+        // Fade names out before they reach the counters or the title.
+        const nearBottom = clamp((bottomLimit - label.y) / (H * 0.04), 0, 1);
+        const nearTop = clamp((label.y - topLimit) / (H * 0.03), 0, 1);
+        // Names under text in the middle fade out too.
+        const awayFromMiddle = middleBand
+          ? clamp(
+              Math.max(middleBand.top - label.y, label.y - middleBand.bottom) / (H * 0.03),
+              0,
+              1,
+            )
+          : 1;
+        const alpha = label.alpha * nearBottom * nearTop * awayFromMiddle;
+        if (alpha < 0.02) continue;
+        ctx.globalAlpha = alpha;
+        ctx.font = labelFont(label.size);
+        ctx.strokeText(text, label.x, label.y);
+        ctx.fillText(text, label.x, label.y);
+      }
+      ctx.globalAlpha = 1;
+    }
+
+    // Head dots
+    ctx.globalCompositeOperation = 'lighter';
+    for (const tr of prepared) {
+      if (!tr.started) continue;
+      const sinceEnd = t - tr.doneAt;
+      if (sinceEnd >= headFade) continue;
+      const a = sinceEnd <= 0 ? 1 : 1 - sinceEnd / headFade;
+      const x = tr.headX * zoom + tx;
+      const y = tr.headY * zoom + ty;
+      const glow = ctx.createRadialGradient(x, y, 0, x, y, headRadius);
+      glow.addColorStop(0, `rgba(255, 244, 230, ${(0.95 * a).toFixed(3)})`);
+      glow.addColorStop(0.22, `rgba(255, 190, 130, ${(0.5 * a).toFixed(3)})`);
+      glow.addColorStop(1, 'rgba(255, 120, 40, 0)');
+      ctx.fillStyle = glow;
+      ctx.beginPath();
+      ctx.arc(x, y, headRadius, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalCompositeOperation = 'source-over';
+
+    ctx.textBaseline = 'alphabetic';
+    if (options.title && title) {
+      ctx.textAlign = titleSide;
+      ctx.font = titleFont;
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.92)';
+      ctx.fillText(options.title, xOf(titleSide), title.y);
+    }
+    if (card) {
+      const x = xOf(cardSide);
+      ctx.textAlign = cardSide;
+      ctx.font = headlineFont;
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.94)';
+      ctx.fillText(card.headline, x, card.headlineY);
+      ctx.font = statusFont;
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+      card.lines.forEach((line, i) =>
+        ctx.fillText(line, x, card.headlineY + statusGap + i * statusStep),
+      );
+    }
+    if (options.watermark) {
+      // On the map credit's line, left of the credit; alone at the bottom right without a map.
+      ctx.font = creditFont;
+      const credit = basemap ? ctx.measureText(basemap.attribution).width + 18 * unit : 0;
+      drawWatermark(ctx, W - W * 0.03 - credit, H - H * 0.012, unit, fontFamily);
+    }
+  }
+
+  /** A copy of the replay's last frame, which the end card is drawn over. */
+  let lastReplayFrame: CanvasLike | null = null;
+
+  return {
+    canvas: frame,
+    frameCount,
+    replayFrames,
+    heatSaturation: saturation,
+    renderFrame(index: number): void {
+      if (index !== nextFrame)
+        throw new Error(`Frames must be rendered in order: expected ${nextFrame}, got ${index}`);
+      nextFrame++;
+      if (index >= replayFrames) {
+        if (!lastReplayFrame) {
+          lastReplayFrame = createCanvas(W, H);
+          (lastReplayFrame.getContext('2d') as Context2DLike).drawImage(frame, 0, 0);
+        }
+        drawEndCard(ctx, lastReplayFrame, (index - replayFrames) / fps, {
+          width: W,
+          height: H,
+          fontFamily,
+        });
+        return;
+      }
+      const t = index / fps;
+      advance(t);
+      const [zoom, tx, ty] = camera
+        ? [camera.zoom[index], camera.tx[index], camera.ty[index]]
+        : [1, 0, 0];
+      drawScene(zoom, tx, ty);
+      drawOverlay(t, zoom, tx, ty);
+    },
+    skipTo(index: number): void {
+      // The end card is drawn over the replay's last frame, so it cannot be skipped to.
+      if (index < nextFrame || index >= replayFrames)
+        throw new Error(`Cannot skip from frame ${nextFrame} to frame ${index}`);
+      for (; nextFrame < index; nextFrame++) advance(nextFrame / fps);
+    },
+  };
+}
