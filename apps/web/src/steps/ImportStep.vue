@@ -43,6 +43,12 @@ async function remove(ids: string[] | 'all'): Promise<void> {
 
     <AddFiles :engine="engine" @changed="emit('changed', $event)" />
     <GettingFiles :open="library.length === 0" />
+    <p class="about muted">
+      Wornways is open source:
+      <a href="https://github.com/tkotosz/wornways" target="_blank" rel="noopener">source</a>
+      ·
+      <a href="/licenses.txt" target="_blank" rel="noopener">licenses</a>
+    </p>
     <p v-if="error" class="error" role="alert">{{ error }}</p>
 
     <template v-if="library.length">
@@ -72,6 +78,15 @@ async function remove(ids: string[] | 'all'): Promise<void> {
 </template>
 
 <style scoped>
+.about {
+  margin: 0.8rem 0 0;
+  font-size: 0.8rem;
+}
+
+.about a {
+  color: inherit;
+}
+
 .intro {
   margin: 0 0 0.8rem;
   font-size: 1.05rem;

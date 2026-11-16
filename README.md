@@ -96,6 +96,15 @@ prints the address to open on the phone (`https://<this computer's address>:4173
   `npm run build -w @wornways/web && npm run preview -w @wornways/web` and open
   `http://localhost:4173` on the phone.
 
+## Deploying
+
+The web app is a static site on Cloudflare Pages. When CI passes for a push to `main`, the
+Deploy workflow builds the app and uploads it (`.github/workflows/deploy.yml`); it needs
+the repository secrets `CLOUDFLARE_API_TOKEN` (permission: Account > Cloudflare Pages >
+Edit) and `CLOUDFLARE_ACCOUNT_ID`. `apps/web/public/_headers` sets the caching and security
+headers, and the build writes `licenses.txt` with the licenses of everything the app
+ships.
+
 ## License
 
 MIT, see [LICENSE](LICENSE). Parts of the engine are based on MIT-licensed code, and the

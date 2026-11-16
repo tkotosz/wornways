@@ -8,6 +8,9 @@ import type { Plugin } from 'vite';
 
 const SOURCE = new URL('./src/service-worker.js', import.meta.url);
 
+/** Files in public/ that tell the host how to serve the others, not served themselves. */
+const HOST_FILES = new Set(['_headers']);
+
 export function serviceWorker(): Plugin {
   let base = '/';
   let publicDir = '';
@@ -26,6 +29,8 @@ export function serviceWorker(): Plugin {
         files.set(name, item.type === 'chunk' ? item.code : item.source);
       for (const name of readdirSync(publicDir, { recursive: true, encoding: 'utf8' })) {
         const path = join(publicDir, name);
+        // Rules for the host (Cloudflare Pages) are never served, so they cannot be stored.
+        if (HOST_FILES.has(name)) continue;
         if (statSync(path).isFile()) files.set(name, readFileSync(path));
       }
 

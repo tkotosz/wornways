@@ -1,0 +1,16 @@
+# Response headers for Cloudflare Pages: this file sets them and is never served itself.
+
+# Every response: no guessing of file types, no full addresses sent to other sites, and only
+# this site may ask for the location (for "Use my current location").
+/*
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(), microphone=(), geolocation=(self)
+
+# Built files carry a hash of their contents in their names, so they never change.
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# The service worker is always checked for a new version.
+/sw.js
+  Cache-Control: no-cache
