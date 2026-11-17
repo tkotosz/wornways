@@ -101,10 +101,24 @@ prints the address to open on the phone (`https://<this computer's address>:4173
 
 ## Deploying
 
-The web app is a static site on Cloudflare Pages. When CI passes for a push to `main`, the
-Deploy workflow builds the app and uploads it (`.github/workflows/deploy.yml`); it needs
-the repository secrets `CLOUDFLARE_API_TOKEN` (permission: Account > Cloudflare Pages >
-Edit) and `CLOUDFLARE_ACCOUNT_ID`. `apps/web/public/_headers` sets the caching and security
+The web app is a static site on Cloudflare Pages, published by the Deploy workflow
+(`.github/workflows/deploy.yml`):
+
+- **Preview:** when CI passes for a push to `main`, the app goes to
+  https://preview.wornways.pages.dev.
+- **Production:** publishing a GitHub Release puts its tag on https://wornways.pages.dev,
+  after the full CI has passed on it. Tags follow semantic versioning (`v0.1.0`; minor for
+  features, patch for fixes):
+
+  ```sh
+  gh release create v0.1.0 --generate-notes
+  ```
+
+  To redeploy or roll back, run the workflow by hand (Actions > Deploy > Run workflow) and
+  pick the tag.
+
+The workflow needs the repository secrets `CLOUDFLARE_API_TOKEN` (permission: Account >
+Cloudflare Pages > Edit) and `CLOUDFLARE_ACCOUNT_ID`. `apps/web/public/_headers` sets the caching and security
 headers, and the build writes `licenses.txt` with the licenses of everything the app
 ships.
 
