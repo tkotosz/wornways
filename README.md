@@ -52,14 +52,17 @@ The same engine as a command-line tool, for developers and for checking videos f
 frame. It encodes with `ffmpeg`, which must be on the PATH.
 
 ```sh
-npm run cli -- --help                                          # every setting, as flags
-npm run cli -- render <folder> --from 2026-10 --to 2026-10     # October as a video
-npm run cli -- render <folder> --preset all-at-once --size square --out out/race.mp4
+npm run cli -- import ~/Downloads/export.zip                   # add activities to the library
+npm run cli -- list                                            # what the library holds
+npm run cli -- render --help                                   # every setting, as flags
+npm run cli -- render --from 2026-10 --to 2026-10              # October as a video
+npm run cli -- render --preset all-at-once --size square --out out/race.mp4
 ```
 
-`<folder>` holds activity files, such as the `activities` folder of a Strava export; the
-`activities.csv` next to it gives the names and sports. Write videos into `out/`, which git
-ignores.
+`import` takes activity files, folders of them, or a Strava or Garmin account export ZIP as
+it is, and keeps the activities in `~/.wornways/library` (`$WORNWAYS_HOME/library` when
+set); `delete` and `delete-all` remove them again. `render` shows the library, or reads the
+paths it is given without storing them. Write videos into `out/`, which git ignores.
 
 ## Developing
 

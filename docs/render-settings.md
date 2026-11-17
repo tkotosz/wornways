@@ -4,7 +4,8 @@ Status: **agreed**; slider ranges and presets may still be tuned. One list of se
 drives both front ends: the CLI turns flags into these settings, and the web UI builds its
 controls from them. The CLI rejects a flag it does not know instead of ignoring it.
 
-The CLI becomes a single command: `wornways render <folder> [flags]`.
+The CLI makes videos with one command: `wornways render [<path>...] [flags]`, of the
+activities in its library or of the files named.
 
 ## How the activities play
 
@@ -131,10 +132,9 @@ the metrics card.
 
 ### Output (CLI only)
 
-| Setting        | CLI flag  | Default                                         |
-| -------------- | --------- | ----------------------------------------------- |
-| Output file    | `--out`   | named after the selection                       |
-| Activity index | `--index` | `activities.csv` next to the folder, if present |
+| Setting     | CLI flag | Default                   |
+| ----------- | -------- | ------------------------- |
+| Output file | `--out`  | named after the selection |
 
 ## Left out on purpose
 

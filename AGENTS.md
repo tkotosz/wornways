@@ -12,8 +12,10 @@
 - `npm run icons`: draws the web app's PNG icons from the SVG marks in
   `apps/web/public/icons/`.
 - `npm run build`: TypeScript project build.
-- `npm run cli -- render <folder> [flags]`: run the CLI from source; `npm run cli -- --help`
-  lists the flags.
+- `npm run cli -- <command>`: run the CLI from source (`import`, `list`, `render`,
+  `delete`, `delete-all`); `npm run cli -- --help` lists them, `<command> --help` the flags.
+  Tests and experiments set `WORNWAYS_HOME` to a temporary folder, so they never touch
+  the real library in `~/.wornways`.
 
 ## Where things are
 

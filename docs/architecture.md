@@ -17,9 +17,11 @@ runs on the user's device: in a browser Web Worker for the web app, in Node for 
   `replay/prepare.ts` sets up a replay (pacing, camera, map, renderer); front ends draw its
   frames in order and encode them. `map/tiles.ts` downloads map tiles into a cache the
   front end provides.
-- `apps/cli`: one `render` command. `main.ts` turns flags into settings, `load.ts` reads
-  and selects the activity files, `video.ts` draws the frames and encodes them, `tiles.ts`
-  keeps map tiles on disk.
+- `apps/cli`: `import`, `list`, `delete` and `delete-all` keep an activity library on
+  disk (`library.ts`, `library-commands.ts`); `render` makes a video. `main.ts` turns flags
+  into settings, `load.ts` reads the library or the files named and selects the
+  activities, `video.ts` draws the frames and encodes them, `tiles.ts` keeps map tiles on
+  disk.
 - `apps/web`: the web app. The Vue page (`src/`) only shows steps and sends requests; one
   Web Worker (`src/worker/`) keeps the activities and makes videos with the engine,
   drawing on `OffscreenCanvas` and encoding with WebCodecs through Mediabunny.

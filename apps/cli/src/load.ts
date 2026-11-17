@@ -1,78 +1,25 @@
-// Reading the activity files of a folder and selecting the ones a replay shows.
+// Reading the activities a replay may show, from the library or from the files named, and
+// selecting the ones the settings choose.
 
-import { existsSync } from 'node:fs';
-import { readdir, readFile } from 'node:fs/promises';
-import path from 'node:path';
-import { gunzipSync } from 'node:zlib';
 import {
   MIN_LENGTH_M,
-  formatFromFilename,
+  importFiles,
   nearPlacesText,
-  parseActivitiesIndex,
-  parseActivity,
-  sameActivity,
   selectTracks,
-  sportIncluded,
   trackLengthM,
-  type IndexEntry,
   type NearPlace,
   type RenderSettings,
   type Track,
 } from '@wornways/engine';
+import { filesAt } from './files.ts';
+import { Library, libraryFolder } from './library.ts';
 import { fail, isoDay, oneLine } from './terminal.ts';
-
-type Candidate = { id: string; name: string; file: string; sport?: string; startTime?: number };
-
-/** Strava's index lists "x.fit.gz"; prefer an already unpacked "x.fit" beside it. */
-function resolveFile(dir: string, filename: string): string | null {
-  const full = path.join(dir, path.basename(filename));
-  if (full.endsWith('.gz') && existsSync(full.slice(0, -3))) return full.slice(0, -3);
-  return existsSync(full) ? full : null;
-}
-
-async function listCandidates(
-  dir: string,
-  indexPath: string | null,
-): Promise<{ candidates: Candidate[]; missing: number }> {
-  if (indexPath) {
-    const entries: IndexEntry[] = parseActivitiesIndex(await readFile(indexPath, 'utf8'));
-    const candidates: Candidate[] = [];
-    let missing = 0;
-    for (const e of entries) {
-      if (!e.filename || !formatFromFilename(e.filename)) continue; // manual entry, no file
-      const file = resolveFile(dir, e.filename);
-      if (!file) {
-        missing++;
-        continue;
-      }
-      candidates.push({
-        id: e.id,
-        name: e.name,
-        file,
-        sport: e.sport,
-        startTime: Number.isNaN(e.startTime) ? undefined : e.startTime,
-      });
-    }
-    return { candidates, missing };
-  }
-  const names = new Set(await readdir(dir));
-  const candidates: Candidate[] = [];
-  for (const name of [...names].sort()) {
-    if (!formatFromFilename(name)) continue;
-    if (name.endsWith('.gz') && names.has(name.slice(0, -3))) continue; // duplicate of the unpacked file
-    candidates.push({
-      id: name.replace(/\.(fit|gpx|tcx)(\.gz)?$/i, ''),
-      name,
-      file: path.join(dir, name),
-    });
-  }
-  return { candidates, missing: 0 };
-}
 
 export type Loaded = {
   tracks: Track[];
-  files: number;
-  parseMs: number;
+  /** Activities read: from the library, or from the files named. */
+  activities: number;
+  readMs: number;
   cleanMs: number;
 };
 
@@ -82,67 +29,43 @@ const PROBLEMS = {
 };
 
 /**
- * Reads the activity files in `dir`, keeps the ones the settings select, and cleans their
- * tracks. `index` is the path of an activities.csv; without it one next to the folder is used.
+ * The activities of the files, folders and archives named, without storing them. All are
+ * read, as an id may be known only once a file is read (as in a Garmin export).
  */
-export async function loadTracks(
-  dir: string,
-  index: string | undefined,
-  settings: RenderSettings,
-): Promise<Loaded> {
-  const from = settings.from ?? -Infinity;
-  const to = settings.to ?? Infinity;
-  const indexGuess = [path.join(dir, '..', 'activities.csv'), path.join(dir, 'activities.csv')];
-  const indexPath = index ? path.resolve(index) : (indexGuess.find((p) => existsSync(p)) ?? null);
-  if (index && !existsSync(indexPath!)) fail(`index not found: ${indexPath}`);
-  const { candidates, missing } = await listCandidates(dir, indexPath);
+async function readPaths(paths: string[]): Promise<Track[]> {
+  const files = await filesAt(paths);
+  const result = await importFiles(files);
   console.log(
-    indexPath
-      ? `Index      ${candidates.length} activities with files (${path.relative(process.cwd(), indexPath) || indexPath})`
-      : `Folder     ${candidates.length} activity files (no activities.csv, sport comes from each file)`,
+    `Read       ${result.activities.length} activities from ${files.length} ${files.length === 1 ? 'file' : 'files'}`,
   );
-  if (missing) console.log(`           ${missing} listed in the index but not found in the folder`);
+  if (result.withoutGps.length)
+    console.log(`           ${result.withoutGps.length} had no position data`);
+  if (result.duplicates)
+    console.log(`           ${result.duplicates} left out as the same activity as another file`);
+  for (const { file, reason } of result.unreadable) console.warn(`  skipped  ${file}: ${reason}`);
+  return result.activities;
+}
 
-  // The index allows skipping files before reading them. Dates get a day of slack here
-  // and are checked exactly against the file's own first timestamp when selecting.
-  const DAY = 86400000;
-  const preselected = candidates.filter(
-    (c) =>
-      (settings.activities === null || settings.activities.includes(c.id)) &&
-      (c.sport === undefined || sportIncluded(settings, c.sport)) &&
-      (c.startTime === undefined || (c.startTime >= from - DAY && c.startTime < to + DAY)),
-  );
+/** The activities of the library. */
+async function readLibrary(): Promise<Track[]> {
+  const library = await Library.open();
+  if (library.size === 0)
+    fail(`your library is empty; add activities with "wornways import" (${libraryFolder()})`);
+  console.log(`Library    ${library.size} activities`);
+  return library.all();
+}
 
-  const tParse = performance.now();
-  const tracks: Track[] = [];
-  const skipped: string[] = [];
-  let noPosition = 0;
-  let duplicates = 0;
-  for (const c of preselected) {
-    try {
-      const raw = await readFile(c.file);
-      const bytes = c.file.endsWith('.gz') ? gunzipSync(raw) : raw;
-      const parsed = parseActivity(bytes, formatFromFilename(c.file)!);
-      if (!parsed) {
-        noPosition++;
-        continue;
-      }
-      // The same activity in another file, e.g. a GPX file next to the FIT file of a ride.
-      if (tracks.some((t) => sameActivity(t, parsed))) {
-        duplicates++;
-        continue;
-      }
-      // The activity list's name, else the file's own, else the file name.
-      const name = (indexPath && c.name) || parsed.name || c.name;
-      tracks.push({ ...parsed, id: c.id, name, sport: c.sport ?? parsed.sport });
-    } catch (err) {
-      skipped.push(`${path.basename(c.file)}: ${err instanceof Error ? err.message : String(err)}`);
-    }
-  }
-  const parseMs = performance.now() - tParse;
+/**
+ * Reads the activities of the files, folders and archives in `paths`, or of the library when
+ * none are given, keeps the ones the settings select, and cleans their tracks.
+ */
+export async function loadTracks(paths: string[], settings: RenderSettings): Promise<Loaded> {
+  const tRead = performance.now();
+  const activities = paths.length ? await readPaths(paths) : await readLibrary();
+  const readMs = performance.now() - tRead;
 
   const tClean = performance.now();
-  const selection = selectTracks(tracks, settings);
+  const selection = selectTracks(activities, settings);
   const cleanMs = performance.now() - tClean;
 
   const { matched } = selection;
@@ -154,10 +77,6 @@ export async function loadTracks(
     settings.activities !== null ? `id ${settings.activities.join(', ')}` : null,
   ].filter(Boolean);
   console.log(`Selected   ${matched.length} activities with GPS (${notes.join('; ')})`);
-  if (noPosition) console.log(`           ${noPosition} had no position data`);
-  if (duplicates)
-    console.log(`           ${duplicates} left out as the same activity as another file`);
-  for (const s of skipped) console.warn(`  skipped  ${s}`);
   if (selection.problem === 'nothing-matches') fail(PROBLEMS['nothing-matches']);
 
   const { startNear, endNear } = settings;
@@ -196,5 +115,5 @@ export async function loadTracks(
     console.log(
       `  left out ${isoDay(track.startTime)}  ${oneLine(track)}  (${track.sport}, under ${MIN_LENGTH_M} m on the map)`,
     );
-  return { tracks: cleaned, files: preselected.length, parseMs, cleanMs };
+  return { tracks: cleaned, activities: activities.length, readMs, cleanMs };
 }
