@@ -1,14 +1,17 @@
 // Reading the activities out of the files a person adds: activity files (FIT, GPX, TCX,
-// also gzip-compressed), ZIP archives such as an account export, and the activities.csv
-// list of an export, which gives activities their names and sports.
+// also gzip-compressed), ZIP archives such as an account export (also ZIP files inside
+// them, as in a Garmin export), and the activity list of an export, which gives activities
+// their names and sports: Strava's activities.csv or Garmin's summarizedActivities files.
 
 import { distanceM } from '../track/geo.ts';
 import { trackStart } from '../track/places.ts';
 import type { ParsedActivity, Track } from '../track/types.ts';
+import { FIT_FILE_ACTIVITY, fitFileType } from './fit.ts';
+import { findGarminEntry, isGarminList, parseGarminList, type GarminEntry } from './garmin-list.ts';
 import { parseActivitiesIndex, type IndexEntry } from './index-csv.ts';
 import { formatFromFilename, parseActivity } from './parse.ts';
 import { gunzip } from './unpack.ts';
-import { listZip, readZipEntry, type RandomAccessFile } from './zip.ts';
+import { listZip, readZipEntry, type RandomAccessFile, type ZipEntry } from './zip.ts';
 
 export type ImportResult = {
   /** The activities read, with the id, name and sport from activities.csv where listed. */
@@ -29,7 +32,10 @@ export type ImportResult = {
   withoutGps: string[];
   /** Files that could not be read, and why. */
   unreadable: { file: string; reason: string }[];
-  /** Files that are not activities, e.g. the photos or planned routes of an export. */
+  /**
+   * Files that are not activities, e.g. the photos or planned routes of an export, or the
+   * daily monitoring and sleep files of a watch.
+   */
   ignored: number;
 };
 
@@ -47,6 +53,11 @@ export type ImportOptions = {
 type Source = { path: string; read: () => Promise<Uint8Array> };
 
 const baseName = (path: string) => path.slice(path.lastIndexOf('/') + 1);
+/**
+ * A file's name as the person is shown it. Garmin names the files of its export after the
+ * account's email address ("name@example.com_123.fit"), which is left out.
+ */
+const fileLabel = (path: string) => baseName(path).replace(/^[^@_]+@[^@_]+_/, '');
 /** Index entries and files are matched by file name, with or without ".gz". */
 const matchKey = (path: string) => baseName(path).toLowerCase().replace(/\.gz$/, '');
 const isIndex = (path: string) => baseName(path).toLowerCase() === 'activities.csv';
@@ -54,7 +65,16 @@ const isZip = (path: string) => path.toLowerCase().endsWith('.zip');
 /** An account export keeps planned routes in a "routes" folder; they are not activities. */
 const isPlannedRoute = (path: string) => /(^|\/)routes\//i.test(path);
 /** The id of an activity no index lists: its file name without the extensions. */
-const idFromName = (path: string) => baseName(path).replace(/\.(fit|gpx|tcx)(\.gz)?$/i, '');
+const idFromName = (path: string) => fileLabel(path).replace(/\.(fit|gpx|tcx)(\.gz)?$/i, '');
+/** ZIP files inside ZIP files are opened this many levels deep. */
+const NESTED_ZIP_DEPTH = 2;
+
+/** Data in memory, read like a file; for a ZIP file inside an archive. */
+const memoryFile = (name: string, bytes: Uint8Array): RandomAccessFile => ({
+  name,
+  size: bytes.length,
+  read: async (offset, length) => bytes.subarray(offset, offset + length),
+});
 
 const reasonOf = (error: unknown) => (error instanceof Error ? error.message : String(error));
 
@@ -89,23 +109,39 @@ export async function importFiles(
   // Collect the activity files and the activity lists, looking inside archives.
   const candidates: Source[] = [];
   const indexes: Source[] = [];
+  const garminLists: Source[] = [];
   const sort = (source: Source) => {
     if (isIndex(source.path)) indexes.push(source);
+    else if (isGarminList(source.path)) garminLists.push(source);
     else if (formatFromFilename(source.path) && !isPlannedRoute(source.path))
       candidates.push(source);
     else result.ignored++;
   };
-  for (const file of files) {
-    if (!isZip(file.name)) {
-      sort({ path: file.name, read: () => file.read(0, file.size) });
-      continue;
-    }
+  const openArchive = async (archive: RandomAccessFile, depth: number) => {
+    let entries: ZipEntry[];
     try {
-      for (const entry of await listZip(file))
-        sort({ path: `${file.name}/${entry.path}`, read: () => readZipEntry(file, entry) });
+      entries = await listZip(archive);
     } catch (error) {
-      result.unreadable.push({ file: file.name, reason: reasonOf(error) });
+      result.unreadable.push({ file: fileLabel(archive.name), reason: reasonOf(error) });
+      return;
     }
+    for (const entry of entries) {
+      const path = `${archive.name}/${entry.path}`;
+      if (!isZip(path) || depth >= NESTED_ZIP_DEPTH) {
+        sort({ path, read: () => readZipEntry(archive, entry) });
+        continue;
+      }
+      // A ZIP file inside is read into memory whole: its entries are packed, not seekable.
+      try {
+        await openArchive(memoryFile(path, await readZipEntry(archive, entry)), depth + 1);
+      } catch (error) {
+        result.unreadable.push({ file: fileLabel(path), reason: reasonOf(error) });
+      }
+    }
+  };
+  for (const file of files) {
+    if (isZip(file.name)) await openArchive(file, 1);
+    else sort({ path: file.name, read: () => file.read(0, file.size) });
   }
 
   const listed = new Map<string, IndexEntry>();
@@ -119,11 +155,20 @@ export async function importFiles(
     }
   }
 
+  const garmin: GarminEntry[] = [];
+  for (const list of garminLists) {
+    try {
+      garmin.push(...parseGarminList(new TextDecoder('utf-8').decode(await list.read())));
+    } catch (error) {
+      result.unreadable.push({ file: fileLabel(list.path), reason: reasonOf(error) });
+    }
+  }
+
   const seen = new Set<string>();
   for (const [done, source] of candidates.entries()) {
     options.onProgress?.({ done, total: candidates.length });
     const entry = listed.get(matchKey(source.path));
-    const id = entry?.id ?? idFromName(source.path);
+    let id = entry?.id ?? idFromName(source.path);
     // The same activity can come twice, e.g. unpacked next to its .gz file.
     if (seen.has(id)) continue;
     seen.add(id);
@@ -135,24 +180,52 @@ export async function importFiles(
     try {
       let bytes = await source.read();
       if (/\.gz$/i.test(source.path)) bytes = await gunzip(bytes);
-      const parsed = parseActivity(bytes, formatFromFilename(source.path)!);
-      if (!parsed) {
-        result.withoutGps.push(baseName(source.path));
+      const format = formatFromFilename(source.path)!;
+      // A watch's export also holds its daily monitoring, sleep and settings files.
+      const fitType = format === 'fit' ? fitFileType(bytes) : null;
+      if (fitType !== null && fitType !== FIT_FILE_ACTIVITY) {
+        result.ignored++;
         continue;
+      }
+      const parsed = parseActivity(bytes, format);
+      if (!parsed) {
+        result.withoutGps.push(fileLabel(source.path));
+        continue;
+      }
+      // Garmin's list is matched by time, so its id is known only now.
+      const garminEntry = entry ? null : findGarminEntry(garmin, parsed.startTime);
+      if (garminEntry) {
+        id = garminEntry.id;
+        // Another file of the same listed activity was read already.
+        if (seen.has(id)) {
+          result.duplicates++;
+          continue;
+        }
+        seen.add(id);
+        if (options.skip?.(id)) {
+          result.skipped++;
+          result.listedSkipped.push({
+            id,
+            name: garminEntry.name,
+            sport: garminEntry.sport || parsed.sport,
+          });
+          continue;
+        }
       }
       if (options.isKnown?.(parsed) || result.activities.some((a) => sameActivity(a, parsed))) {
         result.duplicates++;
         continue;
       }
+      const listName = entry?.name || garminEntry?.name;
       result.activities.push({
         ...parsed,
         id,
         // The activity list's name, else the file's own, else the file name.
-        name: entry?.name || parsed.name || idFromName(source.path),
-        sport: entry?.sport || parsed.sport,
+        name: listName || parsed.name || idFromName(source.path),
+        sport: entry?.sport || garminEntry?.sport || parsed.sport,
       });
     } catch (error) {
-      result.unreadable.push({ file: baseName(source.path), reason: reasonOf(error) });
+      result.unreadable.push({ file: fileLabel(source.path), reason: reasonOf(error) });
     }
   }
   options.onProgress?.({ done: candidates.length, total: candidates.length });

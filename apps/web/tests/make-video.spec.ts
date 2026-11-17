@@ -110,6 +110,16 @@ test('adds an activity once, also from another file of it', async ({ page }) => 
   await expect(page.getByTestId('activity-count')).toHaveText('1 activity on this device');
 });
 
+test('adds a Garmin export as it is, with the ZIP files inside it', async ({ page }) => {
+  await page.goto('/');
+  await addFiles(page, 'garmin-export.zip');
+
+  const report = page.getByTestId('import-report');
+  await expect(report).toContainText('1 activity added');
+  await expect(report).toContainText('1 activity has no GPS route');
+  await expect(page.getByTestId('library')).toContainText('Lakeside loop');
+});
+
 test('deletes one activity, then all of them', async ({ page }) => {
   page.setDefaultTimeout(15_000);
   await page.goto('/');
