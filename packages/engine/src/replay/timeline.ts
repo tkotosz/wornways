@@ -89,44 +89,9 @@ export function chronologicalTimeline(lengthsM: number[], options: Chronological
   return fromWindows(windows, options.duration);
 }
 
-export type SpeedOptions = {
-  /** How many times faster than real life each track is drawn, e.g. 2000. */
-  speed: number;
-  hold?: number;
-  lead?: number;
-  /** As in `ChronologicalOptions`. */
-  overlap?: number;
-  minWindow?: number;
-};
-
-/**
- * Like `chronologicalTimeline`, but every track is drawn at the same multiple of its real
- * pace, so the video's length follows from how much activity there is.
- * `durationsS` are the tracks' own durations in seconds, in the order they should appear.
- */
-export function speedTimeline(durationsS: number[], options: SpeedOptions): Timeline {
-  const hold = options.hold ?? 2.5;
-  const lead = options.lead ?? 0.4;
-  const overlap = Math.min(0.95, Math.max(0, options.overlap ?? 0.4));
-  const minWindow = options.minWindow ?? 0.3;
-
-  let cursor = lead;
-  let end = lead;
-  const windows = durationsS.map((seconds) => {
-    const duration = Math.max(seconds / options.speed, minWindow);
-    const entry = { start: cursor, duration };
-    end = Math.max(end, cursor + duration);
-    cursor += duration * (1 - overlap);
-    return entry;
-  });
-  return fromWindows(windows, end + hold);
-}
-
 export type RaceOptions = {
-  /** Total video length in seconds. Give this or `speed`. */
-  duration?: number;
-  /** Run the clock at a constant multiple of real time instead of fitting a length. */
-  speed?: number;
+  /** Total video length in seconds. */
+  duration: number;
   /** Seconds before the clock starts. */
   lead?: number;
   /** Seconds over which the clock eases in from standstill. */
@@ -141,21 +106,19 @@ export type RaceOptions = {
  * Every track starts at the same moment and moves at its real pace on one shared clock,
  * so shorter activities finish first and the longest one finishes last.
  *
- * With a fixed `duration` the clock starts slowly and speeds up exponentially: the busy
- * first minutes stay readable and the last long activities don't drag. The curve comes from
- * third-party MIT-licensed code (see THIRD_PARTY_NOTICES.md).
+ * The clock starts slowly and speeds up exponentially: the busy first minutes stay readable
+ * and the last long activities don't drag. The curve comes from third-party MIT-licensed
+ * code (see THIRD_PARTY_NOTICES.md).
  */
 export function raceTimeline(durationsS: number[], options: RaceOptions): Timeline {
   const longest = Math.max(...durationsS);
-  const target = options.duration ?? 30;
+  const target = options.duration;
   const lead = options.lead ?? Math.min(1, target * 0.04);
   const ramp = options.ramp ?? Math.min(2, target * 0.08);
   const hold = options.hold ?? Math.min(2.5, target * 0.1);
-  const k = options.speed ? 0 : (options.k ?? 2.3);
+  const k = options.k ?? 2.3;
   // `run` is the clock's travel in video seconds once the ease-in is accounted for.
-  const run = options.speed
-    ? longest / options.speed
-    : Math.max(0.1, target - lead - hold - ramp / 2);
+  const run = Math.max(0.1, target - lead - hold - ramp / 2);
   const duration = lead + run + ramp / 2 + hold;
 
   function clock(t: number): number {

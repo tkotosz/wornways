@@ -23,12 +23,10 @@ export {
   chronologicalTimeline,
   groupTimeline,
   raceTimeline,
-  speedTimeline,
   type Group,
   type GroupOptions,
   type ChronologicalOptions,
   type RaceOptions,
-  type SpeedOptions,
   type Timeline,
   type TimelineEntry,
 } from './replay/timeline.ts';
