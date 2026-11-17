@@ -1,6 +1,4 @@
 #!/usr/bin/env node
-import { existsSync } from 'node:fs';
-import path from 'node:path';
 import { parseArgs } from 'node:util';
 import { createCanvas } from '@napi-rs/canvas';
 import {
@@ -18,6 +16,8 @@ import {
   type SettingGroup,
   type SettingsInput,
 } from '@wornways/engine';
+import { deleteAllCommand, deleteCommand, importCommand, listCommand } from './library-commands.ts';
+import { libraryFolder } from './library.ts';
 import { loadTracks } from './load.ts';
 import { fail, isoDay, oneLine } from './terminal.ts';
 import { fileTileCache, tileCacheDir } from './tiles.ts';
@@ -103,24 +103,25 @@ function groupHelp(group: SettingGroup): string {
   return [GROUP_LABELS[group], ...entries].join('\n');
 }
 
-const HELP = `wornways render <folder> [flags]
+const RENDER_HELP = `wornways render [<path>...] [flags]
 
 Turns GPS activities into a heatmap replay video.
 
-<folder> holds FIT, GPX or TCX files (optionally .gz), e.g. the "activities" folder of a
-Strava export; the activities.csv next to it supplies sport types and names.
+Without a path it shows the activities in your library (see "wornways import"). With paths
+it reads those instead, without adding them to the library: FIT, GPX or TCX files (also
+.gz), folders of them, or a Strava or Garmin account export ZIP.
 
 ${(Object.keys(GROUP_LABELS) as SettingGroup[]).map(groupHelp).join('\n\n')}
 
 Output
 ${helpEntry('--out <file>', 'Output video. [named after the selection]')}
-${helpEntry('--index <file>', 'Path to activities.csv. [the one next to the folder]')}
 
 Examples
-  wornways render ./activities --from 2026-10 --to 2026-10
-  wornways render ./activities --from 2026 --to 2026 --group all --group-pace real
-  wornways render ./activities --from 2026-08-01 --to 2026-08-14 --group day --share distance
-  wornways render ./activities --activity 1234567890
+  wornways render --from 2026-10 --to 2026-10
+  wornways render --from 2026 --to 2026 --group all --group-pace real
+  wornways render --from 2026-08-01 --to 2026-08-14 --group day --share distance
+  wornways render --activity 1234567890
+  wornways render ~/Downloads/export.zip --from 2026-10 --to 2026-10
 
 A period names whole days, months or years: --from 2026-10 --to 2026-10 is October 2026.
 Selecting exactly one activity plays it at its own pace with live time and distance.
@@ -143,22 +144,16 @@ async function render(argv: string[]): Promise<void> {
     options: {
       ...settingFlags,
       out: { type: 'string' },
-      index: { type: 'string' },
       help: { type: 'boolean' },
     },
   });
   const positionals = parsed.positionals;
   // The flags are built from the settings table, so their names are only known as text.
   const values: Record<string, string | boolean | undefined> = parsed.values;
-  if (values['help']) return void console.log(HELP);
+  if (values['help']) return void console.log(RENDER_HELP);
   const tStart = performance.now();
 
-  if (positionals.length === 0) fail('missing <folder>; run "wornways --help"');
-  if (positionals.length > 1) fail(`expected one <folder>, got "${positionals.join('" "')}"`);
-  const dir = path.resolve(positionals[0]);
-  if (!existsSync(dir)) fail(`folder not found: ${dir}`);
   const out = typeof values['out'] === 'string' ? values['out'] : undefined;
-  const index = typeof values['index'] === 'string' ? values['index'] : undefined;
 
   const input: SettingsInput = {};
   for (const setting of SETTINGS) input[setting.name] = values[setting.name];
@@ -170,7 +165,7 @@ async function render(argv: string[]): Promise<void> {
     throw error;
   }
 
-  const loaded = await loadTracks(dir, index, settings);
+  const loaded = await loadTracks(positionals, settings);
   const tracks = loaded.tracks;
   const single = tracks.length === 1 ? tracks[0] : null;
   if (single)
@@ -191,8 +186,8 @@ async function render(argv: string[]): Promise<void> {
   const file = out ?? videoFileName(tracks, settings);
   const { drawMs, encodeMs } = await writeVideo(replay, file);
   describeTimings(replay, file, {
-    parse: loaded.parseMs,
-    files: loaded.files,
+    read: loaded.readMs,
+    activities: loaded.activities,
     clean: loaded.cleanMs,
     setup: setupMs,
     draw: drawMs,
@@ -209,9 +204,32 @@ function errorMessage(error: unknown): string {
   return error.message;
 }
 
+const HELP = `wornways <command> [arguments] [flags]
+
+Turns GPS activities into heatmap replay videos.
+
+Commands
+${helpEntry('import <path>...', 'Add activity files, folders or account export ZIPs (Strava, Garmin) to your library.')}
+${helpEntry('list', 'List the activities in your library.')}
+${helpEntry('render [<path>...]', 'Make a video of the activities in your library, or of the files named.')}
+${helpEntry('delete <id>...', 'Delete activities from your library.')}
+${helpEntry('delete-all', 'Delete every activity in your library.')}
+
+Run "wornways <command> --help" for its flags. The library is kept in
+${libraryFolder()} ($WORNWAYS_HOME/library when set).`;
+
+const COMMANDS: Record<string, (argv: string[]) => Promise<void>> = {
+  import: importCommand,
+  list: listCommand,
+  render,
+  delete: deleteCommand,
+  'delete-all': deleteAllCommand,
+};
+
 const [command, ...rest] = process.argv.slice(2);
-if (command === 'render') {
-  render(rest).catch((error) => fail(errorMessage(error)));
+const run = command ? COMMANDS[command] : undefined;
+if (run) {
+  run(rest).catch((error) => fail(errorMessage(error)));
 } else {
   console.log(HELP);
   process.exit(!command || command === '--help' || command === 'help' ? 0 : 1);

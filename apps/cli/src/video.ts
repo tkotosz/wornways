@@ -113,8 +113,8 @@ export function describeTimings(
   replay: ReplayParts,
   out: string,
   ms: {
-    parse: number;
-    files: number;
+    read: number;
+    activities: number;
     clean: number;
     setup: number;
     draw: number;
@@ -129,7 +129,7 @@ export function describeTimings(
     `Video      ${path.relative(process.cwd(), outPath) || outPath}  (${width}x${height}, ${Number((frames / fps).toFixed(1))} s, ${fps} fps, ${frames} frames)`,
   );
   console.log('Timings');
-  console.log(`  parse    ${seconds(ms.parse)}  (${ms.files} files)`);
+  console.log(`  read     ${seconds(ms.read)}  (${ms.activities} activities)`);
   console.log(`  clean    ${seconds(ms.clean)}`);
   if (map) console.log(`  map      ${seconds(ms.setup)}  (tiles and drawing the map)`);
   console.log(
