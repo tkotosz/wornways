@@ -134,6 +134,15 @@ once there are routes that may be published.
   files and the activity list (`activities.csv`, for names and sports); photos and other
   files are skipped. Archives over 4 GB (ZIP64) work. Unpacking uses the browser's
   built-in `DecompressionStream`.
+- A ZIP inside a ZIP (a Garmin export keeps its activity files in two) is read into
+  memory whole and then read the same way; about 100 MB for a Garmin export.
+- In a Garmin export, activity files sit among thousands of the watch's other FIT files
+  (daily monitoring, sleep, settings); the `file_id` type at the start of each file tells
+  them apart. Names and sports come from `DI-Connect-Fitness/*_summarizedActivities.json`,
+  which does not say which file an activity is in, so a file belongs to the listed
+  activity whose time span holds its first position. Garmin activities get the id
+  `garmin-<activity id>`, and Garmin's activity types are mapped to the same sport names
+  as Strava's.
 - A file that cannot be read is skipped and reported; it never stops the import.
 - Importing the same activity again does not add it twice, also from another file of it
   (a ride as a FIT and as a GPX file, say): activities starting within a minute and

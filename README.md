@@ -9,8 +9,8 @@ files are never uploaded.
 ## What it does
 
 - **Reads your files as they are:** FIT, GPX and TCX files (also `.gz`), a folder of them,
-  or the whole account export ZIP from Strava, with names and sports from its activity
-  list. Garmin's data export works once unpacked.
+  or the whole account export ZIP from Strava or Garmin, with names and sports from its
+  activity list.
 - **Lets you choose what to show:** a period (today, yesterday, this month, a custom
   range…), sports, activities that start or end near a place, and any activity ticked or
   unticked by hand.

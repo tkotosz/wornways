@@ -109,6 +109,54 @@ describe('importFiles', () => {
     expect(result.duplicates).toBe(1);
   });
 
+  describe('a Garmin account export', () => {
+    // garmin-export.zip: an activity list in DI-Connect-Fitness, a profile file, and a ZIP
+    // file inside with three FIT files named after an email address: a ride listed as
+    // "Lakeside loop", an indoor ride without positions, and a daily monitoring file.
+
+    it('reads the activities of the ZIP file inside, named and typed by the activity list', async () => {
+      const result = await importFiles([fixture('garmin-export.zip')]);
+
+      expect(result.activities.map((a) => [a.id, a.name, a.sport])).toEqual([
+        ['garmin-9001', 'Lakeside loop', 'ride'],
+      ]);
+      // The indoor ride, without the email address in its name.
+      expect(result.withoutGps).toEqual(['2002.fit']);
+      // The profile and the monitoring file.
+      expect(result.ignored).toBe(2);
+      expect(result.unreadable).toEqual([]);
+    });
+
+    it('names the same ride in another file after the list, and reads it once', async () => {
+      // The ride of the export, also as a GPX file, e.g. from another service's export.
+      const result = await importFiles([fixture('morning-ride.gpx'), fixture('garmin-export.zip')]);
+
+      expect(result.activities.map((a) => [a.id, a.name])).toEqual([
+        ['garmin-9001', 'Lakeside loop'],
+      ]);
+      expect(result.duplicates).toBe(1);
+    });
+
+    it('names a file without its export after the file, without the email address', async () => {
+      const ride = fixture('morning-ride.fit');
+      const result = await importFiles([{ ...ride, name: 'someone@example.com_3001.fit' }]);
+
+      expect(result.activities.map((a) => [a.id, a.name])).toEqual([['3001', '3001']]);
+    });
+
+    it('skips activities known by their Garmin id, keeping their list name and sport', async () => {
+      const result = await importFiles([fixture('garmin-export.zip')], {
+        skip: (id) => id === 'garmin-9001',
+      });
+
+      expect(result.activities).toEqual([]);
+      expect(result.skipped).toBe(1);
+      expect(result.listedSkipped).toEqual([
+        { id: 'garmin-9001', name: 'Lakeside loop', sport: 'ride' },
+      ]);
+    });
+  });
+
   it('reports its progress', async () => {
     const seen: string[] = [];
     await importFiles([fixture('strava-export.zip')], {

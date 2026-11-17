@@ -115,6 +115,59 @@ function sportSlug(sport: number, subSport: number): string {
   return indoor ? `virtual-${base}` : base;
 }
 
+const MSG_FILE_ID = 0;
+/** The FIT `file` type of a recorded activity; others are e.g. monitoring, sleep or settings. */
+export const FIT_FILE_ACTIVITY = 4;
+const FIT_HEADER = 0x2e464954; // ".FIT"
+
+/**
+ * The type of a FIT file, from its `file_id` message, which the standard puts first. Null when
+ * the data is not FIT or the type is not given. A watch's account export holds activity files
+ * among thousands of other kinds (daily monitoring, sleep, settings); this tells them apart
+ * without reading the whole file.
+ */
+export function fitFileType(data: Uint8Array): number | null {
+  if (data.length < 12) return null;
+  const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
+  if (view.getUint32(8, false) !== FIT_HEADER) return null;
+  const defs: (Definition | undefined)[] = new Array(16);
+  let pos = data[0];
+  // Only the first messages are looked at: file_id comes first, though some devices write a
+  // few other messages before it.
+  for (let message = 0; message < 32 && pos < data.length; message++) {
+    const header = data[pos++];
+    if (!(header & 0x80) && header & 0x40) {
+      const little = data[pos + 1] === 0;
+      const globalNum = view.getUint16(pos + 2, little);
+      const count = data[pos + 4];
+      pos += 5;
+      const fields: number[] = [];
+      for (let i = 0; i < count; i++) fields.push(data[pos + 3 * i], data[pos + 3 * i + 1]);
+      pos += 3 * count;
+      let devBytes = 0;
+      if (header & 0x20) {
+        const devCount = data[pos];
+        for (let i = 0; i < devCount; i++) devBytes += data[pos + 2 + 3 * i];
+        pos += 1 + 3 * devCount;
+      }
+      defs[header & 0x0f] = { little, globalNum, fields, devBytes };
+      continue;
+    }
+    const def = defs[header & 0x80 ? (header >> 5) & 0x3 : header & 0x0f];
+    if (!def) return null;
+    if (def.globalNum !== MSG_FILE_ID) {
+      pos += def.fields.reduce((sum, size, i) => (i % 2 ? sum + size : sum), 0) + def.devBytes;
+      continue;
+    }
+    for (let i = 0; i < def.fields.length; i += 2) {
+      if (def.fields[i] === 0 && pos < data.length) return data[pos] === 0xff ? null : data[pos];
+      pos += def.fields[i + 1];
+    }
+    return null;
+  }
+  return null;
+}
+
 /** Returns null when the file holds fewer than two positioned records. Throws if it is not FIT at all. */
 export function parseFit(data: Uint8Array): ParsedActivity | null {
   const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
@@ -122,12 +175,12 @@ export function parseFit(data: Uint8Array): ParsedActivity | null {
   let sport = -1;
   let subSport = -1;
   let start = 0;
-  if (data.length < 12 || view.getUint32(8, false) !== 0x2e464954)
+  if (data.length < 12 || view.getUint32(8, false) !== FIT_HEADER)
     throw new Error('not a FIT file');
 
   try {
     // ".FIT" at bytes 8..11 of each header; several files may be chained back to back.
-    while (start + 12 <= data.length && view.getUint32(start + 8, false) === 0x2e464954) {
+    while (start + 12 <= data.length && view.getUint32(start + 8, false) === FIT_HEADER) {
       const headerSize = data[start];
       const end = start + headerSize + view.getUint32(start + 4, true);
       const defs: (Definition | undefined)[] = new Array(16);

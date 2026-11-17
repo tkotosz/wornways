@@ -4,8 +4,9 @@
 //
 // Checked 2026-11-16: Strava's steps from its help page
 // (https://support.strava.com/hc/en-us/articles/216918437-Exporting-your-Data-and-Bulk-Export);
-// Garmin's export page needs a sign-in, so its steps stay general: the address is Garmin's,
-// and the layout of the download (ZIP files inside the ZIP) is as Garmin users describe it.
+// Garmin's export page needs a sign-in, so its steps stay general: the address is Garmin's.
+// The layout of the download (activity files in ZIP files inside the ZIP, the activity list
+// in DI-Connect-Fitness) was checked against a real export on 2026-11-17.
 defineProps<{ open: boolean }>();
 </script>
 
@@ -40,8 +41,8 @@ defineProps<{ open: boolean }>();
       </li>
       <li>Garmin emails you a link to a ZIP file; this can take a few days.</li>
       <li>
-        Unpack it, then use Choose a folder and pick the unpacked folder. The activities are in ZIP
-        files inside it, which are read as they are.
+        Add that ZIP here as it is, without unpacking it. The names and sports of your activities
+        come from the list inside it; your watch's daily health data is left out.
       </li>
     </ol>
 
