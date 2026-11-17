@@ -1,18 +1,22 @@
 # Checks every push to main and every pull request: formatting and lint, the TypeScript
-# build, the unit tests, and the web app's browser tests in Chromium.
+# build, the unit tests, and the web app's browser tests in Chromium. The Deploy workflow
+# also runs it on a commit before putting that commit on production.
 name: CI
 
 on:
   push:
     branches: [main]
   pull_request:
+  workflow_call:
 
 permissions:
   contents: read
 
-# A newer push to the same branch or pull request cancels the run still going.
+# A newer push to the same branch or pull request cancels the run still going. Run from
+# Deploy, `github.workflow` is "Deploy", so a deploy's checks and a push's checks of the same
+# branch never cancel each other.
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
