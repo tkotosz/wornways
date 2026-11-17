@@ -93,9 +93,13 @@ wornways delete-all [--yes]
 Deletes activities from your library, by the ids "wornways list" shows, or all of them.
 Asks first, unless --yes is given.`;
 
-/** Asks a yes/no question on the terminal; anything but "y" or "yes" is no. */
+/**
+ * Asks a yes/no question on the terminal; anything but "y" or "yes" is no. The question goes
+ * to stderr, so it is still seen when stdout is redirected, and a closed stdout pipe cannot
+ * break it.
+ */
 async function confirm(question: string): Promise<boolean> {
-  const terminal = createInterface({ input: process.stdin, output: process.stdout });
+  const terminal = createInterface({ input: process.stdin, output: process.stderr });
   try {
     return /^y(es)?$/i.test((await terminal.question(`${question} [y/N] `)).trim());
   } finally {

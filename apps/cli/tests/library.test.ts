@@ -1,4 +1,4 @@
-import { execFile } from 'node:child_process';
+import { execFile, spawnSync } from 'node:child_process';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -74,5 +74,17 @@ describe('the library commands', () => {
     expect(await cli('delete', 'garmin-9001', '--yes')).toContain('Deleted 1 activity.');
     expect(await cli('delete-all', '--yes')).toContain('Deleted 1 activity.');
     expect(await cli('list')).toContain('Your library is empty');
+  }, 30_000);
+
+  it('asks before deleting on stderr, keeping stdout for results', async () => {
+    await cli('import', fixture('trail-run.tcx'));
+    const answered = spawnSync(
+      process.execPath,
+      ['--conditions=source', '--import', 'tsx', 'apps/cli/src/main.ts', 'delete-all'],
+      { cwd: root, env: { ...process.env, WORNWAYS_HOME: home }, input: 'n\n', encoding: 'utf8' },
+    );
+    expect(answered.stderr).toContain('Delete all 1 activity from your library? [y/N]');
+    expect(answered.stdout).toBe('Nothing was deleted.\n');
+    expect(await cli('list')).toContain('1 activity');
   }, 30_000);
 });
