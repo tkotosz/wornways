@@ -9,7 +9,7 @@ import type { Plugin } from 'vite';
 const SOURCE = new URL('./src/service-worker.js', import.meta.url);
 
 /** Files in public/ that tell the host how to serve the others, not served themselves. */
-const HOST_FILES = new Set(['_headers']);
+const HOST_FILES = new Set(['_headers', '_routes.json']);
 
 export function serviceWorker(): Plugin {
   let base = '/';

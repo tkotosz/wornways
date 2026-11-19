@@ -13,6 +13,7 @@ import {
   type RenderSettings,
   type SelectionProblem,
   type SettingsInput,
+  type TileLoader,
   type Track,
 } from '@wornways/engine';
 import {
@@ -47,6 +48,7 @@ export async function makeVideo(
   input: SettingsInput,
   signal: AbortSignal,
   onProgress: (progress: Progress) => void,
+  loadTiles: TileLoader = createTileLoader({ cache: cacheStorageTileCache }),
 ): Promise<{ video: ArrayBuffer; report: VideoReport }> {
   onProgress({ stage: 'choosing' });
   const settings = parseSettings(input);
@@ -64,7 +66,7 @@ export async function makeVideo(
   await loadFont();
   const replay = await prepareReplay(tracks, settings, {
     createCanvas: (w, h) => new OffscreenCanvas(w, h) as unknown as CanvasLike,
-    loadTiles: createTileLoader({ cache: cacheStorageTileCache }),
+    loadTiles,
   });
   if (signal.aborted) throw new Canceled();
 

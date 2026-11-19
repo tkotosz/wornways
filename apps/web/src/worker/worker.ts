@@ -1,14 +1,16 @@
 // The worker: does all the heavy work so the page never freezes. It keeps the library of
 // activities and answers the page's requests (see messages.ts).
 
-import { SettingsError } from '@wornways/engine';
+import { parseSettings, SettingsError } from '@wornways/engine';
 import type { Reply, Request } from '../messages.ts';
 import { Library } from './library.ts';
 import { planVideo } from './plan.ts';
 import { makePoster } from './poster.ts';
+import { StravaError, StravaExpired, StravaSession } from './strava.ts';
 import { Canceled, VideoProblem, makeVideo } from './video.ts';
 
 const library = Library.open();
+let strava: StravaSession | null = null;
 /** The requests still running, to cancel them by id. */
 const running = new Map<number, AbortController>();
 
@@ -19,7 +21,7 @@ function reply(message: Reply, transfer: Transferable[] = []): void {
 /** The message shown to the person for an error. */
 function messageFor(error: unknown): string {
   if (error instanceof SettingsError) return `The setting "${error.setting}" ${error.message}.`;
-  if (error instanceof VideoProblem) return error.message;
+  if (error instanceof VideoProblem || error instanceof StravaError) return error.message;
   console.error(error);
   return `Something went wrong: ${error instanceof Error ? error.message : String(error)}`;
 }
@@ -28,7 +30,42 @@ async function answer(request: Exclude<Request, { type: 'cancel' }>, signal: Abo
   const { id } = request;
   const progress = (p: Extract<Reply, { type: 'progress' }>['progress']) =>
     reply({ type: 'progress', id, progress: p });
+  const session = strava;
+  switch (request.type) {
+    case 'strava-start':
+      session?.close();
+      strava = new StravaSession(request.grant);
+      return reply({ type: 'strava-started', id });
+    case 'strava-end':
+      strava = null;
+      session?.close();
+      if (request.disconnect && session) await session.disconnect();
+      return reply({ type: 'strava-ended', id });
+    case 'strava-list': {
+      if (!session) throw new StravaExpired('Connect with Strava again.');
+      const activities = await session.list(request.from, request.to, signal);
+      return reply({ type: 'strava-listed', id, activities });
+    }
+    case 'strava-prepare': {
+      if (!session) throw new StravaExpired('Connect with Strava again.');
+      const unavailable = await session.prepare(request.ids, signal);
+      return reply({ type: 'strava-prepared', id, unavailable });
+    }
+    case 'strava-prioritize':
+      session?.prioritize(request.ids);
+      return reply({ type: 'strava-prioritized', id });
+  }
   const lib = await library;
+  const source = 'strava' in request && request.strava;
+  if (source && !session) throw new StravaExpired('Connect with Strava again.');
+  const renderSignal = source && session ? AbortSignal.any([signal, session.signal]) : signal;
+  const tracks = async () => {
+    if (!source || !session || !('settings' in request)) return lib.all();
+    const settings = parseSettings(request.settings);
+    const selected = await session.selected(settings.activities ?? []);
+    renderSignal.throwIfAborted();
+    return selected;
+  };
   switch (request.type) {
     case 'read-library':
       return reply({ type: 'library', id, activities: lib.summaries() });
@@ -44,13 +81,26 @@ async function answer(request: Exclude<Request, { type: 'cancel' }>, signal: Abo
     case 'places':
       return reply({ type: 'places', id, places: lib.places(request.settings, request.end) });
     case 'plan':
-      return reply({ type: 'planned', id, plan: planVideo(lib.all(), request.settings) });
+      return reply({ type: 'planned', id, plan: planVideo(await tracks(), request.settings) });
     case 'make-poster': {
-      const image = await makePoster(lib.all(), request.settings, signal);
+      const image = await makePoster(
+        await tracks(),
+        request.settings,
+        renderSignal,
+        source ? session?.loadTiles : undefined,
+      );
+      renderSignal.throwIfAborted();
       return reply({ type: 'poster-made', id, image });
     }
     case 'make-video': {
-      const { video, report } = await makeVideo(lib.all(), request.settings, signal, progress);
+      const { video, report } = await makeVideo(
+        await tracks(),
+        request.settings,
+        renderSignal,
+        progress,
+        source ? session?.loadTiles : undefined,
+      );
+      renderSignal.throwIfAborted();
       return reply({ type: 'video-made', id, video, report }, [video]);
     }
   }
@@ -66,8 +116,15 @@ async function handle(request: Request): Promise<void> {
   try {
     await answer(request, controller.signal);
   } catch (error) {
-    if (error instanceof Canceled) reply({ type: 'canceled', id: request.id });
-    else reply({ type: 'failed', id: request.id, message: messageFor(error) });
+    if (error instanceof Canceled || (error instanceof DOMException && error.name === 'AbortError'))
+      reply({ type: 'canceled', id: request.id });
+    else
+      reply({
+        type: 'failed',
+        id: request.id,
+        message: messageFor(error),
+        expired: error instanceof StravaExpired,
+      });
   } finally {
     running.delete(request.id);
   }

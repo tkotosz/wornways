@@ -13,6 +13,8 @@ import type {
   VideoReport,
 } from './messages.ts';
 
+import type { StravaGrant } from './strava-auth.ts';
+
 type Pending = {
   resolve: (reply: Reply) => void;
   onProgress?: (progress: Progress) => void;
@@ -20,9 +22,11 @@ type Pending = {
 
 /** The request was canceled before it finished. */
 export class Canceled extends Error {}
+export class StravaExpired extends Error {}
 
 export class EngineClient {
   private nextId = 1;
+  private strava = false;
   private readonly pending = new Map<number, Pending>();
 
   constructor(private readonly worker: Worker) {
@@ -62,6 +66,34 @@ export class EngineClient {
     throw this.errorFor(reply);
   }
 
+  async startStrava(grant: StravaGrant): Promise<void> {
+    const reply = await this.send({ type: 'strava-start', id: this.nextId++, grant });
+    if (reply.type !== 'strava-started') throw this.errorFor(reply);
+    this.strava = true;
+  }
+
+  async listStrava(from: number | null, to: number | null): Promise<ActivitySummary[]> {
+    const reply = await this.send({ type: 'strava-list', id: this.nextId++, from, to });
+    if (reply.type === 'strava-listed') return reply.activities;
+    throw this.errorFor(reply);
+  }
+
+  async prepareStrava(ids: string[]): Promise<string[]> {
+    const reply = await this.send({ type: 'strava-prepare', id: this.nextId++, ids });
+    if (reply.type === 'strava-prepared') return reply.unavailable;
+    throw this.errorFor(reply);
+  }
+
+  prioritizeStrava(ids: string[]): void {
+    void this.send({ type: 'strava-prioritize', id: this.nextId++, ids });
+  }
+
+  async endStrava(disconnect = false): Promise<void> {
+    this.strava = false;
+    const reply = await this.send({ type: 'strava-end', id: this.nextId++, disconnect });
+    if (reply.type !== 'strava-ended') throw this.errorFor(reply);
+  }
+
   /** Which activities the settings choose. */
   async match(settings: SettingsInput): Promise<MatchReport> {
     const reply = await this.send({ type: 'match', id: this.nextId++, settings });
@@ -78,7 +110,12 @@ export class EngineClient {
 
   /** How the video the settings describe will be paced. */
   async plan(settings: SettingsInput): Promise<PlanReport> {
-    const reply = await this.send({ type: 'plan', id: this.nextId++, settings });
+    const reply = await this.send({
+      type: 'plan',
+      id: this.nextId++,
+      settings,
+      strava: this.strava,
+    });
     if (reply.type === 'planned') return reply.plan;
     throw this.errorFor(reply);
   }
@@ -89,7 +126,10 @@ export class EngineClient {
     onProgress: (progress: Progress) => void,
   ): { result: Promise<{ video: Blob; report: VideoReport }>; cancel: () => void } {
     const id = this.nextId++;
-    const result = this.send({ type: 'make-video', id, settings }, onProgress).then((reply) => {
+    const result = this.send(
+      { type: 'make-video', id, settings, strava: this.strava },
+      onProgress,
+    ).then((reply) => {
       if (reply.type === 'video-made')
         return { video: new Blob([reply.video], { type: 'video/mp4' }), report: reply.report };
       throw this.errorFor(reply);
@@ -103,10 +143,12 @@ export class EngineClient {
   /** Draws the last frame of the video, small, as a preview; `cancel` stops it. */
   makePoster(settings: SettingsInput): { result: Promise<Blob>; cancel: () => void } {
     const id = this.nextId++;
-    const result = this.send({ type: 'make-poster', id, settings }).then((reply) => {
-      if (reply.type === 'poster-made') return reply.image;
-      throw this.errorFor(reply);
-    });
+    const result = this.send({ type: 'make-poster', id, settings, strava: this.strava }).then(
+      (reply) => {
+        if (reply.type === 'poster-made') return reply.image;
+        throw this.errorFor(reply);
+      },
+    );
     return {
       result,
       cancel: () => this.worker.postMessage({ type: 'cancel', id } satisfies Request),
@@ -123,7 +165,8 @@ export class EngineClient {
 
   private errorFor(reply: Reply): Error {
     if (reply.type === 'canceled') return new Canceled('Canceled');
-    if (reply.type === 'failed') return new Error(reply.message);
+    if (reply.type === 'failed')
+      return reply.expired ? new StravaExpired(reply.message) : new Error(reply.message);
     return new Error(`Unexpected reply: ${reply.type}`);
   }
 }

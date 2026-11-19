@@ -27,12 +27,13 @@ import AppearanceStep from './steps/AppearanceStep.vue';
 import ExportStep from './steps/ExportStep.vue';
 import ImportStep from './steps/ImportStep.vue';
 import PlaybackStep from './steps/PlaybackStep.vue';
+import { useStrava } from './use-strava.ts';
 
 const props = defineProps<{ engine: EngineClient }>();
 
 type Step = 'import' | 'activities' | 'playback' | 'appearance' | 'export';
 const steps: { id: Step; label: string }[] = [
-  { id: 'import', label: 'Import' },
+  { id: 'import', label: 'Source' },
   { id: 'activities', label: 'Activities' },
   { id: 'playback', label: 'Playback' },
   { id: 'appearance', label: 'Appearance' },
@@ -44,30 +45,69 @@ const unsupported = missingSupport();
 const step = ref<Step>('import');
 const loaded = ref(false);
 const library = ref<ActivitySummary[]>([]);
-const choice = ref<Choice>({ ...NO_CHOICE });
-const matched = ref<MatchReport>({ ids: [], problem: null });
+const fileChoice = ref<Choice>({ ...NO_CHOICE });
+const fileMatches = ref<MatchReport>({ ids: [], problem: null });
+const {
+  active: strava,
+  busy: stravaBusy,
+  hasCallback: stravaCallback,
+  choice: stravaChoice,
+  error: stravaError,
+  notice: stravaNotice,
+  matched: stravaMatches,
+  rows: stravaRows,
+  url: stravaUrl,
+  connect: connectStrava,
+  configure: configureStrava,
+  end: endStrava,
+  list: listStrava,
+  prepare: prepareStrava,
+} = useStrava(props.engine, () => {
+  step.value = 'import';
+  video.value = null;
+  stravaAdjustments.value = {};
+});
+const choice = computed({
+  get: () => (strava.value ? stravaChoice.value : fileChoice.value),
+  set: (after: Choice) => {
+    if (strava.value) stravaChoice.value = after;
+    else fileChoice.value = after;
+  },
+});
+const sourceRows = computed(() => (strava.value ? stravaRows.value : library.value));
+const matched = computed(() => (strava.value ? stravaMatches.value : fileMatches.value));
 
 const chosenIds = computed(() =>
   matched.value.ids.filter((id) => !choice.value.excluded.includes(id)),
 );
 const chosenKm = computed(() => {
   const ids = new Set(chosenIds.value);
-  return library.value.reduce((sum, a) => (ids.has(a.id) ? sum + a.distanceM : sum), 0);
+  return sourceRows.value.reduce((sum, a) => (ids.has(a.id) ? sum + a.distanceM : sum), 0);
 });
 /** The chosen activities in date order. */
 const chosen = computed(() => {
   const ids = new Set(chosenIds.value);
-  return library.value.filter((a) => ids.has(a.id)).sort((a, b) => a.startTime - b.startTime);
+  return sourceRows.value.filter((a) => ids.has(a.id)).sort((a, b) => a.startTime - b.startTime);
 });
 const period = computed(() => periodRange(choice.value, new Date()) ?? { from: null, to: null });
 
 // What was set in the Video and Text steps, kept for the next visit.
-const adjustments = ref<Adjustments>(loadAdjustments());
-watch(adjustments, saveAdjustments);
+const fileAdjustments = ref<Adjustments>(loadAdjustments());
+const stravaAdjustments = ref<Adjustments>({});
+const adjustments = computed({
+  get: () => (strava.value ? stravaAdjustments.value : fileAdjustments.value),
+  set: (after: Adjustments) => {
+    if (strava.value) stravaAdjustments.value = after;
+    else fileAdjustments.value = after;
+  },
+});
+watch(fileAdjustments, saveAdjustments);
 
 /** The settings of the video: the chosen activities and the adjustments. */
 const settings = computed(() => ({
-  ...choiceSettings(choice.value, matched.value.ids, new Date()),
+  ...(strava.value
+    ? { activity: chosenIds.value.join(',') }
+    : choiceSettings(choice.value, matched.value.ids, new Date())),
   ...adjustSettings(adjustments.value, countOf(chosenIds.value.length)),
 }));
 
@@ -85,8 +125,27 @@ watch(library, () => (video.value = null));
 /** Whether a step can be opened: later steps need activities, and a choice. */
 function reachable(id: Step): boolean {
   if (id === 'import') return true;
-  if (library.value.length === 0) return false;
-  return id === 'activities' || (chosenIds.value.length > 0 && !placeMissing(choice.value));
+  if (!strava.value && library.value.length === 0) return false;
+  return (
+    id === 'activities' ||
+    (chosenIds.value.length > 0 && !placeMissing(choice.value) && !stravaBusy.value)
+  );
+}
+
+async function navigate(id: Step): Promise<void> {
+  if (!reachable(id)) return;
+  if (strava.value && step.value === 'activities' && id !== 'activities' && id !== 'import') {
+    const ids = chosenIds.value.join(',');
+    if (!(await prepareStrava(chosenIds.value))) return;
+    if (step.value !== 'activities' || ids !== chosenIds.value.join(',')) return;
+  }
+  if (strava.value && step.value === 'import' && id !== 'activities' && id !== 'import') {
+    // Returning from the source picker can use a selection edited in Activities.
+    step.value = 'activities';
+    await navigate(id);
+    return;
+  }
+  step.value = id;
 }
 
 // The top bar's height, for whatever else sticks to the top of the window below it.
@@ -106,25 +165,30 @@ watch(step, () => window.scrollTo({ top: 0 }));
 
 onMounted(async () => {
   if (unsupported) return;
+  void configureStrava();
   library.value = await props.engine.readLibrary();
   loaded.value = true;
-  // Someone who has activities already starts by choosing.
-  if (library.value.length > 0) step.value = 'activities';
+  if (stravaCallback) {
+    if (await connectStrava()) {
+      stravaAdjustments.value = { ...fileAdjustments.value };
+      step.value = 'activities';
+    }
+  } else if (library.value.length > 0) step.value = 'activities';
 });
 
 // Find what the filters match whenever they or the library change. A newer answer may
 // arrive before an older one, so only the latest request's answer is kept.
 let latest = 0;
 watch(
-  [() => filterSettings(choice.value, new Date()), library],
+  [() => filterSettings(fileChoice.value, new Date()), library],
   async ([filters]) => {
     const request = ++latest;
     try {
       const result = await props.engine.match(filters);
-      if (request === latest) matched.value = result;
+      if (request === latest) fileMatches.value = result;
     } catch (error) {
       if (request === latest)
-        matched.value = {
+        fileMatches.value = {
           ids: [],
           problem: error instanceof Error ? error.message : String(error),
         };
@@ -159,7 +223,7 @@ watch(
             :aria-current="s.id === step ? 'step' : undefined"
             :aria-label="s.label"
             :disabled="!reachable(s.id)"
-            @click="step = s.id"
+            @click="navigate(s.id)"
           >
             <span class="symbol" aria-hidden="true">{{ i < stepIndex ? '✓' : i + 1 }}</span>
             {{ s.label }}
@@ -180,7 +244,7 @@ watch(
             :class="{ current: s.id === step, done: i < stepIndex }"
             :aria-label="`Go to ${s.label}`"
             :disabled="!reachable(s.id)"
-            @click="step = s.id"
+            @click="navigate(s.id)"
           />
         </div>
       </div>
@@ -194,17 +258,30 @@ watch(
         v-if="step === 'import'"
         :engine="engine"
         :library="library"
+        :strava-url="stravaUrl"
+        :strava-active="strava"
+        :strava-error="stravaError"
+        :strava-busy="stravaBusy"
+        :strava-notice="stravaNotice"
         @changed="library = $event"
-        @next="step = 'activities'"
+        @files="endStrava()"
+        @disconnect="endStrava(true)"
+        @next="navigate('activities')"
       />
       <ActivitiesStep
         v-else-if="step === 'activities'"
         v-model="choice"
         :engine="engine"
-        :library="library"
+        :library="sourceRows"
         :matched="matched"
-        @back="step = 'import'"
-        @next="step = 'playback'"
+        :strava="strava"
+        :show-source="!!stravaUrl || strava"
+        :busy="stravaBusy"
+        :notice="stravaNotice"
+        @back="navigate('import')"
+        @next="navigate('playback')"
+        @cancel="endStrava()"
+        @retry="listStrava()"
       />
       <PlaybackStep
         v-else-if="step === 'playback'"
@@ -233,7 +310,9 @@ watch(
         :settings="settings"
         :activities="chosenIds.length"
         :meters="chosenKm"
+        :strava="strava"
         @back="step = 'appearance'"
+        @done="endStrava()"
       />
     </template>
   </main>

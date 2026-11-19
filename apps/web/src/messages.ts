@@ -4,20 +4,27 @@
 
 import type { FrequentPlace, Grouping, SettingsInput, TrackEnd } from '@wornways/engine';
 
+import type { StravaGrant } from './strava-auth.ts';
+
 export type Request =
   | { type: 'read-library'; id: number }
   | { type: 'add-files'; id: number; files: File[] }
   /** Deletes the activities with these ids, or every activity. */
   | { type: 'delete-activities'; id: number; ids: string[] | 'all' }
+  | { type: 'strava-start'; id: number; grant: StravaGrant }
+  | { type: 'strava-list'; id: number; from: number | null; to: number | null }
+  | { type: 'strava-prepare'; id: number; ids: string[] }
+  | { type: 'strava-prioritize'; id: number; ids: string[] }
+  | { type: 'strava-end'; id: number; disconnect: boolean }
   /** Which activities the "Which activities" settings choose. */
   | { type: 'match'; id: number; settings: SettingsInput }
   /** The places most of the activities these settings choose start or end at, to suggest. */
   | { type: 'places'; id: number; settings: SettingsInput; end: TrackEnd }
-  | { type: 'make-video'; id: number; settings: SettingsInput }
+  | { type: 'make-video'; id: number; settings: SettingsInput; strava: boolean }
   /** The last frame of the video the settings describe, small, as a preview. */
-  | { type: 'make-poster'; id: number; settings: SettingsInput }
+  | { type: 'make-poster'; id: number; settings: SettingsInput; strava: boolean }
   /** How the video the settings describe will be paced, without drawing it. */
-  | { type: 'plan'; id: number; settings: SettingsInput }
+  | { type: 'plan'; id: number; settings: SettingsInput; strava: boolean }
   /** Stops the request with the given id; that request then replies "canceled". */
   | { type: 'cancel'; id: number };
 
@@ -30,7 +37,11 @@ export type Reply =
   | { type: 'video-made'; id: number; video: ArrayBuffer; report: VideoReport }
   | { type: 'poster-made'; id: number; image: Blob }
   | { type: 'planned'; id: number; plan: PlanReport }
-  | { type: 'failed'; id: number; message: string }
+  | { type: 'strava-started' | 'strava-ended'; id: number }
+  | { type: 'strava-listed'; id: number; activities: ActivitySummary[] }
+  | { type: 'strava-prepared'; id: number; unavailable: string[] }
+  | { type: 'strava-prioritized'; id: number }
+  | { type: 'failed'; id: number; message: string; expired?: boolean }
   | { type: 'canceled'; id: number };
 
 /** Which activities the filters match. */
