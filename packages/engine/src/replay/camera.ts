@@ -269,3 +269,61 @@ export function levelsFor(zoom: number, top: number): [number, number, number] {
   const frac = b === a ? 0 : Math.min(1, Math.max(0, exact - a));
   return [a, frac < 0.004 ? a : b, frac];
 }
+
+/** A portion of a map level, used from this frame until the next window at that level. */
+export type LevelWindow = { from: number; view: View };
+
+/** Split a long pan into bounded windows, aligned to the same pixel grid at each zoom. */
+export function mapLevelWindows(view: View, camera: CameraPath): LevelWindow[][] {
+  const top = Math.max(0, Math.ceil(Math.log2(camera.maxZoom) - 1e-6));
+  const byLevel = Array.from({ length: top + 1 }, () => [] as LevelWindow[]);
+  const padding = Math.ceil((32 * Math.min(view.width, view.height)) / 1080);
+  for (let level = 0; level <= top; level++) {
+    const k = 2 ** level;
+    let x0 = 0;
+    let y0 = 0;
+    let x1 = 0;
+    let y1 = 0;
+    let from = -1;
+    let maxWidth = 0;
+    let maxHeight = 0;
+    const save = () => {
+      byLevel[level].push({
+        from,
+        view: {
+          width: x1 - x0,
+          height: y1 - y0,
+          scale: view.scale * k,
+          offX: view.offX * k - x0,
+          offY: view.offY * k - y0,
+        },
+      });
+    };
+    for (let frame = 0; frame < camera.zoom.length; frame++) {
+      const zoom = camera.zoom[frame];
+      const [a, b] = levelsFor(zoom, top);
+      if (level !== a && level !== b) continue;
+      const s = k / zoom;
+      const left = Math.floor(-camera.tx[frame] * s) - padding;
+      const upper = Math.floor(-camera.ty[frame] * s) - padding;
+      const right = Math.ceil((view.width - camera.tx[frame]) * s) + padding;
+      const bottom = Math.ceil((view.height - camera.ty[frame]) * s) + padding;
+      const width = Math.max(right, x1) - Math.min(left, x0);
+      const height = Math.max(bottom, y1) - Math.min(upper, y0);
+      if (from < 0 || width > maxWidth || height > maxHeight) {
+        if (from >= 0) save();
+        from = frame;
+        [x0, y0, x1, y1] = [left, upper, right, bottom];
+        maxWidth = Math.max(1.6 * view.width, right - left + 0.2 * view.width);
+        maxHeight = Math.max(1.6 * view.height, bottom - upper + 0.2 * view.height);
+      } else {
+        x0 = Math.min(x0, left);
+        y0 = Math.min(y0, upper);
+        x1 = Math.max(x1, right);
+        y1 = Math.max(y1, bottom);
+      }
+    }
+    if (from >= 0) save();
+  }
+  return byLevel;
+}

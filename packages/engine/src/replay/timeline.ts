@@ -166,6 +166,8 @@ export type GroupOptions = {
    * over the group's whole time.
    */
   realSeconds?: number[];
+  /** When given, tracks within each group play in turn, weighted by these distances. */
+  sequentialDistances?: number[];
   /**
    * How much of a group's time the next group starts early, 0 to below 1: 0.4 starts the
    * next group when this one is 60% through. Default 0, one strictly after another.
@@ -223,6 +225,18 @@ export function groupTimeline(
   groups.forEach((group, i) => {
     const start = starts[i];
     const length = lengths[i];
+    if (options.sequentialDistances) {
+      const weights = group.tracks.map((k) => Math.max(1, options.sequentialDistances![k]));
+      const total = weights.reduce((sum, weight) => sum + weight, 0);
+      let cursor = start;
+      group.tracks.forEach((k, j) => {
+        const window = { start: cursor, duration: (length * weights[j]) / total };
+        windows[k] = window;
+        progress[k] = (t) => clamp01((t - window.start) / window.duration);
+        cursor += window.duration;
+      });
+      return;
+    }
     const race = options.realSeconds
       ? raceTimeline(
           group.tracks.map((k) => options.realSeconds![k]),

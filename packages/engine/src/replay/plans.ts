@@ -100,7 +100,8 @@ export function groupsPlan(
   settings: Pick<
     RenderSettings,
     'duration' | 'group' | 'share' | 'groupPace' | 'overlap' | 'endCard'
-  >,
+  > &
+    Partial<Pick<RenderSettings, 'camera'>>,
 ): Plan {
   const { duration } = settings;
   const lead = Math.min(LEAD_S, duration * 0.02);
@@ -126,6 +127,8 @@ export function groupsPlan(
     };
   }
 
+  const sequential = settings.camera === 'follow';
+  const lengths = sequential || settings.share === 'distance' ? tracks.map(trackLengthM) : [];
   const timeline = groupTimeline(
     groups.map((ks) => ({
       tracks: ks,
@@ -138,7 +141,7 @@ export function groupsPlan(
           ? Math.sqrt(
               Math.max(
                 100,
-                ks.reduce((m, k) => m + trackLengthM(tracks[k]), 0),
+                ks.reduce((m, k) => m + lengths[k], 0),
               ),
             )
           : 1,
@@ -148,12 +151,18 @@ export function groupsPlan(
       duration,
       lead,
       hold,
-      realSeconds: settings.groupPace === 'real' ? realSeconds : undefined,
+      realSeconds: !sequential && settings.groupPace === 'real' ? realSeconds : undefined,
+      sequentialDistances: sequential ? lengths : undefined,
       overlap: settings.overlap / 100,
     },
   );
 
-  const times = groups.map((ks) => timeline.windows![ks[0]].duration);
+  const windows = timeline.windows!;
+  const times = groups.map((ks) => {
+    const first = windows[ks[0]];
+    const last = windows[ks[ks.length - 1]];
+    return last.start - first.start + last.duration;
+  });
   const shortest = Math.min(...times);
   const longest = Math.max(...times);
   const seconds = (s: number) => Number(s.toFixed(2));
@@ -163,7 +172,11 @@ export function groupsPlan(
       : `${seconds(shortest)}–${seconds(longest)} s`;
   const unit =
     groups.length === 1 ? grouping : grouping === 'activity' ? 'activities' : `${grouping}s`;
-  const pace = settings.groupPace === 'real' ? ', each at real pace' : '';
+  const pace = sequential
+    ? ', one activity at a time within each group'
+    : settings.groupPace === 'real'
+      ? ', each at real pace'
+      : '';
   const overlapping = settings.overlap > 0 ? `, overlapping ${settings.overlap}%` : '';
   return {
     timeline,

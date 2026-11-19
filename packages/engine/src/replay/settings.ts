@@ -46,7 +46,7 @@ export type RenderSettings = {
   pace: 'time' | 'distance';
 
   // Look
-  camera: 'zoom' | 'fixed';
+  camera: 'zoom' | 'fixed' | 'follow';
   map: boolean;
   width: number;
   height: number;
@@ -280,11 +280,12 @@ export const SETTINGS: readonly SettingDefinition[] = [
     name: 'camera',
     label: 'Camera',
     group: 'look',
-    kind: { type: 'choice', choices: ['zoom', 'fixed'] },
+    kind: { type: 'choice', choices: ['zoom', 'fixed', 'follow'] },
     default: 'zoom',
     help:
       'zoom: start close and pull back smoothly as the routes spread. fixed: show the ' +
-      'whole area from the first frame.',
+      'whole area from the first frame. follow: track the moving end of each route, then ' +
+      'pull back to show every route. Races use zoom.',
   },
   {
     name: 'map',
@@ -559,7 +560,7 @@ export function parseSettings(input: SettingsInput): RenderSettings {
     groupPace: choice<'fit' | 'real'>('group-pace'),
     overlap: number('overlap'),
     pace: choice<'time' | 'distance'>('pace'),
-    camera: choice<'zoom' | 'fixed'>('camera'),
+    camera: choice<RenderSettings['camera']>('camera'),
     map: flag('map'),
     title: text('title'),
     titlePosition: choice<Position>('title-position'),

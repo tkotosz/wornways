@@ -2,12 +2,13 @@
 // the renderer that draws its frames. Front ends then draw the frames in order and hand
 // them to their video encoder or to the screen.
 
-import { tilesForView, type Basemap, type MapLevel } from '../map/basemap.ts';
+import { tilesForView, type Basemap, type MapLevel, type TileId } from '../map/basemap.ts';
 import { MAP_ATTRIBUTION, MAX_TILE_ZOOM, type TileLoader } from '../map/tiles.ts';
 import type { Track } from '../track/types.ts';
-import { followCamera, mapLevelViews, type CameraPath } from './camera.ts';
+import { followCamera, mapLevelViews, mapLevelWindows, type CameraPath } from './camera.ts';
+import { followRouteCamera } from './follow.ts';
 import { automaticTitle, planReplay, type Plan } from './plans.ts';
-import { createRenderer, type CanvasFactory, type Renderer } from './render.ts';
+import { createRenderer, type CanvasFactory, type Renderer, type RenderOptions } from './render.ts';
 import type { RenderSettings } from './settings.ts';
 import { fitView } from './view.ts';
 
@@ -22,6 +23,8 @@ export type ReplayParts = {
   fps: number;
   /** The moving camera; undefined for a fixed one. */
   camera: CameraPath | undefined;
+  /** The camera in use after applying the fallback for races. */
+  cameraMode: RenderSettings['camera'];
   /** What was loaded for the map; null when the settings leave the map out. */
   map: MapReport | null;
 };
@@ -64,24 +67,48 @@ export async function prepareReplay(
   const plan = planReplay(tracks, settings);
   const title = settings.title ?? automaticTitle(tracks, settings);
   const view = fitView(tracks, width, height);
+  const cameraMode =
+    settings.camera === 'follow' && plan.timeline.mode === 'race' ? 'zoom' : settings.camera;
   const camera =
-    settings.camera === 'zoom' ? followCamera(tracks, plan.timeline, view, { fps }) : undefined;
+    cameraMode === 'follow'
+      ? followRouteCamera(tracks, plan.timeline, view, fps)
+      : cameraMode === 'zoom'
+        ? followCamera(tracks, plan.timeline, view, { fps })
+        : undefined;
+  let levelWindows: RenderOptions['levelWindows'];
+  if (cameraMode === 'follow') levelWindows = { levels: mapLevelWindows(view, camera!) };
 
   let basemap: Basemap | undefined;
   let map: MapReport | null = null;
   if (settings.map) {
     map = { tiles: 0, downloaded: 0, zooms: [], error: null };
     try {
-      const levels: MapLevel[] = [];
-      for (const levelView of mapLevelViews(view, camera)) {
-        const ids = tilesForView(levelView, MAX_TILE_ZOOM);
-        const loaded = await options.loadTiles(ids);
-        levels.push({ view: levelView, tiles: loaded.tiles });
-        map.tiles += ids.length;
-        map.downloaded += loaded.downloaded;
-        map.zooms.push(ids[0].z);
+      if (levelWindows) {
+        const key = ({ z, x, y }: TileId) => `${z}/${x}/${y}`;
+        const windows = levelWindows.levels.flat();
+        const ids = windows.map((window) => tilesForView(window.view, MAX_TILE_ZOOM));
+        const unique = new Map(ids.flat().map((id) => [key(id), id]));
+        const loaded = await options.loadTiles([...unique.values()]);
+        const byId = new Map(loaded.tiles.map((tile) => [key(tile), tile]));
+        windows.forEach((window, i) => {
+          window.tiles = ids[i].map((id) => byId.get(key(id)) ?? { ...id, data: null });
+        });
+        levelWindows.attribution = MAP_ATTRIBUTION;
+        map.tiles = unique.size;
+        map.downloaded = loaded.downloaded;
+        map.zooms = [...new Set([...unique.values()].map((id) => id.z))];
+      } else {
+        const levels: MapLevel[] = [];
+        for (const levelView of mapLevelViews(view, camera)) {
+          const ids = tilesForView(levelView, MAX_TILE_ZOOM);
+          const loaded = await options.loadTiles(ids);
+          levels.push({ view: levelView, tiles: loaded.tiles });
+          map.tiles += ids.length;
+          map.downloaded += loaded.downloaded;
+          map.zooms.push(ids[0].z);
+        }
+        basemap = { levels, attribution: MAP_ATTRIBUTION };
       }
-      basemap = { levels, attribution: MAP_ATTRIBUTION };
     } catch (err) {
       map.error = err instanceof Error ? err.message : String(err);
     }
@@ -93,6 +120,7 @@ export async function prepareReplay(
     view,
     camera,
     basemap,
+    levelWindows,
     width,
     height,
     fps,
@@ -109,5 +137,5 @@ export async function prepareReplay(
     endCard: settings.endCard,
     watermark: settings.watermark,
   });
-  return { renderer, plan, title, width, height, fps, camera, map };
+  return { renderer, plan, title, width, height, fps, camera, cameraMode, map };
 }

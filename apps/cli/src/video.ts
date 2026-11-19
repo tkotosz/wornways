@@ -8,8 +8,10 @@ import { seconds } from './terminal.ts';
 
 /** What the CLI prints about the camera and the map of a prepared replay. */
 export function describeReplay(replay: ReplayParts): void {
-  const { camera, map, renderer } = replay;
-  if (camera && camera.maxZoom > 1.001)
+  const { camera, cameraMode, map, renderer } = replay;
+  if (cameraMode === 'follow')
+    console.log('Camera     follows the routes, then pulls back to show the whole area');
+  else if (camera && camera.maxZoom > 1.001)
     console.log(
       `Camera     starts ${camera.maxZoom.toFixed(1)}x closer than the final view and pulls back`,
     );
@@ -17,17 +19,17 @@ export function describeReplay(replay: ReplayParts): void {
     console.log(
       'Camera     shows the whole area from the start (the activities start too far apart to zoom in)',
     );
-  if (map) console.log(mapLine(map));
+  if (map) console.log(mapLine(map, cameraMode === 'follow'));
   console.log(
     `Heat       white at ${renderer.heatSaturation.toFixed(1)} passes (the busiest roads)`,
   );
 }
 
-function mapLine(map: MapReport): string {
+function mapLine(map: MapReport, windowed: boolean): string {
   if (map.error) return `Map        unavailable, rendering without it: ${map.error}`;
   const zooms = [...new Set(map.zooms)].sort((x, y) => x - y);
   const zoomText = zooms.length > 1 ? `${zooms[0]}-${zooms[zooms.length - 1]}` : `${zooms[0]}`;
-  const levels = map.zooms.length > 1 ? ` in ${map.zooms.length} levels` : '';
+  const levels = !windowed && map.zooms.length > 1 ? ` in ${map.zooms.length} levels` : '';
   return (
     `Map        ${map.tiles} tiles at zoom ${zoomText}${levels} ` +
     `(${map.downloaded} downloaded, ${map.tiles - map.downloaded} from cache)`
