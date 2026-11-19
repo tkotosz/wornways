@@ -60,43 +60,53 @@ async function remove(ids: string[] | 'all'): Promise<void> {
     </p>
     <div :class="{ sources: stravaUrl || stravaActive }">
       <section :class="{ 'source-card': stravaUrl || stravaActive }">
-        <template v-if="stravaUrl || stravaActive">
+        <header v-if="stravaUrl || stravaActive" class="source-heading">
           <h2>Files</h2>
           <p class="muted">Activities are saved on this device for next time.</p>
-        </template>
+        </header>
         <p v-else class="muted">
           Add FIT, GPX or TCX files, a folder, or an export ZIP. Wornways reads them here in your
           browser and keeps the activities on this device for next time.
         </p>
-        <button v-if="stravaActive" type="button" class="secondary" @click="emit('files')">
-          Use files
-        </button>
-        <AddFiles v-else :engine="engine" @changed="emit('changed', $event)" />
+        <div class="source-content">
+          <button v-if="stravaActive" type="button" class="secondary" @click="emit('files')">
+            Use files
+          </button>
+          <AddFiles v-else :engine="engine" @changed="emit('changed', $event)" />
+        </div>
       </section>
       <section v-if="stravaUrl || stravaActive" class="source-card">
-        <h2>Strava</h2>
-        <p class="muted">Your connection and cached activities last up to two hours.</p>
-        <button v-if="stravaActive" type="button" class="link" @click="emit('disconnect')">
-          Disconnect Strava
-        </button>
-        <a
-          v-else-if="stravaUrl && !stravaBusy"
-          :href="stravaUrl.href"
-          class="strava-connect"
-          @click="authorize"
-        >
-          <img src="/strava-connect.svg" alt="Connect with Strava" width="237" height="48" />
-        </a>
-        <p v-if="!stravaActive" class="connect-help muted">
-          If Strava says its connection limit was reached, go back and use activity files.
-        </p>
-        <p v-if="!stravaActive" class="connect-help muted">
-          <a href="/privacy.html" target="_blank" rel="noopener noreferrer">Privacy</a> · Wornways
-          reads activity names, dates, sports, distance, and GPS tracks. Manage access in
-          <a href="https://www.strava.com/settings/apps" target="_blank" rel="noopener noreferrer"
-            >Strava settings</a
-          >.
-        </p>
+        <header class="source-heading">
+          <h2>Strava</h2>
+          <p class="muted">Your connection and cached activities last up to two hours.</p>
+        </header>
+        <div class="source-content">
+          <button v-if="stravaActive" type="button" class="link" @click="emit('disconnect')">
+            Disconnect Strava
+          </button>
+          <a
+            v-else-if="stravaUrl && !stravaBusy"
+            :href="stravaUrl.href"
+            class="strava-connect"
+            @click="authorize"
+          >
+            <img src="/strava-connect.svg" alt="Connect with Strava" width="237" height="48" />
+          </a>
+          <div v-if="!stravaActive" class="connect-help muted">
+            <p>If Strava says its connection limit was reached, go back and use activity files.</p>
+            <p>
+              <a href="/privacy.html" target="_blank" rel="noopener noreferrer">Privacy</a> ·
+              Wornways reads activity names, dates, sports, distance, and GPS tracks. Manage access
+              in
+              <a
+                href="https://www.strava.com/settings/apps"
+                target="_blank"
+                rel="noopener noreferrer"
+                >Strava settings</a
+              >.
+            </p>
+          </div>
+        </div>
       </section>
     </div>
     <p v-if="stravaBusy" class="muted" role="status">{{ stravaBusy }}</p>
@@ -104,7 +114,7 @@ async function remove(ids: string[] | 'all'): Promise<void> {
     <p v-if="stravaError" class="error" role="alert">{{ stravaError }}</p>
     <p v-if="error" class="error" role="alert">{{ error }}</p>
     <template v-if="!stravaActive">
-      <GettingFiles :open="library.length === 0" />
+      <GettingFiles />
       <p class="about muted">
         Wornways is open source:
         <a href="https://github.com/tkotosz/wornways" target="_blank" rel="noopener">source</a>
@@ -154,27 +164,56 @@ async function remove(ids: string[] | 'all'): Promise<void> {
 }
 
 .source-card {
+  display: grid;
+  grid-row: span 2;
+  grid-template-rows: subgrid;
   padding: 1rem;
   border: 1px solid var(--line);
   border-radius: 12px;
 }
 
-.source-card h2 {
+.source-heading h2 {
   margin: 0;
   font-size: 1rem;
 }
 
-.source-card p {
-  margin: 0.35rem 0 0.75rem;
+.source-heading p {
+  margin: 0.35rem 0 0;
 }
 
-.source-card .connect-help {
-  margin-bottom: 0;
-  font-size: 0.85rem;
+.source-card .source-content {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.source-card .source-content > button,
+.strava-connect {
+  align-self: start;
 }
 
 .strava-connect {
-  display: inline-block;
+  max-width: 100%;
+}
+
+.source-card :deep(.drop) {
+  margin: 0;
+}
+
+.source-card :deep(.report) {
+  margin-top: 1rem;
+}
+
+.connect-help {
+  display: grid;
+  gap: 0.4rem;
+  margin-top: auto;
+  padding-top: 0.9rem;
+  font-size: 0.85rem;
+}
+
+.connect-help p {
+  margin: 0;
 }
 
 .strava-connect img {
