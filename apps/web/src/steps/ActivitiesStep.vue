@@ -20,7 +20,7 @@ const props = defineProps<{
   canRetry?: boolean;
 }>();
 const choice = defineModel<Choice>({ required: true });
-const emit = defineEmits<{ back: []; next: []; cancel: []; retry: [] }>();
+const emit = defineEmits<{ back: []; next: []; retry: [] }>();
 
 const byId = computed(() => new Map(props.library.map((a) => [a.id, a])));
 const rows = computed(() => props.matched.ids.flatMap((id) => byId.value.get(id) ?? []));
@@ -61,10 +61,7 @@ const ticked = computed(() => rows.value.filter((a) => !choice.value.excluded.in
     />
 
     <div class="footer">
-      <button v-if="strava" type="button" class="secondary" @click="emit('cancel')">
-        Cancel replay
-      </button>
-      <button v-else type="button" class="secondary" @click="emit('back')">← Back</button>
+      <button type="button" class="secondary" @click="emit('back')">← Back</button>
       <button
         type="button"
         class="primary"

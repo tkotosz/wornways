@@ -274,6 +274,10 @@ test('reuses the selected track after a reload and socket interruption', async (
   await connect(page);
   await page.getByRole('button', { name: 'Last year', exact: true }).click();
   await page.getByRole('checkbox', { name: 'Strava test ride' }).check();
+  await page.getByRole('button', { name: '← Back', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Disconnect Strava' })).toBeVisible();
+  await page.getByRole('button', { name: 'Continue' }).click();
+  await expect(page.getByRole('checkbox', { name: 'Strava test ride' })).toBeChecked();
   await page.getByRole('button', { name: 'Continue' }).click();
   await expect(page.getByRole('heading', { name: 'How should your routes play?' })).toBeVisible();
   expect(mock.tracks.filter((id) => id === rideId)).toHaveLength(1);

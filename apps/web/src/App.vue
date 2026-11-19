@@ -297,7 +297,6 @@ watch(
         :can-retry="strava && (!stravaReady || sourceRows.length === 0)"
         @back="navigate('import')"
         @next="navigate('playback')"
-        @cancel="endStrava()"
         @retry="retryStrava()"
       />
       <PlaybackStep
