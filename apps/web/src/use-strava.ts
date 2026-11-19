@@ -97,7 +97,7 @@ export function useStrava(
       await engine.startStrava({ token, expiresAt, sessionId, cacheKey });
       const { draft, ...draftStore } = storage;
       session = { expiresAt, ticket, ...draftStore };
-      choice.value = draft ? { ...draft.choice, excluded: [] } : initialChoice();
+      choice.value = { ...initialChoice(), ...draft?.choice };
       adjustments.value = draft?.adjustments ?? { ...defaultAdjustments };
       initialSelection = draft?.selected ?? [];
       active.value = true;

@@ -39,6 +39,9 @@ export type Choice = {
   customTo: string;
   /** The sports picked; null is "All". Never empty: unpicking the last sport goes back to "All". */
   sports: string[] | null;
+  /** Distance bounds in kilometers; an empty field leaves that side open. */
+  minDistanceKm: string;
+  maxDistanceKm: string;
   /** Keep only activities that start near a place. */
   startNear: NearChoice;
   /** Keep only activities that end near a place. */
@@ -52,6 +55,8 @@ export const NO_CHOICE: Choice = {
   customFrom: '',
   customTo: '',
   sports: null,
+  minDistanceKm: '',
+  maxDistanceKm: '',
   startNear: { on: false, place: '', radius: 1000 },
   endNear: { on: false, place: '', radius: 1000 },
   excluded: [],
@@ -122,6 +127,20 @@ export function toggledSports(choice: Choice, sport: string): string[] | null {
 export const placeMissing = (choice: Choice) =>
   [choice.startNear, choice.endNear].some((near) => near.on && !near.place);
 
+function distanceBound(text: string, open: number): number {
+  const value = text.trim();
+  if (!value) return open;
+  if (!/^(?:\d+(?:[.,]\d*)?|[.,]\d+)$/.test(value)) return NaN;
+  const km = Number(value.replace(',', '.'));
+  return Number.isFinite(km) ? km : NaN;
+}
+
+export function distanceRange(choice: Choice): { min: number; max: number } | null {
+  const min = distanceBound(choice.minDistanceKm, -Infinity);
+  const max = distanceBound(choice.maxDistanceKm, Infinity);
+  return min <= max ? { min, max } : null;
+}
+
 /** The settings of one place filter, once it is on and its place is set. */
 function nearSettings(near: NearChoice, end: 'start' | 'end'): SettingsInput {
   if (!near.on || !near.place) return {};
@@ -145,12 +164,13 @@ export function placeSettings(choice: Choice, today: Date): SettingsInput {
 }
 
 /**
- * The settings of the whole choice: the filters, and the ticked activities when some of
- * the ones the filters match are unticked. `matched` are the ids the filters match.
+ * The settings of the whole choice. Include the ticked IDs when the engine's filters
+ * alone cannot reproduce the list, including when the web app applies a distance bound.
  */
 export function choiceSettings(choice: Choice, matched: string[], today: Date): SettingsInput {
   const settings = filterSettings(choice, today);
   const ticked = matched.filter((id) => !choice.excluded.includes(id));
-  if (ticked.length < matched.length) settings.activity = ticked.join(',');
+  if (ticked.length < matched.length || choice.minDistanceKm.trim() || choice.maxDistanceKm.trim())
+    settings.activity = ticked;
   return settings;
 }

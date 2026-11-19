@@ -397,8 +397,8 @@ export const SETTINGS: readonly SettingDefinition[] = [
   },
 ];
 
-/** What a user entered, by setting name: text, or true/false for a switch. Missing: not set. */
-export type SettingsInput = Record<string, string | boolean | undefined>;
+/** Settings accept text, booleans for switches, and exact ID lists for `activity`. */
+export type SettingsInput = Record<string, string | boolean | readonly string[] | undefined>;
 
 /** A value the user entered cannot be used. `message` reads on after the setting's name. */
 export class SettingsError extends Error {
@@ -474,11 +474,11 @@ export function parseSettings(input: SettingsInput): RenderSettings {
   const preset = presetName === undefined ? {} : PRESETS[presetName as Preset].settings;
 
   /** The entered value, else the preset's, else the default; null when there is none. */
-  const valueOf = (name: string): string | boolean | null =>
-    input[name] ?? preset[name] ?? definition(name).default;
+  const valueOf = (name: string) => input[name] ?? preset[name] ?? definition(name).default;
   const text = (name: string): string | null => {
     const value = valueOf(name);
     if (typeof value === 'boolean') throw new SettingsError(name, 'expects a value');
+    if (value !== null && typeof value !== 'string') throw new SettingsError(name, 'expects text');
     return value;
   };
   const flag = (name: string): boolean => {
@@ -514,11 +514,16 @@ export function parseSettings(input: SettingsInput): RenderSettings {
   if (from !== null && to !== null && to <= from)
     throw new SettingsError('to', 'is before the period start');
 
-  const activityText = text('activity');
-  const activities =
-    activityText === null
-      ? null
-      : [...new Set(activityText.split(',').map((id) => id.trim()))].filter(Boolean);
+  const activity = valueOf('activity');
+  if (typeof activity === 'boolean') throw new SettingsError('activity', 'expects a value');
+  const ids =
+    typeof activity === 'string'
+      ? activity
+          .split(',')
+          .map((id) => id.trim())
+          .filter(Boolean)
+      : activity;
+  const activities = ids === null ? null : [...new Set(ids)];
   if (activities !== null && activities.length === 0)
     throw new SettingsError('activity', 'expects activity ids separated by commas');
 
