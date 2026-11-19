@@ -17,9 +17,8 @@ const props = defineProps<{
   /** How many activities the settings choose, and their distance. */
   activities: number;
   meters: number;
-  strava?: boolean;
 }>();
-const emit = defineEmits<{ back: []; done: [] }>();
+const emit = defineEmits<{ back: [] }>();
 const result = defineModel<MadeVideo | null>('video', { required: true });
 
 const parsed = computed(() => {
@@ -200,7 +199,6 @@ onBeforeUnmount(() => {
         ← Back
       </button>
       <span v-if="result && !progress" class="actions">
-        <button v-if="strava" type="button" class="secondary" @click="emit('done')">Done</button>
         <!-- Where sharing works, it is the main thing to do; elsewhere downloading is. -->
         <a
           :class="canShare ? 'secondary' : 'primary'"

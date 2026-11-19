@@ -72,8 +72,18 @@ export class EngineClient {
     this.strava = true;
   }
 
-  async listStrava(from: number | null, to: number | null): Promise<ActivitySummary[]> {
-    const reply = await this.send({ type: 'strava-list', id: this.nextId++, from, to });
+  async listStrava(
+    from: number | null,
+    to: number | null,
+    activityChanged = false,
+  ): Promise<ActivitySummary[]> {
+    const reply = await this.send({
+      type: 'strava-list',
+      id: this.nextId++,
+      from,
+      to,
+      activityChanged,
+    });
     if (reply.type === 'strava-listed') return reply.activities;
     throw this.errorFor(reply);
   }
@@ -95,15 +105,21 @@ export class EngineClient {
   }
 
   /** Which activities the settings choose. */
-  async match(settings: SettingsInput): Promise<MatchReport> {
-    const reply = await this.send({ type: 'match', id: this.nextId++, settings });
+  async match(settings: SettingsInput, strava = false): Promise<MatchReport> {
+    const reply = await this.send({ type: 'match', id: this.nextId++, settings, strava });
     if (reply.type === 'matched') return reply.match;
     throw this.errorFor(reply);
   }
 
   /** The places most of the activities the settings choose start or end at, busiest first. */
   async places(settings: SettingsInput, end: TrackEnd): Promise<FrequentPlace[]> {
-    const reply = await this.send({ type: 'places', id: this.nextId++, settings, end });
+    const reply = await this.send({
+      type: 'places',
+      id: this.nextId++,
+      settings,
+      end,
+      strava: this.strava,
+    });
     if (reply.type === 'places') return reply.places;
     throw this.errorFor(reply);
   }

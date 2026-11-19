@@ -55,14 +55,13 @@ async function addFiles(page: Page, ...names: string[]): Promise<void> {
 
 test('adds an account export and keeps it for the next visit', async ({ page }) => {
   await page.goto('/');
-  // With nothing stored yet, the step says what the app does and how to get the files.
+  // The file instructions open on request.
   const help = page.getByTestId('getting-files');
   await expect(page.getByTestId('intro')).toBeVisible();
-  await expect(help).toHaveAttribute('open', '');
+  await expect(help).not.toHaveAttribute('open');
+  await help.getByText('How to get your files').click();
   await expect(help.getByRole('link', { name: 'Export Your Data' })).toBeVisible();
   await addFiles(page, 'strava-export.zip');
-  // Then the help folds away to one line, and the introduction goes.
-  await expect(help).not.toHaveAttribute('open');
   await expect(page.getByTestId('intro')).toHaveCount(0);
 
   await expect(page.getByTestId('import-report')).toContainText('3 activities added');
@@ -75,6 +74,7 @@ test('adds an account export and keeps it for the next visit', async ({ page }) 
   // With activities stored, the app opens at the Choose step.
   await expect(page.getByRole('heading', { name: 'Choose your activities' })).toBeVisible();
   await page.getByRole('button', { name: 'Source', exact: true }).click();
+  await expect(help).not.toHaveAttribute('open');
   await expect(page.getByTestId('activity-count')).toHaveText('3 activities on this device');
 });
 

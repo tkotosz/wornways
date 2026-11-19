@@ -46,12 +46,14 @@ const step = ref<Step>('import');
 const loaded = ref(false);
 const libraryError = ref('');
 const library = ref<ActivitySummary[]>([]);
+const fileAdjustments = ref<Adjustments>(loadAdjustments());
+const stravaAdjustments = ref<Adjustments>({});
 const fileChoice = ref<Choice>({ ...NO_CHOICE });
 const fileMatches = ref<MatchReport>({ ids: [], problem: null });
 const {
   active: strava,
+  ready: stravaReady,
   busy: stravaBusy,
-  hasCallback: stravaCallback,
   choice: stravaChoice,
   error: stravaError,
   notice: stravaNotice,
@@ -59,15 +61,22 @@ const {
   rows: stravaRows,
   url: stravaUrl,
   connect: connectStrava,
-  configure: configureStrava,
   end: endStrava,
-  list: listStrava,
+  retry: retryStrava,
   prepare: prepareStrava,
-} = useStrava(props.engine, () => {
-  step.value = 'import';
-  video.value = null;
-  stravaAdjustments.value = {};
-});
+} = useStrava(
+  props.engine,
+  stravaAdjustments,
+  () => {
+    step.value = 'import';
+    video.value = null;
+    stravaAdjustments.value = {};
+  },
+  () => {
+    if (step.value !== 'import') step.value = 'activities';
+    video.value = null;
+  },
+);
 const choice = computed({
   get: () => (strava.value ? stravaChoice.value : fileChoice.value),
   set: (after: Choice) => {
@@ -93,8 +102,6 @@ const chosen = computed(() => {
 const period = computed(() => periodRange(choice.value, new Date()) ?? { from: null, to: null });
 
 // What was set in the Video and Text steps, kept for the next visit.
-const fileAdjustments = ref<Adjustments>(loadAdjustments());
-const stravaAdjustments = ref<Adjustments>({});
 const adjustments = computed({
   get: () => (strava.value ? stravaAdjustments.value : fileAdjustments.value),
   set: (after: Adjustments) => {
@@ -169,12 +176,8 @@ async function loadLibrary(): Promise<void> {
   try {
     library.value = await props.engine.readLibrary();
     loaded.value = true;
-    if (stravaCallback) {
-      if (await connectStrava()) {
-        stravaAdjustments.value = { ...fileAdjustments.value };
-        step.value = 'activities';
-      }
-    } else if (library.value.length > 0) step.value = 'activities';
+    if (library.value.length > 0) step.value = 'activities';
+    if (await connectStrava(fileAdjustments.value)) step.value = 'activities';
   } catch (error) {
     libraryError.value = error instanceof Error ? error.message : String(error);
   }
@@ -182,7 +185,6 @@ async function loadLibrary(): Promise<void> {
 
 onMounted(() => {
   if (unsupported) return;
-  void configureStrava();
   void loadLibrary();
 });
 
@@ -292,10 +294,10 @@ watch(
         :show-source="!!stravaUrl || strava"
         :busy="stravaBusy"
         :notice="stravaNotice"
+        :can-retry="strava && (!stravaReady || sourceRows.length === 0)"
         @back="navigate('import')"
         @next="navigate('playback')"
-        @cancel="endStrava()"
-        @retry="listStrava()"
+        @retry="retryStrava()"
       />
       <PlaybackStep
         v-else-if="step === 'playback'"
@@ -324,9 +326,7 @@ watch(
         :settings="settings"
         :activities="chosenIds.length"
         :meters="chosenKm"
-        :strava="strava"
         @back="step = 'appearance'"
-        @done="endStrava()"
       />
     </template>
   </main>

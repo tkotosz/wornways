@@ -96,10 +96,9 @@ phone.
    files (mostly on phones) and is then the main button.
 
 While no activities are stored (on a first visit, or after deleting everything), step 1
-also says in a few words what the app does, and shows how to get the files out of Strava
-and Garmin: the whole account at once, or one activity. Afterwards those instructions fold
-away to a "How to get your files" line. Sample activities to try the app with come later,
-once there are routes that may be published.
+also says in a few words what the app does. "How to get your files" starts collapsed and
+opens instructions for exporting an account or a single activity from Strava or Garmin.
+Sample activities to try the app with come later, once there are routes that may be published.
 
 ## How it works
 

@@ -1,17 +1,15 @@
 <script setup lang="ts">
-// How to get activity files out of Strava and Garmin. Open while the library is empty (a
-// first visit, or after deleting everything); afterwards a line that opens it again.
+// How to get activity files out of Strava and Garmin.
 //
 // Checked 2026-11-16: Strava's steps from its help page
 // (https://support.strava.com/hc/en-us/articles/216918437-Exporting-your-Data-and-Bulk-Export);
 // Garmin's export page needs a sign-in, so its steps stay general: the address is Garmin's.
 // The layout of the download (activity files in ZIP files inside the ZIP, the activity list
 // in DI-Connect-Fitness) was checked against a real export on 2026-11-17.
-defineProps<{ open: boolean }>();
 </script>
 
 <template>
-  <details class="help" :open="open" data-testid="getting-files">
+  <details class="help" data-testid="getting-files">
     <summary>How to get your files</summary>
 
     <h3>From Strava, all at once</h3>

@@ -15,6 +15,7 @@ const props = defineProps<{
   end: TrackEnd;
   /** The settings of the period and sports, which choose the activities places are suggested from. */
   suggestFrom: SettingsInput;
+  sourceLoaded: boolean;
 }>();
 const near = defineModel<NearChoice>({ required: true });
 
@@ -102,9 +103,13 @@ onMounted(async () => {
 // follow those filters. Only the latest request's answer is kept.
 let latestPlaces = 0;
 watch(
-  () => JSON.stringify(props.suggestFrom),
-  async (settings) => {
+  [() => JSON.stringify(props.suggestFrom), () => props.sourceLoaded],
+  async ([settings, loaded]) => {
     const request = ++latestPlaces;
+    if (!loaded) {
+      places.value = [];
+      return;
+    }
     const found = await props.engine.places(JSON.parse(settings), props.end).catch(() => []);
     if (request === latestPlaces) places.value = found;
   },

@@ -12,14 +12,20 @@ export type Request =
   /** Deletes the activities with these ids, or every activity. */
   | { type: 'delete-activities'; id: number; ids: string[] | 'all' }
   | { type: 'strava-start'; id: number; grant: StravaGrant }
-  | { type: 'strava-list'; id: number; from: number | null; to: number | null }
+  | {
+      type: 'strava-list';
+      id: number;
+      from: number | null;
+      to: number | null;
+      activityChanged: boolean;
+    }
   | { type: 'strava-prepare'; id: number; ids: string[] }
   | { type: 'strava-prioritize'; id: number; ids: string[] }
   | { type: 'strava-end'; id: number; disconnect: boolean }
   /** Which activities the "Which activities" settings choose. */
-  | { type: 'match'; id: number; settings: SettingsInput }
+  | { type: 'match'; id: number; settings: SettingsInput; strava: boolean }
   /** The places most of the activities these settings choose start or end at, to suggest. */
-  | { type: 'places'; id: number; settings: SettingsInput; end: TrackEnd }
+  | { type: 'places'; id: number; settings: SettingsInput; end: TrackEnd; strava: boolean }
   | { type: 'make-video'; id: number; settings: SettingsInput; strava: boolean }
   /** The last frame of the video the settings describe, small, as a preview. */
   | { type: 'make-poster'; id: number; settings: SettingsInput; strava: boolean }

@@ -1,11 +1,27 @@
-import { createTileLoader, sportSlug, STRIDE, type Track } from '@wornways/engine';
-import type { ActivitySummary } from '../messages.ts';
-import { revokeStravaAccess, type StravaGrant } from '../strava-auth.ts';
+import {
+  createTileLoader,
+  distanceM,
+  frequentPlacesAt,
+  nearPlacesText,
+  parseSettings,
+  sportIncluded,
+  sportSlug,
+  STRIDE,
+  type LatLon,
+  type RenderSettings,
+  type SettingsInput,
+  type Track,
+  type TrackEnd,
+} from '@wornways/engine';
+import type { ActivitySummary, MatchReport } from '../messages.ts';
+import { clearStravaAccess, type StravaGrant } from '../strava-auth.ts';
+import { StravaCache } from './strava-cache.ts';
 
 const API = 'https://www.strava.com/api/v3';
 const PAGE_SIZE = 100;
 const PREFETCH_COUNT = 5;
 const TRACK_REQUESTS = 3;
+const textEncoder = new TextEncoder();
 
 type Summary = {
   id: number;
@@ -15,7 +31,30 @@ type Summary = {
   type?: string;
   start_date: string;
   distance: number;
+  start_latlng?: number[] | null;
+  end_latlng?: number[] | null;
+  elapsed_time?: number;
+  visibility?: string;
+  private?: boolean;
+  map?: { summary_polyline?: string };
 };
+
+type StravaActivity = { summary: ActivitySummary; start?: LatLon; end?: LatLon; version: string };
+
+async function routeVersion(data: Summary): Promise<string> {
+  const details = JSON.stringify([
+    data.start_date,
+    data.distance,
+    data.elapsed_time,
+    data.start_latlng,
+    data.end_latlng,
+    data.visibility,
+    data.private,
+    data.map?.summary_polyline,
+  ]);
+  const digest = await crypto.subtle.digest('SHA-256', textEncoder.encode(details));
+  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
+}
 
 type Streams = {
   latlng?: { data: [number, number][] };
@@ -26,16 +65,28 @@ type Streams = {
 export class StravaError extends Error {}
 export class StravaExpired extends StravaError {}
 
-function summary(data: Summary): ActivitySummary | null {
+function coordinates(values: number[] | null | undefined): LatLon | undefined {
+  if (values?.length !== 2) return;
+  const [lat, lon] = values;
+  if (Number.isFinite(lat) && Number.isFinite(lon) && Math.abs(lat!) <= 90 && Math.abs(lon!) <= 180)
+    return { lat: lat!, lon: lon! };
+}
+
+async function summary(data: Summary): Promise<StravaActivity | null> {
   const id = data.id_str ?? (Number.isSafeInteger(data.id) ? String(data.id) : '');
   const startTime = Date.parse(data.start_date);
   if (!/^\d+$/.test(id) || !Number.isFinite(startTime)) return null;
   return {
-    id,
-    name: data.name || 'Strava activity',
-    sport: sportSlug(data.sport_type || data.type || '') || 'unknown',
-    startTime,
-    distanceM: Number.isFinite(data.distance) ? data.distance : 0,
+    summary: {
+      id,
+      name: data.name || 'Strava activity',
+      sport: sportSlug(data.sport_type || data.type || '') || 'unknown',
+      startTime,
+      distanceM: Number.isFinite(data.distance) ? data.distance : 0,
+    },
+    start: coordinates(data.start_latlng),
+    end: coordinates(data.end_latlng),
+    version: await routeVersion(data),
   };
 }
 
@@ -65,17 +116,18 @@ function trackFromStreams(activity: ActivitySummary, streams: Streams): Track | 
   };
 }
 
-/** One replay's Strava data, kept only in the worker. Changing periods cancels the old fetches. */
+/** One replay's Strava activities and temporary browser cache. */
 export class StravaSession {
   private readonly lifetime = new AbortController();
   private range = new AbortController();
-  private activities = new Map<string, ActivitySummary>();
+  private activities = new Map<string, StravaActivity>();
   private tracks = new Map<string, Promise<Track | null>>();
   private tiles = new Map<string, Uint8Array>();
   private limited = false;
   private preparing = false;
   private prefetching = false;
   private ahead: string[] = [];
+  private readonly browserCache: StravaCache<StravaActivity>;
 
   readonly loadTiles = createTileLoader({
     fetchTile: (url, headers, timeout) =>
@@ -98,26 +150,35 @@ export class StravaSession {
     },
   });
 
-  constructor(private readonly grant: StravaGrant) {}
+  constructor(private readonly grant: StravaGrant) {
+    this.browserCache = new StravaCache(
+      grant.sessionId,
+      grant.expiresAt,
+      grant.cacheKey ?? grant.token,
+    );
+  }
 
   get signal(): AbortSignal {
     return this.lifetime.signal;
   }
 
-  close(): void {
+  close(): Promise<unknown> {
     this.lifetime.abort();
     this.activities.clear();
     this.tracks.clear();
     this.tiles.clear();
     this.ahead = [];
+    return this.browserCache.clear();
   }
 
-  async disconnect(): Promise<void> {
+  async end(disconnect: boolean): Promise<void> {
     try {
-      await revokeStravaAccess(this.grant.token);
+      await Promise.all([this.close(), clearStravaAccess(this.grant.token, disconnect)]);
     } catch {
       throw new StravaError(
-        'Strava could not disconnect the app. You can revoke access in Strava settings.',
+        disconnect
+          ? 'Strava could not disconnect the app. You can revoke access in Strava settings.'
+          : 'Could not clear the Strava sign-in. Try again when online.',
       );
     }
   }
@@ -126,16 +187,21 @@ export class StravaSession {
     from: number | null,
     to: number | null,
     signal: AbortSignal,
+    activityChanged: boolean,
   ): Promise<ActivitySummary[]> {
     this.range.abort();
     this.range = new AbortController();
     this.activities.clear();
     this.tracks = new Map();
     this.ahead = [];
-    if (from === null || to === null) return [];
     const range = this.range.signal;
     const active = AbortSignal.any([this.signal, range, signal]);
-    const rows = new Map<string, ActivitySummary>();
+    if (activityChanged) await this.browserCache.clear();
+    active.throwIfAborted();
+    if (from === null || to === null) return [];
+    const previous = await this.browserCache.list();
+    active.throwIfAborted();
+    const rows = new Map<string, StravaActivity>();
     const parameters = new URLSearchParams({
       after: String(Math.floor(from / 1000) - 1),
       before: String(Math.ceil(to / 1000)),
@@ -147,17 +213,68 @@ export class StravaSession {
       const res = await this.get('/athlete/activities?' + parameters.toString(), active);
       const batch = (await res.json()) as Summary[];
       active.throwIfAborted();
-      for (const item of batch) {
-        const row = summary(item);
-        if (row && from <= row.startTime && row.startTime < to) rows.set(row.id, row);
+      for (const row of await Promise.all(batch.map(summary))) {
+        if (row && from <= row.summary.startTime && row.summary.startTime < to)
+          rows.set(row.summary.id, row);
       }
       if (batch.length === 0) break;
     }
 
-    const ordered = [...rows.values()].sort((a, b) => b.startTime - a.startTime);
+    active.throwIfAborted();
+    if (previous) {
+      const invalid = previous.filter(
+        ({ summary, version }) =>
+          summary.startTime >= from &&
+          summary.startTime < to &&
+          rows.get(summary.id)?.version !== version,
+      );
+      await Promise.all(invalid.map((row) => this.browserCache.clearTrack(row.summary.id)));
+      active.throwIfAborted();
+    }
+    await this.browserCache.saveList([...rows.values()]);
+    active.throwIfAborted();
+    const ordered = [...rows.values()]
+      .map((row) => row.summary)
+      .sort((a, b) => b.startTime - a.startTime);
     this.activities = rows;
     this.prioritize(ordered.slice(0, PREFETCH_COUNT).map((row) => row.id));
     return ordered;
+  }
+
+  private filtered(settings: RenderSettings) {
+    return [...this.activities.values()]
+      .sort((a, b) => b.summary.startTime - a.summary.startTime)
+      .filter(
+        ({ summary }) =>
+          sportIncluded(settings, summary.sport) &&
+          (settings.from === null || summary.startTime >= settings.from) &&
+          (settings.to === null || summary.startTime < settings.to),
+      );
+  }
+
+  match(input: SettingsInput): MatchReport {
+    const settings = parseSettings(input);
+    const rows = this.filtered(settings);
+    const within = (point: LatLon | undefined, filter: RenderSettings['startNear']) =>
+      !filter ||
+      (point &&
+        distanceM(point.lat, point.lon, filter.place.lat, filter.place.lon) <= filter.radius);
+    const ids = rows
+      .filter((row) => within(row.start, settings.startNear) && within(row.end, settings.endNear))
+      .map((row) => row.summary.id);
+    const problem =
+      ids.length || !rows.length || (!settings.startNear && !settings.endNear)
+        ? null
+        : 'No Strava activity ' + nearPlacesText(settings) + '.';
+    return { ids, problem };
+  }
+
+  places(input: SettingsInput, end: TrackEnd) {
+    const points = this.filtered(parseSettings(input)).flatMap((row) => {
+      const point = row[end];
+      return point ? [{ ...point, time: row.summary.startTime }] : [];
+    });
+    return frequentPlacesAt(points, 500, 6, 1);
   }
 
   prioritize(ids: string[]): void {
@@ -230,20 +347,30 @@ export class StravaSession {
     if (!row) return Promise.resolve(null);
     const cache = this.tracks;
     const active = AbortSignal.any([this.signal, this.range.signal]);
-    const task = this.get(
-      '/activities/' + id + '/streams?keys=latlng,time,altitude&key_by_type=true',
-      active,
-      true,
-    )
-      .then(async (res) =>
-        res.status === 404 ? null : trackFromStreams(row, (await res.json()) as Streams),
-      )
-      .catch((error: unknown) => {
-        cache.delete(id);
-        throw error;
-      });
+    const task = this.loadTrack(row, active).catch((error: unknown) => {
+      cache.delete(id);
+      throw error;
+    });
     cache.set(id, task);
     return task;
+  }
+
+  private async loadTrack(row: StravaActivity, signal: AbortSignal): Promise<Track | null> {
+    const cached = await this.browserCache.track(row.summary.id, row.version);
+    signal.throwIfAborted();
+    if (cached) return { ...row.summary, ...cached };
+
+    const res = await this.get(
+      '/activities/' + row.summary.id + '/streams?keys=latlng,time,altitude&key_by_type=true',
+      signal,
+      true,
+    );
+    const track =
+      res.status === 404 ? null : trackFromStreams(row.summary, (await res.json()) as Streams);
+    signal.throwIfAborted();
+    if (track) await this.browserCache.saveTrack(track, row.version);
+    signal.throwIfAborted();
+    return track;
   }
 
   private async get(path: string, signal: AbortSignal, allowMissing = false): Promise<Response> {

@@ -128,7 +128,7 @@ const suggestFrom = computed(() => placeSettings(choice.value, new Date()));
       </div>
     </div>
 
-    <div v-if="!strava" class="filter">
+    <div class="filter">
       <span class="label">Places</span>
       <div class="places">
         <template v-for="end in ['start', 'end'] as const" :key="end">
@@ -146,6 +146,7 @@ const suggestFrom = computed(() => placeSettings(choice.value, new Date()));
             :engine="engine"
             :end="end"
             :suggest-from="suggestFrom"
+            :source-loaded="!strava || library.length > 0"
             @update:model-value="update({ [key(end)]: $event })"
           />
         </template>

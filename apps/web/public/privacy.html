@@ -33,11 +33,13 @@
     <h2>Connecting Strava</h2>
     <p>
       When you authorize Wornways, your browser requests the activity IDs, names, dates, sports,
-      distances, and GPS, timing, and elevation data needed for your replay. The sign-in service
-      exchanges the authorization code and forwards account and activity deletion notifications to
-      the open session. Wornways keeps the activity list and tracks in browser memory during the
-      replay and clears them when you end the session. It does not save them to its file library or
-      a server database.
+      distances, start and finish locations, and GPS, timing, and elevation data needed for your
+      replay. The sign-in service exchanges the authorization code and forwards account and activity
+      deletion notifications to the open session. Wornways caches the activity list and downloaded
+      tracks in encrypted form in your browser for the same session as the sign-in cookie, up to two
+      hours. On reload, Wornways checks the list against Strava and reuses tracks that still match.
+      Ending the session clears the cache. If the browser was closed, Wornways removes expired
+      entries the next time you open it. The file library contains activities you added as files.
     </p>
     <p>
       To revoke access, choose Disconnect Strava on the Source screen or remove Wornways in
