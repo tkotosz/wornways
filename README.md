@@ -106,6 +106,10 @@ The web app is a static site on Cloudflare Pages, published by the Deploy workfl
 
 - **Preview:** when CI passes for a push to `main`, the app goes to
   https://preview.wornways.pages.dev.
+- **PR preview:** after CI passes on a same-repo PR to `main`, the repository owner can
+  comment `/preview`. The workflow posts `https://pr-<number>.wornways.pages.dev` on
+  the PR. Run `/preview` again after a push to update that URL. Closing or merging the PR,
+  or commenting `/preview delete`, removes its deployments and marks the link as expired.
 - **Production:** publishing a GitHub Release puts its tag on https://wornways.pages.dev,
   after the full CI has passed on it. Tags follow semantic versioning (`v0.1.0`; minor for
   features, patch for fixes):
