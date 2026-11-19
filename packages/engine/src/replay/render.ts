@@ -1,5 +1,5 @@
-import { drawBasemap, type Basemap, type MapLabel } from '../map/basemap.ts';
-import { levelsFor, mapLevelViews, type CameraPath } from './camera.ts';
+import { drawBasemap, type Basemap, type MapLabel, type Tile } from '../map/basemap.ts';
+import { levelsFor, mapLevelViews, type CameraPath, type LevelWindow } from './camera.ts';
 import { drawEndCard, endCardFrames } from './end-card.ts';
 import { drawWatermark } from './mark.ts';
 import { composeHeat, createHeatRamp, decodeHeat, heatStyle, saturationFromHeat } from './heat.ts';
@@ -113,10 +113,15 @@ export type RenderOptions = {
   background?: string;
   /** Where the tracks sit in the frame; defaults to `fitView(tracks, width, height)`. */
   view?: View;
-  /** Moving camera from `followCamera`. Without one the frame stays on `view`. */
+  /** Without a moving camera the frame stays on `view`. */
   camera?: CameraPath;
   /** Street map drawn under the heatmap, with one level per entry of `mapLevelViews`. */
   basemap?: Basemap;
+  /** Bounded map and heat canvases for a camera that pans over long distances. */
+  levelWindows?: {
+    levels: (LevelWindow & { tiles?: Tile[] })[][];
+    attribution?: string;
+  };
   title?: string;
   /** Singular and plural noun for the counter, e.g. ["ride", "rides"]. */
   countLabel?: [string, string];
@@ -184,6 +189,7 @@ type Prepared = Projected & {
 };
 
 type Rect = { x0: number; y0: number; x1: number; y1: number };
+type RoutePiece = Rect & { xy: number[] };
 
 /**
  * The scene at one zoom level. Level pixel q shows base-view pixel q / k + (ox, oy).
@@ -196,6 +202,7 @@ type Level = {
   k: number;
   ox: number;
   oy: number;
+  heat: CanvasLike;
   heatCtx: Context2DLike;
   composed: CanvasLike;
   composedCtx: Context2DLike;
@@ -276,8 +283,9 @@ export function createRenderer(
 
   const view = options.view ?? fitView(tracks, W, H);
   const readback = options.readbackHint === false ? undefined : { willReadFrequently: true };
-  const levelViews = basemap ? basemap.levels.map((l) => l.view) : mapLevelViews(view, camera);
-  if (!camera && levelViews.length !== 1)
+  const windows = options.levelWindows?.levels;
+  const attribution = options.levelWindows?.attribution ?? basemap?.attribution;
+  if (!camera && (basemap?.levels.length ?? 1) !== 1)
     throw new Error('A fixed camera takes a basemap with one level');
 
   // Points closer than a third of a pixel add nothing, at the closest the camera gets.
@@ -335,9 +343,9 @@ export function createRenderer(
   }
   const ramp = createHeatRamp(saturation);
 
-  // --- Levels: map drawn once each, heat accumulated on each ---
+  // --- Map and heat for each zoom level ---
   const labelFont = (size: number) => `500 ${Math.round(size)}px ${fontFamily}`;
-  const levels: Level[] = levelViews.map((lv, index) => {
+  function createLevel(lv: View, tiles?: Tile[]): Level {
     const k = lv.scale / view.scale;
     const ox = view.offX - lv.offX / k;
     const oy = view.offY - lv.offY / k;
@@ -347,8 +355,8 @@ export function createRenderer(
     composedCtx.fillRect(0, 0, lv.width, lv.height);
 
     const labels: MapLabel[] = [];
-    if (basemap) {
-      const places = drawBasemap(composedCtx, lv, basemap.levels[index].tiles, unit);
+    if (tiles) {
+      const places = drawBasemap(composedCtx, lv, tiles, unit);
       // Keep the most important place names that fit without touching each other.
       const limit = 28 * Math.max(1, (lv.width * lv.height) / (W * H));
       const boxes: Rect[] = [];
@@ -382,6 +390,7 @@ export function createRenderer(
       k,
       ox,
       oy,
+      heat,
       heatCtx,
       composed,
       composedCtx,
@@ -389,7 +398,37 @@ export function createRenderer(
       labels,
       dirty: [],
     };
-  });
+  }
+
+  const levels: (Level | undefined)[] = windows
+    ? windows.map(() => undefined)
+    : basemap
+      ? basemap.levels.map(({ view, tiles }) => createLevel(view, tiles))
+      : mapLevelViews(view, camera).map((levelView) => createLevel(levelView));
+  const windowIndices = windows?.map(() => -1);
+  // Windows opened later need the route as it was originally stroked, including where
+  // pieces meet. Replaying the same pieces preserves pass counts at those joins.
+  const history: RoutePiece[] = [];
+
+  function strokePiece(level: Level, piece: RoutePiece): void {
+    const rect = {
+      x0: (piece.x0 - level.ox) * level.k - pad,
+      y0: (piece.y0 - level.oy) * level.k - pad,
+      x1: (piece.x1 - level.ox) * level.k + pad,
+      y1: (piece.y1 - level.oy) * level.k + pad,
+    };
+    if (rect.x1 < 0 || rect.y1 < 0 || rect.x0 > level.width || rect.y0 > level.height) return;
+    const c = level.heatCtx;
+    c.beginPath();
+    c.moveTo(piece.xy[0], piece.xy[1]);
+    for (let j = 2; j < piece.xy.length; j += 2) c.lineTo(piece.xy[j], piece.xy[j + 1]);
+    for (const s of strokes) {
+      c.lineWidth = s.width / level.k;
+      c.strokeStyle = s.style;
+      c.stroke();
+    }
+    markDirty(level, rect);
+  }
 
   const frame = createCanvas(W, H);
   const ctx = frame.getContext('2d') as Context2DLike;
@@ -515,37 +554,45 @@ export function createRenderer(
       }
       if (bx0 === bx1 && by0 === by1) continue; // standing still
 
-      for (const level of levels) {
-        // Bounding box of the piece in level pixels, with room for the glow.
-        const rect = {
-          x0: (bx0 - level.ox) * level.k - pad,
-          y0: (by0 - level.oy) * level.k - pad,
-          x1: (bx1 - level.ox) * level.k + pad,
-          y1: (by1 - level.oy) * level.k + pad,
-        };
-        if (rect.x1 < 0 || rect.y1 < 0 || rect.x0 > level.width || rect.y0 > level.height) continue;
-        const c = level.heatCtx;
-        c.beginPath();
-        c.moveTo(piece[0], piece[1]);
-        for (let j = 2; j < piece.length; j += 2) c.lineTo(piece[j], piece[j + 1]);
-        for (const s of strokes) {
-          c.lineWidth = s.width / level.k; // the same width on screen at every level
-          c.strokeStyle = s.style;
-          c.stroke();
-        }
-        markDirty(level, rect);
-      }
+      const added = { xy: windows ? piece.slice() : piece, x0: bx0, y0: by0, x1: bx1, y1: by1 };
+      if (windows) history.push(added);
+      for (const level of levels) if (level) strokePiece(level, added);
     }
   }
 
   /** The map and heat at the camera's zoom, cross-fading between the two nearest levels. */
-  function drawScene(zoom: number, tx: number, ty: number): void {
+  function drawScene(index: number, zoom: number, tx: number, ty: number): void {
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.globalCompositeOperation = 'source-over';
     ctx.globalAlpha = 1;
     ctx.fillStyle = background;
     ctx.fillRect(0, 0, W, H);
     const [a, b, frac] = levelsFor(zoom, levels.length - 1);
+    if (windows && windowIndices) {
+      for (const [i, level] of levels.entries()) {
+        const active = i === a || i === b;
+        const previous = windowIndices[i];
+        if (active) {
+          const entries = windows[i];
+          while (entries[windowIndices[i] + 1]?.from <= index) windowIndices[i]++;
+        }
+        if (level && (!active || previous !== windowIndices[i])) {
+          // Release backing stores before opening replacements, including on mobile.
+          level.heat.width = 1;
+          level.heat.height = 1;
+          level.composed.width = 1;
+          level.composed.height = 1;
+          levels[i] = undefined;
+        }
+      }
+      for (const i of a === b ? [a] : [a, b]) {
+        if (levels[i]) continue;
+        const { view, tiles } = windows[i][windowIndices[i]];
+        const level = createLevel(view, tiles);
+        for (const piece of history) strokePiece(level, piece);
+        levels[i] = level;
+      }
+    }
     const drawLevel = (level: Level, alpha: number) => {
       flush(level);
       const s = zoom / level.k;
@@ -553,8 +600,8 @@ export function createRenderer(
       ctx.globalAlpha = alpha;
       ctx.drawImage(level.composed, 0, 0);
     };
-    drawLevel(levels[a], 1);
-    if (b !== a) drawLevel(levels[b], smoothstep(frac));
+    drawLevel(levels[a]!, 1);
+    if (b !== a) drawLevel(levels[b]!, smoothstep(frac));
     ctx.globalAlpha = 1;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
   }
@@ -686,7 +733,7 @@ export function createRenderer(
       title && titleRow === 'bottom' ? Math.min(H * 0.76, title.top - H * 0.06) : H * 0.76;
     /** The rows text in the middle of the frame takes, with room around; null when none. */
     const middleBand = middleRows(card, title);
-    if (basemap) {
+    if (attribution !== undefined) {
       if (bottomStart === H * 0.76) ctx.fillStyle = bottomShade;
       else {
         const shade = ctx.createLinearGradient(0, bottomStart, 0, bottomStart + H * 0.14);
@@ -721,7 +768,7 @@ export function createRenderer(
       ctx.textAlign = 'right';
       ctx.textBaseline = 'alphabetic';
       ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
-      ctx.fillText(basemap.attribution, W - W * 0.03, H - H * 0.012);
+      ctx.fillText(attribution, W - W * 0.03, H - H * 0.012);
 
       // Place names sit above the routes so they stay readable on busy roads. Each zoom
       // level has its own selection; names fade as the camera moves between levels.
@@ -738,8 +785,8 @@ export function createRenderer(
           else visible.set(label.text, { x, y, size: label.size, alpha: weight });
         }
       };
-      collect(levels[a], b === a ? 1 : 1 - mix);
-      if (b !== a) collect(levels[b], mix);
+      collect(levels[a]!, b === a ? 1 : 1 - mix);
+      if (b !== a) collect(levels[b]!, mix);
 
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
@@ -848,7 +895,7 @@ export function createRenderer(
       const [zoom, tx, ty] = camera
         ? [camera.zoom[index], camera.tx[index], camera.ty[index]]
         : [1, 0, 0];
-      drawScene(zoom, tx, ty);
+      drawScene(index, zoom, tx, ty);
       drawOverlay(t, zoom, tx, ty);
     },
     skipTo(index: number): void {

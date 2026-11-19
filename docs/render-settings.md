@@ -33,7 +33,7 @@ video's length or a value under Fine-tune playback makes the preset Custom.
 | `all-at-once`   | every activity starts at the same moment and moves at its real pace         | `--group all --group-pace real --duration 30`                 |
 | `recap`         | activities in turn, grouped as needed (a week by activity, a year by month) | `--group auto --share even --group-pace fit --duration 30`    |
 | `multiday-trip` | one day after another, a longer day getting more time                       | `--group day --share distance --group-pace fit --duration 45` |
-| `highlight`     | for one activity: a 15-second clip, the camera pulling back                 | `--duration 15 --camera zoom`                                 |
+| `highlight`     | for one activity: a 15-second clip with the camera following the route      | `--duration 15 --camera follow`                               |
 
 ## Settings
 
@@ -83,10 +83,16 @@ dates, a month, or the dates all activities span; in a race, the race clock.
 
 | Setting           | CLI flag             | Values                                                                 | Default |
 | ----------------- | -------------------- | ---------------------------------------------------------------------- | ------- |
-| Camera            | `--camera`           | `zoom` or `fixed`                                                      | `zoom`  |
+| Camera            | `--camera`           | `zoom`, `fixed` or `follow`                                            | `zoom`  |
 | Street map        | `--map` / `--no-map` | on/off                                                                 | on      |
 | Frame size        | `--size`             | `WxH`, presets: story 1080x1920, square 1080x1080, landscape 1920x1080 | story   |
 | Frames per second | `--fps`              | 24, 30, 60                                                             | 30      |
+
+The follow camera tracks the moving end of the route and pulls back to show the whole
+replay at the end. Each activity gets a zoom suited to its pace, and the camera widens
+when gliding between distant routes. Activities within each group play in turn, with
+time shared by distance. During a group overlap the camera moves to the latest activity
+to start. Races use the zoom-out camera.
 
 ### Title
 

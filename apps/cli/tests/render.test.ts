@@ -3,6 +3,9 @@ import { describe, expect, it } from 'vitest';
 import {
   chronologicalTimeline,
   createRenderer,
+  parseSettings,
+  planReplay,
+  prepareReplay,
   STRIDE,
   type CanvasLike,
   type Context2DLike,
@@ -19,6 +22,58 @@ function route(): Track {
   }
   return { id: 'route', sport: 'run', startTime: Date.UTC(2026, 4, 2), points };
 }
+
+describe('the follow camera', () => {
+  const create = (w: number, h: number) => createCanvas(w, h) as unknown as CanvasLike;
+
+  it('preserves the accumulated heat when jumping to the preview frame', async () => {
+    const settings = parseSettings({ preset: 'highlight', size: '180x320', 'end-card': false });
+    const prepare = () =>
+      prepareReplay([route()], settings, {
+        createCanvas: create,
+        async loadTiles(ids) {
+          expect(new Set(ids.map(({ z, x, y }) => `${z}/${x}/${y}`)).size).toBe(ids.length);
+          return { tiles: ids.map((id) => ({ ...id, data: null })), downloaded: 0 };
+        },
+      });
+    const { renderer, cameraMode, map } = await prepare();
+    expect(cameraMode).toBe('follow');
+    expect(map?.tiles).toBeGreaterThan(0);
+    const { renderer: preview } = await prepare();
+    const last = renderer.replayFrames - 1;
+    for (let frame = 0; frame <= last; frame++) renderer.renderFrame(frame);
+    preview.skipTo(last);
+    preview.renderFrame(last);
+    const pixels = (canvas: CanvasLike) =>
+      Buffer.from((canvas.getContext('2d') as Context2DLike).getImageData(0, 0, 180, 320).data);
+    expect(heatPixels(preview.canvas, 180, 320)).toBeGreaterThan(50);
+    expect(pixels(renderer.canvas).equals(pixels(preview.canvas))).toBe(true);
+  });
+
+  it('uses the zoom-out camera and preserves the clock for a race', async () => {
+    const settings = parseSettings({ preset: 'all-at-once', camera: 'follow', map: false });
+    const replay = await prepareReplay([route(), route()], settings, {
+      createCanvas: create,
+      size: { width: 180, height: 320 },
+      loadTiles: () => Promise.reject(new Error('The map is off')),
+    });
+    expect(replay.cameraMode).toBe('zoom');
+    expect(replay.plan.timeline.mode).toBe('race');
+  });
+
+  it('assigns time within a group in proportion to route distance', () => {
+    const full = route();
+    const short = { ...full, points: full.points.slice(0, 40 * STRIDE) };
+    const { timeline } = planReplay(
+      [short, full],
+      parseSettings({ camera: 'follow', group: 'all' }),
+    );
+    const [first, second] = timeline.windows!;
+    expect(second!.start).toBeCloseTo(first!.start + first!.duration);
+    expect(second!.duration / first!.duration).toBeCloseTo(119 / 39, 2);
+    expect(timeline.progress(1, second!.start - 0.1)).toBe(0);
+  });
+});
 
 /** Pixels where red clearly dominates (the heat line), in `height` rows from `top`. */
 function heatPixels(canvas: CanvasLike, width: number, height: number, top = 0): number {

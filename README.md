@@ -19,7 +19,7 @@ files are never uploaded.
     with a race clock.
   - **Recap:** one after another, grouped by day, week or month when there are many.
   - **Multiday trip:** one day after another, a longer day getting more time.
-  - **Highlight:** a 15-second clip of a single activity.
+  - **Highlight:** a 15-second clip with the camera following a single activity.
 
   Or fine-tune it: grouping, time share, how a group moves, overlap, drawing pace and the
   camera.

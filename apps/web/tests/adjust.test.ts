@@ -147,7 +147,7 @@ describe('presets', () => {
     expect(withPreset({}, 'custom', 'one')).toEqual({
       'preset-one': 'custom',
       duration: '15',
-      camera: 'zoom',
+      camera: 'follow',
     });
   });
 

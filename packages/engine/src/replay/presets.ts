@@ -29,9 +29,9 @@ export const PRESETS: Record<Preset, PresetDefinition> = {
     settings: { group: 'day', share: 'distance', 'group-pace': 'fit', duration: '45' },
   },
   highlight: {
-    help: 'for one activity: a 15-second clip, the camera pulling back as it goes',
+    help: 'for one activity: a 15-second clip, the camera following the route',
     activities: 'one',
-    settings: { duration: '15', camera: 'zoom' },
+    settings: { duration: '15', camera: 'follow' },
   },
 };
 

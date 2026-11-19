@@ -92,6 +92,8 @@ export type PlanReport = {
   } | null;
   /** Whether a group's activities move at their real pace rather than finishing together. */
   realPace: boolean;
+  /** Whether the camera follows the activities in each group in turn. */
+  follows: boolean;
   /** How much of a group's time, in percent, the next group starts early. */
   overlap: number;
 };

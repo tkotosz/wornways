@@ -89,7 +89,7 @@ describe('parseSettings', () => {
       'group: expects auto or activity or day or week or month or all, got "year"',
     ],
     [{ 'group-pace': 'fast' }, 'group-pace: expects fit or real, got "fast"'],
-    [{ camera: 'follow' }, 'camera: expects zoom or fixed, got "follow"'],
+    [{ camera: 'pan' }, 'camera: expects zoom or fixed or follow, got "pan"'],
     [{ from: 'October' }, 'from: expects YYYY-MM-DD, YYYY-MM or YYYY, got "October"'],
     [{ from: '2026-10', to: '2026-09' }, 'to: is before the period start'],
     [{ 'start-near': 'Budapest' }, 'start-near: expects latitude,longitude, got "Budapest"'],
@@ -146,7 +146,11 @@ describe('parseSettings', () => {
       duration: 45,
     });
     expect(parseSettings({ preset: 'multiday-trip', duration: '20' }).duration).toBe(20);
-    expect(parseSettings({ preset: 'highlight' })).toMatchObject({ duration: 15, camera: 'zoom' });
+    expect(parseSettings({ preset: 'highlight' })).toMatchObject({
+      duration: 15,
+      camera: 'follow',
+    });
+    expect(parseSettings({ preset: 'highlight', camera: 'fixed' }).camera).toBe('fixed');
     expect(errorOf({ preset: 'race' })).toBe(
       'preset: expects all-at-once or recap or multiday-trip or highlight, got "race"',
     );

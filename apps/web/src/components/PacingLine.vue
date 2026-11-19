@@ -33,17 +33,34 @@ async function askPlan(): Promise<void> {
   if (ask === asked) pacing.value = plan ? pacingText(plan) : '';
 }
 
-function pacingText({ activities, seconds, groups, realPace, overlap }: PlanReport): string {
+function pacingText({
+  activities,
+  seconds,
+  groups,
+  realPace,
+  follows,
+  overlap,
+}: PlanReport): string {
   const all = countText(activities, 'activity', 'activities');
   if (!groups)
     return `One activity plays at its own pace, in ${Number(seconds.toFixed(1))} s; grouping does not apply.`;
   if (groups.race) return `This video: a race of all ${all}, each at its real pace.`;
   const [shortest, longest] = [groups.shortest, groups.longest].map((s) => Number(s.toFixed(1)));
   const each = shortest === longest ? `${shortest} s` : `${shortest}–${longest} s`;
-  if (groups.unit === 'all') return `This video: all ${all} together, each drawn over ${each}.`;
+  if (groups.unit === 'all')
+    return follows
+      ? `This video: all ${all} in turn, over ${each}.`
+      : `This video: all ${all} together, each drawn over ${each}.`;
   const [one, many] = UNITS[groups.unit];
   const covered = groups.unit === 'activity' ? '' : ` (${all})`;
-  const pace = realPace && groups.unit !== 'activity' ? ', each group a race at real pace' : '';
+  const pace =
+    groups.unit === 'activity'
+      ? ''
+      : follows
+        ? ', following each activity in turn'
+        : realPace
+          ? ', each group a race at real pace'
+          : '';
   const overlapping = overlap > 0 && groups.count > 1 ? `, overlapping ${overlap}%` : '';
   return `This video: ${countText(groups.count, one, many)}${covered}, ${each} each${pace}${overlapping}.`;
 }

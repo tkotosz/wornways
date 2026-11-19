@@ -58,7 +58,7 @@ export const PRESET_LINES: Record<PresetChoice, string> = {
   recap: 'Your activities one after another, grouped automatically by day, week or month.',
   'all-at-once': 'Every activity starts together and traces its route at its real pace.',
   'multiday-trip': 'Each day in turn, with longer days getting more screen time.',
-  highlight: 'A 15-second clip of the activity, the camera pulling back as it goes.',
+  highlight: 'A 15-second clip with the camera following the route.',
   custom: 'Your own settings, set under Fine-tune playback.',
 };
 
@@ -149,7 +149,7 @@ const CHOICE_LABELS: Record<string, Record<string, string>> = {
   share: { even: 'Even', distance: 'By distance' },
   'group-pace': { fit: 'Fit to the group', real: 'Real pace' },
   pace: { time: 'As recorded', distance: 'Even speed' },
-  camera: { zoom: 'Zooms out', fixed: 'Fixed' },
+  camera: { zoom: 'Zooms out', fixed: 'Fixed', follow: 'Follows' },
   'title-position': POSITION_LABELS,
   'metrics-position': POSITION_LABELS,
 };
@@ -175,7 +175,9 @@ const HINTS: Record<string, string> = {
   pace:
     'As recorded: each activity is drawn at its real speed, slower up the climbs and faster ' +
     'down them, with long stops shortened. Even speed: at one steady speed along the route.',
-  camera: 'Zooms out: starts close and pulls back as the routes spread.',
+  camera:
+    'Follows the moving route and pulls back at the end. Activities within each group ' +
+    'play in turn with this camera. Races use Zooms out.',
   'metrics-fields': 'In the order picked; the first is shown large.',
 };
 

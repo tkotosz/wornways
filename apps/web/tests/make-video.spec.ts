@@ -509,6 +509,15 @@ test('offers Highlight for a single activity, and the other presets for several'
   await expect(page.getByTestId('pacing')).toHaveText(
     'One activity plays at its own pace, in 15 s; grouping does not apply.',
   );
+  await page.getByRole('button', { name: /Fine-tune playback/ }).click();
+  const camera = page.getByTestId('group-camera');
+  const follows = camera.getByRole('button', { name: 'Follows', exact: true });
+  await expect(follows).toHaveAttribute('aria-pressed', 'true');
+  await camera.getByRole('button', { name: 'Fixed', exact: true }).click();
+  await expect(preset('Highlight')).toHaveAttribute('aria-checked', 'false');
+  await follows.click();
+  await expect(follows).toHaveAttribute('aria-pressed', 'true');
+  await page.getByRole('button', { name: /Fine-tune playback/ }).click();
   await page.getByRole('button', { name: 'Continue' }).click();
   await expect(page.getByRole('heading', { name: 'Make it yours' })).toBeVisible();
 
