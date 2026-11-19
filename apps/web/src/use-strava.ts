@@ -10,44 +10,9 @@ import {
   takeStravaCallback,
   type StravaLogin,
 } from './strava-auth.ts';
+import { clearStravaDraft, openStravaDraft, type StravaDraftStore } from './strava-draft.ts';
 
-const DRAFT = 'wornways-strava-draft';
-const ENDED = 'wornways-strava-ended';
 const initialChoice = (): Choice => ({ ...NO_CHOICE, period: 'this-month' });
-
-type Draft = {
-  sessionId: string;
-  choice: Omit<Choice, 'excluded'>;
-  selected: string[];
-  adjustments: Adjustments;
-};
-
-// A blocked storage API only prevents remembering the draft. The normal replay still works.
-function stored(key: string): string | null {
-  try {
-    return sessionStorage.getItem(key);
-  } catch {
-    return null;
-  }
-}
-
-function store(key: string, value: string | null): void {
-  try {
-    if (value === null) sessionStorage.removeItem(key);
-    else sessionStorage.setItem(key, value);
-  } catch {
-    // Optional draft restoration.
-  }
-}
-
-function readDraft(sessionId: string): Draft | null {
-  try {
-    const draft = JSON.parse(stored(DRAFT) ?? 'null') as Draft | null;
-    return draft?.sessionId === sessionId ? draft : null;
-  } catch {
-    return null;
-  }
-}
 
 export function useStrava(
   engine: EngineClient,
@@ -65,7 +30,7 @@ export function useStrava(
   const notice = ref('');
   const selection = ref<MatchReport>({ ids: [], problem: null });
   let callback = takeStravaCallback();
-  let session: Pick<StravaLogin, 'sessionId' | 'ticket' | 'expiresAt'> | null = null;
+  let session: (Pick<StravaLogin, 'ticket' | 'expiresAt'> & StravaDraftStore) | null = null;
   let initialSelection: string[] = [];
   const range = computed(() => periodRange(choice.value, new Date()));
   let revision = 0;
@@ -91,8 +56,7 @@ export function useStrava(
   async function end(disconnect = false) {
     if (!session) return;
     const ended = ++revision;
-    store(ENDED, session.sessionId);
-    store(DRAFT, null);
+    session.end();
     session = null;
     clearTimeout(expiry);
     closeEvents();
@@ -122,16 +86,17 @@ export function useStrava(
       const config = await stravaConfiguration();
       if (config.clientId) url.value = stravaAuthorization(config.clientId);
       const login = params ? await finishStravaAuthorization(params) : config.session;
-      if (!login || login.expiresAt <= Date.now() || stored(ENDED) === login.sessionId) {
-        store(DRAFT, null);
+      if (!login || login.expiresAt <= Date.now()) {
+        clearStravaDraft();
         return false;
       }
+      const storage = await openStravaDraft(login, params !== null);
+      if (!storage) return false;
       // Access tokens stay in the worker after the authorization response.
       const { token, expiresAt, sessionId, ticket, cacheKey } = login;
       await engine.startStrava({ token, expiresAt, sessionId, cacheKey });
-      session = { expiresAt, sessionId, ticket };
-      if (params) store(ENDED, null);
-      const draft = params ? null : readDraft(sessionId);
+      const { draft, ...draftStore } = storage;
+      session = { expiresAt, ticket, ...draftStore };
       choice.value = draft ? { ...draft.choice, excluded: [] } : initialChoice();
       adjustments.value = draft?.adjustments ?? { ...defaultAdjustments };
       initialSelection = draft?.selected ?? [];
@@ -320,13 +285,11 @@ export function useStrava(
     () => {
       if (!session || busy.value || !ready.value || (!rows.value.length && error.value)) return;
       const { excluded: _, ...filters } = choice.value;
-      const draft: Draft = {
-        sessionId: session.sessionId,
+      void session.save({
         choice: filters,
         selected: selected(),
         adjustments: adjustments.value,
-      };
-      store(DRAFT, JSON.stringify(draft));
+      });
     },
     { deep: true },
   );

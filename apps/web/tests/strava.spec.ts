@@ -218,6 +218,12 @@ test.describe('Strava on a phone', () => {
     );
     await page.getByRole('button', { name: 'Use files', exact: true }).click();
     await ending;
+    const [draft, ended] = await page.evaluate(() => [
+      sessionStorage.getItem('wornways-strava-draft'),
+      sessionStorage.getItem('wornways-strava-ended'),
+    ]);
+    expect(draft).toBeNull();
+    expect(ended).toMatch(/^[A-Za-z0-9+/]+={0,2}$/);
     await expect
       .poll(() =>
         page.evaluate(
@@ -281,6 +287,9 @@ test('reuses the selected track after a reload and socket interruption', async (
   await page.getByRole('button', { name: 'Continue' }).click();
   await expect(page.getByRole('heading', { name: 'How should your routes play?' })).toBeVisible();
   expect(mock.tracks.filter((id) => id === rideId)).toHaveLength(1);
+  const savedDraft = () => page.evaluate(() => sessionStorage.getItem('wornways-strava-draft'));
+  await expect.poll(savedDraft).toMatch(/^[A-Za-z0-9+/]+={0,2}$/);
+  expect(await savedDraft()).not.toContain(rideId);
 
   await page.reload();
   await expect(page.getByRole('button', { name: 'Last year', exact: true })).toHaveAttribute(
