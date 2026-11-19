@@ -14,3 +14,7 @@ out/
 # Browser test output
 test-results/
 playwright-report/
+
+# Local Cloudflare Functions secrets and emulator data.
+.dev.vars*
+.wrangler/

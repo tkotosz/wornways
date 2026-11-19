@@ -36,7 +36,7 @@ test('saves the import after the database connection closes', async ({ page }) =
   await expect(page.getByTestId('import-report')).toContainText('1 activity added');
   await page.reload();
   await expect(page.getByRole('heading', { name: 'Choose your activities' })).toBeVisible();
-  await page.getByRole('button', { name: /^(Go to )?Import$/ }).click();
+  await page.getByRole('button', { name: /^(Go to )?Source$/ }).click();
   await expect(page.getByTestId('activity-count')).toHaveText('1 activity on this device');
 });
 

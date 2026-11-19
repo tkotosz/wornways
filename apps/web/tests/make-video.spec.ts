@@ -74,7 +74,7 @@ test('adds an account export and keeps it for the next visit', async ({ page }) 
   await page.reload();
   // With activities stored, the app opens at the Choose step.
   await expect(page.getByRole('heading', { name: 'Choose your activities' })).toBeVisible();
-  await page.getByRole('button', { name: 'Import', exact: true }).click();
+  await page.getByRole('button', { name: 'Source', exact: true }).click();
   await expect(page.getByTestId('activity-count')).toHaveText('3 activities on this device');
 });
 
@@ -130,14 +130,14 @@ test('deletes one activity, then all of them', async ({ page }) => {
   await page.getByRole('button', { name: 'Delete trail-run' }).click();
   await expect(page.getByTestId('activity-count')).toHaveText('1 activity on this device');
 
-  await page.getByRole('button', { name: 'Delete all my data' }).click();
+  await page.getByRole('button', { name: 'Delete saved activities' }).click();
   await page.getByRole('button', { name: 'Keep them' }).click();
   await expect(page.getByTestId('activity-count')).toHaveText('1 activity on this device');
-  await page.getByRole('button', { name: 'Delete all my data' }).click();
+  await page.getByRole('button', { name: 'Delete saved activities' }).click();
   await page.getByRole('button', { name: 'Delete all', exact: true }).click();
   await expect(page.getByTestId('library')).toHaveCount(0);
   await page.reload();
-  await expect(page.getByRole('heading', { name: 'Import your activities' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Choose an activity source' })).toBeVisible();
 });
 
 test('ticks and unticks every activity shown with the header box', async ({ page }) => {

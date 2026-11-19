@@ -3,14 +3,16 @@
 [![CI](https://github.com/tkotosz/wornways/actions/workflows/ci.yml/badge.svg)](https://github.com/tkotosz/wornways/actions/workflows/ci.yml)
 
 Turns your GPS activities into a short video: your routes build up as a glowing heatmap
-over a street map, ready to post as a story. Everything happens on your own device; your
-files are never uploaded.
+over a street map, ready to post as a story. Wornways makes videos on your device.
+Activity files you add stay there.
 
 ## What it does
 
 - **Reads your files as they are:** FIT, GPX and TCX files (also `.gz`), a folder of them,
   or the whole account export ZIP from Strava or Garmin, with names and sports from its
   activity list.
+- **Connects to Strava** on deployments where it is configured. Pick a date range and
+  activities to replay. Wornways clears the list and route data when you end the replay.
 - **Lets you choose what to show:** a period (today, yesterday, this month, a custom
   range…), sports, activities that start or end near a place, and any activity ticked or
   unticked by hand.
@@ -31,8 +33,8 @@ files are never uploaded.
   another app on a phone. The web app can be installed and then starts without a network.
 
 The map comes from [OpenFreeMap](https://openfreemap.org) (OpenMapTiles, OpenStreetMap
-data). Map tile requests are the only thing that leaves the device: they say which area is
-drawn, never the routes.
+data). Tile requests tell the map provider which area is drawn. With Strava, Wornways
+also connects to Strava for sign-in and to read the athlete's selected activities.
 
 ## Running it
 
@@ -106,6 +108,10 @@ The web app is a static site on Cloudflare Pages, published by the Deploy workfl
 
 - **Preview:** when CI passes for a push to `main`, the app goes to
   https://preview.wornways.pages.dev.
+- **PR preview:** after CI passes on a same-repo PR to `main`, the repository owner can
+  comment `/preview`. The workflow posts `https://pr-<number>.wornways.pages.dev` on
+  the PR. Run `/preview` again after a push to update that URL. Closing or merging the PR,
+  or commenting `/preview delete`, removes its deployments and marks the link as expired.
 - **Production:** publishing a GitHub Release puts its tag on https://wornways.pages.dev,
   after the full CI has passed on it. Tags follow semantic versioning (`v0.1.0`; minor for
   features, patch for fixes):
@@ -127,3 +133,39 @@ ships.
 MIT, see [LICENSE](LICENSE). Parts of the engine are based on MIT-licensed code, and the
 web app ships the Inter font; [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) says
 exactly what. Report security problems as described in [SECURITY.md](SECURITY.md).
+
+### Enabling Connect with Strava
+
+The Source screen offers Strava when the deployment has the OAuth credentials and
+the event relay binding. The ordinary Vite server and on-demand PR previews serve
+the file workflow. For local OAuth testing, use Wrangler Pages dev.
+
+1. Register a [Strava API application](https://www.strava.com/settings/api). Set its
+   authorization callback domain to the Pages hostname you will use. The callback is
+   the app's root URL.
+2. Deploy the relay with
+   `npx wrangler deploy --config cloudflare/strava-events/wrangler.jsonc`.
+   In the Pages project, bind its `StravaEvents` Durable Object as `STRAVA_EVENTS`.
+   It uses WebSockets to notify open sessions of revocations and activity deletions.
+3. Set `STRAVA_CLIENT_ID` and `STRAVA_ORIGIN` in the Pages environment. The origin
+   includes the protocol and hostname and has no trailing slash. Add
+   `STRAVA_CLIENT_SECRET` and a long random URL-safe `STRAVA_WEBHOOK_TOKEN` as Pages
+   secrets, then redeploy Pages.
+4. [Register the webhook subscription](https://developers.strava.com/docs/webhooks/)
+   with the verification token and the callback at
+   `<STRAVA_ORIGIN>/api/strava/webhook/<STRAVA_WEBHOOK_TOKEN>`. Confirm that revoking
+   access from Strava ends an open Wornways session. Use your own athlete account
+   for the first live test and include the on-device MP4 export and share flow when
+   submitting the integration for wider access.
+
+For local testing, run `npx wrangler dev --config cloudflare/strava-events/wrangler.jsonc`
+in one terminal. Build the web app and run
+`npx wrangler pages dev apps/web/dist --port 8788 --do STRAVA_EVENTS=StravaEvents@wornways-strava-events`
+in another. Put the four Strava settings in a local `.dev.vars` file in the repo root
+and set the origin to `http://localhost:8788`. The local relay can accept a simulated
+webhook. Strava itself needs a public HTTPS callback to deliver real events.
+
+Activity list and stream requests go directly from the browser to Strava. Activity
+data, drawn previews, and the in-app MP4 are kept in memory, along with the short-lived
+access token. Each replay requires a connection. The Pages Function and event relay
+do not write athlete records, routes, or tokens to storage.
