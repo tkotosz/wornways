@@ -56,11 +56,19 @@ async function addFiles(page: Page, ...names: string[]): Promise<void> {
 test('adds an account export and keeps it for the next visit', async ({ page }) => {
   await page.goto('/');
   // The file instructions open on request.
-  const help = page.getByTestId('getting-files');
+  const guideLink = page.getByRole('button', { name: 'How to get your files' });
+  const guide = page.getByRole('dialog', { name: 'How to get your files' });
   await expect(page.getByTestId('intro')).toBeVisible();
-  await expect(help).not.toHaveAttribute('open');
-  await help.getByText('How to get your files').click();
-  await expect(help.getByRole('link', { name: 'Export Your Data' })).toBeVisible();
+  await expect(guide).toBeHidden();
+  await guideLink.click();
+  await expect(guide.getByRole('link', { name: 'Export Your Data' })).toBeVisible();
+  await guide.getByRole('button', { name: 'Close' }).click();
+  await expect(guide).toBeHidden();
+  await expect(guideLink).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect(guide).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(guide).toBeHidden();
   await addFiles(page, 'strava-export.zip');
   await expect(page.getByTestId('intro')).toHaveCount(0);
 
@@ -73,8 +81,23 @@ test('adds an account export and keeps it for the next visit', async ({ page }) 
   await page.reload();
   // With activities stored, the app opens at the Choose step.
   await expect(page.getByRole('heading', { name: 'Choose your activities' })).toBeVisible();
+  await page.getByRole('button', { name: 'About', exact: true }).click();
+  const about = page.getByRole('dialog', { name: 'About Wornways' });
+  await expect(about.getByRole('link', { name: 'Privacy Policy' })).toHaveAttribute(
+    'href',
+    '/privacy.html',
+  );
+  await expect(about.getByRole('link', { name: 'Source on GitHub' })).toHaveAttribute(
+    'href',
+    'https://github.com/tkotosz/wornways',
+  );
+  await expect(about.getByRole('link', { name: 'Licenses' })).toHaveAttribute(
+    'href',
+    '/licenses.txt',
+  );
+  await about.getByRole('button', { name: 'Close' }).click();
   await page.getByRole('button', { name: 'Source', exact: true }).click();
-  await expect(help).not.toHaveAttribute('open');
+  await expect(guide).toBeHidden();
   await expect(page.getByTestId('activity-count')).toHaveText('3 activities on this device');
 });
 

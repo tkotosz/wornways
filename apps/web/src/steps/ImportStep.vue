@@ -16,7 +16,6 @@ const props = defineProps<{
   stravaActive: boolean;
   stravaError: string;
   stravaBusy: string;
-  stravaNotice: string;
 }>();
 const emit = defineEmits<{
   changed: [library: ActivitySummary[]];
@@ -73,6 +72,7 @@ async function remove(ids: string[] | 'all'): Promise<void> {
             Use files
           </button>
           <AddFiles v-else :engine="engine" @changed="emit('changed', $event)" />
+          <GettingFiles />
         </div>
       </section>
       <section v-if="stravaUrl || stravaActive" class="source-card">
@@ -95,10 +95,13 @@ async function remove(ids: string[] | 'all'): Promise<void> {
           <div v-if="!stravaActive" class="connect-help muted">
             <p>If Strava says its connection limit was reached, go back and use activity files.</p>
             <p>
-              <a href="/privacy.html" target="_blank" rel="noopener noreferrer">Privacy</a> ·
-              Wornways reads activity names, dates, sports, distance, and GPS tracks. Manage access
-              in
+              <a class="link" href="/privacy.html" target="_blank" rel="noopener noreferrer"
+                >Privacy</a
+              >
+              · Wornways reads activity names, dates, sports, distance, and GPS tracks. Manage
+              access in
               <a
+                class="link"
                 href="https://www.strava.com/settings/apps"
                 target="_blank"
                 rel="noopener noreferrer"
@@ -110,35 +113,23 @@ async function remove(ids: string[] | 'all'): Promise<void> {
       </section>
     </div>
     <p v-if="stravaBusy" class="muted" role="status">{{ stravaBusy }}</p>
-    <p v-if="stravaNotice && !stravaActive" class="muted" role="status">{{ stravaNotice }}</p>
     <p v-if="stravaError" class="error" role="alert">{{ stravaError }}</p>
     <p v-if="error" class="error" role="alert">{{ error }}</p>
-    <template v-if="!stravaActive">
-      <GettingFiles />
-      <p class="about muted">
-        Wornways is open source:
-        <a href="https://github.com/tkotosz/wornways" target="_blank" rel="noopener">source</a>
-        ·
-        <a href="/licenses.txt" target="_blank" rel="noopener">licenses</a>
-      </p>
-      <template v-if="library.length">
-        <div class="library-head">
-          <h2 data-testid="activity-count">
-            {{ countText(library.length, 'activity', 'activities') }} on this device
-          </h2>
-          <span v-if="confirmingDeleteAll" class="confirm">
-            Delete all of them?
-            <button type="button" class="danger" @click="remove('all')">Delete all</button>
-            <button type="button" class="link" @click="confirmingDeleteAll = false">
-              Keep them
-            </button>
-          </span>
-          <button v-else type="button" class="link" @click="confirmingDeleteAll = true">
-            Delete saved activities
-          </button>
-        </div>
-        <ActivityGrid :rows="library" mode="delete" test-id="library" @delete="remove([$event])" />
-      </template>
+    <template v-if="!stravaActive && library.length">
+      <div class="library-head">
+        <h2 data-testid="activity-count">
+          {{ countText(library.length, 'activity', 'activities') }} on this device
+        </h2>
+        <span v-if="confirmingDeleteAll" class="confirm">
+          Delete all of them?
+          <button type="button" class="danger" @click="remove('all')">Delete all</button>
+          <button type="button" class="link" @click="confirmingDeleteAll = false">Keep them</button>
+        </span>
+        <button v-else type="button" class="link" @click="confirmingDeleteAll = true">
+          Delete saved activities
+        </button>
+      </div>
+      <ActivityGrid :rows="library" mode="delete" test-id="library" @delete="remove([$event])" />
     </template>
 
     <div class="footer">
@@ -207,8 +198,7 @@ async function remove(ids: string[] | 'all'): Promise<void> {
 .connect-help {
   display: grid;
   gap: 0.4rem;
-  margin-top: auto;
-  padding-top: 0.9rem;
+  margin-top: 0.9rem;
   font-size: 0.85rem;
 }
 
@@ -220,15 +210,6 @@ async function remove(ids: string[] | 'all'): Promise<void> {
   display: block;
   max-width: 100%;
   height: auto;
-}
-
-.about {
-  margin: 0.8rem 0 0;
-  font-size: 0.8rem;
-}
-
-.about a {
-  color: inherit;
 }
 
 .intro {

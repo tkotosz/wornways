@@ -53,8 +53,8 @@ export function useStrava(
     error.value = caught instanceof Error ? caught.message : String(caught);
   }
 
-  async function end(disconnect = false) {
-    if (!session) return;
+  async function end(disconnect = false): Promise<boolean> {
+    if (!session) return false;
     const ended = ++revision;
     session.end();
     session = null;
@@ -71,10 +71,10 @@ export function useStrava(
     onEnd();
     try {
       await engine.endStrava(disconnect);
-      if (disconnect && revision === ended)
-        notice.value = 'Strava disconnected and temporary activities cleared.';
+      return revision === ended;
     } catch (caught) {
       if (revision === ended && (!error.value || disconnect)) failed(caught);
+      return false;
     }
   }
 

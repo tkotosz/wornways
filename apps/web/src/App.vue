@@ -19,6 +19,7 @@ import {
   periodRange,
   type Choice,
 } from './choice.ts';
+import ModalPanel from './components/ModalPanel.vue';
 import type { EngineClient } from './engine-client.ts';
 import { install, installOffer } from './install.ts';
 import type { MadeVideo } from './made-video.ts';
@@ -78,6 +79,19 @@ const {
     video.value = null;
   },
 );
+
+const toast = ref('');
+let toastTimer: ReturnType<typeof setTimeout> | undefined;
+
+async function disconnectStrava(): Promise<void> {
+  if (!(await endStrava(true))) return;
+  toast.value = 'Strava disconnected and temporary activities cleared.';
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => (toast.value = ''), 5000);
+}
+
+onBeforeUnmount(() => clearTimeout(toastTimer));
+
 const choice = computed({
   get: () => (strava.value ? stravaChoice.value : fileChoice.value),
   set: (after: Choice) => {
@@ -233,6 +247,30 @@ watch(
       </span>
       <span class="aside">
         <span class="muted promise">Your files stay on this device</span>
+        <ModalPanel title="About Wornways">
+          <template #trigger="{ open }">
+            <button type="button" class="link about-trigger" aria-haspopup="dialog" @click="open">
+              About
+            </button>
+          </template>
+          <p class="about-copy">
+            Wornways turns GPS activities into short videos that show your routes on a map. It makes
+            videos in your browser. Activities you import from files stay on this device.
+          </p>
+          <p class="about-copy">Wornways is open source under the MIT License.</p>
+          <nav class="about-links" aria-label="Project links">
+            <a class="link" href="/privacy.html" target="_blank" rel="noopener">Privacy Policy</a>
+            <a
+              class="link"
+              href="https://github.com/tkotosz/wornways"
+              target="_blank"
+              rel="noopener"
+            >
+              Source on GitHub
+            </a>
+            <a class="link" href="/licenses.txt" target="_blank" rel="noopener">Licenses</a>
+          </nav>
+        </ModalPanel>
         <button v-if="installOffer" type="button" class="secondary install" @click="install">
           Install app
         </button>
@@ -291,10 +329,9 @@ watch(
         :strava-active="strava"
         :strava-error="stravaError"
         :strava-busy="stravaBusy"
-        :strava-notice="stravaNotice"
         @changed="library = $event"
         @files="endStrava()"
-        @disconnect="endStrava(true)"
+        @disconnect="disconnectStrava"
         @next="navigate('activities')"
       />
       <ActivitiesStep
@@ -343,6 +380,10 @@ watch(
       />
     </template>
   </main>
+
+  <div class="toast-region" aria-live="polite" aria-atomic="true">
+    <p v-if="toast" class="toast">{{ toast }}</p>
+  </div>
 </template>
 
 <style scoped>
@@ -381,6 +422,20 @@ watch(
   gap: 1rem;
 }
 
+.about-trigger {
+  min-height: 1.5rem;
+}
+
+.about-copy {
+  margin: 0 0 0.85rem;
+}
+
+.about-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.15rem;
+}
+
 .install {
   padding: 0.35rem 0.8rem;
   font-size: 0.85rem;
@@ -412,6 +467,29 @@ watch(
   /* No padding at the bottom: the Back and Next bar ends the page, so the place it sticks
      to while scrolling is the place it ends up at, and it does not move at the end. */
   padding: 1.5rem 1.5rem 0;
+}
+
+.toast-region {
+  position: fixed;
+  top: calc(var(--top-bar-height, 0px) + 1rem);
+  right: 1rem;
+  left: 1rem;
+  z-index: 15;
+  display: flex;
+  justify-content: flex-end;
+  pointer-events: none;
+}
+
+.toast {
+  max-width: 24rem;
+  margin: 0;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel);
+  box-shadow: 0 6px 20px rgb(0 0 0 / 40%);
+  font-size: 0.85rem;
+  line-height: 1.4;
 }
 
 .steps-row {

@@ -241,6 +241,22 @@ test.describe('Strava on a phone', () => {
   });
 });
 
+test('shows a temporary confirmation after disconnecting Strava', async ({ page }) => {
+  await fakeStrava(page);
+  await page.clock.install();
+  await page.goto('/');
+  await connect(page);
+  await page.getByRole('button', { name: 'Source', exact: true }).click();
+  await page.getByRole('button', { name: 'Disconnect Strava' }).click();
+
+  const confirmation = 'Strava disconnected and temporary activities cleared.';
+  const toast = page.locator('[aria-live="polite"]').getByText(confirmation, { exact: true });
+  await expect(toast).toBeVisible();
+  await expect(page.getByRole('main')).not.toContainText(confirmation);
+  await page.clock.fastForward(5000);
+  await expect(toast).toBeHidden();
+});
+
 test('clears the session when Strava revokes access', async ({ page }) => {
   let releaseTrack: () => void = () => undefined;
   const pendingTrack = new Promise<void>((resolve) => {
