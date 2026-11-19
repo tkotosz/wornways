@@ -6,12 +6,16 @@
 // Garmin's export page needs a sign-in, so its steps stay general: the address is Garmin's.
 // The layout of the download (activity files in ZIP files inside the ZIP, the activity list
 // in DI-Connect-Fitness) was checked against a real export on 2026-11-17.
+import ModalPanel from './ModalPanel.vue';
 </script>
 
 <template>
-  <details class="help" data-testid="getting-files">
-    <summary>How to get your files</summary>
-
+  <ModalPanel title="How to get your files">
+    <template #trigger="{ open }">
+      <button type="button" class="link guide-link" aria-haspopup="dialog" @click="open">
+        How to get your files
+      </button>
+    </template>
     <h3>From Strava, all at once</h3>
     <ol>
       <li>
@@ -30,6 +34,7 @@
       <li>
         Sign in to your Garmin account and ask for a copy of your data on its
         <a
+          class="link"
           href="https://www.garmin.com/account/datamanagement/exportdata/"
           target="_blank"
           rel="noopener"
@@ -50,25 +55,25 @@
       Connect, an activity's gear menu offers Export File. Wornways reads FIT, GPX and TCX files,
       also compressed (.gz).
     </p>
-  </details>
+  </ModalPanel>
 </template>
 
 <style scoped>
-.help {
-  margin-top: 1.2rem;
-  padding: 0.9rem 1.1rem;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-}
-
-summary {
-  cursor: pointer;
-  font-weight: 600;
+.guide-link {
+  align-self: start;
+  margin-top: 0.65rem;
+  padding: 0.25rem 0;
+  font-size: 0.85rem;
 }
 
 h3 {
   margin: 1.1rem 0 0.4rem;
+  color: var(--text);
   font-size: 0.95rem;
+}
+
+h3:first-child {
+  margin-top: 0;
 }
 
 ol {
@@ -82,14 +87,5 @@ li + li {
 
 p {
   margin: 0;
-}
-
-.help,
-a {
-  color: var(--muted);
-}
-
-a:hover {
-  color: var(--text);
 }
 </style>

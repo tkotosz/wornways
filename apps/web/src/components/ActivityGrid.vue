@@ -98,7 +98,7 @@ function toggleAll(): void {
             <a
               v-if="strava"
               :href="'https://www.strava.com/activities/' + a.id"
-              class="strava-link"
+              class="link strava-link"
               target="_blank"
               rel="noopener noreferrer"
               @click.stop
