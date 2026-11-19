@@ -3,14 +3,16 @@ const STATE = 'wornways-strava-state';
 
 export type StravaGrant = { token: string; expiresAt: number };
 
-export async function stravaClientId(): Promise<string | null> {
+export type StravaLogin = StravaGrant & { ticket: string; sessionId: string };
+type StravaConfiguration = { clientId?: string; session?: StravaLogin };
+
+export async function stravaConfiguration(): Promise<StravaConfiguration> {
   try {
-    const res = await fetch(ENDPOINT, { cache: 'no-store' });
-    if (!res.ok || !res.headers.get('Content-Type')?.includes('application/json')) return null;
-    const data = (await res.json()) as { clientId?: string };
-    return data.clientId ?? null;
+    const res = await fetch(ENDPOINT, { cache: 'no-store', signal: AbortSignal.timeout(6000) });
+    if (!res.ok || !res.headers.get('Content-Type')?.includes('application/json')) return {};
+    return (await res.json()) as StravaConfiguration;
   } catch {
-    return null;
+    return {};
   }
 }
 
@@ -46,6 +48,7 @@ async function oauthRequest(method: 'POST' | 'DELETE', body: object): Promise<Re
     method,
     headers: { 'Content-Type': 'application/json' },
     cache: 'no-store',
+    signal: AbortSignal.timeout(8000),
     body: JSON.stringify(body),
   });
   if (!res.ok) {
@@ -55,22 +58,24 @@ async function oauthRequest(method: 'POST' | 'DELETE', body: object): Promise<Re
   return res;
 }
 
-export async function finishStravaAuthorization(
-  params: URLSearchParams,
-): Promise<StravaGrant & { ticket: string }> {
+export async function finishStravaAuthorization(params: URLSearchParams): Promise<StravaLogin> {
   const state = sessionStorage.getItem(STATE);
   sessionStorage.removeItem(STATE);
   if (!state || params.get('state') !== state)
     throw new Error('The Strava sign-in expired. Connect again.');
-  if (params.has('error')) throw new Error('Strava access was canceled.');
+  const authorizationError = params.get('error');
+  if (authorizationError === 'access_denied') throw new Error('Strava access was canceled.');
+  if (authorizationError)
+    throw new Error('Strava could not connect. You can still use activity files.');
   const scopes = params.get('scope')?.split(/[, ]+/) ?? [];
   if (!scopes.some((scope) => scope === 'activity:read' || scope === 'activity:read_all'))
     throw new Error('Allow Wornways to read your Strava activities, then connect again.');
   const res = await oauthRequest('POST', { code: params.get('code') });
-  const grant = (await res.json()) as StravaGrant & { ticket: string };
+  const grant = (await res.json()) as StravaLogin;
   if (
     !grant.token ||
     !grant.ticket ||
+    !grant.sessionId ||
     !Number.isFinite(grant.expiresAt) ||
     grant.expiresAt <= Date.now()
   )
@@ -78,6 +83,6 @@ export async function finishStravaAuthorization(
   return grant;
 }
 
-export async function revokeStravaAccess(token: string): Promise<void> {
-  await oauthRequest('DELETE', { token });
+export async function clearStravaAccess(token: string, disconnect: boolean): Promise<void> {
+  await oauthRequest('DELETE', { token, disconnect });
 }

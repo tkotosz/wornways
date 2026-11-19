@@ -12,7 +12,7 @@ Activity files you add stay there.
   or the whole account export ZIP from Strava or Garmin, with names and sports from its
   activity list.
 - **Connects to Strava** on deployments where it is configured. Pick a date range and
-  activities to replay. Wornways clears the list and route data when you end the replay.
+  activities to replay. Your connection lasts up to two hours and can resume after a reload.
 - **Lets you choose what to show:** a period (today, yesterday, this month, a custom
   range…), sports, activities that start or end near a place, and any activity ticked or
   unticked by hand.
@@ -166,6 +166,8 @@ and set the origin to `http://localhost:8788`. The local relay can accept a simu
 webhook. Strava itself needs a public HTTPS callback to deliver real events.
 
 Activity list and stream requests go directly from the browser to Strava. Activity
-data, drawn previews, and the in-app MP4 are kept in memory, along with the short-lived
-access token. Each replay requires a connection. The Pages Function and event relay
-do not write athlete records, routes, or tokens to storage.
+summaries, route tracks, previews, and the in-app MP4 are kept in browser memory. A
+browser cookie holds the encrypted session for up to two hours, and the current tab
+can restore its filters, selection, and video settings. On reload, activity data is
+fetched again. The Pages Function and event relay use no server-side activity or
+session storage.

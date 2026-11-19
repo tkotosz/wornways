@@ -6,26 +6,51 @@ const rideId = '9007199254740999';
 
 test.use({ serviceWorkers: 'block' });
 
-async function fakeStrava(page: Page, pendingTrack?: Promise<void>) {
+async function fakeStrava(
+  page: Page,
+  options: {
+    pendingTrack?: Promise<void>;
+    capacityReached?: boolean;
+    otherActivities?: boolean;
+  } = {},
+) {
   let relay: WebSocketRoute | undefined;
   let exchanges = 0;
+  let connections = 0;
+  const grant = {
+    token: 'test-token',
+    expiresAt: Date.now() + 3_600_000,
+    ticket: 'test-ticket',
+    sessionId: 'test-session',
+  };
+  const cookie = 'strava-test-session=1';
+  const attributes = '; Path=/api/strava/oauth; Secure; HttpOnly; SameSite=Strict';
   const tracks: string[] = [];
   const periods: number[] = [];
 
   await page.context().routeWebSocket('**/api/strava/events', (socket) => {
     relay = socket;
+    connections++;
   });
 
   await page.route('**/api/strava/oauth', async (route) => {
-    if (route.request().method() === 'POST') {
+    const request = route.request();
+    if (request.method() === 'POST') {
       exchanges++;
-      await route.fulfill({
-        json: { token: 'test-token', expiresAt: Date.now() + 3_600_000, ticket: 'test-ticket' },
+      return route.fulfill({ json: grant, headers: { 'set-cookie': cookie + attributes } });
+    }
+    if (request.method() === 'DELETE')
+      return route.fulfill({
+        json: {},
+        headers: { 'set-cookie': cookie + attributes + '; Max-Age=0' },
       });
-    } else await route.fulfill({ json: { clientId: '123' } });
+    const signedIn = (await request.headerValue('cookie'))?.includes(cookie);
+    await route.fulfill({ json: { clientId: '123', ...(signedIn ? { session: grant } : {}) } });
   });
 
   await page.route('https://www.strava.com/oauth/authorize?*', async (route) => {
+    if (options.capacityReached)
+      return route.fulfill({ status: 403, body: 'Limit of connected athletes exceeded' });
     const request = new URL(route.request().url());
     const callback = new URL(request.searchParams.get('redirect_uri')!);
     callback.search = new URLSearchParams({
@@ -61,6 +86,8 @@ async function fakeStrava(page: Page, pendingTrack?: Promise<void>) {
               sport_type: 'MountainBikeRide',
               start_date: olderYear + '-03-15T10:30:00Z',
               distance: 1400,
+              start_latlng: [47.496, 19.04],
+              end_latlng: [47.5, 19.05],
             },
             {
               id: 18,
@@ -69,14 +96,35 @@ async function fakeStrava(page: Page, pendingTrack?: Promise<void>) {
               start_date: olderYear + '-03-10T10:30:00Z',
               distance: 2000,
             },
+            {
+              id: 19,
+              name: 'Strava out-and-back',
+              sport_type: 'Ride',
+              start_date: olderYear + '-03-07T10:30:00Z',
+              distance: 4000,
+              start_latlng: [47.495, 19.04],
+              end_latlng: [47.48, 19.08],
+            },
           ]
         : [];
+      if (matches && options.otherActivities)
+        for (let i = 0; i < 5; i++) {
+          json.push({
+            id: 20 + i,
+            name: 'A ride elsewhere',
+            sport_type: 'Ride',
+            start_date: olderYear + '-03-20T10:30:00Z',
+            distance: 4000,
+            start_latlng: [46.5, 19.5],
+            end_latlng: [46.5, 19.5],
+          });
+        }
       return route.fulfill({ json, headers });
     }
     const id = url.pathname.split('/').at(-2)!;
     tracks.push(id);
     if (id !== rideId) return route.fulfill({ status: 404, json: {}, headers });
-    await pendingTrack;
+    await options.pendingTrack;
     return route.fulfill({
       headers,
       json: {
@@ -100,7 +148,13 @@ async function fakeStrava(page: Page, pendingTrack?: Promise<void>) {
       });
     return route.fulfill({ status: 204 });
   });
-  return { relay: () => relay, exchanges: () => exchanges, periods, tracks };
+  return {
+    relay: () => relay,
+    exchanges: () => exchanges,
+    connections: () => connections,
+    periods,
+    tracks,
+  };
 }
 
 async function connect(page: Page) {
@@ -111,7 +165,7 @@ async function connect(page: Page) {
 test.describe('Strava on a phone', () => {
   test.use({ viewport: { width: 393, height: 852 }, isMobile: true, hasTouch: true });
 
-  test('makes a video from last year and keeps the saved file library after Done', async ({
+  test('makes a video from last year and keeps the saved file library after switching sources', async ({
     page,
   }) => {
     const mock = await fakeStrava(page);
@@ -148,7 +202,14 @@ test.describe('Strava on a phone', () => {
     const download = page.waitForEvent('download');
     await page.getByRole('link', { name: 'Download' }).click();
     expect((await download).suggestedFilename()).toMatch(/\.mp4$/);
-    await page.getByRole('button', { name: 'Done', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Done', exact: true })).toHaveCount(0);
+    await page.getByRole('button', { name: 'Go to Source' }).click();
+    const ending = page.waitForResponse(
+      (response) =>
+        response.url().endsWith('/api/strava/oauth') && response.request().method() === 'DELETE',
+    );
+    await page.getByRole('button', { name: 'Use files', exact: true }).click();
+    await ending;
     await expect(page.getByTestId('result')).toHaveCount(0);
     await expect(page.getByTestId('activity-count')).toContainText('3 activities');
     await page.reload();
@@ -165,7 +226,7 @@ test('clears the session when Strava revokes access', async ({ page }) => {
     releaseTrack = resolve;
   });
   try {
-    const mock = await fakeStrava(page, pendingTrack);
+    const mock = await fakeStrava(page, { pendingTrack });
     await page.goto('/');
     await connect(page);
     await page.getByRole('button', { name: 'Last year', exact: true }).click();
@@ -190,4 +251,65 @@ test('rejects a Strava callback with mismatched state before exchanging its code
   await expect(page.getByRole('alert')).toContainText('sign-in expired');
   expect(mock.exchanges()).toBe(0);
   expect(new URL(page.url()).search).toBe('');
+});
+
+test('restores the connection and selected activities after a reload and socket interruption', async ({
+  page,
+}) => {
+  const mock = await fakeStrava(page);
+  await page.goto('/');
+  await connect(page);
+  await page.getByRole('button', { name: 'Last year', exact: true }).click();
+  await page.getByRole('checkbox', { name: 'Strava test ride' }).check();
+
+  await page.reload();
+  await expect(page.getByRole('button', { name: 'Last year', exact: true })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+  await expect(page.getByRole('checkbox', { name: 'Strava test ride' })).toBeChecked();
+  expect(mock.exchanges()).toBe(1);
+  await page.evaluate(`
+    window.dispatchEvent(new PageTransitionEvent('pagehide', { persisted: true }));
+    window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true }));
+  `);
+  await expect(page.getByRole('checkbox', { name: 'Strava test ride' })).toBeChecked();
+  const connections = mock.connections();
+  await mock.relay()!.close({ code: 1001 });
+  await expect.poll(() => mock.connections()).toBeGreaterThan(connections);
+  await expect(page.getByRole('checkbox', { name: 'Strava test ride' })).toBeChecked();
+  expect(mock.exchanges()).toBe(1);
+});
+
+test('filters Strava rides by both start and finish using activity summaries', async ({
+  page,
+  context,
+}) => {
+  await context.clearPermissions();
+  const mock = await fakeStrava(page, { otherActivities: true });
+  await page.goto('/');
+  await connect(page);
+  await page.getByRole('button', { name: 'Last year', exact: true }).click();
+  const grid = page.getByTestId('chosen');
+  await expect(grid).toContainText('Strava indoor ride');
+  await page.getByRole('checkbox', { name: 'Starts near a place' }).check();
+  await page.getByRole('textbox', { name: 'Start place' }).fill('47.496, 19.04');
+  await expect(grid).toContainText('Strava test ride');
+  await expect(grid).toContainText('Strava out-and-back');
+  await expect(grid).not.toContainText('Strava indoor ride');
+  await page.getByRole('checkbox', { name: 'Ends near a place' }).check();
+  await page.getByRole('textbox', { name: 'End place' }).fill('47.5, 19.05');
+  await expect(grid).toContainText('Strava test ride');
+  await expect(grid).not.toContainText('Strava out-and-back');
+  expect(mock.tracks).not.toContain(rideId);
+});
+
+test('offers the file workflow when Strava refuses a connection at capacity', async ({ page }) => {
+  await fakeStrava(page, { capacityReached: true });
+  await page.goto('/');
+  await expect(page.getByText('If Strava says its connection limit was reached')).toBeVisible();
+  await page.getByRole('link', { name: 'Connect with Strava' }).click();
+  await expect(page.getByText('Limit of connected athletes exceeded')).toBeVisible();
+  await page.goBack();
+  await expect(page.getByRole('button', { name: 'Choose files' })).toBeVisible();
 });

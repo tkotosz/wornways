@@ -76,7 +76,22 @@ export function frequentPlaces(
   limit: number,
   minCount = 2,
 ): FrequentPlace[] {
-  let left = tracks.map((t) => ({ ...pointAt(t, end), time: t.startTime }));
+  return frequentPlacesAt(
+    tracks.map((t) => ({ ...pointAt(t, end), time: t.startTime })),
+    radiusM,
+    limit,
+    minCount,
+  );
+}
+
+/** Place suggestions for activities whose endpoints are already known. */
+export function frequentPlacesAt(
+  points: (LatLon & { time: number })[],
+  radiusM: number,
+  limit: number,
+  minCount = 2,
+): FrequentPlace[] {
+  let left = points;
   const places: FrequentPlace[] = [];
   while (places.length < limit && left.length > 0) {
     const { center } = densest(left, radiusM);

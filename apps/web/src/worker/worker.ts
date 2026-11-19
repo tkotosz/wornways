@@ -48,7 +48,7 @@ async function answer(request: Exclude<Request, { type: 'cancel' }>, signal: Abo
     case 'strava-end':
       strava = null;
       session?.close();
-      if (request.disconnect && session) await session.disconnect();
+      if (session) await session.end(request.disconnect);
       return reply({ type: 'strava-ended', id });
     case 'strava-list': {
       if (!session) throw new StravaExpired('Connect with Strava again.');
@@ -64,12 +64,17 @@ async function answer(request: Exclude<Request, { type: 'cancel' }>, signal: Abo
       session?.prioritize(request.ids);
       return reply({ type: 'strava-prioritized', id });
   }
-  const lib = await getLibrary();
   const source = 'strava' in request && request.strava;
   if (source && !session) throw new StravaExpired('Connect with Strava again.');
+  if (source && session) {
+    if (request.type === 'match')
+      return reply({ type: 'matched', id, match: session.match(request.settings) });
+    if (request.type === 'places')
+      return reply({ type: 'places', id, places: session.places(request.settings, request.end) });
+  }
   const renderSignal = source && session ? AbortSignal.any([signal, session.signal]) : signal;
   const tracks = async () => {
-    if (!source || !session || !('settings' in request)) return lib.all();
+    if (!source || !session || !('settings' in request)) return (await getLibrary()).all();
     const settings = parseSettings(request.settings);
     const selected = await session.selected(settings.activities ?? []);
     renderSignal.throwIfAborted();
@@ -77,18 +82,25 @@ async function answer(request: Exclude<Request, { type: 'cancel' }>, signal: Abo
   };
   switch (request.type) {
     case 'read-library':
-      return reply({ type: 'library', id, activities: lib.summaries() });
+      return reply({ type: 'library', id, activities: (await getLibrary()).summaries() });
     case 'add-files': {
+      const lib = await getLibrary();
       const report = await lib.add(request.files, progress);
       return reply({ type: 'files-added', id, report, activities: lib.summaries() });
     }
-    case 'delete-activities':
+    case 'delete-activities': {
+      const lib = await getLibrary();
       await lib.delete(request.ids);
       return reply({ type: 'library', id, activities: lib.summaries() });
+    }
     case 'match':
-      return reply({ type: 'matched', id, match: lib.match(request.settings) });
+      return reply({ type: 'matched', id, match: (await getLibrary()).match(request.settings) });
     case 'places':
-      return reply({ type: 'places', id, places: lib.places(request.settings, request.end) });
+      return reply({
+        type: 'places',
+        id,
+        places: (await getLibrary()).places(request.settings, request.end),
+      });
     case 'plan':
       return reply({ type: 'planned', id, plan: planVideo(await tracks(), request.settings) });
     case 'make-poster': {

@@ -75,7 +75,7 @@ async function remove(ids: string[] | 'all'): Promise<void> {
       </section>
       <section v-if="stravaUrl || stravaActive" class="source-card">
         <h2>Strava</h2>
-        <p class="muted">Activities are loaded for this replay and cleared when you finish.</p>
+        <p class="muted">Your connection lasts up to two hours. You can disconnect at any time.</p>
         <button v-if="stravaActive" type="button" class="link" @click="emit('disconnect')">
           Disconnect Strava
         </button>
@@ -87,6 +87,9 @@ async function remove(ids: string[] | 'all'): Promise<void> {
         >
           <img src="/strava-connect.svg" alt="Connect with Strava" width="237" height="48" />
         </a>
+        <p v-if="!stravaActive" class="connect-help muted">
+          If Strava says its connection limit was reached, go back and use activity files.
+        </p>
         <p v-if="!stravaActive" class="connect-help muted">
           <a href="/privacy.html" target="_blank" rel="noopener noreferrer">Privacy</a> · Wornways
           reads activity names, dates, sports, distance, and GPS tracks. Manage access in

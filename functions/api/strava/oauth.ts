@@ -1,13 +1,23 @@
 // The public client ID is used to build the authorization link. Only this Function
 // sees the client secret or the refresh token Strava returns.
+import {
+  expiredSessionCookie,
+  readSession,
+  sessionCookie,
+  STRAVA_SESSION_MS,
+} from '../../../cloudflare/strava-cookie.ts';
 import { makeTicket, stravaReady, type StravaEnv } from '../../../cloudflare/strava-session.ts';
 
 type Context = { request: Request; env: StravaEnv };
 
-function json(body: unknown, status = 200): Response {
+function json(body: unknown, status = 200, cookie?: string): Response {
   return Response.json(body, {
     status,
-    headers: { 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' },
+    headers: {
+      'Cache-Control': 'no-store',
+      'X-Content-Type-Options': 'nosniff',
+      ...(cookie ? { 'Set-Cookie': cookie } : {}),
+    },
   });
 }
 
@@ -17,7 +27,10 @@ export async function onRequest({ request, env }: Context): Promise<Response> {
   const clientId = env.STRAVA_CLIENT_ID!;
   const secret = env.STRAVA_CLIENT_SECRET!;
 
-  if (request.method === 'GET') return json({ clientId });
+  if (request.method === 'GET') {
+    const session = await readSession(request, secret, origin);
+    return json({ clientId, ...(session ? { session } : {}) });
+  }
   if (request.method !== 'POST' && request.method !== 'DELETE') return json({}, 405);
   if (
     request.headers.get('Origin') !== origin ||
@@ -27,15 +40,25 @@ export async function onRequest({ request, env }: Context): Promise<Response> {
 
   try {
     if (request.method === 'DELETE') {
-      const { token } = (await request.json()) as { token?: unknown };
+      const { token, disconnect } = (await request.json()) as {
+        token?: unknown;
+        disconnect?: boolean;
+      };
       if (typeof token !== 'string' || !token || token.length > 1024)
         return json({ error: 'The Strava session is missing.' }, 400);
+      const session = await readSession(request, secret, origin);
+      const cookie = !session || session.token === token ? expiredSessionCookie : undefined;
+      if (!disconnect) return json({}, 200, cookie);
+
       const response = await fetch('https://www.strava.com/oauth/revoke', {
         method: 'POST',
         headers: { Authorization: 'Basic ' + btoa(clientId + ':' + secret) },
         body: new URLSearchParams({ token, token_type_hint: 'access_token' }),
-      });
-      return response.ok ? json({}) : json({ error: 'Strava could not disconnect the app.' }, 502);
+        signal: AbortSignal.timeout(5000),
+      }).catch(() => null);
+      return response?.ok
+        ? json({}, 200, cookie)
+        : json({ error: 'Strava could not disconnect the app.' }, 502, cookie);
     }
 
     const { code } = (await request.json()) as { code?: unknown };
@@ -59,14 +82,21 @@ export async function onRequest({ request, env }: Context): Promise<Response> {
     const athlete =
       data.athlete?.id_str ??
       (Number.isSafeInteger(data.athlete?.id) ? String(data.athlete?.id) : '');
-    const expiresAt = (data.expires_at ?? 0) * 1000;
-    if (!data.access_token || expiresAt <= Date.now() || !/^\d+$/.test(athlete))
+    const expiresAt = Math.min((data.expires_at ?? 0) * 1000, Date.now() + STRAVA_SESSION_MS);
+    if (
+      !data.access_token ||
+      !Number.isFinite(expiresAt) ||
+      expiresAt <= Date.now() ||
+      !/^\d+$/.test(athlete)
+    )
       return json({ error: 'Strava did not return a usable session.' }, 502);
-    return json({
+    const session = {
       token: data.access_token,
       expiresAt,
       ticket: await makeTicket(secret, athlete, expiresAt),
-    });
+      sessionId: crypto.randomUUID(),
+    };
+    return json(session, 200, await sessionCookie(session, secret, origin));
   } catch {
     return json({ error: 'Strava could not complete the request. Try again.' }, 502);
   }

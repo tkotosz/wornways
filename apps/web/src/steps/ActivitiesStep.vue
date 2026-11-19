@@ -17,6 +17,7 @@ const props = defineProps<{
   showSource?: boolean;
   busy?: string;
   notice?: string;
+  canRetry?: boolean;
 }>();
 const choice = defineModel<Choice>({ required: true });
 const emit = defineEmits<{ back: []; next: []; cancel: []; retry: [] }>();
@@ -44,12 +45,7 @@ const ticked = computed(() => rows.value.filter((a) => !choice.value.excluded.in
     </p>
     <p v-else-if="matched.problem" class="error" role="alert">
       {{ matched.problem }}
-      <button
-        v-if="strava && !library.length && !busy"
-        type="button"
-        class="link"
-        @click="emit('retry')"
-      >
+      <button v-if="canRetry && !busy" type="button" class="link" @click="emit('retry')">
         Try again
       </button>
     </p>

@@ -17,9 +17,9 @@ export type Request =
   | { type: 'strava-prioritize'; id: number; ids: string[] }
   | { type: 'strava-end'; id: number; disconnect: boolean }
   /** Which activities the "Which activities" settings choose. */
-  | { type: 'match'; id: number; settings: SettingsInput }
+  | { type: 'match'; id: number; settings: SettingsInput; strava: boolean }
   /** The places most of the activities these settings choose start or end at, to suggest. */
-  | { type: 'places'; id: number; settings: SettingsInput; end: TrackEnd }
+  | { type: 'places'; id: number; settings: SettingsInput; end: TrackEnd; strava: boolean }
   | { type: 'make-video'; id: number; settings: SettingsInput; strava: boolean }
   /** The last frame of the video the settings describe, small, as a preview. */
   | { type: 'make-poster'; id: number; settings: SettingsInput; strava: boolean }

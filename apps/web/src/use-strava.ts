@@ -1,35 +1,86 @@
-import { computed, onBeforeUnmount, ref, watch } from 'vue';
-import { NO_CHOICE, periodRange, type Choice } from './choice.ts';
+import { computed, onBeforeUnmount, ref, watch, type Ref } from 'vue';
+import type { Adjustments } from './adjust.ts';
+import { NO_CHOICE, filterSettings, periodRange, type Choice } from './choice.ts';
 import { Canceled, StravaExpired, type EngineClient } from './engine-client.ts';
 import type { ActivitySummary, MatchReport } from './messages.ts';
 import {
   finishStravaAuthorization,
   stravaAuthorization,
-  stravaClientId,
+  stravaConfiguration,
   takeStravaCallback,
+  type StravaLogin,
 } from './strava-auth.ts';
 
-export function useStrava(engine: EngineClient, onEnd: () => void) {
+const DRAFT = 'wornways-strava-draft';
+const ENDED = 'wornways-strava-ended';
+const initialChoice = (): Choice => ({ ...NO_CHOICE, period: 'this-month' });
+
+type Draft = {
+  sessionId: string;
+  choice: Omit<Choice, 'excluded'>;
+  selected: string[];
+  adjustments: Adjustments;
+};
+
+// A blocked storage API only prevents remembering the draft. The normal replay still works.
+function stored(key: string): string | null {
+  try {
+    return sessionStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function store(key: string, value: string | null): void {
+  try {
+    if (value === null) sessionStorage.removeItem(key);
+    else sessionStorage.setItem(key, value);
+  } catch {
+    // Optional draft restoration.
+  }
+}
+
+function readDraft(sessionId: string): Draft | null {
+  try {
+    const draft = JSON.parse(stored(DRAFT) ?? 'null') as Draft | null;
+    return draft?.sessionId === sessionId ? draft : null;
+  } catch {
+    return null;
+  }
+}
+
+export function useStrava(
+  engine: EngineClient,
+  adjustments: Ref<Adjustments>,
+  onEnd: () => void,
+  onRevalidate: () => void,
+) {
   const active = ref(false);
-  const choice = ref<Choice>({ ...NO_CHOICE, period: 'this-month' });
+  const ready = ref(false);
+  const choice = ref<Choice>(initialChoice());
   const rows = ref<ActivitySummary[]>([]);
   const url = ref<URL | null>(null);
   const error = ref('');
   const busy = ref('');
   const notice = ref('');
+  const selection = ref<MatchReport>({ ids: [], problem: null });
   let callback = takeStravaCallback();
-  const hasCallback = callback !== null;
+  let session: Pick<StravaLogin, 'sessionId' | 'ticket' | 'expiresAt'> | null = null;
+  let initialSelection: string[] = [];
   const range = computed(() => periodRange(choice.value, new Date()));
   let revision = 0;
   let expiry: ReturnType<typeof setTimeout> | undefined;
   let socket: WebSocket | null = null;
 
   const matched = computed<MatchReport>(() => ({
-    ids: rows.value
-      .filter((row) => !choice.value.sports || choice.value.sports.includes(row.sport))
-      .map((row) => row.id),
-    problem: error.value || null,
+    ids: ready.value ? selection.value.ids : [],
+    problem: error.value || selection.value.problem,
   }));
+
+  function selected() {
+    const excluded = new Set(choice.value.excluded);
+    return rows.value.filter((row) => !excluded.has(row.id)).map((row) => row.id);
+  }
 
   function failed(caught: unknown) {
     if (caught instanceof Canceled) return;
@@ -38,13 +89,18 @@ export function useStrava(engine: EngineClient, onEnd: () => void) {
   }
 
   async function end(disconnect = false) {
-    if (!active.value) return;
+    if (!session) return;
     const ended = ++revision;
+    store(ENDED, session.sessionId);
+    store(DRAFT, null);
+    session = null;
     clearTimeout(expiry);
     closeEvents();
     active.value = false;
+    ready.value = false;
     rows.value = [];
-    choice.value = { ...NO_CHOICE, period: 'this-month' };
+    selection.value = { ids: [], problem: null };
+    choice.value = initialChoice();
     error.value = '';
     busy.value = '';
     notice.value = '';
@@ -54,35 +110,44 @@ export function useStrava(engine: EngineClient, onEnd: () => void) {
       if (disconnect && revision === ended)
         notice.value = 'Strava disconnected and temporary activities cleared.';
     } catch (caught) {
-      if (revision === ended) failed(caught);
+      if (revision === ended && (!error.value || disconnect)) failed(caught);
     }
   }
 
-  async function connect() {
-    if (!callback) return false;
+  async function connect(defaultAdjustments: Adjustments) {
     const params = callback;
     callback = null;
-    busy.value = 'Connecting to Strava…';
+    if (params) busy.value = 'Connecting to Strava…';
     try {
-      const { token, expiresAt, ticket } = await finishStravaAuthorization(params);
-      const events = await openEvents(ticket);
-      await engine.startStrava({ token, expiresAt });
-      if (events.readyState !== WebSocket.OPEN) {
-        await engine.endStrava();
-        throw new Error('Could not keep the Strava connection open. Connect again.');
+      const config = await stravaConfiguration();
+      if (config.clientId) url.value = stravaAuthorization(config.clientId);
+      const login = params ? await finishStravaAuthorization(params) : config.session;
+      if (!login || login.expiresAt <= Date.now() || stored(ENDED) === login.sessionId) {
+        store(DRAFT, null);
+        return false;
       }
+      // Access tokens stay in the worker after the authorization response.
+      const { token, expiresAt, sessionId, ticket } = login;
+      await engine.startStrava({ token, expiresAt });
+      session = { expiresAt, sessionId, ticket };
+      if (params) store(ENDED, null);
+      const draft = params ? null : readDraft(sessionId);
+      choice.value = draft ? { ...draft.choice, excluded: [] } : initialChoice();
+      adjustments.value = draft?.adjustments ?? { ...defaultAdjustments };
+      initialSelection = draft?.selected ?? [];
       active.value = true;
-      expiry = setTimeout(
-        () => failed(new StravaExpired('Your Strava session expired. Connect again.')),
-        expiresAt - Date.now(),
-      );
+      expiry = setTimeout(expired, expiresAt - Date.now());
       return true;
     } catch (caught) {
-      closeEvents();
-      busy.value = '';
       failed(caught);
       return false;
+    } finally {
+      busy.value = '';
     }
+  }
+
+  function expired() {
+    failed(new StravaExpired('Your Strava session expired. Connect again.'));
   }
 
   function closeEvents() {
@@ -91,29 +156,33 @@ export function useStrava(engine: EngineClient, onEnd: () => void) {
     events?.close();
   }
 
-  async function openEvents(ticket: string): Promise<WebSocket> {
+  async function openEvents(ticket: string): Promise<void> {
     const endpoint = new URL('/api/strava/events', location.origin);
     endpoint.protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
     const events = new WebSocket(endpoint, 'session.' + ticket);
     socket = events;
     events.addEventListener('message', ({ data }) => {
       if (socket !== events) return;
-      if (!active.value) closeEvents();
       if (data === 'revoked')
         failed(new StravaExpired('Strava access was revoked. Temporary activities were cleared.'));
-      if (data === 'activity')
-        failed(
-          new StravaExpired(
-            'An activity changed or was deleted on Strava. Connect again to use the updated list.',
-          ),
-        );
+      if (data === 'activity') {
+        onRevalidate();
+        void list(selected());
+      }
     });
     events.addEventListener('close', () => {
-      if (socket === events && active.value)
-        failed(new StravaExpired('The Strava connection closed. Connect again.'));
+      if (socket !== events || !ready.value) return;
+      socket = null;
+      ready.value = false;
+      ++revision;
+      onRevalidate();
+      void resume();
     });
     await new Promise<void>((resolve, reject) => {
-      const unavailable = () => reject(new Error('Could not connect to Strava. Try again.'));
+      const unavailable = () => {
+        clearTimeout(timer);
+        reject(new Error('Could not reach Strava. Try again when online.'));
+      };
       const timer = setTimeout(unavailable, 8000);
       events.addEventListener(
         'open',
@@ -123,37 +192,43 @@ export function useStrava(engine: EngineClient, onEnd: () => void) {
         },
         { once: true },
       );
-      events.addEventListener(
-        'error',
-        () => {
-          clearTimeout(timer);
-          unavailable();
-        },
-        { once: true },
-      );
-      events.addEventListener(
-        'close',
-        () => {
-          clearTimeout(timer);
-          unavailable();
-        },
-        { once: true },
-      );
+      events.addEventListener('error', unavailable, { once: true });
+      events.addEventListener('close', unavailable, { once: true });
     });
-    return events;
+    if (socket !== events || events.readyState !== WebSocket.OPEN)
+      throw new Error('Could not reach Strava. Try again when online.');
   }
 
-  async function configure() {
-    const id = await stravaClientId();
-    if (id) url.value = stravaAuthorization(id);
+  async function resume() {
+    if (!session || document.hidden || ready.value || socket) return;
+    if (session.expiresAt <= Date.now()) {
+      expired();
+      return;
+    }
+    const attempt = session;
+    busy.value = 'Connecting to Strava…';
+    try {
+      await openEvents(attempt.ticket);
+      if (session !== attempt) return;
+      ready.value = true;
+      const keep = rows.value.length ? selected() : initialSelection;
+      initialSelection = [];
+      await list(keep);
+    } catch (caught) {
+      if (session !== attempt) return;
+      closeEvents();
+      busy.value = '';
+      failed(caught);
+    }
   }
 
-  async function list() {
-    if (!active.value) return;
+  async function list(keep: string[] = []) {
+    if (!active.value || !ready.value) return;
     const request = ++revision;
     const from = range.value?.from;
     const to = range.value?.to;
     rows.value = [];
+    selection.value = { ids: [], problem: null };
     notice.value = '';
     busy.value = '';
     error.value = '';
@@ -166,20 +241,33 @@ export function useStrava(engine: EngineClient, onEnd: () => void) {
     }
 
     busy.value = 'Finding activities on Strava…';
+    const remembered = new Set(keep);
     try {
       const activities = await engine.listStrava(from, to);
       if (request !== revision) return;
-      choice.value = { ...choice.value, excluded: activities.map((row) => row.id) };
+      choice.value = {
+        ...choice.value,
+        excluded: activities.filter((row) => !remembered.has(row.id)).map((row) => row.id),
+      };
       rows.value = activities;
       if (!activities.length) notice.value = 'No Strava activities in this period.';
     } catch (caught) {
-      if (request === revision) failed(caught);
+      if (request === revision) {
+        initialSelection = keep;
+        failed(caught);
+      }
     } finally {
       if (request === revision) busy.value = '';
     }
   }
 
+  function retry() {
+    if (ready.value) void list(rows.value.length ? selected() : initialSelection);
+    else void resume();
+  }
+
   async function prepare(ids: string[]) {
+    if (!ready.value) return false;
     const request = revision;
     busy.value = 'Loading selected tracks…';
     error.value = '';
@@ -201,27 +289,68 @@ export function useStrava(engine: EngineClient, onEnd: () => void) {
     }
   }
 
-  watch([active, () => range.value?.from, () => range.value?.to], list);
+  watch(active, () => void resume());
+  watch([() => range.value?.from, () => range.value?.to], () => void list());
+  watch([() => filterSettings(choice.value, new Date()), rows, ready], async ([filters]) => {
+    const currentRows = rows.value;
+    if (!ready.value || !currentRows.length) return;
+    const current = ++matchRequest;
+    try {
+      const result = await engine.match(filters, true);
+      if (current !== matchRequest || currentRows !== rows.value || !ready.value) return;
+      const shown = new Set(currentRows.map((row) => row.id));
+      selection.value = { ids: result.ids.filter((id) => shown.has(id)), problem: result.problem };
+    } catch (caught) {
+      if (current === matchRequest && currentRows === rows.value && ready.value) failed(caught);
+    }
+  });
+  let matchRequest = 0;
+
   watch(
     () => choice.value.excluded,
     (after, before) => {
-      if (!active.value || !rows.value.length) return;
+      if (!ready.value || !rows.value.length) return;
       const unchecked = new Set(after);
       const checked = before.filter((id) => !unchecked.has(id));
       if (checked.length) engine.prioritizeStrava(checked);
     },
   );
-  const leavePage = () => void end();
-  window.addEventListener('pagehide', leavePage);
+  watch(
+    [choice, rows, adjustments, busy],
+    () => {
+      if (!session || busy.value || !ready.value || (!rows.value.length && error.value)) return;
+      const { excluded: _, ...filters } = choice.value;
+      const draft: Draft = {
+        sessionId: session.sessionId,
+        choice: filters,
+        selected: selected(),
+        adjustments: adjustments.value,
+      };
+      store(DRAFT, JSON.stringify(draft));
+    },
+    { deep: true },
+  );
+
+  const foreground = () => {
+    if (!session || document.hidden) return;
+    if (session.expiresAt <= Date.now()) expired();
+    else void resume();
+  };
+  document.addEventListener('visibilitychange', foreground);
+  window.addEventListener('pageshow', foreground);
+  window.addEventListener('online', foreground);
   onBeforeUnmount(() => {
-    window.removeEventListener('pagehide', leavePage);
-    leavePage();
+    clearTimeout(expiry);
+    document.removeEventListener('visibilitychange', foreground);
+    window.removeEventListener('pageshow', foreground);
+    window.removeEventListener('online', foreground);
+    closeEvents();
   });
 
   return {
     active,
+    ready,
     busy,
-    hasCallback,
     choice,
     error,
     notice,
@@ -229,9 +358,8 @@ export function useStrava(engine: EngineClient, onEnd: () => void) {
     rows,
     url,
     connect,
-    configure,
     end,
-    list,
+    retry,
     prepare,
   };
 }

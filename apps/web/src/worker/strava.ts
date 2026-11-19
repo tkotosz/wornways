@@ -1,6 +1,20 @@
-import { createTileLoader, sportSlug, STRIDE, type Track } from '@wornways/engine';
-import type { ActivitySummary } from '../messages.ts';
-import { revokeStravaAccess, type StravaGrant } from '../strava-auth.ts';
+import {
+  createTileLoader,
+  distanceM,
+  frequentPlacesAt,
+  nearPlacesText,
+  parseSettings,
+  sportIncluded,
+  sportSlug,
+  STRIDE,
+  type LatLon,
+  type RenderSettings,
+  type SettingsInput,
+  type Track,
+  type TrackEnd,
+} from '@wornways/engine';
+import type { ActivitySummary, MatchReport } from '../messages.ts';
+import { clearStravaAccess, type StravaGrant } from '../strava-auth.ts';
 
 const API = 'https://www.strava.com/api/v3';
 const PAGE_SIZE = 100;
@@ -15,7 +29,11 @@ type Summary = {
   type?: string;
   start_date: string;
   distance: number;
+  start_latlng?: number[] | null;
+  end_latlng?: number[] | null;
 };
+
+type StravaActivity = { summary: ActivitySummary; start?: LatLon; end?: LatLon };
 
 type Streams = {
   latlng?: { data: [number, number][] };
@@ -26,16 +44,27 @@ type Streams = {
 export class StravaError extends Error {}
 export class StravaExpired extends StravaError {}
 
-function summary(data: Summary): ActivitySummary | null {
+function coordinates(values: number[] | null | undefined): LatLon | undefined {
+  if (values?.length !== 2) return;
+  const [lat, lon] = values;
+  if (Number.isFinite(lat) && Number.isFinite(lon) && Math.abs(lat!) <= 90 && Math.abs(lon!) <= 180)
+    return { lat: lat!, lon: lon! };
+}
+
+function summary(data: Summary): StravaActivity | null {
   const id = data.id_str ?? (Number.isSafeInteger(data.id) ? String(data.id) : '');
   const startTime = Date.parse(data.start_date);
   if (!/^\d+$/.test(id) || !Number.isFinite(startTime)) return null;
   return {
-    id,
-    name: data.name || 'Strava activity',
-    sport: sportSlug(data.sport_type || data.type || '') || 'unknown',
-    startTime,
-    distanceM: Number.isFinite(data.distance) ? data.distance : 0,
+    summary: {
+      id,
+      name: data.name || 'Strava activity',
+      sport: sportSlug(data.sport_type || data.type || '') || 'unknown',
+      startTime,
+      distanceM: Number.isFinite(data.distance) ? data.distance : 0,
+    },
+    start: coordinates(data.start_latlng),
+    end: coordinates(data.end_latlng),
   };
 }
 
@@ -69,7 +98,7 @@ function trackFromStreams(activity: ActivitySummary, streams: Streams): Track | 
 export class StravaSession {
   private readonly lifetime = new AbortController();
   private range = new AbortController();
-  private activities = new Map<string, ActivitySummary>();
+  private activities = new Map<string, StravaActivity>();
   private tracks = new Map<string, Promise<Track | null>>();
   private tiles = new Map<string, Uint8Array>();
   private limited = false;
@@ -112,12 +141,14 @@ export class StravaSession {
     this.ahead = [];
   }
 
-  async disconnect(): Promise<void> {
+  async end(disconnect: boolean): Promise<void> {
     try {
-      await revokeStravaAccess(this.grant.token);
+      await clearStravaAccess(this.grant.token, disconnect);
     } catch {
       throw new StravaError(
-        'Strava could not disconnect the app. You can revoke access in Strava settings.',
+        disconnect
+          ? 'Strava could not disconnect the app. You can revoke access in Strava settings.'
+          : 'Could not clear the Strava sign-in. Try again when online.',
       );
     }
   }
@@ -135,7 +166,7 @@ export class StravaSession {
     if (from === null || to === null) return [];
     const range = this.range.signal;
     const active = AbortSignal.any([this.signal, range, signal]);
-    const rows = new Map<string, ActivitySummary>();
+    const rows = new Map<string, StravaActivity>();
     const parameters = new URLSearchParams({
       after: String(Math.floor(from / 1000) - 1),
       before: String(Math.ceil(to / 1000)),
@@ -149,15 +180,54 @@ export class StravaSession {
       active.throwIfAborted();
       for (const item of batch) {
         const row = summary(item);
-        if (row && from <= row.startTime && row.startTime < to) rows.set(row.id, row);
+        if (row && from <= row.summary.startTime && row.summary.startTime < to)
+          rows.set(row.summary.id, row);
       }
       if (batch.length === 0) break;
     }
 
-    const ordered = [...rows.values()].sort((a, b) => b.startTime - a.startTime);
+    const ordered = [...rows.values()]
+      .map((row) => row.summary)
+      .sort((a, b) => b.startTime - a.startTime);
     this.activities = rows;
     this.prioritize(ordered.slice(0, PREFETCH_COUNT).map((row) => row.id));
     return ordered;
+  }
+
+  private filtered(settings: RenderSettings) {
+    return [...this.activities.values()]
+      .sort((a, b) => b.summary.startTime - a.summary.startTime)
+      .filter(
+        ({ summary }) =>
+          sportIncluded(settings, summary.sport) &&
+          (settings.from === null || summary.startTime >= settings.from) &&
+          (settings.to === null || summary.startTime < settings.to),
+      );
+  }
+
+  match(input: SettingsInput): MatchReport {
+    const settings = parseSettings(input);
+    const rows = this.filtered(settings);
+    const within = (point: LatLon | undefined, filter: RenderSettings['startNear']) =>
+      !filter ||
+      (point &&
+        distanceM(point.lat, point.lon, filter.place.lat, filter.place.lon) <= filter.radius);
+    const ids = rows
+      .filter((row) => within(row.start, settings.startNear) && within(row.end, settings.endNear))
+      .map((row) => row.summary.id);
+    const problem =
+      ids.length || !rows.length || (!settings.startNear && !settings.endNear)
+        ? null
+        : 'No Strava activity ' + nearPlacesText(settings) + '.';
+    return { ids, problem };
+  }
+
+  places(input: SettingsInput, end: TrackEnd) {
+    const points = this.filtered(parseSettings(input)).flatMap((row) => {
+      const point = row[end];
+      return point ? [{ ...point, time: row.summary.startTime }] : [];
+    });
+    return frequentPlacesAt(points, 500, 6, 1);
   }
 
   prioritize(ids: string[]): void {
@@ -236,7 +306,7 @@ export class StravaSession {
       true,
     )
       .then(async (res) =>
-        res.status === 404 ? null : trackFromStreams(row, (await res.json()) as Streams),
+        res.status === 404 ? null : trackFromStreams(row.summary, (await res.json()) as Streams),
       )
       .catch((error: unknown) => {
         cache.delete(id);

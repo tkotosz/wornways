@@ -13,6 +13,7 @@ export {
 export {
   distanceFrom,
   frequentPlaces,
+  frequentPlacesAt,
   trackEnd,
   trackStart,
   type FrequentPlace,
