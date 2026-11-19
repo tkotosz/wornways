@@ -43,6 +43,7 @@ const stepIndex = computed(() => steps.findIndex((s) => s.id === step.value));
 const unsupported = missingSupport();
 const step = ref<Step>('import');
 const loaded = ref(false);
+const libraryError = ref('');
 const library = ref<ActivitySummary[]>([]);
 const choice = ref<Choice>({ ...NO_CHOICE });
 const matched = ref<MatchReport>({ ids: [], problem: null });
@@ -104,12 +105,20 @@ onBeforeUnmount(() => topBarSize.disconnect());
 // Each step starts at the top of the page.
 watch(step, () => window.scrollTo({ top: 0 }));
 
-onMounted(async () => {
-  if (unsupported) return;
-  library.value = await props.engine.readLibrary();
-  loaded.value = true;
-  // Someone who has activities already starts by choosing.
-  if (library.value.length > 0) step.value = 'activities';
+async function loadLibrary(): Promise<void> {
+  libraryError.value = '';
+  try {
+    library.value = await props.engine.readLibrary();
+    loaded.value = true;
+    // Someone who has activities already starts by choosing.
+    if (library.value.length > 0) step.value = 'activities';
+  } catch (error) {
+    libraryError.value = error instanceof Error ? error.message : String(error);
+  }
+}
+
+onMounted(() => {
+  if (!unsupported) void loadLibrary();
 });
 
 // Find what the filters match whenever they or the library change. A newer answer may
@@ -189,6 +198,10 @@ watch(
 
   <main class="main">
     <p v-if="unsupported" class="error" role="alert">{{ unsupported }}</p>
+    <div v-else-if="libraryError">
+      <p class="error" role="alert">{{ libraryError }}</p>
+      <button type="button" class="secondary" @click="loadLibrary">Try again</button>
+    </div>
     <template v-else-if="loaded">
       <ImportStep
         v-if="step === 'import'"

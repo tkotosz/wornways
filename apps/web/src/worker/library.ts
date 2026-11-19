@@ -16,7 +16,7 @@ import {
   type TrackEnd,
 } from '@wornways/engine';
 import type { ActivitySummary, ImportReport, MatchReport, Progress } from '../messages.ts';
-import { openActivityStore, type ActivityStore } from './store.ts';
+import { createActivityStore, type ActivityStore } from './store.ts';
 
 /** Starts (or ends) this close together count as one place. */
 const PLACE_RADIUS_M = 500;
@@ -37,7 +37,7 @@ export class Library {
   ) {}
 
   static async open(): Promise<Library> {
-    const store = await openActivityStore();
+    const store = createActivityStore();
     const stored = await store.readAll();
     return new Library(store, new Map(stored.map((a) => [a.id, a])));
   }

@@ -6,9 +6,18 @@ import type { Reply, Request } from '../messages.ts';
 import { Library } from './library.ts';
 import { planVideo } from './plan.ts';
 import { makePoster } from './poster.ts';
+import { ActivityStoreUnavailable } from './store.ts';
 import { Canceled, VideoProblem, makeVideo } from './video.ts';
 
-const library = Library.open();
+let library: Promise<Library> | undefined;
+
+function getLibrary(): Promise<Library> {
+  return (library ??= Library.open().catch((error: unknown) => {
+    library = undefined;
+    throw error;
+  }));
+}
+
 /** The requests still running, to cancel them by id. */
 const running = new Map<number, AbortController>();
 
@@ -21,6 +30,7 @@ function messageFor(error: unknown): string {
   if (error instanceof SettingsError) return `The setting "${error.setting}" ${error.message}.`;
   if (error instanceof VideoProblem) return error.message;
   console.error(error);
+  if (error instanceof ActivityStoreUnavailable) return error.message;
   return `Something went wrong: ${error instanceof Error ? error.message : String(error)}`;
 }
 
@@ -28,7 +38,7 @@ async function answer(request: Exclude<Request, { type: 'cancel' }>, signal: Abo
   const { id } = request;
   const progress = (p: Extract<Reply, { type: 'progress' }>['progress']) =>
     reply({ type: 'progress', id, progress: p });
-  const lib = await library;
+  const lib = await getLibrary();
   switch (request.type) {
     case 'read-library':
       return reply({ type: 'library', id, activities: lib.summaries() });
