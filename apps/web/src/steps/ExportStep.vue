@@ -17,8 +17,9 @@ const props = defineProps<{
   /** How many activities the settings choose, and their distance. */
   activities: number;
   meters: number;
+  strava?: boolean;
 }>();
-const emit = defineEmits<{ back: [] }>();
+const emit = defineEmits<{ back: []; done: [] }>();
 const result = defineModel<MadeVideo | null>('video', { required: true });
 
 const parsed = computed(() => {
@@ -50,6 +51,7 @@ const stageStyle = computed(() => {
 // The finished picture, shown until the video is made.
 const poster = ref('');
 let cancelPoster: (() => void) | null = null;
+let left = false;
 
 /** Draws the finished picture for the current settings, unless the video is made. */
 async function drawPoster(): Promise<void> {
@@ -59,6 +61,7 @@ async function drawPoster(): Promise<void> {
   cancelPoster = task.cancel;
   try {
     const image = await task.result;
+    if (left || cancelPoster !== task.cancel) return;
     if (poster.value) URL.revokeObjectURL(poster.value);
     poster.value = URL.createObjectURL(image);
   } catch {
@@ -102,6 +105,7 @@ async function make(): Promise<void> {
   cancel = task.cancel;
   try {
     const { video, report } = await task.result;
+    if (left) return;
     const file = new File([video], report.fileName, { type: 'video/mp4' });
     const settingsKey = JSON.stringify(props.settings);
     result.value = { file, url: URL.createObjectURL(file), report, settingsKey };
@@ -134,6 +138,7 @@ async function share(): Promise<void> {
 
 // Leaving the step stops a video or a picture that is still being made.
 onBeforeUnmount(() => {
+  left = true;
   cancel?.();
   cancelPoster?.();
   if (poster.value) URL.revokeObjectURL(poster.value);
@@ -145,7 +150,7 @@ onBeforeUnmount(() => {
     <h1>Make your video</h1>
     <p class="muted">
       A replay of {{ countText(activities, 'activity', 'activities') }} ({{ kmText(meters) }}). It
-      is made on this device; nothing is uploaded.
+      is made on this device.
     </p>
 
     <div class="stage" :style="stageStyle">
@@ -195,6 +200,7 @@ onBeforeUnmount(() => {
         ← Back
       </button>
       <span v-if="result && !progress" class="actions">
+        <button v-if="strava" type="button" class="secondary" @click="emit('done')">Done</button>
         <!-- Where sharing works, it is the main thing to do; elsewhere downloading is. -->
         <a
           :class="canShare ? 'secondary' : 'primary'"
@@ -297,6 +303,7 @@ onBeforeUnmount(() => {
 
 .actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 0.8rem;
 }
 

@@ -37,6 +37,12 @@ export type TileLoader = (ids: TileId[]) => Promise<TileLoad>;
 
 export type TileLoaderOptions = {
   cache: TileCache;
+  /** The host may control how requests are made, for example for temporary browser sessions. */
+  fetchTile?: (
+    url: string,
+    headers: Record<string, string>,
+    timeoutMs: number,
+  ) => Promise<Response>;
   /** Sent with every request where the platform allows it, naming the app. */
   userAgent?: string;
 };
@@ -49,7 +55,10 @@ export function createTileLoader(options: TileLoaderOptions): TileLoader {
   const headers: Record<string, string> = options.userAgent
     ? { 'User-Agent': options.userAgent }
     : {};
-  const get = (url: string) => fetch(url, { headers, signal: AbortSignal.timeout(TIMEOUT_MS) });
+  const get = (url: string) =>
+    options.fetchTile
+      ? options.fetchTile(url, headers, TIMEOUT_MS)
+      : fetch(url, { headers, signal: AbortSignal.timeout(TIMEOUT_MS) });
 
   /** The current tile URL template. Falls back to the last one seen when offline. */
   async function tileJson(): Promise<TileJson> {

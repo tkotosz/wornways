@@ -12,6 +12,7 @@ const props = defineProps<{
   mode: 'select' | 'delete';
   /** Names the grid for tests: the table gets it, its count line `<testId>-count`. */
   testId: string;
+  strava?: boolean;
 }>();
 /** In "select" mode: the ids of the unticked activities, kept when other rows come and go. */
 const excluded = defineModel<string[]>('excluded', { default: () => [] });
@@ -92,7 +93,18 @@ function toggleAll(): void {
             <span class="long">{{ dayText(a.startTime) }}</span>
             <span class="short">{{ shortDayText(a.startTime) }}</span>
           </td>
-          <td class="name">{{ a.name }}</td>
+          <td class="name">
+            {{ a.name }}
+            <a
+              v-if="strava"
+              :href="'https://www.strava.com/activities/' + a.id"
+              class="strava-link"
+              target="_blank"
+              rel="noopener noreferrer"
+              @click.stop
+              >View on Strava</a
+            >
+          </td>
           <td class="sport muted">{{ sportText(a.sport) }}</td>
           <td class="km muted">{{ kmText(a.distanceM) }}</td>
           <td v-if="!selecting" class="remove">
@@ -113,6 +125,11 @@ function toggleAll(): void {
 </template>
 
 <style scoped>
+.strava-link {
+  display: block;
+  font-size: 0.75rem;
+}
+
 .scroller {
   max-height: 28rem;
   overflow: auto;

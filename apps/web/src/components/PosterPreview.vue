@@ -47,6 +47,7 @@ async function draw(): Promise<void> {
   cancel = task.cancel;
   try {
     const image = await task.result;
+    if (cancel !== task.cancel) return;
     if (url.value) URL.revokeObjectURL(url.value);
     url.value = URL.createObjectURL(image);
     busy.value = false;
@@ -70,6 +71,7 @@ watch(
 onBeforeUnmount(() => {
   clearTimeout(timer);
   cancel?.();
+  cancel = null;
   if (url.value) URL.revokeObjectURL(url.value);
 });
 </script>

@@ -7,6 +7,7 @@ import {
   selectTracks,
   type CanvasLike,
   type SettingsInput,
+  type TileLoader,
   type Track,
 } from '@wornways/engine';
 import { loadFont } from './font.ts';
@@ -24,6 +25,7 @@ export async function makePoster(
   library: Track[],
   input: SettingsInput,
   signal: AbortSignal,
+  loadTiles: TileLoader = createTileLoader({ cache: cacheStorageTileCache }),
 ): Promise<Blob> {
   const settings = parseSettings(input);
   const selection = selectTracks(library, settings);
@@ -34,7 +36,7 @@ export async function makePoster(
   await loadFont();
   const replay = await prepareReplay(selection.tracks, settings, {
     createCanvas: (w, h) => new OffscreenCanvas(w, h) as unknown as CanvasLike,
-    loadTiles: createTileLoader({ cache: cacheStorageTileCache }),
+    loadTiles,
     size,
   });
   if (signal.aborted) throw new Canceled();

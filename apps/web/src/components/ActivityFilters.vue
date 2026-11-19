@@ -16,8 +16,11 @@ import type { EngineClient } from '../engine-client.ts';
 import { sportText } from '../format.ts';
 import type { ActivitySummary } from '../messages.ts';
 
-const props = defineProps<{ engine: EngineClient; library: ActivitySummary[] }>();
+const props = defineProps<{ engine: EngineClient; library: ActivitySummary[]; strava?: boolean }>();
 const choice = defineModel<Choice>({ required: true });
+const periods = computed(() =>
+  props.strava ? PERIODS.filter((period) => period.id !== 'all') : PERIODS,
+);
 
 /** Every sport in the library, the most frequent first. */
 const allSports = computed(() => {
@@ -77,7 +80,7 @@ const suggestFrom = computed(() => placeSettings(choice.value, new Date()));
       <span class="label">Period</span>
       <div class="chips">
         <button
-          v-for="p in PERIODS"
+          v-for="p in periods"
           :key="p.id"
           type="button"
           class="chip"
@@ -125,7 +128,7 @@ const suggestFrom = computed(() => placeSettings(choice.value, new Date()));
       </div>
     </div>
 
-    <div class="filter">
+    <div v-if="!strava" class="filter">
       <span class="label">Places</span>
       <div class="places">
         <template v-for="end in ['start', 'end'] as const" :key="end">
