@@ -6,11 +6,19 @@ import type { Reply, Request } from '../messages.ts';
 import { Library } from './library.ts';
 import { planVideo } from './plan.ts';
 import { makePoster } from './poster.ts';
+import { ActivityStoreUnavailable } from './store.ts';
 import { StravaError, StravaExpired, StravaSession } from './strava.ts';
 import { Canceled, VideoProblem, makeVideo } from './video.ts';
 
-const library = Library.open();
+let library: Promise<Library> | undefined;
 let strava: StravaSession | null = null;
+
+function getLibrary(): Promise<Library> {
+  return (library ??= Library.open().catch((error: unknown) => {
+    library = undefined;
+    throw error;
+  }));
+}
 /** The requests still running, to cancel them by id. */
 const running = new Map<number, AbortController>();
 
@@ -23,6 +31,7 @@ function messageFor(error: unknown): string {
   if (error instanceof SettingsError) return `The setting "${error.setting}" ${error.message}.`;
   if (error instanceof VideoProblem || error instanceof StravaError) return error.message;
   console.error(error);
+  if (error instanceof ActivityStoreUnavailable) return error.message;
   return `Something went wrong: ${error instanceof Error ? error.message : String(error)}`;
 }
 
@@ -55,7 +64,7 @@ async function answer(request: Exclude<Request, { type: 'cancel' }>, signal: Abo
       session?.prioritize(request.ids);
       return reply({ type: 'strava-prioritized', id });
   }
-  const lib = await library;
+  const lib = await getLibrary();
   const source = 'strava' in request && request.strava;
   if (source && !session) throw new StravaExpired('Connect with Strava again.');
   const renderSignal = source && session ? AbortSignal.any([signal, session.signal]) : signal;

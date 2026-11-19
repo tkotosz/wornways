@@ -19,9 +19,18 @@ function done<T>(request: IDBRequest<T>): Promise<T> {
 function committed(transaction: IDBTransaction): Promise<void> {
   return new Promise((resolve, reject) => {
     transaction.oncomplete = () => resolve();
-    transaction.onerror = () => reject(transaction.error);
-    transaction.onabort = () => reject(transaction.error ?? new Error('Storing was aborted'));
+    transaction.onabort = () =>
+      reject(transaction.error ?? new DOMException('Storing was aborted', 'AbortError'));
   });
+}
+
+export class ActivityStoreUnavailable extends Error {
+  constructor(cause: DOMException) {
+    super(
+      'The browser lost access to the activity library. Try again. If it still fails, close and reopen this tab.',
+      { cause },
+    );
+  }
 }
 
 export type ActivityStore = {
@@ -33,30 +42,78 @@ export type ActivityStore = {
   deleteAll(): Promise<void>;
 };
 
-export async function openActivityStore(): Promise<ActivityStore> {
-  const opening = indexedDB.open(DATABASE, VERSION);
-  opening.onupgradeneeded = () => opening.result.createObjectStore(ACTIVITIES, { keyPath: 'id' });
-  const db = await done(opening);
-  const transaction = (mode: IDBTransactionMode) => db.transaction(ACTIVITIES, mode);
+/** Use a fresh connection for each operation, including after the file picker closes. */
+async function withDatabase<T>(operation: (db: IDBDatabase) => Promise<T>): Promise<T> {
+  for (let attempt = 0; ; attempt++) {
+    let db: IDBDatabase | undefined;
+    try {
+      const opening = indexedDB.open(DATABASE, VERSION);
+      opening.onupgradeneeded = () =>
+        opening.result.createObjectStore(ACTIVITIES, { keyPath: 'id' });
+      db = await done(opening);
+      return await operation(db);
+    } catch (error) {
+      if (
+        !(error instanceof DOMException) ||
+        !['InvalidStateError', 'AbortError', 'UnknownError'].includes(error.name)
+      )
+        throw error;
+      if (attempt > 0) throw new ActivityStoreUnavailable(error);
+    } finally {
+      db?.close();
+    }
+  }
+}
+
+/** Enqueue all writes synchronously and wait for commit or rollback. */
+async function write(db: IDBDatabase, enqueue: (store: IDBObjectStore) => void): Promise<void> {
+  const transaction = db.transaction(ACTIVITIES, 'readwrite');
+  const completion = committed(transaction);
+  try {
+    enqueue(transaction.objectStore(ACTIVITIES));
+  } catch (error) {
+    transaction.abort();
+    await completion.catch(() => {});
+    throw error;
+  }
+  await completion;
+}
+
+export function createActivityStore(): ActivityStore {
+  // A retry must finish before the next operation, so a failed write can't overtake a delete.
+  let pending: Promise<unknown> = Promise.resolve();
+  function access<T>(operation: (db: IDBDatabase) => Promise<T>): Promise<T> {
+    const result = pending.then(() => withDatabase(operation));
+    pending = result.catch(() => {});
+    return result;
+  }
 
   return {
-    async readAll() {
-      return done(transaction('readonly').objectStore(ACTIVITIES).getAll() as IDBRequest<Track[]>);
+    readAll() {
+      return access((db) =>
+        done(
+          db.transaction(ACTIVITIES, 'readonly').objectStore(ACTIVITIES).getAll() as IDBRequest<
+            Track[]
+          >,
+        ),
+      );
     },
-    async put(activities) {
-      const t = transaction('readwrite');
-      for (const activity of activities) t.objectStore(ACTIVITIES).put(activity);
-      await committed(t);
+    put(activities) {
+      return access((db) =>
+        write(db, (store) => {
+          for (const activity of activities) store.put(activity);
+        }),
+      );
     },
-    async delete(ids) {
-      const t = transaction('readwrite');
-      for (const id of ids) t.objectStore(ACTIVITIES).delete(id);
-      await committed(t);
+    delete(ids) {
+      return access((db) =>
+        write(db, (store) => {
+          for (const id of ids) store.delete(id);
+        }),
+      );
     },
-    async deleteAll() {
-      const t = transaction('readwrite');
-      t.objectStore(ACTIVITIES).clear();
-      await committed(t);
+    deleteAll() {
+      return access((db) => write(db, (store) => store.clear()));
     },
   };
 }
