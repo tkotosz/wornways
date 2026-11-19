@@ -211,31 +211,47 @@ test('chooses activities with filters and by hand', async ({ page }) => {
   await expect(page.getByRole('button', { name: 'Continue' })).toBeDisabled();
 });
 
-test('makes a video of the chosen activities', async ({ page, context }) => {
+test('makes a video of activities within the chosen distance range', async ({ page, context }) => {
   const mapRequests = await offlineMap(context);
   await page.goto('/');
-  await addFiles(page, 'morning-ride.fit', 'trail-run.tcx', 'strava-export.zip');
+  await addFiles(page, 'morning-ride.fit', 'strava-export.zip');
+  await page.getByTestId('file-input').setInputFiles({
+    name: 'trail, run.tcx',
+    mimeType: 'application/xml',
+    buffer: await readFile(fixture('trail-run.tcx')),
+  });
+  await expect(page.getByTestId('activity-count')).toContainText('5 activities');
   await page.getByRole('button', { name: 'Continue' }).click();
-  await page.getByTestId('chosen').getByText('Balaton loop, windy').click();
-  await expect(page.getByTestId('chosen-count')).toContainText('4 of 5 activities');
+  const count = page.getByTestId('chosen-count');
+  const minimum = page.getByRole('textbox', { name: 'Minimum (km)' });
+  const maximum = page.getByRole('textbox', { name: 'Maximum (km)' });
+  await minimum.fill('9');
+  await expect(count).toContainText('4 of 4 activities');
+  await maximum.fill('8');
+  await expect(page.getByRole('alert')).toContainText('minimum must be at or below the maximum');
+  await expect(page.getByRole('button', { name: 'Continue' })).toBeDisabled();
+  await maximum.fill('9');
+  await expect(page.getByRole('alert')).toHaveText('No activities match the distance range.');
+  await maximum.fill('40');
+  await expect(count).toContainText('3 of 3 activities');
   await page.getByRole('button', { name: 'Continue' }).click(); // to Playback
   await page.getByRole('button', { name: 'Continue' }).click(); // to Appearance
   await page.getByRole('button', { name: 'Continue' }).click(); // to Export
 
-  await expect(page.getByText('A replay of 4 activities')).toBeVisible();
+  await expect(page.getByText('A replay of 3 activities')).toBeVisible();
   await expect(page.getByTestId('video-summary')).toHaveText('1080 × 1920 · 30 s + end card');
   await page.getByRole('button', { name: 'Make video' }).click();
   await expect(page.getByTestId('progress')).toBeVisible();
   const result = page.getByTestId('result');
   await expect(result).toBeVisible({ timeout: 150_000 });
-  await expect(page.getByTestId('made')).toContainText('4 activities');
+  await expect(page.getByTestId('made')).toContainText('3 activities');
   await expect(page.getByText('could not be loaded')).toHaveCount(0);
   expect(mapRequests()).toBeGreaterThan(1);
 
   const downloading = page.waitForEvent('download');
   await page.getByRole('link', { name: /Download/ }).click();
   const download = await downloading;
-  expect(download.suggestedFilename()).toMatch(/^replay-2026-03-\d\d-to-2026-05-02\.mp4$/);
+  expect(download.suggestedFilename()).toMatch(/^replay-2026-03-\d\d-to-2026-04-27\.mp4$/);
   const video = await readFile(await download.path());
   expect(video.length).toBeGreaterThan(50_000);
   expect(video.subarray(4, 8).toString('latin1')).toBe('ftyp'); // an MP4 file

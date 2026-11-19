@@ -66,14 +66,17 @@ describe('choiceSettings', () => {
     expect(placeMissing(off)).toBe(false);
   });
 
-  it('names the ticked activities only when some are unticked', () => {
+  it('passes exact IDs when activities are unticked or distance is filtered', () => {
     const choice = { ...NO_CHOICE, sports: ['ride', 'run'], excluded: ['b', 'x'] };
 
     expect(choiceSettings(choice, ['a', 'b', 'c'], today)).toMatchObject({
       sport: 'ride,run',
-      activity: 'a,c',
+      activity: ['a', 'c'],
     });
     expect(choiceSettings(NO_CHOICE, ['a', 'b'], today).activity).toBeUndefined();
+    expect(choiceSettings({ ...NO_CHOICE, minDistanceKm: '5' }, ['a,b'], today).activity).toEqual([
+      'a,b',
+    ]);
   });
 });
 

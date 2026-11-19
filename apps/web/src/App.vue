@@ -13,6 +13,7 @@ import {
 import {
   NO_CHOICE,
   choiceSettings,
+  distanceRange,
   filterSettings,
   placeMissing,
   periodRange,
@@ -85,7 +86,19 @@ const choice = computed({
   },
 });
 const sourceRows = computed(() => (strava.value ? stravaRows.value : library.value));
-const matched = computed(() => (strava.value ? stravaMatches.value : fileMatches.value));
+const matched = computed<MatchReport>(() => {
+  const match = strava.value ? stravaMatches.value : fileMatches.value;
+  const range = distanceRange(choice.value);
+  if (!range) return { ...match, ids: [] };
+  if ((range.min === -Infinity && range.max === Infinity) || !match.ids.length) return match;
+
+  const distances = new Map(sourceRows.value.map((a) => [a.id, a.distanceM / 1000]));
+  const ids = match.ids.filter((id) => {
+    const km = distances.get(id);
+    return km !== undefined && km >= range.min && km <= range.max;
+  });
+  return { ids, problem: ids.length ? match.problem : 'No activities match the distance range.' };
+});
 
 const chosenIds = computed(() =>
   matched.value.ids.filter((id) => !choice.value.excluded.includes(id)),
@@ -114,7 +127,7 @@ watch(fileAdjustments, saveAdjustments);
 /** The settings of the video: the chosen activities and the adjustments. */
 const settings = computed(() => ({
   ...(strava.value
-    ? { activity: chosenIds.value.join(',') }
+    ? { activity: chosenIds.value }
     : choiceSettings(choice.value, matched.value.ids, new Date())),
   ...adjustSettings(adjustments.value, countOf(chosenIds.value.length)),
 }));

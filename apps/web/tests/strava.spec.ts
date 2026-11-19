@@ -279,6 +279,12 @@ test('reuses the selected track after a reload and socket interruption', async (
   await page.goto('/');
   await connect(page);
   await page.getByRole('button', { name: 'Last year', exact: true }).click();
+  const minimum = page.getByRole('textbox', { name: 'Minimum (km)' });
+  const maximum = page.getByRole('textbox', { name: 'Maximum (km)' });
+  await expect(page.getByTestId('chosen')).toContainText('Strava indoor ride');
+  await maximum.fill('1.4');
+  await minimum.fill('1,4');
+  await expect(page.getByTestId('chosen-count')).toContainText('of 1 activity');
   await page.getByRole('checkbox', { name: 'Strava test ride' }).check();
   await page.getByRole('button', { name: '← Back', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Disconnect Strava' })).toBeVisible();
@@ -296,6 +302,9 @@ test('reuses the selected track after a reload and socket interruption', async (
     'aria-pressed',
     'true',
   );
+  await expect(minimum).toHaveValue('1,4');
+  await expect(maximum).toHaveValue('1.4');
+  await expect(page.getByTestId('chosen-count')).toContainText('1 of 1 activity');
   await expect(page.getByRole('checkbox', { name: 'Strava test ride' })).toBeChecked();
   expect(mock.exchanges()).toBe(1);
   await page.evaluate(`
