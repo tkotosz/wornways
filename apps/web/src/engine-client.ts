@@ -72,8 +72,18 @@ export class EngineClient {
     this.strava = true;
   }
 
-  async listStrava(from: number | null, to: number | null): Promise<ActivitySummary[]> {
-    const reply = await this.send({ type: 'strava-list', id: this.nextId++, from, to });
+  async listStrava(
+    from: number | null,
+    to: number | null,
+    activityChanged = false,
+  ): Promise<ActivitySummary[]> {
+    const reply = await this.send({
+      type: 'strava-list',
+      id: this.nextId++,
+      from,
+      to,
+      activityChanged,
+    });
     if (reply.type === 'strava-listed') return reply.activities;
     throw this.errorFor(reply);
   }

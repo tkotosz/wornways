@@ -4,7 +4,13 @@ const NAME = '__Secure-wornways-strava';
 const ATTRIBUTES = 'Path=/api/strava/oauth; Secure; HttpOnly; SameSite=Strict';
 export const STRAVA_SESSION_MS = 2 * 60 * 60 * 1000;
 
-export type StravaLogin = { token: string; expiresAt: number; ticket: string; sessionId: string };
+export type StravaLogin = {
+  token: string;
+  expiresAt: number;
+  ticket: string;
+  sessionId: string;
+  cacheKey?: string;
+};
 
 const bytes = new TextEncoder();
 const base64url = (value: Uint8Array) =>

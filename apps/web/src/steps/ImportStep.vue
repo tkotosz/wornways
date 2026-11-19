@@ -75,7 +75,7 @@ async function remove(ids: string[] | 'all'): Promise<void> {
       </section>
       <section v-if="stravaUrl || stravaActive" class="source-card">
         <h2>Strava</h2>
-        <p class="muted">Your connection lasts up to two hours. You can disconnect at any time.</p>
+        <p class="muted">Your connection and cached activities last up to two hours.</p>
         <button v-if="stravaActive" type="button" class="link" @click="emit('disconnect')">
           Disconnect Strava
         </button>

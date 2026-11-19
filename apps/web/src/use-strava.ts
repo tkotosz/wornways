@@ -127,8 +127,8 @@ export function useStrava(
         return false;
       }
       // Access tokens stay in the worker after the authorization response.
-      const { token, expiresAt, sessionId, ticket } = login;
-      await engine.startStrava({ token, expiresAt });
+      const { token, expiresAt, sessionId, ticket, cacheKey } = login;
+      await engine.startStrava({ token, expiresAt, sessionId, cacheKey });
       session = { expiresAt, sessionId, ticket };
       if (params) store(ENDED, null);
       const draft = params ? null : readDraft(sessionId);
@@ -167,7 +167,7 @@ export function useStrava(
         failed(new StravaExpired('Strava access was revoked. Temporary activities were cleared.'));
       if (data === 'activity') {
         onRevalidate();
-        void list(selected());
+        void list(selected(), true);
       }
     });
     events.addEventListener('close', () => {
@@ -222,7 +222,7 @@ export function useStrava(
     }
   }
 
-  async function list(keep: string[] = []) {
+  async function list(keep: string[] = [], activityChanged = false) {
     if (!active.value || !ready.value) return;
     const request = ++revision;
     const from = range.value?.from;
@@ -236,14 +236,14 @@ export function useStrava(
 
     if (from == null || to == null) {
       error.value = 'Choose a start and end date for your Strava activities.';
-      await engine.listStrava(null, null).catch(() => {});
+      await engine.listStrava(null, null, activityChanged).catch(() => {});
       return;
     }
 
     busy.value = 'Finding activities on Strava…';
     const remembered = new Set(keep);
     try {
-      const activities = await engine.listStrava(from, to);
+      const activities = await engine.listStrava(from, to, activityChanged);
       if (request !== revision) return;
       choice.value = {
         ...choice.value,

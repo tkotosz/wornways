@@ -12,7 +12,13 @@ export type Request =
   /** Deletes the activities with these ids, or every activity. */
   | { type: 'delete-activities'; id: number; ids: string[] | 'all' }
   | { type: 'strava-start'; id: number; grant: StravaGrant }
-  | { type: 'strava-list'; id: number; from: number | null; to: number | null }
+  | {
+      type: 'strava-list';
+      id: number;
+      from: number | null;
+      to: number | null;
+      activityChanged: boolean;
+    }
   | { type: 'strava-prepare'; id: number; ids: string[] }
   | { type: 'strava-prioritize'; id: number; ids: string[] }
   | { type: 'strava-end'; id: number; disconnect: boolean }

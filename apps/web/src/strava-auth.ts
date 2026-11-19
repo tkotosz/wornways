@@ -1,9 +1,14 @@
 const ENDPOINT = '/api/strava/oauth';
 const STATE = 'wornways-strava-state';
 
-export type StravaGrant = { token: string; expiresAt: number };
+export type StravaGrant = {
+  token: string;
+  expiresAt: number;
+  sessionId: string;
+  cacheKey?: string;
+};
 
-export type StravaLogin = StravaGrant & { ticket: string; sessionId: string };
+export type StravaLogin = StravaGrant & { ticket: string };
 type StravaConfiguration = { clientId?: string; session?: StravaLogin };
 
 export async function stravaConfiguration(): Promise<StravaConfiguration> {

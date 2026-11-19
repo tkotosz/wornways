@@ -47,7 +47,13 @@ describe('the Strava Pages Functions', () => {
     expect(response.status).toBe(200);
     expect(response.headers.get('Cache-Control')).toBe('no-store');
     const data = (await response.json()) as { ticket: string; token: string };
-    expect(Object.keys(data).sort()).toEqual(['expiresAt', 'sessionId', 'ticket', 'token']);
+    expect(Object.keys(data).sort()).toEqual([
+      'cacheKey',
+      'expiresAt',
+      'sessionId',
+      'ticket',
+      'token',
+    ]);
     expect(data.token).toBe('short-lived');
     const setCookie = response.headers.get('Set-Cookie');
     expect(setCookie).toContain('Secure; HttpOnly; SameSite=Strict');

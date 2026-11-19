@@ -17,11 +17,13 @@ async function fakeStrava(
   let relay: WebSocketRoute | undefined;
   let exchanges = 0;
   let connections = 0;
+  let removedRide = false;
   const grant = {
     token: 'test-token',
     expiresAt: Date.now() + 3_600_000,
     ticket: 'test-ticket',
     sessionId: 'test-session',
+    cacheKey: 'test-cache-key',
   };
   const cookie = 'strava-test-session=1';
   const attributes = '; Path=/api/strava/oauth; Secure; HttpOnly; SameSite=Strict';
@@ -119,7 +121,10 @@ async function fakeStrava(
             end_latlng: [46.5, 19.5],
           });
         }
-      return route.fulfill({ json, headers });
+      return route.fulfill({
+        json: removedRide ? json.filter((row) => row.id_str !== rideId) : json,
+        headers,
+      });
     }
     const id = url.pathname.split('/').at(-2)!;
     tracks.push(id);
@@ -154,6 +159,9 @@ async function fakeStrava(
     connections: () => connections,
     periods,
     tracks,
+    removeRide: () => {
+      removedRide = true;
+    },
   };
 }
 
@@ -210,6 +218,13 @@ test.describe('Strava on a phone', () => {
     );
     await page.getByRole('button', { name: 'Use files', exact: true }).click();
     await ending;
+    await expect
+      .poll(() =>
+        page.evaluate(
+          "caches.keys().then((names) => names.some((name) => name.startsWith('wornways-strava-')))",
+        ),
+      )
+      .toBe(false);
     await expect(page.getByTestId('result')).toHaveCount(0);
     await expect(page.getByTestId('activity-count')).toContainText('3 activities');
     await page.reload();
@@ -253,14 +268,15 @@ test('rejects a Strava callback with mismatched state before exchanging its code
   expect(new URL(page.url()).search).toBe('');
 });
 
-test('restores the connection and selected activities after a reload and socket interruption', async ({
-  page,
-}) => {
+test('reuses the selected track after a reload and socket interruption', async ({ page }) => {
   const mock = await fakeStrava(page);
   await page.goto('/');
   await connect(page);
   await page.getByRole('button', { name: 'Last year', exact: true }).click();
   await page.getByRole('checkbox', { name: 'Strava test ride' }).check();
+  await page.getByRole('button', { name: 'Continue' }).click();
+  await expect(page.getByRole('heading', { name: 'How should your routes play?' })).toBeVisible();
+  expect(mock.tracks.filter((id) => id === rideId)).toHaveLength(1);
 
   await page.reload();
   await expect(page.getByRole('button', { name: 'Last year', exact: true })).toHaveAttribute(
@@ -279,6 +295,46 @@ test('restores the connection and selected activities after a reload and socket 
   await expect.poll(() => mock.connections()).toBeGreaterThan(connections);
   await expect(page.getByRole('checkbox', { name: 'Strava test ride' })).toBeChecked();
   expect(mock.exchanges()).toBe(1);
+  await page.getByRole('button', { name: 'Continue' }).click();
+  await expect(page.getByRole('heading', { name: 'How should your routes play?' })).toBeVisible();
+  expect(mock.tracks.filter((id) => id === rideId)).toHaveLength(1);
+});
+
+test('validates cached activities on reload and removes deleted tracks', async ({ page }) => {
+  const mock = await fakeStrava(page);
+  await page.goto('/');
+  await connect(page);
+  await page.getByRole('button', { name: 'Last year', exact: true }).click();
+  await page.getByRole('checkbox', { name: 'Strava test ride' }).check();
+  await page.getByRole('button', { name: 'Continue' }).click();
+  await expect(page.getByRole('heading', { name: 'How should your routes play?' })).toBeVisible();
+
+  const cached = () =>
+    page.evaluate(`
+    caches.keys().then(async (names) => {
+      const active = await caches.open(names.find((name) => name.startsWith('wornways-strava-')));
+      const entries = await active.keys();
+      return entries.some((entry) => entry.url.includes('/tracks/'));
+    })
+  `);
+  expect(await cached()).toBe(true);
+  mock.removeRide();
+  await page.reload();
+  await expect(page.getByTestId('chosen')).toContainText('Strava out-and-back');
+  await expect(page.getByRole('checkbox', { name: 'Strava test ride' })).toHaveCount(0);
+  expect(await cached()).toBe(false);
+});
+
+test('prunes expired Strava caches when Wornways starts', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.getByRole('button', { name: 'Choose files' })).toBeVisible();
+  await page.evaluate(`caches.open('wornways-strava-1-expired').then(() => undefined)`);
+  await page.reload();
+  await expect
+    .poll(() =>
+      page.evaluate("caches.keys().then((names) => names.includes('wornways-strava-1-expired'))"),
+    )
+    .toBe(false);
 });
 
 test('filters Strava rides by both start and finish using activity summaries', async ({

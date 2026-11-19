@@ -7,11 +7,13 @@ import { Library } from './library.ts';
 import { planVideo } from './plan.ts';
 import { makePoster } from './poster.ts';
 import { ActivityStoreUnavailable } from './store.ts';
+import { pruneStravaCaches } from './strava-cache.ts';
 import { StravaError, StravaExpired, StravaSession } from './strava.ts';
 import { Canceled, VideoProblem, makeVideo } from './video.ts';
 
 let library: Promise<Library> | undefined;
 let strava: StravaSession | null = null;
+void pruneStravaCaches();
 
 function getLibrary(): Promise<Library> {
   return (library ??= Library.open().catch((error: unknown) => {
@@ -42,17 +44,21 @@ async function answer(request: Exclude<Request, { type: 'cancel' }>, signal: Abo
   const session = strava;
   switch (request.type) {
     case 'strava-start':
-      session?.close();
+      await session?.close();
       strava = new StravaSession(request.grant);
       return reply({ type: 'strava-started', id });
     case 'strava-end':
       strava = null;
-      session?.close();
       if (session) await session.end(request.disconnect);
       return reply({ type: 'strava-ended', id });
     case 'strava-list': {
       if (!session) throw new StravaExpired('Connect with Strava again.');
-      const activities = await session.list(request.from, request.to, signal);
+      const activities = await session.list(
+        request.from,
+        request.to,
+        signal,
+        request.activityChanged,
+      );
       return reply({ type: 'strava-listed', id, activities });
     }
     case 'strava-prepare': {

@@ -95,6 +95,7 @@ export async function onRequest({ request, env }: Context): Promise<Response> {
       expiresAt,
       ticket: await makeTicket(secret, athlete, expiresAt),
       sessionId: crypto.randomUUID(),
+      cacheKey: btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(32)))),
     };
     return json(session, 200, await sessionCookie(session, secret, origin));
   } catch {
