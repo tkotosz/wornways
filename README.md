@@ -168,8 +168,9 @@ the app and start both the Pages preview and the Strava relay. The command sets 
 local origin to `http://127.0.0.1:8788`. Strava needs a public HTTPS webhook URL to
 deliver real events.
 
-Activity list and stream requests go directly from the browser to Strava. An
-encrypted cookie keeps the sign-in for up to two hours. The browser temporarily
+The Pages Functions exchange the OAuth code and fetch activity lists and GPS streams
+from Strava. An encrypted, HttpOnly cookie keeps the sign-in for up to two hours.
+The Functions decrypt it when they need the Strava access token. The browser temporarily
 caches encrypted activity summaries and downloaded tracks for the same session.
 On reload, Wornways refreshes the list and reuses tracks whose activity details still match.
 Ending the session clears the cache. Expired entries are removed on the next

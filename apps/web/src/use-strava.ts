@@ -8,7 +8,7 @@ import {
   stravaAuthorization,
   stravaConfiguration,
   takeStravaCallback,
-  type StravaLogin,
+  type StravaGrant,
 } from './strava-auth.ts';
 import { clearStravaDraft, openStravaDraft, type StravaDraftStore } from './strava-draft.ts';
 
@@ -30,7 +30,7 @@ export function useStrava(
   const notice = ref('');
   const selection = ref<MatchReport>({ ids: [], problem: null });
   let callback = takeStravaCallback();
-  let session: (Pick<StravaLogin, 'ticket' | 'expiresAt'> & StravaDraftStore) | null = null;
+  let session: (Pick<StravaGrant, 'sessionId' | 'expiresAt'> & StravaDraftStore) | null = null;
   let initialSelection: string[] = [];
   const range = computed(() => periodRange(choice.value, new Date()));
   let revision = 0;
@@ -92,11 +92,10 @@ export function useStrava(
       }
       const storage = await openStravaDraft(login, params !== null);
       if (!storage) return false;
-      // Access tokens stay in the worker after the authorization response.
-      const { token, expiresAt, sessionId, ticket, cacheKey } = login;
-      await engine.startStrava({ token, expiresAt, sessionId, cacheKey });
+      const { expiresAt, sessionId, cacheKey } = login;
+      await engine.startStrava({ expiresAt, sessionId, cacheKey });
       const { draft, ...draftStore } = storage;
-      session = { expiresAt, ticket, ...draftStore };
+      session = { expiresAt, sessionId, ...draftStore };
       choice.value = { ...initialChoice(), ...draft?.choice };
       adjustments.value = draft?.adjustments ?? { ...defaultAdjustments };
       initialSelection = draft?.selected ?? [];
@@ -121,10 +120,10 @@ export function useStrava(
     events?.close();
   }
 
-  async function openEvents(ticket: string): Promise<void> {
+  async function openEvents(sessionId: string): Promise<void> {
     const endpoint = new URL('/api/strava/events', location.origin);
     endpoint.protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const events = new WebSocket(endpoint, 'session.' + ticket);
+    const events = new WebSocket(endpoint, 'session.' + sessionId);
     socket = events;
     events.addEventListener('message', ({ data }) => {
       if (socket !== events) return;
@@ -173,7 +172,7 @@ export function useStrava(
     const attempt = session;
     busy.value = 'Connecting to Strava…';
     try {
-      await openEvents(attempt.ticket);
+      await openEvents(attempt.sessionId);
       if (session !== attempt) return;
       ready.value = true;
       const keep = rows.value.length ? selected() : initialSelection;
@@ -182,6 +181,12 @@ export function useStrava(
     } catch (caught) {
       if (session !== attempt) return;
       closeEvents();
+      const config = await stravaConfiguration();
+      if (session !== attempt) return;
+      if (config.clientId && config.session?.sessionId !== attempt.sessionId) {
+        failed(new StravaExpired('Your Strava session ended. Connect again.'));
+        return;
+      }
       busy.value = '';
       failed(caught);
     }

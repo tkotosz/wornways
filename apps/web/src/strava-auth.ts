@@ -2,14 +2,12 @@ const ENDPOINT = '/api/strava/oauth';
 const STATE = 'wornways-strava-state';
 
 export type StravaGrant = {
-  token: string;
   expiresAt: number;
   sessionId: string;
-  cacheKey?: string;
+  cacheKey: string;
 };
 
-export type StravaLogin = StravaGrant & { ticket: string };
-type StravaConfiguration = { clientId?: string; session?: StravaLogin };
+type StravaConfiguration = { clientId?: string; session?: StravaGrant };
 
 export async function stravaConfiguration(): Promise<StravaConfiguration> {
   try {
@@ -63,7 +61,7 @@ async function oauthRequest(method: 'POST' | 'DELETE', body: object): Promise<Re
   return res;
 }
 
-export async function finishStravaAuthorization(params: URLSearchParams): Promise<StravaLogin> {
+export async function finishStravaAuthorization(params: URLSearchParams): Promise<StravaGrant> {
   const state = sessionStorage.getItem(STATE);
   sessionStorage.removeItem(STATE);
   if (!state || params.get('state') !== state)
@@ -76,10 +74,9 @@ export async function finishStravaAuthorization(params: URLSearchParams): Promis
   if (!scopes.some((scope) => scope === 'activity:read' || scope === 'activity:read_all'))
     throw new Error('Allow Wornways to read your Strava activities, then connect again.');
   const res = await oauthRequest('POST', { code: params.get('code') });
-  const grant = (await res.json()) as StravaLogin;
+  const grant = (await res.json()) as StravaGrant;
   if (
-    !grant.token ||
-    !grant.ticket ||
+    !grant.cacheKey ||
     !grant.sessionId ||
     !Number.isFinite(grant.expiresAt) ||
     grant.expiresAt <= Date.now()
@@ -88,6 +85,6 @@ export async function finishStravaAuthorization(params: URLSearchParams): Promis
   return grant;
 }
 
-export async function clearStravaAccess(token: string, disconnect: boolean): Promise<void> {
-  await oauthRequest('DELETE', { token, disconnect });
+export async function clearStravaAccess(sessionId: string, disconnect: boolean): Promise<void> {
+  await oauthRequest('DELETE', { sessionId, disconnect });
 }

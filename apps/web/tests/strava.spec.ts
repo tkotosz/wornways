@@ -18,17 +18,18 @@ async function fakeStrava(
   let exchanges = 0;
   let connections = 0;
   let removedRide = false;
+  let expiredAccess = false;
   const grant = {
-    token: 'test-token',
     expiresAt: Date.now() + 3_600_000,
-    ticket: 'test-ticket',
     sessionId: 'test-session',
     cacheKey: 'test-cache-key',
   };
   const cookie = 'strava-test-session=1';
-  const attributes = '; Path=/api/strava/oauth; Secure; HttpOnly; SameSite=Strict';
+  const attributes = '; Path=/api/strava; Secure; HttpOnly; SameSite=Strict';
   const tracks: string[] = [];
   const periods: number[] = [];
+  const directApiRequests: string[] = [];
+  const disconnects: boolean[] = [];
 
   await page.context().routeWebSocket('**/api/strava/events', (socket) => {
     relay = socket;
@@ -41,12 +42,22 @@ async function fakeStrava(
       exchanges++;
       return route.fulfill({ json: grant, headers: { 'set-cookie': cookie + attributes } });
     }
-    if (request.method() === 'DELETE')
+    const signedIn = (await request.headerValue('cookie'))?.includes(cookie);
+    if (request.method() === 'DELETE') {
+      const payload = request.postDataJSON() as { sessionId: string; disconnect: boolean };
+      expect(payload).toEqual({
+        sessionId: grant.sessionId,
+        disconnect: expect.any(Boolean),
+      });
+      const { sessionId, disconnect } = payload;
+      if (!signedIn || sessionId !== grant.sessionId)
+        return route.fulfill({ status: disconnect ? 409 : 200, json: {} });
+      disconnects.push(disconnect);
       return route.fulfill({
         json: {},
         headers: { 'set-cookie': cookie + attributes + '; Max-Age=0' },
       });
-    const signedIn = (await request.headerValue('cookie'))?.includes(cookie);
+    }
     await route.fulfill({ json: { clientId: '123', ...(signedIn ? { session: grant } : {}) } });
   });
 
@@ -64,14 +75,21 @@ async function fakeStrava(
   });
 
   await page.context().route('https://www.strava.com/api/v3/**', async (route) => {
-    const url = new URL(route.request().url());
-    const headers = {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Headers': 'authorization',
-      'Access-Control-Allow-Methods': 'GET, OPTIONS',
-    };
-    if (route.request().method() === 'OPTIONS') return route.fulfill({ status: 204, headers });
-    if (url.pathname.endsWith('/athlete/activities')) {
+    directApiRequests.push(route.request().url());
+    await route.abort();
+  });
+
+  await page.context().route('**/api/strava/activities?*', async (route) => {
+    const request = route.request();
+    const url = new URL(request.url());
+    const signedIn = (await request.headerValue('cookie'))?.includes(cookie);
+    const sessionId = await request.headerValue('X-Wornways-Strava-Session');
+    expect(await request.headerValue('authorization')).toBeNull();
+    if (!signedIn || sessionId !== grant.sessionId || expiredAccess)
+      return route.fulfill({ status: 401 });
+
+    const id = url.searchParams.get('activity');
+    if (id === null) {
       const after = Number(url.searchParams.get('after'));
       periods.push(after);
       const march = Date.UTC(olderYear, 2, 15) / 1000;
@@ -123,15 +141,12 @@ async function fakeStrava(
         }
       return route.fulfill({
         json: removedRide ? json.filter((row) => row.id_str !== rideId) : json,
-        headers,
       });
     }
-    const id = url.pathname.split('/').at(-2)!;
     tracks.push(id);
-    if (id !== rideId) return route.fulfill({ status: 404, json: {}, headers });
+    if (id !== rideId) return route.fulfill({ status: 404 });
     await options.pendingTrack;
     return route.fulfill({
-      headers,
       json: {
         latlng: {
           data: [
@@ -159,6 +174,11 @@ async function fakeStrava(
     connections: () => connections,
     periods,
     tracks,
+    directApiRequests,
+    disconnects,
+    expireAccess: () => {
+      expiredAccess = true;
+    },
     removeRide: () => {
       removedRide = true;
     },
@@ -238,11 +258,13 @@ test.describe('Strava on a phone', () => {
     await expect(page.getByTestId('chosen')).not.toContainText('Strava test ride');
     expect(mock.tracks.filter((id) => id === rideId)).toHaveLength(1);
     expect(mock.periods.length).toBeGreaterThan(1);
+    expect(mock.directApiRequests).toEqual([]);
+    expect(mock.disconnects).toEqual([false]);
   });
 });
 
 test('shows a temporary confirmation after disconnecting Strava', async ({ page }) => {
-  await fakeStrava(page);
+  const mock = await fakeStrava(page);
   await page.clock.install();
   await page.goto('/');
   await connect(page);
@@ -255,6 +277,24 @@ test('shows a temporary confirmation after disconnecting Strava', async ({ page 
   await expect(page.getByRole('main')).not.toContainText(confirmation);
   await page.clock.fastForward(5000);
   await expect(toast).toBeHidden();
+  expect(mock.disconnects).toEqual([true]);
+});
+
+test('clears the browser session when the Strava activity endpoint rejects access', async ({
+  page,
+}) => {
+  const mock = await fakeStrava(page);
+  await page.goto('/');
+  await connect(page);
+  await page.getByRole('button', { name: 'Last year', exact: true }).click();
+  await expect(page.getByTestId('chosen')).toContainText('Strava test ride');
+  mock.expireAccess();
+
+  await page.getByRole('button', { name: 'This month', exact: true }).click();
+  await expect(page.getByRole('alert')).toContainText('Your Strava session ended');
+  await expect(page.getByTestId('chosen')).toHaveCount(0);
+  await expect(page.getByRole('link', { name: 'Connect with Strava' })).toBeVisible();
+  await expect.poll(() => mock.disconnects).toEqual([false]);
 });
 
 test('clears the session when Strava revokes access', async ({ page }) => {
