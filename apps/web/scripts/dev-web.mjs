@@ -63,18 +63,11 @@ if (await ready(`http://${host}:${relayPort}`, 'Strava relay', () => true)) {
     '--compatibility-date',
     '2024-11-11',
     '--binding',
-    'GARMIN_PERSONAL_ENABLED=1',
     `STRAVA_ORIGIN=${origin}`,
     '--do',
     'STRAVA_EVENTS=StravaEvents@wornways-strava-events',
   ]);
-  if (
-    await ready(
-      `${origin}/api/garmin`,
-      'Wornways',
-      async (response) => (await response.json()).available === true,
-    )
-  ) {
+  if (await ready(origin, 'Wornways', (response) => response.ok)) {
     console.log(`Wornways is running at ${origin}/`);
   }
 }
