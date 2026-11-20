@@ -3,7 +3,6 @@
 
 import { parseSettings, SettingsError } from '@wornways/engine';
 import type { Reply, Request } from '../messages.ts';
-import { GarminError, GarminExpired, GarminSession } from './garmin.ts';
 import { Library } from './library.ts';
 import { planVideo } from './plan.ts';
 import { makePoster } from './poster.ts';
@@ -14,8 +13,6 @@ import { Canceled, VideoProblem, makeVideo } from './video.ts';
 
 let library: Promise<Library> | undefined;
 let strava: StravaSession | null = null;
-let garmin: GarminSession | null = null;
-let garminOpening: AbortController | null = null;
 void pruneStravaCaches();
 
 function getLibrary(): Promise<Library> {
@@ -34,8 +31,7 @@ function reply(message: Reply, transfer: Transferable[] = []): void {
 /** The message shown to the person for an error. */
 function messageFor(error: unknown): string {
   if (error instanceof SettingsError) return `The setting "${error.setting}" ${error.message}.`;
-  if (error instanceof VideoProblem || error instanceof StravaError || error instanceof GarminError)
-    return error.message;
+  if (error instanceof VideoProblem || error instanceof StravaError) return error.message;
   console.error(error);
   if (error instanceof ActivityStoreUnavailable) return error.message;
   return `Something went wrong: ${error instanceof Error ? error.message : String(error)}`;
@@ -45,20 +41,19 @@ async function answer(request: Exclude<Request, { type: 'cancel' }>, signal: Abo
   const { id } = request;
   const progress = (p: Extract<Reply, { type: 'progress' }>['progress']) =>
     reply({ type: 'progress', id, progress: p });
+  const session = strava;
   switch (request.type) {
     case 'strava-start':
-      await strava?.close();
+      await session?.close();
       strava = new StravaSession(request.grant);
       return reply({ type: 'strava-started', id });
-    case 'strava-end': {
-      const previous = strava;
+    case 'strava-end':
       strava = null;
-      if (previous) await previous.end(request.disconnect);
+      if (session) await session.end(request.disconnect);
       return reply({ type: 'strava-ended', id });
-    }
     case 'strava-list': {
-      if (!strava) throw new StravaExpired('Connect with Strava again.');
-      const activities = await strava.list(
+      if (!session) throw new StravaExpired('Connect with Strava again.');
+      const activities = await session.list(
         request.from,
         request.to,
         signal,
@@ -67,61 +62,25 @@ async function answer(request: Exclude<Request, { type: 'cancel' }>, signal: Abo
       return reply({ type: 'strava-listed', id, activities });
     }
     case 'strava-prepare': {
-      if (!strava) throw new StravaExpired('Connect with Strava again.');
-      const unavailable = await strava.prepare(request.ids, signal);
+      if (!session) throw new StravaExpired('Connect with Strava again.');
+      const unavailable = await session.prepare(request.ids, signal);
       return reply({ type: 'strava-prepared', id, unavailable });
     }
     case 'strava-prioritize':
-      strava?.prioritize(request.ids);
+      session?.prioritize(request.ids);
       return reply({ type: 'strava-prioritized', id });
-    case 'garmin-start': {
-      garminOpening?.abort();
-      garmin?.close();
-      garmin = null;
-      const opening = new AbortController();
-      garminOpening = opening;
-      try {
-        const active = AbortSignal.any([signal, opening.signal]);
-        const session = await GarminSession.open(request.key, active);
-        if (active.aborted) {
-          session.close();
-          active.throwIfAborted();
-        }
-        garmin = session;
-        return reply({ type: 'garmin-started', id, expiresAt: session.expiresAt });
-      } finally {
-        if (garminOpening === opening) garminOpening = null;
-      }
-    }
-    case 'garmin-end':
-      garminOpening?.abort();
-      garmin?.close();
-      garmin = null;
-      return reply({ type: 'garmin-ended', id });
-    case 'garmin-list': {
-      if (!garmin) throw new GarminExpired('Connect to Garmin again.');
-      const activities = await garmin.list(request.from, request.to, signal);
-      return reply({ type: 'garmin-listed', id, activities });
-    }
-    case 'garmin-prepare': {
-      if (!garmin) throw new GarminExpired('Connect to Garmin again.');
-      const unavailable = await garmin.prepare(request.ids, signal);
-      return reply({ type: 'garmin-prepared', id, unavailable });
-    }
   }
-  const source = 'source' in request ? request.source : 'files';
-  const session = source === 'strava' ? strava : source === 'garmin' ? garmin : null;
-  if (source === 'strava' && !session) throw new StravaExpired('Connect with Strava again.');
-  if (source === 'garmin' && !session) throw new GarminExpired('Connect to Garmin again.');
-  if (session) {
+  const source = 'strava' in request && request.strava;
+  if (source && !session) throw new StravaExpired('Connect with Strava again.');
+  if (source && session) {
     if (request.type === 'match')
       return reply({ type: 'matched', id, match: session.match(request.settings) });
     if (request.type === 'places')
       return reply({ type: 'places', id, places: session.places(request.settings, request.end) });
   }
-  const renderSignal = session ? AbortSignal.any([signal, session.signal]) : signal;
+  const renderSignal = source && session ? AbortSignal.any([signal, session.signal]) : signal;
   const tracks = async () => {
-    if (!session || !('settings' in request)) return (await getLibrary()).all();
+    if (!source || !session || !('settings' in request)) return (await getLibrary()).all();
     const settings = parseSettings(request.settings);
     const selected = await session.selected(settings.activities ?? []);
     renderSignal.throwIfAborted();
@@ -155,7 +114,7 @@ async function answer(request: Exclude<Request, { type: 'cancel' }>, signal: Abo
         await tracks(),
         request.settings,
         renderSignal,
-        session?.loadTiles,
+        source ? session?.loadTiles : undefined,
       );
       renderSignal.throwIfAborted();
       return reply({ type: 'poster-made', id, image });
@@ -166,7 +125,7 @@ async function answer(request: Exclude<Request, { type: 'cancel' }>, signal: Abo
         request.settings,
         renderSignal,
         progress,
-        session?.loadTiles,
+        source ? session?.loadTiles : undefined,
       );
       renderSignal.throwIfAborted();
       return reply({ type: 'video-made', id, video, report }, [video]);
@@ -191,12 +150,7 @@ async function handle(request: Request): Promise<void> {
         type: 'failed',
         id: request.id,
         message: messageFor(error),
-        expired:
-          error instanceof StravaExpired
-            ? 'strava'
-            : error instanceof GarminExpired
-              ? 'garmin'
-              : undefined,
+        expired: error instanceof StravaExpired,
       });
   } finally {
     running.delete(request.id);

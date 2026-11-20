@@ -29,7 +29,6 @@ import AppearanceStep from './steps/AppearanceStep.vue';
 import ExportStep from './steps/ExportStep.vue';
 import ImportStep from './steps/ImportStep.vue';
 import PlaybackStep from './steps/PlaybackStep.vue';
-import { useGarmin } from './use-garmin.ts';
 import { useStrava } from './use-strava.ts';
 
 const props = defineProps<{ engine: EngineClient }>();
@@ -51,7 +50,6 @@ const libraryError = ref('');
 const library = ref<ActivitySummary[]>([]);
 const fileAdjustments = ref<Adjustments>(loadAdjustments());
 const stravaAdjustments = ref<Adjustments>({});
-const garminAdjustments = ref<Adjustments>({});
 const fileChoice = ref<Choice>({ ...NO_CHOICE });
 const fileMatches = ref<MatchReport>({ ids: [], problem: null });
 const {
@@ -82,53 +80,12 @@ const {
   },
 );
 
-const {
-  available: garminAvailable,
-  active: garmin,
-  busy: garminBusy,
-  error: garminError,
-  notice: garminNotice,
-  rows: garminRows,
-  choice: garminChoice,
-  matched: garminMatches,
-  discover: discoverGarmin,
-  connect: connectGarmin,
-  end: endGarmin,
-  retry: retryGarmin,
-  prepare: prepareGarmin,
-} = useGarmin(props.engine, () => {
-  step.value = 'import';
-  video.value = null;
-  garminAdjustments.value = {};
-});
-const remote = computed(() => strava.value || garmin.value);
-const remoteBusy = computed(() => stravaBusy.value || garminBusy.value);
-
 const toast = ref('');
 let toastTimer: ReturnType<typeof setTimeout> | undefined;
 
 async function disconnectStrava(): Promise<void> {
-  if (await endStrava(true)) showToast('Strava disconnected and temporary activities cleared.');
-}
-
-async function startGarmin(key: string): Promise<void> {
-  if (!strava.value && (await connectGarmin(key))) {
-    video.value = null;
-    step.value = 'activities';
-  }
-}
-
-async function disconnectGarmin(): Promise<void> {
-  if (await endGarmin()) showToast('Garmin Connect disconnected and temporary activities cleared.');
-}
-
-function useFiles(): void {
-  if (strava.value) void endStrava();
-  if (garmin.value) void endGarmin();
-}
-
-function showToast(message: string): void {
-  toast.value = message;
+  if (!(await endStrava(true))) return;
+  toast.value = 'Strava disconnected and temporary activities cleared.';
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => (toast.value = ''), 5000);
 }
@@ -136,20 +93,14 @@ function showToast(message: string): void {
 onBeforeUnmount(() => clearTimeout(toastTimer));
 
 const choice = computed({
-  get: () =>
-    strava.value ? stravaChoice.value : garmin.value ? garminChoice.value : fileChoice.value,
+  get: () => (strava.value ? stravaChoice.value : fileChoice.value),
   set: (after: Choice) => {
     if (strava.value) stravaChoice.value = after;
-    else if (garmin.value) garminChoice.value = after;
     else fileChoice.value = after;
   },
 });
-const sourceRows = computed(() =>
-  strava.value ? stravaRows.value : garmin.value ? garminRows.value : library.value,
-);
-const activityMatch = computed(() =>
-  strava.value ? stravaMatches.value : garmin.value ? garminMatches.value : fileMatches.value,
-);
+const sourceRows = computed(() => (strava.value ? stravaRows.value : library.value));
+const activityMatch = computed(() => (strava.value ? stravaMatches.value : fileMatches.value));
 const distances = computed(() => new Map(sourceRows.value.map((a) => [a.id, a.distanceM / 1000])));
 const awaitingPlace = computed(() => placeMissing(choice.value));
 const distanceScale = computed(() => {
@@ -195,15 +146,9 @@ const period = computed(() => periodRange(choice.value, new Date()) ?? { from: n
 
 // What was set in the Video and Text steps, kept for the next visit.
 const adjustments = computed({
-  get: () =>
-    strava.value
-      ? stravaAdjustments.value
-      : garmin.value
-        ? garminAdjustments.value
-        : fileAdjustments.value,
+  get: () => (strava.value ? stravaAdjustments.value : fileAdjustments.value),
   set: (after: Adjustments) => {
     if (strava.value) stravaAdjustments.value = after;
-    else if (garmin.value) garminAdjustments.value = after;
     else fileAdjustments.value = after;
   },
 });
@@ -211,7 +156,7 @@ watch(fileAdjustments, saveAdjustments);
 
 /** The settings of the video: the chosen activities and the adjustments. */
 const settings = computed(() => ({
-  ...(remote.value
+  ...(strava.value
     ? { activity: chosenIds.value }
     : choiceSettings(choice.value, matched.value.ids, new Date())),
   ...adjustSettings(adjustments.value, countOf(chosenIds.value.length)),
@@ -231,21 +176,20 @@ watch(library, () => (video.value = null));
 /** Whether a step can be opened: later steps need activities, and a choice. */
 function reachable(id: Step): boolean {
   if (id === 'import') return true;
-  if (!remote.value && (library.value.length === 0 || !!garminBusy.value)) return false;
+  if (!strava.value && library.value.length === 0) return false;
   return (
-    id === 'activities' || (chosenIds.value.length > 0 && !awaitingPlace.value && !remoteBusy.value)
+    id === 'activities' || (chosenIds.value.length > 0 && !awaitingPlace.value && !stravaBusy.value)
   );
 }
 
 async function navigate(id: Step): Promise<void> {
   if (!reachable(id)) return;
-  if (remote.value && step.value === 'activities' && id !== 'activities' && id !== 'import') {
+  if (strava.value && step.value === 'activities' && id !== 'activities' && id !== 'import') {
     const ids = chosenIds.value.join(',');
-    const prepare = strava.value ? prepareStrava : prepareGarmin;
-    if (!(await prepare(chosenIds.value))) return;
+    if (!(await prepareStrava(chosenIds.value))) return;
     if (step.value !== 'activities' || ids !== chosenIds.value.join(',')) return;
   }
-  if (remote.value && step.value === 'import' && id !== 'activities' && id !== 'import') {
+  if (strava.value && step.value === 'import' && id !== 'activities' && id !== 'import') {
     // Returning from the source picker can use a selection edited in Activities.
     step.value = 'activities';
     await navigate(id);
@@ -276,7 +220,6 @@ async function loadLibrary(): Promise<void> {
     loaded.value = true;
     if (library.value.length > 0) step.value = 'activities';
     if (await connectStrava(fileAdjustments.value)) step.value = 'activities';
-    void discoverGarmin();
   } catch (error) {
     libraryError.value = error instanceof Error ? error.message : String(error);
   }
@@ -402,15 +345,9 @@ watch(
         :strava-active="strava"
         :strava-error="stravaError"
         :strava-busy="stravaBusy"
-        :garmin-available="garminAvailable"
-        :garmin-active="garmin"
-        :garmin-error="garminError"
-        :garmin-busy="garminBusy"
         @changed="library = $event"
-        @files="useFiles"
+        @files="endStrava()"
         @disconnect="disconnectStrava"
-        @connect-garmin="startGarmin"
-        @disconnect-garmin="disconnectGarmin"
         @next="navigate('activities')"
       />
       <ActivitiesStep
@@ -421,17 +358,13 @@ watch(
         :matched="matched"
         :distance-scale="distanceScale"
         :strava="strava"
-        :garmin="garmin"
-        :show-source="!!stravaUrl || strava || garminAvailable"
-        :busy="remoteBusy"
-        :notice="strava ? stravaNotice : garminNotice"
-        :can-retry="
-          !remoteBusy &&
-          (strava ? !stravaReady || sourceRows.length === 0 : garmin && !!garminError)
-        "
+        :show-source="!!stravaUrl || strava"
+        :busy="stravaBusy"
+        :notice="stravaNotice"
+        :can-retry="strava && (!stravaReady || sourceRows.length === 0)"
         @back="navigate('import')"
         @next="navigate('playback')"
-        @retry="strava ? retryStrava() : retryGarmin()"
+        @retry="retryStrava()"
       />
       <PlaybackStep
         v-else-if="step === 'playback'"

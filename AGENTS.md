@@ -5,7 +5,7 @@
 - `npm test`: unit tests (Vitest), reads workspace packages from source.
 - `npm run test:web`: browser tests of the web app in Chromium (Playwright), against a
   built preview; map tiles are answered offline.
-- `npm run dev:web`: the local Pages preview with Garmin enabled and Strava configured through `.dev.vars`.
+- `npm run dev:web`: the local Pages preview with Strava configured through `.dev.vars`.
 - `npm run dev:web:vite`: the Vite dev server for file-based replays.
 - `npm run dev:phone`: the built web app over HTTPS on the local network, for trying it on
   a phone (see the README).

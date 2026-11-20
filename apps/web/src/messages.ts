@@ -6,8 +6,6 @@ import type { FrequentPlace, Grouping, SettingsInput, TrackEnd } from '@wornways
 
 import type { StravaGrant } from './strava-auth.ts';
 
-export type ActivitySource = 'files' | 'strava' | 'garmin';
-
 export type Request =
   | { type: 'read-library'; id: number }
   | { type: 'add-files'; id: number; files: File[] }
@@ -24,19 +22,15 @@ export type Request =
   | { type: 'strava-prepare'; id: number; ids: string[] }
   | { type: 'strava-prioritize'; id: number; ids: string[] }
   | { type: 'strava-end'; id: number; disconnect: boolean }
-  | { type: 'garmin-start'; id: number; key: string }
-  | { type: 'garmin-list'; id: number; from: number | null; to: number | null }
-  | { type: 'garmin-prepare'; id: number; ids: string[] }
-  | { type: 'garmin-end'; id: number }
   /** Which activities the "Which activities" settings choose. */
-  | { type: 'match'; id: number; settings: SettingsInput; source: ActivitySource }
+  | { type: 'match'; id: number; settings: SettingsInput; strava: boolean }
   /** The places most of the activities these settings choose start or end at, to suggest. */
-  | { type: 'places'; id: number; settings: SettingsInput; end: TrackEnd; source: ActivitySource }
-  | { type: 'make-video'; id: number; settings: SettingsInput; source: ActivitySource }
+  | { type: 'places'; id: number; settings: SettingsInput; end: TrackEnd; strava: boolean }
+  | { type: 'make-video'; id: number; settings: SettingsInput; strava: boolean }
   /** The last frame of the video the settings describe, small, as a preview. */
-  | { type: 'make-poster'; id: number; settings: SettingsInput; source: ActivitySource }
+  | { type: 'make-poster'; id: number; settings: SettingsInput; strava: boolean }
   /** How the video the settings describe will be paced, without drawing it. */
-  | { type: 'plan'; id: number; settings: SettingsInput; source: ActivitySource }
+  | { type: 'plan'; id: number; settings: SettingsInput; strava: boolean }
   /** Stops the request with the given id; that request then replies "canceled". */
   | { type: 'cancel'; id: number };
 
@@ -53,11 +47,7 @@ export type Reply =
   | { type: 'strava-listed'; id: number; activities: ActivitySummary[] }
   | { type: 'strava-prepared'; id: number; unavailable: string[] }
   | { type: 'strava-prioritized'; id: number }
-  | { type: 'garmin-started'; id: number; expiresAt: number }
-  | { type: 'garmin-listed'; id: number; activities: ActivitySummary[] }
-  | { type: 'garmin-prepared'; id: number; unavailable: string[] }
-  | { type: 'garmin-ended'; id: number }
-  | { type: 'failed'; id: number; message: string; expired?: 'strava' | 'garmin' }
+  | { type: 'failed'; id: number; message: string; expired?: boolean }
   | { type: 'canceled'; id: number };
 
 /** Which activities the filters match. */

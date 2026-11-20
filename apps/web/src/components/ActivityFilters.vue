@@ -21,11 +21,11 @@ const props = defineProps<{
   engine: EngineClient;
   library: ActivitySummary[];
   distanceScale: { min: number; max: number } | null;
-  remote?: boolean;
+  strava?: boolean;
 }>();
 const choice = defineModel<Choice>({ required: true });
 const periods = computed(() =>
-  props.remote ? PERIODS.filter((period) => period.id !== 'all') : PERIODS,
+  props.strava ? PERIODS.filter((period) => period.id !== 'all') : PERIODS,
 );
 
 /** Every sport in the library, the most frequent first. */
@@ -157,7 +157,7 @@ const suggestFrom = computed(() => placeSettings(choice.value, new Date()));
             :engine="engine"
             :end="end"
             :suggest-from="suggestFrom"
-            :source-loaded="!remote || library.length > 0"
+            :source-loaded="!strava || library.length > 0"
             @update:model-value="update({ [key(end)]: $event })"
           />
         </template>

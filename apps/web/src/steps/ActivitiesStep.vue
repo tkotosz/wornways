@@ -15,7 +15,6 @@ const props = defineProps<{
   matched: MatchReport;
   distanceScale: { min: number; max: number } | null;
   strava?: boolean;
-  garmin?: boolean;
   showSource?: boolean;
   busy?: string;
   notice?: string;
@@ -34,14 +33,14 @@ const ticked = computed(() => rows.value.filter((a) => !choice.value.excluded.in
     <h1>Choose your activities</h1>
 
     <p v-if="showSource" class="muted source">
-      {{ strava ? 'Strava' : garmin ? 'Garmin Connect' : 'Files on this device' }}
+      {{ strava ? 'Strava' : 'Files on this device' }}
       <button type="button" class="link" @click="emit('back')">Change source</button>
     </p>
     <ActivityFilters
       v-model="choice"
       :engine="engine"
       :library="library"
-      :remote="strava || garmin"
+      :strava="strava"
       :distance-scale="distanceScale"
     />
 
