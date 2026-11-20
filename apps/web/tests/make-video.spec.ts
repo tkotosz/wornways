@@ -177,9 +177,7 @@ test('ticks and unticks every activity shown with the header box', async ({ page
   await expect(page.getByRole('button', { name: 'Continue' })).toBeDisabled();
   await page.getByTestId('chosen').getByText('trail-run').click();
   await expect(count).toContainText('1 of 5 activities selected');
-  expect(await selectAll.evaluate((box) => (box as { indeterminate: boolean }).indeterminate)).toBe(
-    true,
-  );
+  expect(await selectAll.evaluate((box) => (box as HTMLInputElement).indeterminate)).toBe(true);
   await selectAll.click();
   await expect(count).toContainText('5 of 5 activities selected');
   // Nothing can be deleted while choosing.

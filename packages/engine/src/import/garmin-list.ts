@@ -56,6 +56,9 @@ const GARMIN_SPORTS: Record<string, string> = {
   sailing_v2: 'sail',
 };
 
+/** Garmin's activity type in the app's own naming, or empty when unknown. */
+export const garminSport = (type: string): string => GARMIN_SPORTS[type] ?? '';
+
 /** Whether a path is one of the activity list files of a Garmin export. */
 export const isGarminList = (path: string) => /_summarizedActivities\.json$/i.test(path);
 
@@ -86,7 +89,7 @@ export function parseGarminList(jsonText: string): GarminEntry[] {
       return {
         id: `garmin-${s.activityId}`,
         name: s.name ?? '',
-        sport: GARMIN_SPORTS[s.activityType ?? ''] ?? '',
+        sport: garminSport(s.activityType ?? ''),
         start: s.beginTimestamp!,
         end: s.beginTimestamp! + length,
       };

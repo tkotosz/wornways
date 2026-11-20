@@ -3,6 +3,7 @@
 
 import type { FrequentPlace, SettingsInput, TrackEnd } from '@wornways/engine';
 import type {
+  ActivitySource,
   ActivitySummary,
   ImportReport,
   MatchReport,
@@ -23,10 +24,12 @@ type Pending = {
 /** The request was canceled before it finished. */
 export class Canceled extends Error {}
 export class StravaExpired extends Error {}
+export class GarminExpired extends Error {}
 
 export class EngineClient {
   private nextId = 1;
-  private strava = false;
+  private source: ActivitySource = 'files';
+  private garminAttempt = 0;
   private readonly pending = new Map<number, Pending>();
 
   constructor(private readonly worker: Worker) {
@@ -69,7 +72,7 @@ export class EngineClient {
   async startStrava(grant: StravaGrant): Promise<void> {
     const reply = await this.send({ type: 'strava-start', id: this.nextId++, grant });
     if (reply.type !== 'strava-started') throw this.errorFor(reply);
-    this.strava = true;
+    this.source = 'strava';
   }
 
   async listStrava(
@@ -99,14 +102,42 @@ export class EngineClient {
   }
 
   async endStrava(disconnect = false): Promise<void> {
-    this.strava = false;
+    this.source = 'files';
     const reply = await this.send({ type: 'strava-end', id: this.nextId++, disconnect });
     if (reply.type !== 'strava-ended') throw this.errorFor(reply);
   }
 
+  async startGarmin(key: string): Promise<number> {
+    const attempt = ++this.garminAttempt;
+    const reply = await this.send({ type: 'garmin-start', id: this.nextId++, key });
+    if (attempt !== this.garminAttempt) throw new Canceled('Canceled');
+    if (reply.type !== 'garmin-started') throw this.errorFor(reply);
+    this.source = 'garmin';
+    return reply.expiresAt;
+  }
+
+  async listGarmin(from: number | null, to: number | null): Promise<ActivitySummary[]> {
+    const reply = await this.send({ type: 'garmin-list', id: this.nextId++, from, to });
+    if (reply.type === 'garmin-listed') return reply.activities;
+    throw this.errorFor(reply);
+  }
+
+  async prepareGarmin(ids: string[]): Promise<string[]> {
+    const reply = await this.send({ type: 'garmin-prepare', id: this.nextId++, ids });
+    if (reply.type === 'garmin-prepared') return reply.unavailable;
+    throw this.errorFor(reply);
+  }
+
+  async endGarmin(): Promise<void> {
+    ++this.garminAttempt;
+    if (this.source === 'garmin') this.source = 'files';
+    const reply = await this.send({ type: 'garmin-end', id: this.nextId++ });
+    if (reply.type !== 'garmin-ended') throw this.errorFor(reply);
+  }
+
   /** Which activities the settings choose. */
-  async match(settings: SettingsInput, strava = false): Promise<MatchReport> {
-    const reply = await this.send({ type: 'match', id: this.nextId++, settings, strava });
+  async match(settings: SettingsInput, source: ActivitySource = 'files'): Promise<MatchReport> {
+    const reply = await this.send({ type: 'match', id: this.nextId++, settings, source });
     if (reply.type === 'matched') return reply.match;
     throw this.errorFor(reply);
   }
@@ -118,7 +149,7 @@ export class EngineClient {
       id: this.nextId++,
       settings,
       end,
-      strava: this.strava,
+      source: this.source,
     });
     if (reply.type === 'places') return reply.places;
     throw this.errorFor(reply);
@@ -130,7 +161,7 @@ export class EngineClient {
       type: 'plan',
       id: this.nextId++,
       settings,
-      strava: this.strava,
+      source: this.source,
     });
     if (reply.type === 'planned') return reply.plan;
     throw this.errorFor(reply);
@@ -143,7 +174,7 @@ export class EngineClient {
   ): { result: Promise<{ video: Blob; report: VideoReport }>; cancel: () => void } {
     const id = this.nextId++;
     const result = this.send(
-      { type: 'make-video', id, settings, strava: this.strava },
+      { type: 'make-video', id, settings, source: this.source },
       onProgress,
     ).then((reply) => {
       if (reply.type === 'video-made')
@@ -159,7 +190,7 @@ export class EngineClient {
   /** Draws the last frame of the video, small, as a preview; `cancel` stops it. */
   makePoster(settings: SettingsInput): { result: Promise<Blob>; cancel: () => void } {
     const id = this.nextId++;
-    const result = this.send({ type: 'make-poster', id, settings, strava: this.strava }).then(
+    const result = this.send({ type: 'make-poster', id, settings, source: this.source }).then(
       (reply) => {
         if (reply.type === 'poster-made') return reply.image;
         throw this.errorFor(reply);
@@ -181,8 +212,11 @@ export class EngineClient {
 
   private errorFor(reply: Reply): Error {
     if (reply.type === 'canceled') return new Canceled('Canceled');
-    if (reply.type === 'failed')
-      return reply.expired ? new StravaExpired(reply.message) : new Error(reply.message);
+    if (reply.type === 'failed') {
+      if (reply.expired === 'strava') return new StravaExpired(reply.message);
+      if (reply.expired === 'garmin') return new GarminExpired(reply.message);
+      return new Error(reply.message);
+    }
     return new Error(`Unexpected reply: ${reply.type}`);
   }
 }

@@ -14,6 +14,8 @@ Activity files you add stay there.
 - **Connects to Strava** on deployments where it is configured. Pick a date range and
   activities to replay. Wornways can restore your connection and downloaded tracks
   after a reload for up to two hours.
+- **Connects to Garmin Connect** on a personal installation. Use your own Personal API
+  key to browse a period and replay selected activities in a temporary tab session.
 - **Lets you choose what to show:** a period (today, yesterday, this month, a custom
   range…), sports, activities that start or end near a place, and any activity ticked or
   unticked by hand.
@@ -174,3 +176,23 @@ Ending the session clears the cache. Expired entries are removed on the next
 visit if the browser was closed. The current tab can also restore its filters,
 selection, and video settings. Previews and the in-app MP4 stay in memory. The
 Pages Function and event relay use no server-side activity or session storage.
+
+### Enabling Garmin Connect for personal use
+
+Enable this only on a Wornways installation you operate for your own use. The Garmin
+Connect Personal API key gives access to your own account. Generate it in
+[Garmin Connect settings](https://connect.garmin.com/app/settings/personalApiToken) and
+enter it on the Wornways Source screen.
+
+Set `GARMIN_PERSONAL_ENABLED=1` in your Cloudflare Pages environment and use a Workers
+compatibility date of `2024-11-11` or later. To try it locally from the repository root:
+
+```sh
+npm run build -w @wornways/web
+npx wrangler pages dev apps/web/dist --compatibility-date=2024-11-11 --binding GARMIN_PERSONAL_ENABLED=1
+```
+
+The Pages Function relays the key exchange and activity requests to Garmin. The key is
+discarded after exchange. Garmin activity lists, downloaded tracks, and the access token
+stay in the tab’s worker memory. The connection ends on disconnect, reload, or expiry,
+within two hours. Delete the key in Garmin Connect settings to revoke it there.
