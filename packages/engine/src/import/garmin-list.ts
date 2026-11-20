@@ -98,13 +98,17 @@ const START_SLACK_MS = 60_000;
 
 /**
  * The listed activity a file belongs to: the one whose time span holds the file's first
- * position, the latest-starting one when spans overlap. Null when none does.
+ * position, the latest-starting one when spans overlap. Outside any span, allow the
+ * position to precede the closest start by up to a minute.
  */
 export function findGarminEntry(entries: GarminEntry[], startTime: number): GarminEntry | null {
   let found: GarminEntry | null = null;
+  let upcoming: GarminEntry | null = null;
   for (const entry of entries) {
     if (startTime < entry.start - START_SLACK_MS || startTime > entry.end) continue;
-    if (!found || entry.start > found.start) found = entry;
+    if (entry.start > startTime) {
+      if (!upcoming || entry.start < upcoming.start) upcoming = entry;
+    } else if (!found || entry.start > found.start) found = entry;
   }
-  return found;
+  return found ?? upcoming;
 }

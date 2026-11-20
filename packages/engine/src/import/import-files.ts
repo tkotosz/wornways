@@ -165,16 +165,17 @@ export async function importFiles(
   }
 
   const seen = new Set<string>();
+  const skipped = new Map<string, (typeof result.listedSkipped)[number] | undefined>();
   for (const [done, source] of candidates.entries()) {
     options.onProgress?.({ done, total: candidates.length });
     const entry = listed.get(matchKey(source.path));
-    let id = entry?.id ?? idFromName(source.path);
-    // The same activity can come twice, e.g. unpacked next to its .gz file.
-    if (seen.has(id)) continue;
-    seen.add(id);
-    if (options.skip?.(id)) {
-      result.skipped++;
-      if (entry) result.listedSkipped.push({ id, name: entry.name, sport: entry.sport });
+    const fileId = entry?.id ?? idFromName(source.path);
+    // A Garmin list can assign a different ID, so unlisted files need to be read first.
+    const idKnown = entry !== undefined || garmin.length === 0;
+    if (idKnown && seen.has(fileId)) continue;
+    if (idKnown && options.skip?.(fileId)) {
+      if (entry) skipped.set(fileId, { id: fileId, name: entry.name, sport: entry.sport });
+      else if (!skipped.has(fileId)) skipped.set(fileId, undefined);
       continue;
     }
     try {
@@ -194,29 +195,23 @@ export async function importFiles(
       }
       // Garmin's list is matched by time, so its id is known only now.
       const garminEntry = entry ? null : findGarminEntry(garmin, parsed.startTime);
-      if (garminEntry) {
-        id = garminEntry.id;
-        // Another file of the same listed activity was read already.
-        if (seen.has(id)) {
-          result.duplicates++;
-          continue;
-        }
-        seen.add(id);
-        if (options.skip?.(id)) {
-          result.skipped++;
-          result.listedSkipped.push({
-            id,
-            name: garminEntry.name,
-            sport: garminEntry.sport || parsed.sport,
-          });
-          continue;
-        }
+      const id = garminEntry?.id ?? fileId;
+      if (seen.has(id)) {
+        result.duplicates++;
+        continue;
+      }
+      if (!idKnown && options.skip?.(id)) {
+        if (garminEntry)
+          skipped.set(id, { id, name: garminEntry.name, sport: garminEntry.sport || parsed.sport });
+        else if (!skipped.has(id)) skipped.set(id, undefined);
+        continue;
       }
       if (options.isKnown?.(parsed) || result.activities.some((a) => sameActivity(a, parsed))) {
         result.duplicates++;
         continue;
       }
       const listName = entry?.name || garminEntry?.name;
+      seen.add(id);
       result.activities.push({
         ...parsed,
         id,
@@ -228,6 +223,8 @@ export async function importFiles(
       result.unreadable.push({ file: fileLabel(source.path), reason: reasonOf(error) });
     }
   }
+  result.skipped = skipped.size;
+  result.listedSkipped = [...skipped.values()].filter((entry) => entry !== undefined);
   options.onProgress?.({ done: candidates.length, total: candidates.length });
   return result;
 }

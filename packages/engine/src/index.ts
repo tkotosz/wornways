@@ -82,6 +82,8 @@ export {
   SETTINGS,
   SIZE_PRESETS,
   SettingsError,
+  parseDistanceKm,
+  parseFrameSize,
   parseSettings,
   type RenderSettings,
   type SettingDefinition,

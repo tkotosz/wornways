@@ -45,6 +45,16 @@ describe('Library', () => {
     await library.deleteAll();
     expect((await Library.open(home)).size).toBe(0);
   });
+
+  it('keeps activities added through separate, concurrently open libraries', async () => {
+    const first = await Library.open(home);
+    const second = await Library.open(home);
+    await Promise.all([first.put([track('1', 1000)]), second.put([track('2', 2000)])]);
+    await first.delete(['1']);
+
+    expect((await Library.open(home)).all().map((a) => a.id)).toEqual(['2']);
+    expect(first.all().map((a) => a.id)).toEqual(['2']);
+  });
 });
 
 describe('the library commands', () => {
@@ -87,4 +97,14 @@ describe('the library commands', () => {
     expect(answered.stdout).toBe('Nothing was deleted.\n');
     expect(await cli('list')).toContain('1 activity');
   }, 30_000);
+
+  it('accepts a distance flag on render and excludes longer activities', async () => {
+    const args = ['render', fixture('trail-run.tcx'), '--max-distance=0'];
+    await expect(cli(...args)).rejects.toMatchObject({
+      code: 1,
+      stdout: expect.stringContaining('Selected   0 activities with GPS'),
+      stderr: expect.stringContaining('nothing matches the filters'),
+    });
+    await expect(cli('constructor')).rejects.toMatchObject({ code: 1, stderr: '' });
+  });
 });

@@ -1,30 +1,63 @@
 <script setup lang="ts">
 // Step 4: how the video looks: its frame (shape and frames per second), the title, the
 // metrics, the map and the branding, with a live preview of the finished picture.
-import type { SettingsInput } from '@wornways/engine';
-import { APPEARANCE_PANELS, FRAME_RATES, SIZE_LABELS, type Adjustments } from '../adjust.ts';
+import { SETTINGS, SIZE_PRESETS, parseFrameSize, type SettingsInput } from '@wornways/engine';
+import { computed, ref } from 'vue';
+import {
+  APPEARANCE_PANELS,
+  FRAME_RATES,
+  SIZE_LABELS,
+  countOf,
+  type Adjustments,
+} from '../adjust.ts';
 import PosterPreview from '../components/PosterPreview.vue';
 import SettingsGroups from '../components/SettingsGroups.vue';
 import type { EngineClient } from '../engine-client.ts';
-import type { ActivitySummary } from '../messages.ts';
+import type { PlanReport } from '../messages.ts';
 
 defineProps<{
   engine: EngineClient;
   /** The settings of the whole video, for the preview. */
   settings: SettingsInput;
-  /** The activities the video shows, in date order. */
-  chosen: ActivitySummary[];
-  /** The chosen period, for the automatic title; null where open. */
-  period: { from: number | null; to: number | null };
+  activities: number;
+  plan: PlanReport | null;
 }>();
 const adjustments = defineModel<Adjustments>({ required: true });
 const emit = defineEmits<{ back: []; next: [] }>();
 
-const size = () => String(adjustments.value['size'] ?? 'story');
-const fps = () => String(adjustments.value['fps'] ?? '30');
+const size = computed(() =>
+  String(adjustments.value['size'] ?? SETTINGS.find((s) => s.name === 'size')!.default),
+);
+const fps = computed(() =>
+  String(adjustments.value['fps'] ?? SETTINGS.find((s) => s.name === 'fps')!.default),
+);
+const sizeDraft = ref<string | null>(null);
+const sizeError = ref('');
 
 function set(name: 'size' | 'fps', value: string): void {
   adjustments.value = { ...adjustments.value, [name]: value };
+}
+
+function pickSize(value: string): void {
+  sizeDraft.value = null;
+  sizeError.value = '';
+  set('size', value);
+}
+
+function applySize(): void {
+  try {
+    const [width, height] = parseFrameSize(sizeDraft.value?.trim() ?? '');
+    pickSize(`${width}x${height}`);
+  } catch (error) {
+    sizeError.value = error instanceof Error ? error.message : String(error);
+  }
+}
+
+function editSize(): void {
+  if (sizeDraft.value !== null) return;
+  sizeDraft.value = Object.hasOwn(SIZE_PRESETS, size.value)
+    ? SIZE_PRESETS[size.value]!.join('x')
+    : size.value;
 }
 </script>
 
@@ -36,7 +69,12 @@ function set(name: 'size' | 'fps', value: string): void {
     </p>
 
     <div class="layout">
-      <PosterPreview class="preview" :engine="engine" :settings="settings" />
+      <PosterPreview
+        class="preview"
+        :engine="engine"
+        :settings="settings"
+        :seconds="plan?.seconds"
+      />
       <div class="settings">
         <!-- The frame: where the video will be posted decides its shape. -->
         <div class="frame" data-testid="frame">
@@ -45,16 +83,43 @@ function set(name: 'size' | 'fps', value: string): void {
             <span class="label">Aspect ratio</span>
             <div class="chips" role="group" aria-label="Aspect ratio">
               <button
-                v-for="(label, name) in SIZE_LABELS"
+                v-for="name in Object.keys(SIZE_PRESETS)"
                 :key="name"
                 type="button"
                 class="chip"
-                :aria-pressed="size() === name"
-                @click="set('size', name)"
+                :aria-pressed="sizeDraft === null && size === name"
+                @click="pickSize(name)"
               >
-                {{ label }}
+                {{ SIZE_LABELS[name] ?? name }}
+              </button>
+              <button
+                type="button"
+                class="chip"
+                :aria-pressed="sizeDraft !== null || !Object.hasOwn(SIZE_PRESETS, size)"
+                @click="editSize"
+              >
+                Custom size
               </button>
             </div>
+            <form
+              v-if="sizeDraft !== null || !Object.hasOwn(SIZE_PRESETS, size)"
+              class="chips"
+              @submit.prevent="applySize"
+            >
+              <input
+                type="text"
+                aria-label="Frame size in pixels"
+                placeholder="Width x height"
+                :value="sizeDraft ?? size"
+                :aria-invalid="!!sizeError"
+                @input="
+                  sizeDraft = ($event.target as HTMLInputElement).value;
+                  sizeError = '';
+                "
+              />
+              <button type="submit" class="secondary" :disabled="sizeDraft === null">Apply</button>
+            </form>
+            <p v-if="sizeError" class="error" role="alert">{{ sizeError }}</p>
           </div>
           <div class="row">
             <span class="label">Frame rate</span>
@@ -64,7 +129,7 @@ function set(name: 'size' | 'fps', value: string): void {
                 :key="rate"
                 type="button"
                 class="chip"
-                :aria-pressed="fps() === rate"
+                :aria-pressed="fps === rate"
                 @click="set('fps', rate)"
               >
                 {{ rate }} fps
@@ -79,8 +144,8 @@ function set(name: 'size' | 'fps', value: string): void {
         <SettingsGroups
           v-model="adjustments"
           :groups="APPEARANCE_PANELS"
-          :chosen="chosen"
-          :period="period"
+          :count="countOf(activities)"
+          :plan="plan"
         />
       </div>
     </div>
@@ -141,6 +206,17 @@ function set(name: 'size' | 'fps', value: string): void {
 .hint {
   margin: 0;
   font-size: 0.85rem;
+}
+
+.chips input {
+  min-width: 0;
+  max-width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0.4rem 0.6rem;
+  background: var(--background);
+  color: var(--text);
+  font: inherit;
 }
 
 /* Phones: one column, the preview first so each change shows at once. */

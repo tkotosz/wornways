@@ -1,13 +1,10 @@
 <script setup lang="ts">
 // A line telling what the settings will actually play: how many groups, of what, and how
 // long each one gets, worked out by the engine without drawing anything.
-import type { SettingsInput } from '@wornways/engine';
-import { onBeforeUnmount, ref, watch } from 'vue';
-import type { EngineClient } from '../engine-client.ts';
 import { countText } from '../format.ts';
 import type { PlanReport } from '../messages.ts';
 
-const props = defineProps<{ engine: EngineClient; settings: SettingsInput }>();
+defineProps<{ plan: PlanReport }>();
 
 const UNITS = {
   activity: ['activity', 'activities'],
@@ -15,23 +12,6 @@ const UNITS = {
   week: ['week', 'weeks'],
   month: ['month', 'months'],
 } as const;
-
-/** What the settings will play, e.g. "12 months (312 activities), 2.3 s each"; empty for none. */
-const pacing = ref('');
-/** Only the newest answer counts: settings can change while one is on its way. */
-let asked = 0;
-let timer: ReturnType<typeof setTimeout> | undefined;
-
-async function askPlan(): Promise<void> {
-  const ask = ++asked;
-  let plan: PlanReport | null = null;
-  try {
-    plan = await props.engine.plan(props.settings);
-  } catch {
-    // Settings that choose nothing: the other steps say so.
-  }
-  if (ask === asked) pacing.value = plan ? pacingText(plan) : '';
-}
 
 function pacingText({
   activities,
@@ -64,20 +44,10 @@ function pacingText({
   const overlapping = overlap > 0 && groups.count > 1 ? `, overlapping ${overlap}%` : '';
   return `This video: ${countText(groups.count, one, many)}${covered}, ${each} each${pace}${overlapping}.`;
 }
-
-watch(
-  () => JSON.stringify(props.settings),
-  () => {
-    clearTimeout(timer);
-    timer = setTimeout(() => void askPlan(), 150);
-  },
-  { immediate: true },
-);
-onBeforeUnmount(() => clearTimeout(timer));
 </script>
 
 <template>
-  <p v-if="pacing" class="pacing" data-testid="pacing">{{ pacing }}</p>
+  <p class="pacing" data-testid="pacing">{{ pacingText(plan) }}</p>
 </template>
 
 <style scoped>

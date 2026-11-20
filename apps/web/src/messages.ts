@@ -96,6 +96,8 @@ export type PlanReport = {
   activities: number;
   meters: number;
   privacyOmitted: number;
+  title: string;
+  hasElevation: boolean;
   /** The replay's length in seconds, without the end card. */
   seconds: number;
   /**

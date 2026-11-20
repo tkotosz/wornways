@@ -66,4 +66,21 @@ describe('createTileLoader', () => {
     expect(result.downloaded).toBe(0);
     expect(cache.keys()).toContain('v2/14/1/2.pbf');
   });
+
+  it('returns downloaded tiles when the cache is unavailable', async () => {
+    const unavailable = async () => {
+      throw new Error('storage unavailable');
+    };
+    const load = createTileLoader({
+      cache: { read: unavailable, write: unavailable, keepOnly: unavailable },
+      fetchTile: async (url) =>
+        url.endsWith('/planet')
+          ? Response.json({ tiles: ['https://tiles.example/v1/{z}/{x}/{y}.pbf'] })
+          : new Response('tile'),
+    });
+
+    const result = await load([{ z: 14, x: 1, y: 2 }]);
+    expect(result.downloaded).toBe(1);
+    expect(new TextDecoder().decode(result.tiles[0].data!)).toBe('tile');
+  });
 });

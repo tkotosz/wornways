@@ -118,7 +118,7 @@ export function raceTimeline(durationsS: number[], options: RaceOptions): Timeli
   const hold = options.hold ?? Math.min(2.5, target * 0.1);
   const k = options.k ?? 2.3;
   // `run` is the clock's travel in video seconds once the ease-in is accounted for.
-  const run = Math.max(0.1, target - lead - hold - ramp / 2);
+  const run = Math.max(Number.EPSILON, target - lead - hold - ramp / 2);
   const duration = lead + run + ramp / 2 + hold;
 
   function clock(t: number): number {

@@ -59,6 +59,9 @@ export function createTileLoader(options: TileLoaderOptions): TileLoader {
     options.fetchTile
       ? options.fetchTile(url, headers, TIMEOUT_MS)
       : fetch(url, { headers, signal: AbortSignal.timeout(TIMEOUT_MS) });
+  // A disabled or full cache still allows the map to be drawn from the network.
+  const readCached = (key: string) => cache.read(key).catch(() => undefined);
+  const saveCached = (key: string, data: Uint8Array) => cache.write(key, data).catch(() => {});
 
   /** The current tile URL template. Falls back to the last one seen when offline. */
   async function tileJson(): Promise<TileJson> {
@@ -67,10 +70,10 @@ export function createTileLoader(options: TileLoaderOptions): TileLoader {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const json = (await res.json()) as TileJson;
       if (!json.tiles?.[0]) throw new Error('no tile URL in the response');
-      await cache.write('tilejson.json', new TextEncoder().encode(JSON.stringify(json)));
+      await saveCached('tilejson.json', new TextEncoder().encode(JSON.stringify(json)));
       return json;
     } catch (err) {
-      const cached = await cache.read('tilejson.json');
+      const cached = await readCached('tilejson.json');
       if (cached) return JSON.parse(new TextDecoder().decode(cached)) as TileJson;
       throw new Error(
         `could not reach the map tile service (${err instanceof Error ? err.message : err})`,
@@ -85,16 +88,18 @@ export function createTileLoader(options: TileLoaderOptions): TileLoader {
     // versions apart so one map never mixes two snapshots of the data.
     const version = /\/([^/{}]+)\/\{z\}/.exec(template)?.[1] ?? 'unversioned';
     // A new version makes the tiles of the earlier ones useless: delete them, once.
-    const lastVersion = await cache.read('version');
+    const lastVersion = await readCached('version');
     if (lastVersion === undefined || new TextDecoder().decode(lastVersion) !== version) {
-      await cache.keepOnly([version, 'tilejson.json']);
-      await cache.write('version', new TextEncoder().encode(version));
+      await cache
+        .keepOnly([version, 'tilejson.json'])
+        .then(() => saveCached('version', new TextEncoder().encode(version)))
+        .catch(() => {});
     }
 
     let downloaded = 0;
     async function load(id: TileId): Promise<Tile> {
       const key = `${version}/${id.z}/${id.x}/${id.y}.pbf`;
-      let data = await cache.read(key);
+      let data = await readCached(key);
       if (data === undefined) {
         const url = template
           .replace('{z}', String(id.z))
@@ -106,7 +111,7 @@ export function createTileLoader(options: TileLoaderOptions): TileLoader {
         else if (!res.ok) throw new Error(`map tile ${id.z}/${id.x}/${id.y}: HTTP ${res.status}`);
         else data = new Uint8Array(await res.arrayBuffer());
         if (isGzip(data)) data = await gunzip(data);
-        await cache.write(key, data);
+        await saveCached(key, data);
         downloaded++;
       }
       return { ...id, data: data.length > 0 ? data : null };

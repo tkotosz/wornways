@@ -61,6 +61,23 @@ describe('selectTracks', () => {
     expect(selection.keptPoints).toBeGreaterThan(100);
   });
 
+  it('combines inclusive distance bounds with the other filters before trimming', () => {
+    const run = library.find((track) => track.id === 'run')!;
+    const exactKm = String(trackLengthM(run) / 1000);
+    const short = activity({ id: 'short', day: 5, sport: 'run', lengthM: 3_000 });
+    const selection = selectTracks(
+      [...library, short],
+      parseSettings({
+        sport: 'run',
+        'min-distance': exactKm,
+        'max-distance': exactKm,
+        'trim-radius': '500',
+      }),
+    );
+    expect(ids(selection.tracks)).toEqual(['run']);
+    expect(trackLengthM(selection.tracks[0]!)).toBeLessThan(Number(exactKm) * 1000);
+  });
+
   const home = `${HOME.lat},${HOME.lon}`;
   /** A place this many meters east of home, as the settings take it. */
   const east = (m: number) => `${HOME.lat},${HOME.lon + m / perLon}`;

@@ -1,6 +1,7 @@
 // Drawing a prepared replay frame by frame and encoding it to a video file with ffmpeg.
 
 import { spawn } from 'node:child_process';
+import { mkdtemp, rename, rm } from 'node:fs/promises';
 import path from 'node:path';
 import type { Canvas } from '@napi-rs/canvas';
 import type { MapReport, ReplayParts } from '@wornways/engine';
@@ -41,6 +42,19 @@ export async function writeVideo(
   replay: ReplayParts,
   out: string,
 ): Promise<{ drawMs: number; encodeMs: number }> {
+  const destination = path.resolve(out);
+  const folder = await mkdtemp(path.join(path.dirname(destination), '.wornways-'));
+  const temporary = path.join(folder, path.basename(destination));
+  try {
+    const timings = await encodeVideo(replay, temporary);
+    await rename(temporary, destination);
+    return timings;
+  } finally {
+    await rm(folder, { recursive: true, force: true });
+  }
+}
+
+async function encodeVideo(replay: ReplayParts, out: string) {
   const { renderer, width, height, fps } = replay;
   const canvas = renderer.canvas as unknown as Canvas;
   const ffmpeg = spawn(
@@ -70,7 +84,7 @@ export async function writeVideo(
       'yuv420p',
       '-movflags',
       '+faststart',
-      path.resolve(out),
+      out,
     ],
     { stdio: ['pipe', 'ignore', 'pipe'] },
   );
@@ -87,27 +101,33 @@ export async function writeVideo(
   let drawMs = 0;
   let encodeMs = 0;
   const tty = process.stdout.isTTY;
-  for (let f = 0; f < renderer.frameCount; f++) {
-    let t = performance.now();
-    renderer.renderFrame(f);
-    const pixels = canvas.data(); // raw RGBA; reading it back forces the drawing to finish
-    drawMs += performance.now() - t;
+  try {
+    for (let f = 0; f < renderer.frameCount; f++) {
+      let t = performance.now();
+      renderer.renderFrame(f);
+      const pixels = canvas.data(); // raw RGBA; reading it back forces the drawing to finish
+      drawMs += performance.now() - t;
 
-    t = performance.now();
-    // Waiting for each frame to be handed over keeps memory flat and makes this number
-    // reflect how fast the encoder takes frames.
-    const flushed = new Promise<void>((resolve) => ffmpeg.stdin.write(pixels, () => resolve()));
-    await Promise.race([flushed, ffmpegDone]);
-    encodeMs += performance.now() - t;
-    if (tty && f % 15 === 0)
-      process.stdout.write(`\rRendering  frame ${f + 1}/${renderer.frameCount}`);
+      t = performance.now();
+      // Waiting for each frame keeps memory flat and measures encoder backpressure.
+      const flushed = new Promise<void>((resolve) => ffmpeg.stdin.write(pixels, () => resolve()));
+      await Promise.race([flushed, ffmpegDone]);
+      encodeMs += performance.now() - t;
+      if (tty && f % 15 === 0)
+        process.stdout.write(`\rRendering  frame ${f + 1}/${renderer.frameCount}`);
+    }
+    const tFinish = performance.now();
+    ffmpeg.stdin.end();
+    await ffmpegDone;
+    encodeMs += performance.now() - tFinish;
+    return { drawMs, encodeMs };
+  } catch (error) {
+    ffmpeg.kill();
+    await ffmpegDone.catch(() => {});
+    throw error;
+  } finally {
+    if (tty) process.stdout.write('\r\x1b[K');
   }
-  const tFinish = performance.now();
-  ffmpeg.stdin.end();
-  await ffmpegDone;
-  encodeMs += performance.now() - tFinish;
-  if (tty) process.stdout.write('\r\x1b[K');
-  return { drawMs, encodeMs };
 }
 
 /** The closing lines: the file and where the time went. */

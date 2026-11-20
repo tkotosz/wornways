@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { chronologicalTimeline } from '../../src/replay/timeline.ts';
+import { chronologicalTimeline, raceTimeline } from '../../src/replay/timeline.ts';
+
+it('finishes a real-pace group within its window even when it lasts less than 100 ms', () => {
+  const timeline = raceTimeline([45, 60], { duration: 0.05, lead: 0, hold: 0 });
+  expect(timeline.duration).toBeCloseTo(0.05);
+  expect(timeline.progress(1, 0.05)).toBeCloseTo(1);
+});
 
 describe('chronologicalTimeline', () => {
   const timeline = chronologicalTimeline([5_000, 20_000, 1_000], { duration: 15 });

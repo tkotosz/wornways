@@ -69,13 +69,22 @@ export type Selection = Omit<Match, 'kept' | 'problem'> & {
 export function matchActivities(activities: Track[], settings: RenderSettings): Match {
   const from = settings.from ?? -Infinity;
   const to = settings.to ?? Infinity;
-  const matched = activities.filter(
+  const ids = settings.activities ? new Set(settings.activities) : null;
+  let matched = activities.filter(
     (t) =>
-      (settings.activities === null || settings.activities.includes(t.id)) &&
+      (ids === null || ids.has(t.id)) &&
       sportIncluded(settings, t.sport) &&
       t.startTime >= from &&
       t.startTime < to,
   );
+  if (settings.minDistanceKm !== null || settings.maxDistanceKm !== null) {
+    const min = settings.minDistanceKm ?? 0;
+    const max = settings.maxDistanceKm ?? Infinity;
+    matched = matched.filter((track) => {
+      const km = trackLengthM(track) / 1000;
+      return km >= min && km <= max;
+    });
+  }
   const match: Match = { kept: matched, problem: null, matched, farAway: [] };
   if (matched.length === 0) return { ...match, kept: [], problem: 'nothing-matches' };
 

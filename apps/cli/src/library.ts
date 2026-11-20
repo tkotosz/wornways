@@ -10,6 +10,8 @@
 import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import path from 'node:path';
+import { DatabaseSync } from 'node:sqlite';
+import { setTimeout as delay } from 'node:timers/promises';
 import type { Track } from '@wornways/engine';
 
 type StoredActivity = Pick<Track, 'id' | 'name' | 'sport' | 'startTime'>;
@@ -21,29 +23,54 @@ export function libraryFolder(): string {
 }
 
 const isMissing = (error: unknown) => (error as { code?: unknown })?.code === 'ENOENT';
+const SQLITE_BUSY = 5;
+
+/** Publish a complete file with one rename. Writers hold the library lock. */
+async function replaceFile(file: string, contents: string | Uint8Array): Promise<void> {
+  const temporary = `${file}.tmp`;
+  try {
+    await writeFile(temporary, contents);
+    await rename(temporary, file);
+  } catch (error) {
+    await rm(temporary, { force: true }).catch(() => {});
+    throw error;
+  }
+}
 
 export class Library {
   private constructor(
     private readonly folder: string,
-    private readonly activities: Map<string, Track>,
+    private activities: Map<string, Track>,
   ) {}
 
   /** Reads the library in `folder`; an empty library when there is none yet. */
   static async open(folder: string = libraryFolder()): Promise<Library> {
+    const library = new Library(folder, new Map());
+    try {
+      library.activities = await library.read();
+    } catch (error) {
+      // A deletion may have published a new list and removed points while we read the old list.
+      if (!isMissing(error)) throw error;
+      library.activities = await library.read();
+    }
+    return library;
+  }
+
+  private async read(): Promise<Map<string, Track>> {
     let stored: StoredActivity[] = [];
     try {
-      stored = JSON.parse(await readFile(path.join(folder, 'activities.json'), 'utf8'));
+      stored = JSON.parse(await readFile(path.join(this.folder, 'activities.json'), 'utf8'));
     } catch (error) {
       if (!isMissing(error)) throw error;
     }
-    const library = new Library(folder, new Map());
+    const activities = new Map<string, Track>();
     for (const activity of stored) {
-      const bytes = await readFile(library.pointsFile(activity.id));
+      const bytes = await readFile(this.pointsFile(activity.id));
       // A copy, so that the points start at an offset a Float64Array can use.
       const points = new Float64Array(new Uint8Array(bytes).buffer);
-      library.activities.set(activity.id, { ...activity, points });
+      activities.set(activity.id, { ...activity, points });
     }
-    return library;
+    return activities;
   }
 
   get size(): number {
@@ -66,29 +93,55 @@ export class Library {
   /** Stores the activities, replacing ones with the same id. */
   async put(activities: Track[]): Promise<void> {
     if (activities.length === 0) return;
-    await mkdir(path.join(this.folder, 'points'), { recursive: true });
-    for (const activity of activities) {
-      const { points } = activity;
-      await writeFile(
-        this.pointsFile(activity.id),
-        new Uint8Array(points.buffer, points.byteOffset, points.byteLength),
-      );
-      this.activities.set(activity.id, activity);
-    }
-    await this.writeList();
+    await this.write(async (current) => {
+      await mkdir(path.join(this.folder, 'points'), { recursive: true });
+      for (const activity of activities) {
+        const { points } = activity;
+        await replaceFile(
+          this.pointsFile(activity.id),
+          new Uint8Array(points.buffer, points.byteOffset, points.byteLength),
+        );
+        current.set(activity.id, activity);
+      }
+      await this.writeList(current);
+    });
   }
 
   async delete(ids: string[]): Promise<void> {
-    for (const id of ids) {
-      this.activities.delete(id);
-      await rm(this.pointsFile(id), { force: true });
-    }
-    await this.writeList();
+    await this.write(async (current) => {
+      for (const id of ids) current.delete(id);
+      await this.writeList(current);
+      for (const id of ids) await rm(this.pointsFile(id), { force: true });
+    });
   }
 
   async deleteAll(): Promise<void> {
-    this.activities.clear();
-    await rm(this.folder, { recursive: true, force: true });
+    await this.write(async (current) => {
+      current.clear();
+      await this.writeList(current);
+      await rm(path.join(this.folder, 'points'), { recursive: true, force: true });
+    });
+  }
+
+  /** Serialize writers across CLI processes and reread the list once the lock is held. */
+  private async write(operation: (current: Map<string, Track>) => Promise<void>): Promise<void> {
+    await mkdir(this.folder, { recursive: true });
+    // SQLite provides a process-owned file lock that is released even if a command is killed.
+    // The activity list and points keep their existing format.
+    using lock = new DatabaseSync(path.join(this.folder, '.lock.sqlite'));
+    const deadline = performance.now() + 10_000;
+    for (;;) {
+      try {
+        lock.exec('BEGIN IMMEDIATE');
+        break;
+      } catch (error) {
+        if ((error as { errcode?: number }).errcode !== SQLITE_BUSY) throw error;
+        if (performance.now() >= deadline)
+          throw new Error('The activity library is busy. Try again.', { cause: error });
+        await delay(50);
+      }
+    }
+    await operation(await this.read());
   }
 
   /** Ids may hold any character, so they are encoded for file names. */
@@ -97,16 +150,12 @@ export class Library {
   }
 
   /** Writes the list through a temporary file, so a crash never leaves half a list. */
-  private async writeList(): Promise<void> {
-    const list: StoredActivity[] = this.all().map(({ id, name, sport, startTime }) => ({
-      id,
-      name,
-      sport,
-      startTime,
-    }));
+  private async writeList(activities: Map<string, Track>): Promise<void> {
+    const list: StoredActivity[] = [...activities.values()]
+      .sort((a, b) => b.startTime - a.startTime)
+      .map(({ id, name, sport, startTime }) => ({ id, name, sport, startTime }));
     const file = path.join(this.folder, 'activities.json');
-    await mkdir(this.folder, { recursive: true });
-    await writeFile(`${file}.tmp`, JSON.stringify(list));
-    await rename(`${file}.tmp`, file);
+    await replaceFile(file, JSON.stringify(list));
+    this.activities = activities;
   }
 }

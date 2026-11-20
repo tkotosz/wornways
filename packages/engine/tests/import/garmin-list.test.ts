@@ -54,4 +54,10 @@ describe('findGarminEntry', () => {
     expect(findGarminEntry(entries, 3_100_000)?.id).toBe('b');
     expect(findGarminEntry(entries, 6_000_000)).toBeNull();
   });
+
+  it('uses start slack only if no activity has started and picks the closest start', () => {
+    expect(findGarminEntry(entries, 2_990_000)?.id).toBe('a');
+    const upcoming = [entry('next', 25_000, 26_000), entry('first', 15_000, 16_000)];
+    expect(findGarminEntry(upcoming, 10_000)?.id).toBe('first');
+  });
 });
