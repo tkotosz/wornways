@@ -49,7 +49,7 @@ export async function openStravaDraft(
 
   const material = await crypto.subtle.digest(
     'SHA-256',
-    encoder.encode(DRAFT + ':' + grant.sessionId + ':' + (grant.cacheKey ?? grant.token)),
+    encoder.encode(DRAFT + ':' + grant.sessionId + ':' + grant.cacheKey),
   );
   const key = await crypto.subtle.importKey('raw', material, 'AES-GCM', false, [
     'encrypt',

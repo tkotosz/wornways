@@ -1,3 +1,4 @@
+import { readSession } from '../../../cloudflare/strava-cookie.ts';
 import { stravaReady, ticketChannel, type StravaEnv } from '../../../cloudflare/strava-session.ts';
 
 export async function onRequestGet({ request, env }: { request: Request; env: StravaEnv }) {
@@ -10,11 +11,16 @@ export async function onRequestGet({ request, env }: { request: Request; env: St
     return new Response(null, { status: 403 });
 
   const protocol = request.headers.get('Sec-WebSocket-Protocol') ?? '';
-  const channel =
-    protocol.startsWith('session.') &&
-    (await ticketChannel(env.STRAVA_CLIENT_SECRET!, protocol.slice('session.'.length)));
+  const secret = env.STRAVA_CLIENT_SECRET!;
+  const session = await readSession(request, secret, url.origin);
+  if (!session || protocol !== `session.${session.sessionId}`)
+    return new Response(null, { status: 401 });
+  const channel = await ticketChannel(secret, session.ticket);
   if (!channel) return new Response(null, { status: 403 });
 
+  const headers = new Headers(request.headers);
+  headers.delete('Cookie');
+  headers.delete('Authorization');
   const relay = env.STRAVA_EVENTS!;
-  return relay.get(relay.idFromName(channel)).fetch(request);
+  return relay.get(relay.idFromName(channel)).fetch(new Request(request, { headers }));
 }

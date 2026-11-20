@@ -17,8 +17,7 @@ import { clearStravaAccess, type StravaGrant } from '../strava-auth.ts';
 import { StravaCache } from './strava-cache.ts';
 import { sessionTileLoader } from './tile-cache.ts';
 
-const API = 'https://www.strava.com/api/v3';
-const PAGE_SIZE = 100;
+const API = '/api/strava/activities';
 const PREFETCH_COUNT = 5;
 const TRACK_REQUESTS = 3;
 const textEncoder = new TextEncoder();
@@ -131,11 +130,7 @@ export class StravaSession {
   readonly loadTiles = sessionTileLoader(this.signal);
 
   constructor(private readonly grant: StravaGrant) {
-    this.browserCache = new StravaCache(
-      grant.sessionId,
-      grant.expiresAt,
-      grant.cacheKey ?? grant.token,
-    );
+    this.browserCache = new StravaCache(grant.sessionId, grant.expiresAt, grant.cacheKey);
   }
 
   get signal(): AbortSignal {
@@ -152,7 +147,7 @@ export class StravaSession {
 
   async end(disconnect: boolean): Promise<void> {
     try {
-      await Promise.all([this.close(), clearStravaAccess(this.grant.token, disconnect)]);
+      await Promise.all([this.close(), clearStravaAccess(this.grant.sessionId, disconnect)]);
     } catch {
       throw new StravaError(
         disconnect
@@ -184,12 +179,11 @@ export class StravaSession {
     const parameters = new URLSearchParams({
       after: String(Math.floor(from / 1000) - 1),
       before: String(Math.ceil(to / 1000)),
-      per_page: String(PAGE_SIZE),
     });
 
     for (let page = 1; ; page++) {
       parameters.set('page', String(page));
-      const res = await this.get('/athlete/activities?' + parameters.toString(), active);
+      const res = await this.get(parameters, active);
       const batch = (await res.json()) as Summary[];
       active.throwIfAborted();
       for (const row of await Promise.all(batch.map(summary))) {
@@ -339,11 +333,7 @@ export class StravaSession {
     signal.throwIfAborted();
     if (cached) return { ...row.summary, ...cached };
 
-    const res = await this.get(
-      '/activities/' + row.summary.id + '/streams?keys=latlng,time,altitude&key_by_type=true',
-      signal,
-      true,
-    );
+    const res = await this.get(new URLSearchParams({ activity: row.summary.id }), signal, true);
     const track =
       res.status === 404 ? null : trackFromStreams(row.summary, (await res.json()) as Streams);
     signal.throwIfAborted();
@@ -352,12 +342,18 @@ export class StravaSession {
     return track;
   }
 
-  private async get(path: string, signal: AbortSignal, allowMissing = false): Promise<Response> {
+  private async get(
+    query: URLSearchParams,
+    signal: AbortSignal,
+    allowMissing = false,
+  ): Promise<Response> {
     signal.throwIfAborted();
     if (this.grant.expiresAt <= Date.now()) throw new StravaExpired('Your Strava session expired.');
-    const res = await fetch(API + path, {
+    const res = await fetch(`${API}?${query}`, {
       cache: 'no-store',
-      headers: { Authorization: 'Bearer ' + this.grant.token },
+      credentials: 'same-origin',
+      redirect: 'error',
+      headers: { 'X-Wornways-Strava-Session': this.grant.sessionId },
       signal: AbortSignal.any([signal, AbortSignal.timeout(20_000)]),
     }).catch((error: unknown) => {
       if (signal.aborted) throw error;
