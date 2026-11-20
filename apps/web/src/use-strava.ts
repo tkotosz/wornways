@@ -256,12 +256,13 @@ export function useStrava(
 
   watch(active, () => void resume());
   watch([() => range.value?.from, () => range.value?.to], () => void list());
-  watch([() => filterSettings(choice.value, new Date()), rows, ready], async ([filters]) => {
+  const filters = computed(() => filterSettings(choice.value, new Date()));
+  watch([() => JSON.stringify(filters.value), rows, ready], async () => {
     const currentRows = rows.value;
     if (!ready.value || !currentRows.length) return;
     const current = ++matchRequest;
     try {
-      const result = await engine.match(filters, true);
+      const result = await engine.match(filters.value, true);
       if (current !== matchRequest || currentRows !== rows.value || !ready.value) return;
       const shown = new Set(currentRows.map((row) => row.id));
       selection.value = { ids: result.ids.filter((id) => shown.has(id)), problem: result.problem };

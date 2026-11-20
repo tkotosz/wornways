@@ -100,15 +100,31 @@ const choice = computed({
   },
 });
 const sourceRows = computed(() => (strava.value ? stravaRows.value : library.value));
+const activityMatch = computed(() => (strava.value ? stravaMatches.value : fileMatches.value));
+const distances = computed(() => new Map(sourceRows.value.map((a) => [a.id, a.distanceM / 1000])));
+const awaitingPlace = computed(() => placeMissing(choice.value));
+const distanceScale = computed(() => {
+  if (awaitingPlace.value) return null;
+  const distanceById = distances.value;
+  let min = Infinity;
+  let max = -Infinity;
+  for (const id of activityMatch.value.ids) {
+    const km = distanceById.get(id);
+    if (km === undefined || !Number.isFinite(km) || km < 0) continue;
+    min = Math.min(min, km);
+    max = Math.max(max, km);
+  }
+  return min < max ? { min: Math.floor(min), max: Math.ceil(max) } : null;
+});
 const matched = computed<MatchReport>(() => {
-  const match = strava.value ? stravaMatches.value : fileMatches.value;
+  const match = activityMatch.value;
   const range = distanceRange(choice.value);
   if (!range) return { ...match, ids: [] };
   if ((range.min === -Infinity && range.max === Infinity) || !match.ids.length) return match;
 
-  const distances = new Map(sourceRows.value.map((a) => [a.id, a.distanceM / 1000]));
+  const distanceById = distances.value;
   const ids = match.ids.filter((id) => {
-    const km = distances.get(id);
+    const km = distanceById.get(id);
     return km !== undefined && km >= range.min && km <= range.max;
   });
   return { ids, problem: ids.length ? match.problem : 'No activities match the distance range.' };
@@ -162,8 +178,7 @@ function reachable(id: Step): boolean {
   if (id === 'import') return true;
   if (!strava.value && library.value.length === 0) return false;
   return (
-    id === 'activities' ||
-    (chosenIds.value.length > 0 && !placeMissing(choice.value) && !stravaBusy.value)
+    id === 'activities' || (chosenIds.value.length > 0 && !awaitingPlace.value && !stravaBusy.value)
   );
 }
 
@@ -218,12 +233,13 @@ onMounted(() => {
 // Find what the filters match whenever they or the library change. A newer answer may
 // arrive before an older one, so only the latest request's answer is kept.
 let latest = 0;
+const fileFilters = computed(() => filterSettings(fileChoice.value, new Date()));
 watch(
-  [() => filterSettings(fileChoice.value, new Date()), library],
-  async ([filters]) => {
+  [() => JSON.stringify(fileFilters.value), library],
+  async () => {
     const request = ++latest;
     try {
-      const result = await props.engine.match(filters);
+      const result = await props.engine.match(fileFilters.value);
       if (request === latest) fileMatches.value = result;
     } catch (error) {
       if (request === latest)
@@ -340,6 +356,7 @@ watch(
         :engine="engine"
         :library="sourceRows"
         :matched="matched"
+        :distance-scale="distanceScale"
         :strava="strava"
         :show-source="!!stravaUrl || strava"
         :busy="stravaBusy"

@@ -4,7 +4,6 @@ import type { TrackEnd } from '@wornways/engine';
 import { computed } from 'vue';
 import {
   PERIODS,
-  distanceRange,
   periodRange,
   placeSettings,
   sportPicked,
@@ -12,17 +11,22 @@ import {
   type Choice,
 } from '../choice.ts';
 import DateField from '../components/DateField.vue';
+import DistanceFilter from './DistanceFilter.vue';
 import NearPlacePanel from '../components/NearPlacePanel.vue';
 import type { EngineClient } from '../engine-client.ts';
 import { sportText } from '../format.ts';
 import type { ActivitySummary } from '../messages.ts';
 
-const props = defineProps<{ engine: EngineClient; library: ActivitySummary[]; strava?: boolean }>();
+const props = defineProps<{
+  engine: EngineClient;
+  library: ActivitySummary[];
+  distanceScale: { min: number; max: number } | null;
+  strava?: boolean;
+}>();
 const choice = defineModel<Choice>({ required: true });
 const periods = computed(() =>
   props.strava ? PERIODS.filter((period) => period.id !== 'all') : PERIODS,
 );
-const distanceInvalid = computed(() => distanceRange(choice.value) === null);
 
 /** Every sport in the library, the most frequent first. */
 const allSports = computed(() => {
@@ -132,25 +136,7 @@ const suggestFrom = computed(() => placeSettings(choice.value, new Date()));
 
     <div class="filter">
       <span id="distance-label" class="label">Distance</span>
-      <div class="distance" role="group" aria-labelledby="distance-label">
-        <div class="distance-fields">
-          <label v-for="bound in ['minDistanceKm', 'maxDistanceKm'] as const" :key="bound">
-            {{ bound === 'minDistanceKm' ? 'Minimum (km)' : 'Maximum (km)' }}
-            <input
-              type="text"
-              inputmode="decimal"
-              placeholder="Any"
-              :value="choice[bound]"
-              :aria-invalid="distanceInvalid || undefined"
-              :aria-describedby="distanceInvalid ? 'distance-error' : undefined"
-              @input="update({ [bound]: ($event.target as HTMLInputElement).value })"
-            />
-          </label>
-        </div>
-        <p v-if="distanceInvalid" id="distance-error" class="error" role="alert">
-          Enter distances of 0 km or more. The minimum must be at or below the maximum.
-        </p>
-      </div>
+      <DistanceFilter :choice="choice" :scale="distanceScale" @update="update" />
     </div>
 
     <div class="filter">
@@ -212,39 +198,6 @@ const suggestFrom = computed(() => placeSettings(choice.value, new Date()));
   display: flex;
   flex-wrap: wrap;
   gap: 1rem;
-}
-
-.distance-fields {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem;
-}
-
-.distance-fields label {
-  display: grid;
-  gap: 0.3rem;
-  color: var(--muted);
-  font-size: 0.85rem;
-}
-
-.distance-fields input {
-  width: 8rem;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  padding: 0.4rem 0.8rem;
-  color: var(--text);
-  background: var(--panel);
-  font: inherit;
-  font-size: 1rem;
-}
-
-.distance-fields input[aria-invalid='true'] {
-  border-color: var(--danger);
-}
-
-.distance .error {
-  margin: 0.5rem 0 0;
-  font-size: 0.85rem;
 }
 
 .places {
