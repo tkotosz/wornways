@@ -42,6 +42,7 @@ export type MapReport = {
 export type PrepareOptions = {
   createCanvas: CanvasFactory;
   loadTiles: TileLoader;
+  signal?: AbortSignal;
   /** Draw at this size instead of the settings' frame size, e.g. for a smaller preview. */
   size?: { width: number; height: number };
 };
@@ -60,6 +61,7 @@ export async function prepareReplay(
   options: PrepareOptions,
 ): Promise<ReplayParts> {
   if (tracks.length === 0) throw new Error('No tracks to replay');
+  options.signal?.throwIfAborted();
   const { width, height } = options.size ?? settings;
   const { fps } = settings;
   const single = tracks.length === 1 ? tracks[0] : null;
@@ -88,7 +90,7 @@ export async function prepareReplay(
         const windows = levelWindows.levels.flat();
         const ids = windows.map((window) => tilesForView(window.view, MAX_TILE_ZOOM));
         const unique = new Map(ids.flat().map((id) => [key(id), id]));
-        const loaded = await options.loadTiles([...unique.values()]);
+        const loaded = await options.loadTiles([...unique.values()], options.signal);
         const byId = new Map(loaded.tiles.map((tile) => [key(tile), tile]));
         windows.forEach((window, i) => {
           window.tiles = ids[i].map((id) => byId.get(key(id)) ?? { ...id, data: null });
@@ -101,7 +103,7 @@ export async function prepareReplay(
         const levels: MapLevel[] = [];
         for (const levelView of mapLevelViews(view, camera)) {
           const ids = tilesForView(levelView, MAX_TILE_ZOOM);
-          const loaded = await options.loadTiles(ids);
+          const loaded = await options.loadTiles(ids, options.signal);
           levels.push({ view: levelView, tiles: loaded.tiles });
           map.tiles += ids.length;
           map.downloaded += loaded.downloaded;
@@ -113,9 +115,10 @@ export async function prepareReplay(
       map.error = err instanceof Error ? err.message : String(err);
     }
   }
+  options.signal?.throwIfAborted();
 
-  const shownSports = settings.sports ?? (single ? [single.sport] : null);
-  const words = sportWords(shownSports?.length === 1 ? shownSports[0] : null);
+  const sport = tracks[0].sport;
+  const words = sportWords(tracks.every((track) => track.sport === sport) ? sport : null);
   const renderer = createRenderer(tracks, plan.timeline, options.createCanvas, {
     view,
     camera,

@@ -1,5 +1,5 @@
 import { execFile, spawnSync } from 'node:child_process';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { promisify } from 'node:util';
@@ -107,4 +107,29 @@ describe('the library commands', () => {
     });
     await expect(cli('constructor')).rejects.toMatchObject({ code: 1, stderr: '' });
   });
+
+  it('imports distinct same-name files concurrently and accepts their literal IDs', async () => {
+    const paths = [1, 2].map((day) => path.join(home, String(day), 'my, trip.gpx'));
+    for (const [i, file] of paths.entries()) {
+      await mkdir(path.dirname(file));
+      const date = `2026-11-0${i + 1}`;
+      await writeFile(
+        file,
+        `<gpx><trk><trkseg>
+          <trkpt lat="47.5" lon="19"><time>${date}T10:00:00Z</time></trkpt>
+          <trkpt lat="47.5" lon="19.005"><time>${date}T10:01:00Z</time></trkpt>
+        </trkseg></trk></gpx>`,
+      );
+    }
+    await Promise.all(paths.map((file) => cli('import', file)));
+    const list = await cli('list');
+    expect(list).toContain('2 activities');
+    expect(list).toMatch(/^my, trip-2 /m);
+    await expect(
+      cli('render', '--activity-id', 'my, trip-2', '--trim-radius=2000'),
+    ).rejects.toMatchObject({
+      stdout: expect.stringContaining('Selected   1 activities with GPS'),
+      stderr: expect.stringContaining('no usable route remains'),
+    });
+  }, 30_000);
 });

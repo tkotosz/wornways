@@ -1,4 +1,6 @@
-import { readFile } from 'node:fs/promises';
+import { copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import { expect, test, type BrowserContext, type Page } from '@playwright/test';
 
 const fixtures = new URL('../../../packages/engine/tests/import/fixtures/', import.meta.url);
@@ -141,6 +143,30 @@ test('adds a Garmin export as it is, with the ZIP files inside it', async ({ pag
   await expect(report).toContainText('1 activity added');
   await expect(report).toContainText('1 activity has no GPS route');
   await expect(page.getByTestId('library')).toContainText('Lakeside loop');
+});
+
+test('uses the export metadata and skips planned routes when a folder is picked', async ({
+  page,
+}) => {
+  const folder = await mkdtemp(path.join(tmpdir(), 'wornways-folder-'));
+  try {
+    await mkdir(path.join(folder, 'activities'));
+    await mkdir(path.join(folder, 'routes'));
+    await Promise.all([
+      copyFile(fixture('morning-ride.fit'), path.join(folder, 'activities', 'workout.fit')),
+      copyFile(fixture('trail-run.tcx'), path.join(folder, 'routes', 'workout.tcx')),
+      writeFile(
+        path.join(folder, 'activities.csv'),
+        'Activity ID,Activity Name,Activity Type,Filename\n123,Exported ride,Ride,activities/workout.fit',
+      ),
+    ]);
+    await page.goto('/');
+    await page.getByTestId('folder-input').setInputFiles(folder);
+    await expect(page.getByTestId('import-report')).toContainText('1 activity added');
+    await expect(page.getByTestId('library')).toContainText('Exported ride');
+  } finally {
+    await rm(folder, { recursive: true, force: true });
+  }
 });
 
 test('deletes one activity, then all of them', async ({ page }) => {
@@ -529,7 +555,7 @@ test('starts the end place at the start place, then keeps both filters apart', a
   const end = page.getByTestId('end-near');
   await expect(end.getByLabel('End place')).toHaveValue(startPlace);
   await expect(end.getByRole('button', { name: /^\d \d end ·/ })).toHaveCount(2);
-  await expect(end.getByLabel('End radius')).toHaveValue('1000');
+  await expect(end.getByLabel('End radius', { exact: true })).toHaveValue('1000');
 
   await end.getByLabel('End place').fill('10, 10');
   await expect(page.getByRole('alert')).toHaveText(
@@ -709,6 +735,17 @@ test('offers Highlight for a single activity, and the other presets for several'
   await page.getByRole('button', { name: 'Playback', exact: true }).click();
   await expect(presets).toHaveCount(3);
   await expect(preset('All at once')).toHaveAttribute('aria-checked', 'true');
+  await page.getByRole('button', { name: /Fine-tune playback/ }).click();
+  await expect(camera.getByRole('button', { name: 'Zooms out' })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+  await page.getByRole('button', { name: 'Reset playback to defaults' }).click();
+  await expect(page.getByTestId('pacing')).toHaveText('This video: 2 activities, 14.7 s each.');
+  const exactLength = page.getByRole('spinbutton', { name: 'Exact video length in seconds' });
+  await exactLength.fill('20.5');
+  await exactLength.press('Enter');
+  await expect(page.getByTestId('replay-summary')).toHaveText('20.5 seconds · Custom playback');
 });
 
 test('keeps Back and Next in place while the page scrolls', async ({ page }) => {

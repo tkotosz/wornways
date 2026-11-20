@@ -5,10 +5,16 @@ export function metresPerDegree(lat: number): { perLat: number; perLon: number }
   return { perLat: 110540, perLon: 111320 * Math.cos(lat * RAD) };
 }
 
+/** The signed longitude step along the shorter arc, including across the date line. */
+export function longitudeDelta(from: number, to: number): number {
+  const delta = (to - from) % 360;
+  return delta > 180 ? delta - 360 : delta < -180 ? delta + 360 : delta;
+}
+
 /** Flat-earth distance in metres; accurate enough over the few kilometres it is used for. */
 export function distanceM(lat1: number, lon1: number, lat2: number, lon2: number): number {
   const { perLat, perLon } = metresPerDegree((lat1 + lat2) / 2);
-  return Math.hypot((lat2 - lat1) * perLat, (lon2 - lon1) * perLon);
+  return Math.hypot((lat2 - lat1) * perLat, longitudeDelta(lon1, lon2) * perLon);
 }
 
 /** Web Mercator, normalised so the whole world spans 0..1 on both axes. */

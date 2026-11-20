@@ -1,5 +1,5 @@
 import { computed, onBeforeUnmount, ref, watch, type Ref } from 'vue';
-import type { Adjustments } from './adjust.ts';
+import { fromEarlierVersions, type Adjustments } from './adjust.ts';
 import { NO_CHOICE, filterSettings, periodRange, type Choice } from './choice.ts';
 import { Canceled, StravaExpired, type EngineClient } from './engine-client.ts';
 import type { ActivitySummary, MatchReport } from './messages.ts';
@@ -97,7 +97,7 @@ export function useStrava(
       const { draft, ...draftStore } = storage;
       session = { expiresAt, sessionId, ...draftStore };
       choice.value = { ...initialChoice(), ...draft?.choice };
-      adjustments.value = draft?.adjustments ?? { ...defaultAdjustments };
+      adjustments.value = fromEarlierVersions(draft?.adjustments ?? defaultAdjustments);
       initialSelection = draft?.selected ?? [];
       active.value = true;
       expiry = setTimeout(expired, expiresAt - Date.now());

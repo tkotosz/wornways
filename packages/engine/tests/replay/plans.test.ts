@@ -191,6 +191,7 @@ describe('videoFileName', () => {
   it.each([
     [{ from: '2026-08', to: '2026-08' }, 'month-2026-08.mp4'],
     [{ from: '2026', to: '2026' }, 'year-2026.mp4'],
+    [{ from: '0099', to: '0099' }, 'year-0099.mp4'],
     [{ from: '2026-08-01', to: '2026-08-14' }, 'replay-2026-08-01-to-2026-08-14.mp4'],
     [{}, 'replay-2026-08-01-to-2026-08-04.mp4'],
   ])('names the video of %j', (input, name) => {
@@ -199,5 +200,10 @@ describe('videoFileName', () => {
 
   it('names a single activity by its id', () => {
     expect(videoFileName([august[0]!], parseSettings({}))).toBe('activity-2026-8-1.mp4');
+  });
+
+  it('keeps a single activity ID with path separators in one filename', () => {
+    const track = { ...august[0], id: 'ride\u005cday/1' };
+    expect(videoFileName([track], parseSettings({}))).toBe('activity-ride%5Cday%2F1.mp4');
   });
 });

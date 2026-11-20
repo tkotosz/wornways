@@ -54,7 +54,11 @@ export class EngineClient {
     files: File[],
     onProgress: (progress: Progress) => void,
   ): Promise<{ report: ImportReport; activities: ActivitySummary[] }> {
-    const reply = await this.send({ type: 'add-files', id: this.nextId++, files }, onProgress);
+    const picked = files.map((file) => ({ file, path: file.webkitRelativePath || file.name }));
+    const reply = await this.send(
+      { type: 'add-files', id: this.nextId++, files: picked },
+      onProgress,
+    );
     if (reply.type === 'files-added') return reply;
     throw this.errorFor(reply);
   }

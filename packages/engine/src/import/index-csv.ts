@@ -92,10 +92,10 @@ export function parseActivitiesIndex(csvText: string): IndexEntry[] {
     .slice(1)
     .filter((r) => r.length > file)
     .map((r) => ({
-      id: r[id],
-      name: name >= 0 ? r[name] : '',
-      sport: sportSlug(r[type]),
-      startTime: date >= 0 ? parseStravaDate(r[date]) : NaN,
-      filename: r[file],
+      id: r[id]?.trim() ?? '',
+      name: r[name] ?? '',
+      sport: sportSlug(r[type] ?? ''),
+      startTime: parseStravaDate(r[date] ?? ''),
+      filename: r[file].trim(),
     }));
 }

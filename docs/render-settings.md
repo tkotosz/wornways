@@ -27,6 +27,9 @@ A preset is a named recipe for the timing: `--preset <name>` fills in the settin
 and a setting given with it wins over its value. The web app offers the same presets on
 its Playback step (Highlight for a single activity, the others for several); changing the
 video's length or a value under Fine-tune playback makes the preset Custom.
+Single- and multi-activity replays remember their timing and camera settings independently.
+Use **Reset playback to defaults** under Fine-tune playback for the same starting settings as
+`wornways render` without a preset.
 
 | Preset          | What it plays                                                               | Settings                                                      |
 | --------------- | --------------------------------------------------------------------------- | ------------------------------------------------------------- |
@@ -56,8 +59,9 @@ The place filters are independent: activities that start and end at home take th
 place for both; a ride from home to a race takes two. A radius without its place is
 refused.
 
-The activity ids narrow what the other settings choose; the web app sets them when
-activities are unticked by hand in its list.
+The activity IDs narrow what the other settings choose. The web app sets them when
+activities are unticked by hand in its list. Use `--activity-id <id>` for a literal ID
+that contains a comma. Repeat the flag to include several literal IDs.
 
 Distance bounds apply before GPS cleaning and privacy trimming. For example,
 `--min-distance 5 --max-distance 10` keeps activities from 5 through 10 km. The web app
@@ -69,6 +73,8 @@ custom)
 that fill in the start and the end. In Custom, enter a day, month or year in either field.
 
 ### Timing
+
+The fields beside numeric sliders accept exact values within the same ranges as the CLI.
 
 | Setting      | CLI flag       | Values                                                                                                                                                                  | Default |
 | ------------ | -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
@@ -93,7 +99,8 @@ dates, a month, or the dates all activities span; in a race, the race clock.
 
 In the web app, the slider is under Appearance. It uses the same radius around the
 start and finish of each selected activity. The preview and export keep the longest
-continuous section outside both circles. Activities with less than 200 m left are
+continuous section outside those circles. If GPS cleaning moves an endpoint,
+the radius applies to its original and cleaned positions. Activities with less than 200 m left are
 omitted. Export shows the visible distance and the number of omitted activities.
 Trimmed exports default to the filename `replay.mp4`.
 

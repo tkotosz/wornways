@@ -1,32 +1,32 @@
-import { distanceM, mercatorX, mercatorY, metresPerDegree } from './geo.ts';
+import { distanceM, longitudeDelta, mercatorY, metresPerDegree } from './geo.ts';
+import { trackEnd, trackStart, type LatLon } from './places.ts';
 import { STRIDE, type Track } from './types.ts';
 
-type Zone = { x: number; y: number; scaleX: number; scaleY: number };
+type Zone = { lon: number; y: number; scaleX: number; scaleY: number };
 type Interval = [from: number, to: number];
 
-function zoneAt(points: Float64Array, offset: number): Zone {
-  const lat = points[offset + 1];
+function zoneAt({ lat, lon }: LatLon): Zone {
   const { perLat, perLon } = metresPerDegree(lat);
   return {
-    x: mercatorX(points[offset]),
+    lon,
     y: mercatorY(lat),
-    scaleX: 360 * perLon,
+    scaleX: perLon,
     scaleY: 360 * Math.cos((lat * Math.PI) / 180) * perLat,
   };
 }
 
 /** The part of a map segment inside the endpoint's circle, in local metres. */
 function inside(
-  x0: number,
+  lon0: number,
   y0: number,
-  x1: number,
+  lon1: number,
   y1: number,
   zone: Zone,
   radius: number,
 ): Interval | null {
-  const x = (x0 - zone.x) * zone.scaleX;
+  const x = longitudeDelta(zone.lon, lon0) * zone.scaleX;
   const y = (y0 - zone.y) * zone.scaleY;
-  const dx = (x1 - x0) * zone.scaleX;
+  const dx = longitudeDelta(lon0, lon1) * zone.scaleX;
   const dy = (y1 - y0) * zone.scaleY;
   const length = Math.hypot(dx, dy);
   if (!length) return Math.hypot(x, y) <= radius ? [0, 1] : null;
@@ -46,7 +46,11 @@ function pointAt(points: Float64Array, index: number): Float64Array {
   const fraction = index % 1;
   const point = points.slice(offset, offset + STRIDE);
   if (fraction === 0) return point;
-  for (let i = 0; i < STRIDE; i++) point[i] += fraction * (points[offset + STRIDE + i] - point[i]);
+  for (let i = 2; i < STRIDE; i++) point[i] += fraction * (points[offset + STRIDE + i] - point[i]);
+  point[0] = longitudeDelta(
+    0,
+    point[0] + fraction * longitudeDelta(point[0], points[offset + STRIDE]),
+  );
   // Match the straight segment drawn on the Mercator map, including at the trim boundary.
   const y = mercatorY(points[offset + 1]);
   const cut = y + fraction * (mercatorY(points[offset + STRIDE + 1]) - y);
@@ -55,10 +59,14 @@ function pointAt(points: Float64Array, index: number): Float64Array {
 }
 
 /** Keep the longest continuous part of a cleaned route outside both endpoint circles. */
-export function trimEndpoints(track: Track, radius: number): Track | null {
+export function trimEndpoints(track: Track, radius: number, original: Track = track): Track | null {
   const p = track.points;
   const last = p.length / STRIDE - 1;
-  const zones = [zoneAt(p, 0), zoneAt(p, last * STRIDE)];
+  const ends = [trackStart(track), trackEnd(track)];
+  // Cleaning can drop an endpoint that the surviving route visits again later.
+  for (const point of [trackStart(original), trackEnd(original)])
+    if (!ends.some(({ lat, lon }) => lat === point.lat && lon === point.lon)) ends.push(point);
+  const zones = ends.map(zoneAt);
   // Track a visible section with fractional point indices, so each cut can land
   // between two samples without joining separate sections.
   let start = 0;
@@ -76,14 +84,12 @@ export function trimEndpoints(track: Track, radius: number): Track | null {
   for (let i = 0; i < last; i++) {
     const a = i * STRIDE;
     const b = a + STRIDE;
-    const x0 = mercatorX(p[a]);
     const y0 = mercatorY(p[a + 1]);
-    const x1 = mercatorX(p[b]);
     const y1 = mercatorY(p[b + 1]);
-    if (![x0, y0, x1, y1].every(Number.isFinite)) return null;
+    if (![p[a], y0, p[b], y1].every(Number.isFinite)) return null;
     const distance = distanceM(p[a + 1], p[a], p[b + 1], p[b]);
     const hidden = zones
-      .map((zone) => inside(x0, y0, x1, y1, zone, radius))
+      .map((zone) => inside(p[a], y0, p[b], y1, zone, radius))
       .filter((interval) => interval !== null)
       .sort((a, b) => a[0] - b[0]);
     let shown = 0;

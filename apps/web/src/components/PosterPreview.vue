@@ -53,6 +53,8 @@ async function draw(): Promise<void> {
   } catch (caught) {
     // A newer drawing took over; it clears "busy" when it is done.
     if (cancel !== task.cancel || caught instanceof Canceled) return;
+    if (url.value) URL.revokeObjectURL(url.value);
+    url.value = '';
     error.value = caught instanceof Error ? caught.message : String(caught);
     busy.value = false;
   }

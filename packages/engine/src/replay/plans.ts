@@ -53,7 +53,9 @@ const AUTO_GROUPINGS: readonly Grouping[] = ['activity', 'day', 'week', 'month']
 /** Monday of the week `ms` falls in, at midnight, local time. */
 function mondayOf(ms: number): Date {
   const d = new Date(ms);
-  return new Date(d.getFullYear(), d.getMonth(), d.getDate() - ((d.getDay() + 6) % 7));
+  d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+  d.setHours(0, 0, 0, 0);
+  return d;
 }
 
 /** Track indexes in groups: one per activity, per calendar day, week or month, or one. */
@@ -82,8 +84,10 @@ function groupLabel(starts: number[], grouping: Grouping): string {
   if (grouping === 'all') return dateRange(firstStart, starts[starts.length - 1]);
   if (grouping === 'month') return monthFormat.format(firstStart);
   if (grouping === 'week') {
-    const monday = mondayOf(firstStart).getTime();
-    return dateRange(monday, monday + 6 * 86400000);
+    const monday = mondayOf(firstStart);
+    const sunday = new Date(monday);
+    sunday.setDate(sunday.getDate() + 6);
+    return dateRange(monday.getTime(), sunday.getTime());
   }
   return dayFormat.format(firstStart);
 }
@@ -230,15 +234,21 @@ export function planReplay(tracks: Track[], settings: RenderSettings): Plan {
 export function isWholeMonth(from: number, to: number): boolean {
   const a = new Date(from);
   return (
-    from === new Date(a.getFullYear(), a.getMonth(), 1).getTime() &&
-    to === new Date(a.getFullYear(), a.getMonth() + 1, 1).getTime()
+    from === firstOfMonth(a.getFullYear(), a.getMonth()) &&
+    to === firstOfMonth(a.getFullYear(), a.getMonth() + 1)
   );
 }
 
 /** Whether the period from `from` up to (not including) `to` is exactly one calendar year. */
 export function isWholeYear(from: number, to: number): boolean {
   const year = new Date(from).getFullYear();
-  return from === new Date(year, 0, 1).getTime() && to === new Date(year + 1, 0, 1).getTime();
+  return from === firstOfMonth(year, 0) && to === firstOfMonth(year + 1, 0);
+}
+
+function firstOfMonth(year: number, month: number): number {
+  const date = new Date(0);
+  date.setFullYear(year, month, 1);
+  return date.setHours(0, 0, 0, 0);
 }
 
 /**
@@ -255,7 +265,7 @@ export function automaticTitle(
   const { from, to } = settings;
   if (from !== null && to !== null) {
     if (isWholeMonth(from, to)) return monthFormat.format(from);
-    if (isWholeYear(from, to)) return String(new Date(from).getFullYear());
+    if (isWholeYear(from, to)) return isoDay(from).slice(0, 4);
   }
   return dateRange(
     from ?? tracks[0].startTime,
@@ -266,7 +276,7 @@ export function automaticTitle(
 /** YYYY-MM-DD in local time. */
 const isoDay = (ms: number) => {
   const d = new Date(ms);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  return `${String(d.getFullYear()).padStart(4, '0')}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 };
 
 /**
@@ -277,7 +287,8 @@ const isoDay = (ms: number) => {
 export function videoFileName(tracks: Track[], settings: RenderSettings): string {
   if (tracks.length === 0) throw new Error('No tracks to name');
   if (settings.trimRadius) return 'replay.mp4';
-  if (tracks.length === 1) return `activity-${tracks[0].id}.mp4`;
+  if (tracks.length === 1)
+    return `activity-${tracks[0].id.replace(/[<>:"/\\|?*]/g, encodeURIComponent)}.mp4`;
   const { from, to } = settings;
   if (from !== null && to !== null) {
     if (isWholeMonth(from, to)) return `month-${isoDay(from).slice(0, 7)}.mp4`;

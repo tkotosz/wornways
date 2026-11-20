@@ -128,13 +128,14 @@ export function selectTracks(activities: Track[], settings: RenderSettings): Sel
   if (problem) return selection;
 
   selection.rawPoints = kept.reduce((n, t) => n + pointCount(t), 0);
+  const original = settings.trimRadius ? new Map(kept.map((t) => [t.id, t])) : undefined;
   const cleaned: Track[] = [];
   for (const t of kept) {
     const trim = trimEdgeJumps(t);
     if (trim.start || trim.end)
       selection.trimmed.push({ track: t, start: trim.start, end: trim.end });
     const c = cleanTrack(trim.track, { edgeJumpM: 0 });
-    if (c) cleaned.push(c);
+    if (c) cleaned.push({ ...c, startTime: t.startTime });
   }
   cleaned.sort((a, b) => a.startTime - b.startTime);
   for (const t of cleaned.filter((c) => trackLengthM(c) < MIN_LENGTH_M)) {
@@ -145,7 +146,7 @@ export function selectTracks(activities: Track[], settings: RenderSettings): Sel
 
   const tracks = settings.trimRadius
     ? cleaned.flatMap((track) => {
-        const visible = trimEndpoints(track, settings.trimRadius);
+        const visible = trimEndpoints(track, settings.trimRadius, original?.get(track.id));
         return visible && trackLengthM(visible) >= MIN_LENGTH_M ? [visible] : [];
       })
     : cleaned;

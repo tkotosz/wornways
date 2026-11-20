@@ -7,6 +7,10 @@ import { pointCount } from '../../src/track/types.ts';
 /** A fixture file, read the way a browser reads a picked file: part by part. */
 function fixture(name: string): RandomAccessFile {
   const bytes = new Uint8Array(readFileSync(new URL(`fixtures/${name}`, import.meta.url)));
+  return file(name, bytes);
+}
+
+function file(name: string, bytes: Uint8Array): RandomAccessFile {
   return {
     name,
     size: bytes.length,
@@ -109,6 +113,34 @@ describe('importFiles', () => {
     expect(result.unreadable).toHaveLength(1);
   });
 
+  it('keeps distinct same-name activities on a later import and deduplicates reimports', async () => {
+    const ride = { ...fixture('morning-ride.fit'), name: 'trip.fit' };
+    const run = { ...fixture('trail-run.tcx'), name: 'trip.tcx' };
+    const first = await importFiles([ride]);
+    const known = new Map(first.activities.map((a) => [a.id, a]));
+    const second = await importFiles([run], { known });
+    expect(second.activities.map(({ id, sport }) => [id, sport])).toEqual([['trip-2', 'run']]);
+    known.set(second.activities[0].id, second.activities[0]);
+    const repeated = await importFiles([ride, run], { known });
+    expect(repeated.activities).toEqual([]);
+    expect(repeated.duplicates).toBe(2);
+  });
+
+  it('matches loose export indexes by path and leaves other files with the same basename alone', async () => {
+    const ride = { ...fixture('morning-ride.gpx'), name: 'export/activities/workout.gpx' };
+    const other = { ...fixture('trail-run.tcx'), name: 'other/activities/workout.tcx' };
+    const csv = file(
+      'export/activities.csv',
+      new TextEncoder().encode(
+        'Activity ID,Activity Name,Activity Type,Filename\n123,Sunday ride,Ride,activities/workout.gpx\n444,Other ride,Ride,activities/workout.tcx',
+      ),
+    );
+    const result = await importFiles([csv, ride, other]);
+    expect(result.activities.map(({ id, name, sport }) => [id, name, sport])).toEqual([
+      ['123', 'Sunday ride', 'ride'],
+      ['workout', 'workout', 'run'],
+    ]);
+  });
   it('leaves out an activity the caller knows already', async () => {
     const result = await importFiles([fixture('morning-ride.gpx')], { isKnown: () => true });
 

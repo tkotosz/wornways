@@ -10,7 +10,7 @@ import { fail } from './terminal.ts';
 async function diskFile(file: string): Promise<RandomAccessFile> {
   const { size } = await stat(file);
   return {
-    name: file,
+    name: file.split(path.sep).join('/'),
     size,
     read: async (offset, length) => {
       const handle = await open(file);

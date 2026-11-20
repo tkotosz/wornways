@@ -42,7 +42,9 @@ export type ImportResult = {
 export type ImportProgress = { done: number; total: number };
 
 export type ImportOptions = {
-  /** Called with the activity id before a file is read; true leaves the activity out. */
+  /** Activities in the destination library, used to detect duplicates and reserve IDs. */
+  known?: ReadonlyMap<string, Track>;
+  /** An ID the caller explicitly wants to exclude. */
   skip?: (id: string) => boolean;
   /** Called with each activity read; true leaves it out as the same as one known already. */
   isKnown?: (activity: ParsedActivity) => boolean;
@@ -50,16 +52,17 @@ export type ImportOptions = {
 };
 
 /** One file to read: a file of its own or an entry of an archive. */
-type Source = { path: string; read: () => Promise<Uint8Array> };
+type Source = { path: string; index: Map<string, IndexEntry>; read: () => Promise<Uint8Array> };
 
 const baseName = (path: string) => path.slice(path.lastIndexOf('/') + 1);
+const directory = (path: string) => path.slice(0, path.lastIndexOf('/') + 1);
 /**
  * A file's name as the person is shown it. Garmin names the files of its export after the
  * account's email address ("name@example.com_123.fit"), which is left out.
  */
 const fileLabel = (path: string) => baseName(path).replace(/^[^@_]+@[^@_]+_/, '');
-/** Index entries and files are matched by file name, with or without ".gz". */
-const matchKey = (path: string) => baseName(path).toLowerCase().replace(/\.gz$/, '');
+/** Index paths are relative to the list, and match with or without ".gz". */
+const matchKey = (path: string) => path.replaceAll('\\', '/').toLowerCase().replace(/\.gz$/, '');
 const isIndex = (path: string) => baseName(path).toLowerCase() === 'activities.csv';
 const isZip = (path: string) => path.toLowerCase().endsWith('.zip');
 /** An account export keeps planned routes in a "routes" folder; they are not activities. */
@@ -110,6 +113,9 @@ export async function importFiles(
   const candidates: Source[] = [];
   const indexes: Source[] = [];
   const garminLists: Source[] = [];
+  const looseIndex = new Map<string, IndexEntry>();
+  // A browser file picker delivers individually selected files without their directories.
+  const flatIndex = new Map<string, IndexEntry | null>();
   const sort = (source: Source) => {
     if (isIndex(source.path)) indexes.push(source);
     else if (isGarminList(source.path)) garminLists.push(source);
@@ -117,7 +123,11 @@ export async function importFiles(
       candidates.push(source);
     else result.ignored++;
   };
-  const openArchive = async (archive: RandomAccessFile, depth: number) => {
+  const openArchive = async (
+    archive: RandomAccessFile,
+    index: Map<string, IndexEntry>,
+    depth: number,
+  ) => {
     let entries: ZipEntry[];
     try {
       entries = await listZip(archive);
@@ -128,28 +138,34 @@ export async function importFiles(
     for (const entry of entries) {
       const path = `${archive.name}/${entry.path}`;
       if (!isZip(path) || depth >= NESTED_ZIP_DEPTH) {
-        sort({ path, read: () => readZipEntry(archive, entry) });
+        sort({ path, index, read: () => readZipEntry(archive, entry) });
         continue;
       }
       // A ZIP file inside is read into memory whole: its entries are packed, not seekable.
       try {
-        await openArchive(memoryFile(path, await readZipEntry(archive, entry)), depth + 1);
+        await openArchive(memoryFile(path, await readZipEntry(archive, entry)), index, depth + 1);
       } catch (error) {
         result.unreadable.push({ file: fileLabel(path), reason: reasonOf(error) });
       }
     }
   };
   for (const file of files) {
-    if (isZip(file.name)) await openArchive(file, 1);
-    else sort({ path: file.name, read: () => file.read(0, file.size) });
+    if (isZip(file.name)) await openArchive(file, new Map(), 1);
+    else sort({ path: file.name, index: looseIndex, read: () => file.read(0, file.size) });
   }
 
-  const listed = new Map<string, IndexEntry>();
   for (const index of indexes) {
     try {
       const text = new TextDecoder('utf-8').decode(await index.read());
-      for (const entry of parseActivitiesIndex(text))
-        if (entry.filename) listed.set(matchKey(entry.filename), entry);
+      for (const entry of parseActivitiesIndex(text)) {
+        if (!entry.filename) continue;
+        const filename = matchKey(entry.filename).replace(/^\.\//, '');
+        index.index.set(matchKey(directory(index.path)) + filename, entry);
+        if (index.path === baseName(index.path)) {
+          const key = baseName(filename);
+          flatIndex.set(key, flatIndex.has(key) ? null : entry);
+        }
+      }
     } catch (error) {
       result.unreadable.push({ file: index.path, reason: reasonOf(error) });
     }
@@ -165,17 +181,17 @@ export async function importFiles(
   }
 
   const seen = new Set<string>();
+  const known = options.known ?? new Map<string, Track>();
+  const knownTracks = [...known.values()];
   const skipped = new Map<string, (typeof result.listedSkipped)[number] | undefined>();
   for (const [done, source] of candidates.entries()) {
     options.onProgress?.({ done, total: candidates.length });
-    const entry = listed.get(matchKey(source.path));
-    const fileId = entry?.id ?? idFromName(source.path);
-    // A Garmin list can assign a different ID, so unlisted files need to be read first.
-    const idKnown = entry !== undefined || garmin.length === 0;
-    if (idKnown && seen.has(fileId)) continue;
-    if (idKnown && options.skip?.(fileId)) {
-      if (entry) skipped.set(fileId, { id: fileId, name: entry.name, sport: entry.sport });
-      else if (!skipped.has(fileId)) skipped.set(fileId, undefined);
+    const key = matchKey(source.path);
+    const entry = source.index.get(key) ?? (!directory(key) ? flatIndex.get(key) : null);
+    const listedId = entry?.id;
+    // An explicitly skipped provider ID can be checked before reading the file.
+    if (entry && listedId && options.skip?.(listedId)) {
+      skipped.set(listedId, { id: listedId, name: entry.name, sport: entry.sport });
       continue;
     }
     try {
@@ -195,30 +211,39 @@ export async function importFiles(
       }
       // Garmin's list is matched by time, so its id is known only now.
       const garminEntry = entry ? null : findGarminEntry(garmin, parsed.startTime);
-      const id = garminEntry?.id ?? fileId;
-      if (seen.has(id)) {
-        result.duplicates++;
+      const providerId = listedId || garminEntry?.id;
+      const fileId = providerId ?? idFromName(source.path);
+      const existing = providerId ? known.get(providerId) : undefined;
+      if ((existing && sameActivity(existing, parsed)) || options.skip?.(fileId)) {
+        if (entry || garminEntry) {
+          skipped.set(fileId, {
+            id: fileId,
+            name: entry?.name || garminEntry?.name || '',
+            sport: entry?.sport || garminEntry?.sport || '',
+          });
+        } else if (!skipped.has(fileId)) skipped.set(fileId, undefined);
         continue;
       }
-      if (!idKnown && options.skip?.(id)) {
-        if (garminEntry)
-          skipped.set(id, { id, name: garminEntry.name, sport: garminEntry.sport || parsed.sport });
-        else if (!skipped.has(id)) skipped.set(id, undefined);
-        continue;
-      }
-      if (options.isKnown?.(parsed) || result.activities.some((a) => sameActivity(a, parsed))) {
+      if (
+        options.isKnown?.(parsed) ||
+        knownTracks.some((a) => sameActivity(a, parsed)) ||
+        result.activities.some((a) => sameActivity(a, parsed))
+      ) {
         result.duplicates++;
         continue;
       }
       const listName = entry?.name || garminEntry?.name;
-      seen.add(id);
-      result.activities.push({
+      let id = fileId;
+      for (let copy = 2; seen.has(id) || known.has(id); copy++) id = `${fileId}-${copy}`;
+      const activity = {
         ...parsed,
         id,
         // The activity list's name, else the file's own, else the file name.
         name: listName || parsed.name || idFromName(source.path),
         sport: entry?.sport || garminEntry?.sport || parsed.sport,
-      });
+      };
+      seen.add(id);
+      result.activities.push(activity);
     } catch (error) {
       result.unreadable.push({ file: fileLabel(source.path), reason: reasonOf(error) });
     }

@@ -100,6 +100,13 @@ function settingHelp(setting: SettingDefinition): string {
 
 function groupHelp(group: SettingGroup): string {
   const entries = SETTINGS.filter((s) => s.group === group).map(settingHelp);
+  if (group === 'activities')
+    entries.push(
+      helpEntry(
+        '--activity-id <id>',
+        'Include one literal ID, even if it contains a comma. Repeat to include more IDs.',
+      ),
+    );
   return [GROUP_LABELS[group], ...entries].join('\n');
 }
 
@@ -143,13 +150,15 @@ async function render(argv: string[]): Promise<void> {
     allowNegative: true,
     options: {
       ...settingFlags,
+      'activity-id': { type: 'string', multiple: true },
       out: { type: 'string' },
       help: { type: 'boolean' },
     },
   });
   const positionals = parsed.positionals;
   // The flags are built from the settings table, so their names are only known as text.
-  const values: Record<string, string | boolean | undefined> = parsed.values;
+  const literalIds = parsed.values['activity-id'];
+  const values: Record<string, string | boolean | string[] | undefined> = parsed.values;
   if (values['help']) return void console.log(RENDER_HELP);
   const tStart = performance.now();
 
@@ -157,6 +166,16 @@ async function render(argv: string[]): Promise<void> {
 
   const input: SettingsInput = {};
   for (const setting of SETTINGS) input[setting.name] = values[setting.name];
+  if (literalIds) {
+    const listed =
+      typeof input.activity === 'string'
+        ? input.activity
+            .split(',')
+            .map((id) => id.trim())
+            .filter(Boolean)
+        : [];
+    input.activity = [...listed, ...literalIds];
+  }
   let settings: RenderSettings;
   try {
     settings = parseSettings(input);

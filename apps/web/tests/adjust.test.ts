@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { SETTINGS } from '@wornways/engine';
+import { SETTINGS, parseSettings } from '@wornways/engine';
 import {
   adjustSettings,
   fineTuned,
@@ -7,6 +7,7 @@ import {
   offered,
   presetChoices,
   presetOf,
+  resetPlayback,
   settingLabel,
   valueOf,
   withPreset,
@@ -125,24 +126,29 @@ describe('presets', () => {
     expect(adjustSettings(trip, 'several')).toEqual({ preset: 'multiday-trip', camera: 'fixed' });
   });
 
-  it('picks a preset, and starts Custom from the values the video has now', () => {
+  it('picks a preset and keeps existing overrides', () => {
     expect(withPreset({ preset: 'custom', duration: '20' }, 'all-at-once', 'several')).toEqual({
       preset: 'all-at-once',
       duration: '20',
     });
-    expect(withPreset({ preset: 'multiday-trip', camera: 'fixed' }, 'custom', 'several')).toEqual({
-      preset: 'custom',
-      group: 'day',
-      share: 'distance',
-      'group-pace': 'fit',
-      duration: '45',
-      camera: 'fixed',
-    });
-    expect(withPreset({}, 'custom', 'one')).toEqual({
-      'preset-one': 'custom',
-      duration: '15',
-      camera: 'follow',
-    });
+  });
+
+  it('keeps custom timing and camera settings independent for each selection size', () => {
+    const single = fineTuned({}, { ...playbackAdjustments({}, 'one'), camera: 'fixed' }, 'one');
+    expect(adjustSettings(single, 'one')).toEqual({ duration: '15', camera: 'fixed' });
+    expect(adjustSettings(single, 'several')).toEqual({ preset: 'all-at-once' });
+    const several = fineTuned(
+      single,
+      { ...playbackAdjustments(single, 'several'), duration: '22.5', camera: 'zoom' },
+      'several',
+    );
+    expect(adjustSettings(several, 'one')).toEqual({ duration: '15', camera: 'fixed' });
+    expect(adjustSettings(several, 'several')).toMatchObject({ duration: '22.5', camera: 'zoom' });
+    for (const count of ['one', 'several'] as const) {
+      expect(parseSettings(adjustSettings(resetPlayback(several, count), count))).toEqual(
+        parseSettings({}),
+      );
+    }
   });
 
   it('turns Custom when Fine-tune changes a value the preset sets, and only then', () => {
@@ -172,9 +178,14 @@ describe('presets', () => {
       fromEarlierVersions({ preset: 'custom', 'preset-one': 'custom', camera: 'fixed' }),
     ).toEqual({
       camera: 'fixed',
-      'saved-with': 'five-steps',
+      'one-camera': 'fixed',
+      'saved-with': 'separate-playback',
     });
     const now = { preset: 'custom', camera: 'fixed', 'saved-with': 'five-steps' };
-    expect(fromEarlierVersions(now)).toEqual(now);
+    expect(fromEarlierVersions(now)).toEqual({
+      ...now,
+      'one-camera': 'fixed',
+      'saved-with': 'separate-playback',
+    });
   });
 });
