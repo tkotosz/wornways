@@ -17,7 +17,8 @@
     "lint": "eslint . && prettier --check .",
     "format": "prettier --write .",
     "cli": "node --conditions=source --import tsx apps/cli/src/main.ts",
-    "dev:web": "npm run dev -w @wornways/web",
+    "dev:web": "npm run build -w @wornways/web && npx --yes --package wrangler@4.156.2 -- node apps/web/scripts/dev-web.mjs",
+    "dev:web:vite": "npm run dev -w @wornways/web",
     "test:web": "playwright test",
     "dev:phone": "npm run phone -w @wornways/web",
     "icons": "node apps/web/scripts/make-icons.ts"

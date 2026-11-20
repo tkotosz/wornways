@@ -2,6 +2,7 @@
 import { ref, useId } from 'vue';
 
 defineProps<{ title: string }>();
+const emit = defineEmits<{ closed: [] }>();
 
 const titleId = useId();
 const dialog = ref<HTMLDialogElement | null>(null);
@@ -11,20 +12,22 @@ function open(): void {
   dialog.value?.showModal();
   content.value?.scrollTo({ top: 0 });
 }
+
+function close(): void {
+  dialog.value?.close();
+}
 </script>
 
 <template>
   <slot name="trigger" :open="open" />
   <Teleport to="body">
-    <dialog ref="dialog" class="modal" :aria-labelledby="titleId">
+    <dialog ref="dialog" class="modal" :aria-labelledby="titleId" @close="emit('closed')">
       <header class="modal-header">
         <h2 :id="titleId">{{ title }}</h2>
-        <button type="button" class="secondary close" autofocus @click="dialog?.close()">
-          Close
-        </button>
+        <button type="button" class="secondary close" autofocus @click="close">Close</button>
       </header>
       <div ref="content" class="modal-content" tabindex="0">
-        <slot />
+        <slot :close="close" />
       </div>
     </dialog>
   </Teleport>

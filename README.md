@@ -14,6 +14,8 @@ Activity files you add stay there.
 - **Connects to Strava** on deployments where it is configured. Pick a date range and
   activities to replay. Wornways can restore your connection and downloaded tracks
   after a reload for up to two hours.
+- **Connects to Garmin Connect** on a personal installation. Use your own Personal API
+  key to browse a period and replay selected activities in a temporary tab session.
 - **Lets you choose what to show:** a period (today, yesterday, this month, a custom
   range…), sports, activities that start or end near a place, and any activity ticked or
   unticked by hand.
@@ -43,7 +45,8 @@ Requires Node 26 (see `.nvmrc`).
 
 ```sh
 npm install
-npm run dev:web      # the web app on http://localhost:5173
+npm run dev:web      # local preview with Garmin and optional Strava on http://127.0.0.1:8788
+npm run dev:web:vite # file-only development with hot reload on http://localhost:5173
 ```
 
 The web app needs a browser that can encode video: a current Chrome or Edge, Safari 16.4
@@ -159,12 +162,11 @@ the file workflow. For local OAuth testing, use Wrangler Pages dev.
    for the first live test and include the on-device MP4 export and share flow when
    submitting the integration for wider access.
 
-For local testing, run `npx wrangler dev --config cloudflare/strava-events/wrangler.jsonc`
-in one terminal. Build the web app and run
-`npx wrangler pages dev apps/web/dist --port 8788 --do STRAVA_EVENTS=StravaEvents@wornways-strava-events`
-in another. Put the four Strava settings in a local `.dev.vars` file in the repo root
-and set the origin to `http://localhost:8788`. The local relay can accept a simulated
-webhook. Strava itself needs a public HTTPS callback to deliver real events.
+For local testing, put `STRAVA_CLIENT_ID`, `STRAVA_CLIENT_SECRET`, and
+`STRAVA_WEBHOOK_TOKEN` in `.dev.vars` in the repo root. Run `npm run dev:web` to build
+the app and start both the Pages preview and the Strava relay. The command sets the
+local origin to `http://127.0.0.1:8788`. Strava needs a public HTTPS webhook URL to
+deliver real events.
 
 Activity list and stream requests go directly from the browser to Strava. An
 encrypted cookie keeps the sign-in for up to two hours. The browser temporarily
@@ -174,3 +176,19 @@ Ending the session clears the cache. Expired entries are removed on the next
 visit if the browser was closed. The current tab can also restore its filters,
 selection, and video settings. Previews and the in-app MP4 stay in memory. The
 Pages Function and event relay use no server-side activity or session storage.
+
+### Enabling Garmin Connect for personal use
+
+Enable this only on a Wornways installation you operate for your own use. The Garmin
+Connect Personal API key gives access to your own account. Generate it in
+[Garmin Connect settings](https://connect.garmin.com/app/settings/personalApiToken) and
+enter it on the Wornways Source screen.
+
+Set `GARMIN_PERSONAL_ENABLED=1` in your Cloudflare Pages environment and use a Workers
+compatibility date of `2024-11-11` or later. `npm run dev:web` enables Garmin in the
+local preview.
+
+The Pages Function relays the key exchange and activity requests to Garmin. The key is
+discarded after exchange. Garmin activity lists, downloaded tracks, and the access token
+stay in the tab’s worker memory. The connection ends on disconnect, reload, or expiry,
+within two hours. Delete the key in Garmin Connect settings to revoke it there.

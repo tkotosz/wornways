@@ -1,5 +1,6 @@
 export { STRIDE, pointCount, type ParsedActivity, type Track } from './track/types.ts';
 export { formatFromFilename, parseActivity, type ActivityFormat } from './import/parse.ts';
+export { garminSport } from './import/garmin-list.ts';
 export { parseActivitiesIndex, parseCsv, sportSlug, type IndexEntry } from './import/index-csv.ts';
 export {
   cleanTrack,

@@ -1,5 +1,4 @@
 import {
-  createTileLoader,
   distanceM,
   frequentPlacesAt,
   nearPlacesText,
@@ -16,6 +15,7 @@ import {
 import type { ActivitySummary, MatchReport } from '../messages.ts';
 import { clearStravaAccess, type StravaGrant } from '../strava-auth.ts';
 import { StravaCache } from './strava-cache.ts';
+import { sessionTileLoader } from './tile-cache.ts';
 
 const API = 'https://www.strava.com/api/v3';
 const PAGE_SIZE = 100;
@@ -122,33 +122,13 @@ export class StravaSession {
   private range = new AbortController();
   private activities = new Map<string, StravaActivity>();
   private tracks = new Map<string, Promise<Track | null>>();
-  private tiles = new Map<string, Uint8Array>();
   private limited = false;
   private preparing = false;
   private prefetching = false;
   private ahead: string[] = [];
   private readonly browserCache: StravaCache<StravaActivity>;
 
-  readonly loadTiles = createTileLoader({
-    fetchTile: (url, headers, timeout) =>
-      fetch(url, {
-        headers,
-        cache: 'no-store',
-        signal: AbortSignal.any([this.signal, AbortSignal.timeout(timeout)]),
-      }),
-    cache: {
-      read: async (key) => this.tiles.get(key),
-      write: async (key, data) => {
-        if (!this.signal.aborted) this.tiles.set(key, data);
-      },
-      keepOnly: async (versions) => {
-        for (const key of this.tiles.keys()) {
-          if (!versions.some((version) => key === version || key.startsWith(version + '/')))
-            this.tiles.delete(key);
-        }
-      },
-    },
-  });
+  readonly loadTiles = sessionTileLoader(this.signal);
 
   constructor(private readonly grant: StravaGrant) {
     this.browserCache = new StravaCache(
@@ -166,7 +146,6 @@ export class StravaSession {
     this.lifetime.abort();
     this.activities.clear();
     this.tracks.clear();
-    this.tiles.clear();
     this.ahead = [];
     return this.browserCache.clear();
   }
