@@ -76,6 +76,8 @@ export async function loadTracks(paths: string[], settings: RenderSettings): Pro
       ? `${isoDay(settings.from ?? matched[0]?.startTime ?? 0)} to ${settings.to !== null ? isoDay(settings.to - 1) : '...'}`
       : null,
     settings.activities !== null ? `id ${settings.activities.join(', ')}` : null,
+    settings.minDistanceKm !== null ? `at least ${settings.minDistanceKm} km` : null,
+    settings.maxDistanceKm !== null ? `at most ${settings.maxDistanceKm} km` : null,
   ].filter(Boolean);
   console.log(`Selected   ${matched.length} activities with GPS (${notes.join('; ')})`);
   if (selection.problem === 'nothing-matches') fail(PROBLEMS['nothing-matches']);

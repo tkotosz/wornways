@@ -14,9 +14,8 @@ import type { PlanReport, Progress } from '../messages.ts';
 const props = defineProps<{
   engine: EngineClient;
   settings: SettingsInput;
-  /** How many activities the settings choose, and their distance. */
-  activities: number;
-  meters: number;
+  plan: PlanReport | null;
+  planError: string;
 }>();
 const emit = defineEmits<{ back: [] }>();
 const result = defineModel<MadeVideo | null>('video', { required: true });
@@ -30,33 +29,13 @@ const parsed = computed(() => {
 });
 const settingsKey = computed(() => JSON.stringify(props.settings));
 const trimRadius = computed(() => parsed.value?.trimRadius ?? 0);
-const trimmedPlan = ref<PlanReport | null>(null);
-const trimError = ref('');
-
-watch(
-  settingsKey,
-  async (key, _, onCleanup) => {
-    trimmedPlan.value = null;
-    trimError.value = '';
-    if (!trimRadius.value) return;
-    let current = true;
-    onCleanup(() => (current = false));
-    try {
-      const plan = await props.engine.plan(props.settings);
-      if (current && key === settingsKey.value) trimmedPlan.value = plan;
-    } catch (caught) {
-      if (current && key === settingsKey.value)
-        trimError.value = caught instanceof Error ? caught.message : String(caught);
-    }
-  },
-  { immediate: true },
-);
 
 /** The settings in words, e.g. "1080 × 1920 · 30 s + end card". */
 const summary = computed(() => {
   const s = parsed.value;
   if (!s) return '';
-  const length = s.endCard ? `${s.duration} s + end card` : `${s.duration} s`;
+  const seconds = Number((props.plan?.seconds ?? s.duration).toFixed(1));
+  const length = s.endCard ? `${seconds} s + end card` : `${seconds} s`;
   return `${s.width} × ${s.height} · ${length}`;
 });
 
@@ -129,7 +108,7 @@ const percent = computed(() => {
 });
 
 async function make(): Promise<void> {
-  if (progress.value || (trimRadius.value && !trimmedPlan.value)) return;
+  if (progress.value || !props.plan || !parsed.value) return;
   const key = settingsKey.value;
   cancelPoster?.();
   result.value = null;
@@ -190,23 +169,23 @@ onBeforeUnmount(() => {
 <template>
   <section>
     <h1>Make your video</h1>
-    <p v-if="!trimRadius" class="muted">
-      A replay of {{ countText(activities, 'activity', 'activities') }} ({{ kmText(meters) }}). It
-      is made on this device.
+    <p v-if="!trimRadius && plan" class="muted">
+      A replay of {{ countText(plan.activities, 'activity', 'activities') }} ({{
+        kmText(plan.meters)
+      }}). It is made on this device.
     </p>
-    <p v-else class="muted" role="status">
+    <p v-if="trimRadius" class="muted" role="status">
       {{ trimRadius }} m trim radius at each start and finish.
-      <template v-if="trimmedPlan">
-        {{ countText(trimmedPlan.activities, 'activity', 'activities') }} in the replay ({{
-          kmText(trimmedPlan.meters)
+      <template v-if="plan">
+        {{ countText(plan.activities, 'activity', 'activities') }} in the replay ({{
+          kmText(plan.meters)
         }}).
-        <template v-if="trimmedPlan.privacyOmitted">
-          {{ countText(trimmedPlan.privacyOmitted, 'activity', 'activities') }} omitted after
-          trimming.
+        <template v-if="plan.privacyOmitted">
+          {{ countText(plan.privacyOmitted, 'activity', 'activities') }} omitted after trimming.
         </template>
       </template>
     </p>
-    <p v-if="trimError" class="error" role="alert">{{ trimError }}</p>
+    <p v-if="planError" class="error" role="alert">{{ planError }}</p>
 
     <div class="stage" :style="stageStyle">
       <video
@@ -229,13 +208,7 @@ onBeforeUnmount(() => {
             <div class="bar"><div :style="{ width: `${percent}%` }" /></div>
             <button type="button" class="secondary" @click="cancel?.()">Cancel</button>
           </div>
-          <button
-            v-else
-            type="button"
-            class="make"
-            :disabled="!!trimRadius && !trimmedPlan"
-            @click="make"
-          >
+          <button v-else type="button" class="make" :disabled="!plan || !parsed" @click="make">
             <span class="play" aria-hidden="true">▶</span>
             Make video
           </button>

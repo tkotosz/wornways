@@ -266,6 +266,7 @@ export function useStrava(
     const currentRows = rows.value;
     if (!ready.value || !currentRows.length) return;
     const current = ++matchRequest;
+    selection.value = { ids: [], problem: null };
     try {
       const result = await engine.match(filters.value, true);
       if (current !== matchRequest || currentRows !== rows.value || !ready.value) return;

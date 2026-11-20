@@ -2,6 +2,8 @@
 // which tells what the chosen settings will actually play.
 
 import {
+  STRIDE,
+  automaticTitle,
   parseSettings,
   planReplay,
   selectTracks,
@@ -21,6 +23,10 @@ export function planVideo(library: Track[], input: SettingsInput): PlanReport {
     activities: selection.tracks.length,
     meters: selection.tracks.reduce((sum, track) => sum + trackLengthM(track), 0),
     privacyOmitted: selection.privacyOmitted,
+    title: automaticTitle(selection.tracks, settings),
+    hasElevation: selection.tracks.some((track) =>
+      track.points.some((value, index) => index % STRIDE === 2 && Number.isFinite(value)),
+    ),
     seconds: plan.timeline.duration,
     groups: plan.groups ?? null,
     realPace: settings.groupPace === 'real',

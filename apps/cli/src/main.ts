@@ -227,7 +227,7 @@ const COMMANDS: Record<string, (argv: string[]) => Promise<void>> = {
 };
 
 const [command, ...rest] = process.argv.slice(2);
-const run = command ? COMMANDS[command] : undefined;
+const run = command && Object.hasOwn(COMMANDS, command) ? COMMANDS[command] : undefined;
 if (run) {
   run(rest).catch((error) => fail(errorMessage(error)));
 } else {

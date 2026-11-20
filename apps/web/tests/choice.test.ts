@@ -66,7 +66,7 @@ describe('choiceSettings', () => {
     expect(placeMissing(off)).toBe(false);
   });
 
-  it('passes exact IDs when activities are unticked or distance is filtered', () => {
+  it('passes exact IDs for manual exclusions and distance bounds for the engine', () => {
     const choice = { ...NO_CHOICE, sports: ['ride', 'run'], excluded: ['b', 'x'] };
 
     expect(choiceSettings(choice, ['a', 'b', 'c'], today)).toMatchObject({
@@ -74,9 +74,9 @@ describe('choiceSettings', () => {
       activity: ['a', 'c'],
     });
     expect(choiceSettings(NO_CHOICE, ['a', 'b'], today).activity).toBeUndefined();
-    expect(choiceSettings({ ...NO_CHOICE, minDistanceKm: '5' }, ['a,b'], today).activity).toEqual([
-      'a,b',
-    ]);
+    expect(
+      choiceSettings({ ...NO_CHOICE, minDistanceKm: '5,5', maxDistanceKm: '10' }, ['a,b'], today),
+    ).toEqual({ sport: undefined, 'min-distance': '5,5', 'max-distance': '10' });
   });
 });
 

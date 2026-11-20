@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // Step 3: how the routes play. A preset is enough; the video's length and Fine-tune
 // playback change its values, which makes it Custom. A summary tells what will play.
-import { SETTINGS, type SettingsInput } from '@wornways/engine';
+import { SETTINGS } from '@wornways/engine';
 import { computed, ref } from 'vue';
 import {
   PLAYBACK_PANELS,
@@ -9,6 +9,7 @@ import {
   PRESET_LINES,
   countOf,
   fineTuned,
+  playbackAdjustments,
   presetChoices,
   presetOf,
   settingHint,
@@ -20,23 +21,17 @@ import {
 import PacingLine from '../components/PacingLine.vue';
 import PresetDrawing from '../components/PresetDrawing.vue';
 import SettingsGroups from '../components/SettingsGroups.vue';
-import type { EngineClient } from '../engine-client.ts';
-import type { ActivitySummary } from '../messages.ts';
+import type { PlanReport } from '../messages.ts';
 
 const props = defineProps<{
-  engine: EngineClient;
-  /** Every setting of the video, the choice of activities included. */
-  settings: SettingsInput;
-  /** The activities the video shows, in date order. */
-  chosen: ActivitySummary[];
-  /** The chosen period, for the automatic title; null where open. */
-  period: { from: number | null; to: number | null };
+  activities: number;
+  plan: PlanReport | null;
 }>();
 const adjustments = defineModel<Adjustments>({ required: true });
 const emit = defineEmits<{ back: []; next: [] }>();
 
 /** One activity gets its own presets; several get the others. */
-const count = computed(() => countOf(props.chosen.length));
+const count = computed(() => countOf(props.activities));
 const preset = computed(() => presetOf(adjustments.value, count.value));
 
 function pick(picked: PresetChoice): void {
@@ -45,7 +40,7 @@ function pick(picked: PresetChoice): void {
 
 /** The adjustments as changed below: a change to a value the preset sets makes it Custom. */
 const tuned = computed({
-  get: () => adjustments.value,
+  get: () => playbackAdjustments(adjustments.value, count.value),
   set: (after: Adjustments) =>
     (adjustments.value = fineTuned(adjustments.value, after, count.value)),
 });
@@ -59,7 +54,7 @@ const duration = computed(() => Number(valueOf(adjustments.value, DURATION, coun
 const durationShown = ref<number | null>(null);
 function setDuration(seconds: number): void {
   durationShown.value = null;
-  tuned.value = { ...adjustments.value, duration: String(seconds) };
+  tuned.value = { ...tuned.value, duration: String(seconds) };
 }
 
 const fineTuneOpen = ref(false);
@@ -123,10 +118,10 @@ const fineTuneOpen = ref(false);
       <div>
         <span class="caption">Your replay</span>
         <strong data-testid="replay-summary">
-          {{ duration }} seconds ·
+          {{ Number((plan?.seconds ?? duration).toFixed(1)) }} seconds ·
           {{ preset === 'custom' ? 'Custom playback' : PRESET_LABELS[preset] }}
         </strong>
-        <PacingLine class="muted small" :engine="engine" :settings="settings" />
+        <PacingLine v-if="plan" class="muted small" :plan="plan" />
       </div>
     </div>
 
@@ -154,8 +149,7 @@ const fineTuneOpen = ref(false);
         v-model="tuned"
         class="fine-tune-panels"
         :groups="PLAYBACK_PANELS"
-        :chosen="chosen"
-        :period="period"
+        :count="count"
       />
     </div>
 

@@ -279,6 +279,42 @@ test('keeps the distance slider scale steady until other filters change', async 
   await expect(maximum).toHaveValue('9,2');
 });
 
+test('accepts month and year bounds and validates custom frame sizes', async ({
+  page,
+  context,
+}) => {
+  await offlineMap(context);
+  await page.goto('/');
+  await addFiles(page, 'morning-ride.fit', 'trail-run.tcx');
+  await page.getByRole('button', { name: 'Continue' }).click();
+  await page.getByRole('button', { name: 'Custom', exact: true }).click();
+  await page.getByRole('button', { name: /^From:/ }).click();
+  const from = page.getByRole('textbox', { name: 'From date' });
+  await from.fill('2026-04-31');
+  await from.press('Enter');
+  await expect(page.getByRole('alert')).toContainText('Enter a valid date');
+  await from.fill('2026-05');
+  await from.press('Enter');
+  await expect(page.getByRole('button', { name: /^From:/ })).toHaveText('May 2026');
+  await page.getByRole('button', { name: /^To:/ }).click();
+  const to = page.getByRole('textbox', { name: 'To date' });
+  await to.fill('2026');
+  await to.press('Enter');
+  await expect(page.getByTestId('chosen-count')).toContainText('1 of 1 activity');
+
+  await page.getByRole('button', { name: 'Appearance', exact: true }).click();
+  await page.getByRole('button', { name: 'Custom size' }).click();
+  const size = page.getByRole('textbox', { name: 'Frame size in pixels' });
+  await size.fill('641x480');
+  await size.press('Enter');
+  await expect(page.getByRole('alert')).toContainText('needs even numbers');
+  await size.fill('640x480');
+  await size.press('Enter');
+  await expect(page.getByTestId('preview')).toContainText('640 × 480 · 30 fps');
+  await page.getByRole('button', { name: 'Continue' }).click();
+  await expect(page.getByTestId('video-summary')).toHaveText('640 × 480 · 15 s + end card');
+});
+
 test('makes a video of activities within the chosen distance range', async ({ page, context }) => {
   const mapRequests = await offlineMap(context);
   await page.goto('/');
@@ -588,6 +624,9 @@ test('sets up the video and its text, and keeps both for the next visit', async 
   ).toBeVisible();
   await page.getByTestId('group-title').getByRole('button', { name: 'Bottom middle' }).click();
   await expect(page.getByTestId('group-metrics')).toContainText('Show metrics');
+  await expect(page.getByTestId('group-metrics').getByRole('button', { name: 'Date' })).toHaveCount(
+    0,
+  );
   await slider('Size').first().fill('150');
   await slider('Size').first().dispatchEvent('change');
   // The end card is on unless switched off; off, the video is the replay alone.

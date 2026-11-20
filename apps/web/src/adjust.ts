@@ -66,6 +66,12 @@ export const PRESET_LINES: Record<PresetChoice, string> = {
 const presetValues = (preset: PresetChoice): Record<string, string> =>
   preset === 'custom' ? {} : PRESETS[preset].settings;
 
+/** The settings shown under Fine-tune, with the current preset's values applied. */
+export const playbackAdjustments = (
+  adjustments: Adjustments,
+  count: ActivityCount,
+): Adjustments => ({ ...adjustments, ...presetValues(presetOf(adjustments, count)) });
+
 /**
  * The adjustments with another preset picked. Under a preset its own settings come from
  * it; Custom starts from the values the video has now.
@@ -82,7 +88,7 @@ export function withPreset(
 }
 
 /**
- * The adjustments after a change under Fine-tune. Changing a setting the preset sets turns
+ * The adjustments after editing the effective values under Fine-tune. Changing a setting the preset sets turns
  * the preset into Custom, starting from its values; any other change keeps the preset.
  */
 export function fineTuned(
@@ -91,18 +97,20 @@ export function fineTuned(
   count: ActivityCount,
 ): Adjustments {
   const values = presetValues(presetOf(before, count));
-  const names = new Set([...Object.keys(before), ...Object.keys(after)]);
-  const changed = [...names].filter((name) => after[name] !== before[name]);
-  if (!changed.some((name) => name in values)) return after;
-  // The preset's values, then the changes; a change back to the default leaves no value.
-  const tuned = { ...before, ...values, [presetKey(count)]: 'custom' } as Record<
-    string,
-    string | boolean | undefined
-  >;
+  const effective = playbackAdjustments(before, count);
+  const names = new Set([...Object.keys(effective), ...Object.keys(after)]);
+  const changed = [...names].filter((name) => after[name] !== effective[name]);
+  const tuned: Record<string, string | boolean | undefined> = changed.some((name) =>
+    Object.hasOwn(values, name),
+  )
+    ? { ...effective, [presetKey(count)]: 'custom' }
+    : { ...before };
   for (const name of changed) tuned[name] = after[name];
   return Object.fromEntries(
-    Object.entries(tuned).filter(([, value]) => value !== undefined),
-  ) as Adjustments;
+    Object.entries(tuned).filter(
+      (entry): entry is [string, string | boolean] => entry[1] !== undefined,
+    ),
+  );
 }
 
 /** The panels of the Appearance step, after its Frame panel. */
@@ -201,13 +209,6 @@ export const settingHint = (setting: string, count: ActivityCount) =>
   (count === 'one' ? HINTS[`${setting}-one`] : undefined) ?? HINTS[setting] ?? '';
 
 export const sliderStep = (setting: string) => STEPS[setting] ?? 1;
-
-/**
- * Whether the adjustments make a race: every activity in one group at real pace. The
- * video then shows a race clock instead of dates.
- */
-export const isRace = (adjustments: Adjustments) =>
-  adjustments['group'] === 'all' && adjustments['group-pace'] === 'real';
 
 /** A panel of settings on the Video and Text steps. */
 export type Panel = 'timing' | 'camera' | 'privacy' | 'map' | 'title' | 'metrics' | 'brand';

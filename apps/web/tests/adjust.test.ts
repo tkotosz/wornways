@@ -3,7 +3,7 @@ import { SETTINGS } from '@wornways/engine';
 import {
   adjustSettings,
   fineTuned,
-  isRace,
+  playbackAdjustments,
   offered,
   presetChoices,
   presetOf,
@@ -89,12 +89,6 @@ describe('the settings offered', () => {
       camera: 'fixed',
     });
   });
-
-  it('calls all activities in one group at real pace a race', () => {
-    expect(isRace({ group: 'all', 'group-pace': 'real' })).toBe(true);
-    expect(isRace({ group: 'all' })).toBe(false);
-    expect(isRace({ group: 'day', 'group-pace': 'real' })).toBe(false);
-  });
 });
 
 describe('presets', () => {
@@ -153,17 +147,23 @@ describe('presets', () => {
 
   it('turns Custom when Fine-tune changes a value the preset sets, and only then', () => {
     const recap = { preset: 'recap', duration: '20' };
+    const effective = playbackAdjustments(recap, 'several');
 
-    expect(fineTuned(recap, { ...recap, group: 'week' }, 'several')).toEqual({
+    expect(fineTuned(recap, { ...effective, group: 'week' }, 'several')).toEqual({
       preset: 'custom',
       group: 'week',
       share: 'even',
       'group-pace': 'fit',
       duration: '30',
     });
-    expect(fineTuned(recap, { ...recap, camera: 'fixed' }, 'several')).toEqual({
+    expect(fineTuned(recap, { ...effective, camera: 'fixed' }, 'several')).toEqual({
       ...recap,
       camera: 'fixed',
+    });
+    expect(fineTuned(recap, effective, 'several')).toEqual(recap);
+    expect(fineTuned(recap, { ...effective, duration: '20' }, 'several')).toMatchObject({
+      preset: 'custom',
+      duration: '20',
     });
   });
 

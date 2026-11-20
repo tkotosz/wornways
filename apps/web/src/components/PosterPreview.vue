@@ -6,7 +6,7 @@ import { parseSettings, type SettingsInput } from '@wornways/engine';
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { Canceled, type EngineClient } from '../engine-client.ts';
 
-const props = defineProps<{ engine: EngineClient; settings: SettingsInput }>();
+const props = defineProps<{ engine: EngineClient; settings: SettingsInput; seconds?: number }>();
 
 /** Waits this long after a change, so dragging a slider draws once, not at every step. */
 const PAUSE_MS = 400;
@@ -35,8 +35,10 @@ const SHAPES: Record<string, string> = {
 /** "Story 9:16" for a named shape, else the size. */
 const shape = computed(() => {
   const { width, height } = frame.value;
-  const ratio = width === height ? '1:1' : width < height ? '9:16' : '16:9';
-  return SHAPES[ratio] ?? `${width} × ${height}`;
+  if (width === height) return SHAPES['1:1'];
+  if (width * 16 === height * 9) return SHAPES['9:16'];
+  if (width * 9 === height * 16) return SHAPES['16:9'];
+  return `${width} × ${height}`;
 });
 
 async function draw(): Promise<void> {
@@ -94,7 +96,8 @@ onBeforeUnmount(() => {
       <span v-else-if="error" class="status error">{{ error }}</span>
     </div>
     <p class="caption muted">
-      {{ frame.width }} × {{ frame.height }} · {{ frame.fps }} fps · {{ frame.duration }} s
+      {{ frame.width }} × {{ frame.height }} · {{ frame.fps }} fps ·
+      {{ Number((seconds ?? frame.duration).toFixed(1)) }} s
     </p>
   </div>
 </template>

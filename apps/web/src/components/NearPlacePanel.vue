@@ -2,7 +2,7 @@
 // One place filter's panel ("starts near" or "ends near"): the place in one field, set by
 // typing, the current location or the map, and the slider for how near counts.
 import { SETTINGS, type FrequentPlace, type SettingsInput, type TrackEnd } from '@wornways/engine';
-import { defineAsyncComponent, onMounted, ref, watch } from 'vue';
+import { defineAsyncComponent, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import type { NearChoice } from '../choice.ts';
 import type { EngineClient } from '../engine-client.ts';
 import { distanceText } from '../format.ts';
@@ -37,6 +37,7 @@ function shown(place: string): string {
 const placeText = ref(shown(near.value.place));
 const placeError = ref('');
 const locating = ref(false);
+let locationRequest = 0;
 const places = ref<FrequentPlace[]>([]);
 /** The radius while the slider is dragged; the choice changes when it is let go. */
 const radiusShown = ref(near.value.radius);
@@ -54,6 +55,8 @@ function readPlace(text: string): string {
 }
 
 function setPlaceText(text: string): void {
+  locationRequest++;
+  locating.value = false;
   placeText.value = text;
   const place = readPlace(text);
   placeError.value =
@@ -73,13 +76,16 @@ function useCurrentLocation(asked: boolean): void {
     return;
   }
   locating.value = true;
+  const request = ++locationRequest;
   placeError.value = '';
   navigator.geolocation.getCurrentPosition(
     (here) => {
+      if (request !== locationRequest) return;
       locating.value = false;
       setPlace(here.coords.latitude, here.coords.longitude);
     },
     (failure) => {
+      if (request !== locationRequest) return;
       locating.value = false;
       if (!asked) return;
       placeError.value =
@@ -95,9 +101,11 @@ function useCurrentLocation(asked: boolean): void {
 // refused it before.
 onMounted(async () => {
   if (near.value.place || !navigator.geolocation) return;
+  const request = locationRequest;
   const permission = await navigator.permissions?.query({ name: 'geolocation' }).catch(() => null);
-  if (permission?.state !== 'denied') useCurrentLocation(false);
+  if (request === locationRequest && permission?.state !== 'denied') useCurrentLocation(false);
 });
+onBeforeUnmount(() => locationRequest++);
 
 // The places suggested come from the activities the period and sports choose, so they
 // follow those filters. Only the latest request's answer is kept.

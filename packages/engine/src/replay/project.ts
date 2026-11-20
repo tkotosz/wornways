@@ -41,11 +41,13 @@ export function projectTrack(
     const o = i * STRIDE;
     if (i > 0) metres += distanceM(p[o - STRIDE + 1], p[o - STRIDE], p[o + 1], p[o]);
     const ele = p[o + 2];
-    if (Number.isNaN(level)) level = ele;
-    else if (ele - level >= CLIMB_STEP_M) {
-      climbed += ele - level;
-      level = ele;
-    } else if (level - ele >= CLIMB_STEP_M) level = ele;
+    if (Number.isFinite(ele)) {
+      if (Number.isNaN(level)) level = ele;
+      else if (ele - level >= CLIMB_STEP_M) {
+        climbed += ele - level;
+        level = ele;
+      } else if (level - ele >= CLIMB_STEP_M) level = ele;
+    }
     const x = mercatorX(p[o]) * view.scale + view.offX;
     const y = mercatorY(p[o + 1]) * view.scale + view.offY;
     const k = xy.length;

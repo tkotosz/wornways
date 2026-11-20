@@ -102,6 +102,13 @@ describe('importFiles', () => {
     expect(result.duplicates).toBe(1);
   });
 
+  it('imports a valid copy when the first file with its ID is unreadable', async () => {
+    const copy = { ...fixture('broken.gpx'), name: 'backup/morning-ride.gpx' };
+    const result = await importFiles([copy, fixture('morning-ride.gpx')]);
+    expect(result.activities.map(({ id }) => id)).toEqual(['morning-ride']);
+    expect(result.unreadable).toHaveLength(1);
+  });
+
   it('leaves out an activity the caller knows already', async () => {
     const result = await importFiles([fixture('morning-ride.gpx')], { isKnown: () => true });
 
@@ -154,6 +161,15 @@ describe('importFiles', () => {
       expect(result.listedSkipped).toEqual([
         { id: 'garmin-9001', name: 'Lakeside loop', sport: 'ride' },
       ]);
+    });
+
+    it('keeps an activity whose file name already equals the Garmin ID', async () => {
+      const ride = { ...fixture('morning-ride.gpx'), name: 'garmin-9001.gpx' };
+      const result = await importFiles([ride, fixture('garmin-export.zip')]);
+      expect(result.activities.map(({ id, name }) => [id, name])).toEqual([
+        ['garmin-9001', 'Lakeside loop'],
+      ]);
+      expect(result.duplicates).toBe(1);
     });
   });
 

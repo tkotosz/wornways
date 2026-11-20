@@ -1,20 +1,13 @@
 <script setup lang="ts">
 // The controls of a few setting groups, built from the engine's settings table: buttons
 // for a choice, a slider for a number, a switch for on/off, and a few made to measure.
-import {
-  METRICS,
-  automaticTitle,
-  defaultMetrics,
-  type Metric,
-  type SettingDefinition,
-} from '@wornways/engine';
+import { METRICS, defaultMetrics, type Metric, type SettingDefinition } from '@wornways/engine';
 import { computed } from 'vue';
 import {
   SHOW_TITLE,
   choiceLabel,
-  countOf,
-  isRace,
   offered,
+  type ActivityCount,
   type Panel,
   settingHint,
   settingLabel,
@@ -22,20 +15,15 @@ import {
   valueOf,
   type Adjustments,
 } from '../adjust.ts';
-import type { ActivitySummary } from '../messages.ts';
+import type { PlanReport } from '../messages.ts';
 
 const props = defineProps<{
   /** The groups to show, in order. */
   groups: Panel[];
-  /** The activities the video shows, in date order. */
-  chosen: ActivitySummary[];
-  /** The chosen period, for the automatic title; null where open. */
-  period: { from: number | null; to: number | null };
+  count: ActivityCount;
+  plan?: PlanReport | null;
 }>();
 const adjustments = defineModel<Adjustments>({ required: true });
-
-const single = computed(() => props.chosen.length === 1);
-const count = computed(() => countOf(props.chosen.length));
 
 const GROUP_TITLES: Record<Panel, string> = {
   timing: 'Timing',
@@ -51,7 +39,7 @@ const groups = computed(() =>
   props.groups.map((group) => ({ group, main: offered(group) })).filter((g) => g.main.length > 0),
 );
 
-const value = (setting: SettingDefinition) => valueOf(adjustments.value, setting, count.value);
+const value = (setting: SettingDefinition) => valueOf(adjustments.value, setting, props.count);
 
 /** Sets a setting; undefined puts it back to its default. */
 function set(name: string, newValue: string | boolean | undefined): void {
@@ -70,9 +58,7 @@ function sliderValue(setting: SettingDefinition): string {
 }
 
 // Title: the automatic one unless the person wrote another; empty for none.
-const autoTitle = computed(() =>
-  props.chosen.length ? automaticTitle(props.chosen, props.period) : '',
-);
+const autoTitle = computed(() => props.plan?.title ?? '');
 const titleSet = computed(() => typeof adjustments.value['title'] === 'string');
 
 // Metrics: the values this video can show, and the ones picked, in order.
@@ -84,18 +70,23 @@ const shown = (group: Panel, name: string) =>
   (group !== 'title' || showsTitle.value) &&
   (group !== 'metrics' || name === 'metrics' || showsMetrics.value);
 /** What the metrics have to describe: one activity, all at once, or activities in turn. */
-const kind = computed(() =>
-  single.value ? 'single' : isRace(adjustments.value) ? 'race' : 'groups',
-);
+const kind = computed(() => {
+  if (!props.plan) return null;
+  if (props.plan.activities === 1) return 'single';
+  return props.plan.groups?.race ? 'race' : 'groups';
+});
 const offeredMetrics = computed(() =>
   METRICS.filter((m) => {
-    if (m === 'pace') return single.value;
-    if (m === 'count') return !single.value;
+    if (!kind.value) return false;
+    if (m === 'pace') return kind.value === 'single';
+    if (m === 'count') return kind.value !== 'single';
     if (m === 'date') return kind.value !== 'race';
+    if (m === 'elevation') return props.plan?.hasElevation;
     return true;
   }),
 );
 const pickedMetrics = computed<Metric[]>(() => {
+  if (!kind.value) return [];
   const set = adjustments.value['metrics-fields'];
   const picked =
     typeof set === 'string' ? (set.split(',') as Metric[]) : defaultMetrics(kind.value);
@@ -199,7 +190,12 @@ function toggleMetric(metric: Metric): void {
                   :value="titleSet ? adjustments['title'] : autoTitle"
                   @input="set('title', ($event.target as HTMLInputElement).value)"
                 />
-                <button v-if="titleSet" type="button" class="link" @click="set('title', undefined)">
+                <button
+                  v-if="titleSet && plan"
+                  type="button"
+                  class="link"
+                  @click="set('title', undefined)"
+                >
                   Use "{{ autoTitle }}"
                 </button>
               </div>
@@ -218,6 +214,14 @@ function toggleMetric(metric: Metric): void {
                     pickedMetrics.indexOf(metric) + 1
                   }}</span>
                   {{ metric.charAt(0).toUpperCase() + metric.slice(1) }}
+                </button>
+                <button
+                  v-if="plan && adjustments['metrics-fields'] !== undefined"
+                  type="button"
+                  class="link"
+                  @click="set('metrics-fields', undefined)"
+                >
+                  Use automatic metrics
                 </button>
               </div>
 

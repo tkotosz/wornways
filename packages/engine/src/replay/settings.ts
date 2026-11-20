@@ -21,6 +21,9 @@ export type RenderSettings = {
   activities: string[] | null;
   /** Sport slugs to include; null: every sport. */
   sports: string[] | null;
+  /** Inclusive bounds on the activity's distance before cleaning, in kilometres. */
+  minDistanceKm: number | null;
+  maxDistanceKm: number | null;
   /** Keep only activities that start within `radius` meters of the place; null: off. */
   startNear: NearPlace | null;
   /** Keep only activities that end within `radius` meters of the place; null: off. */
@@ -168,6 +171,24 @@ export const SETTINGS: readonly SettingDefinition[] = [
     default: null,
     automatic: 'every sport',
     help: 'Sports to include, e.g. "ride" or "run,hike".',
+  },
+  {
+    name: 'min-distance',
+    label: 'Minimum distance',
+    group: 'activities',
+    kind: { type: 'text', valueName: 'km' },
+    default: null,
+    automatic: 'no minimum',
+    help: 'Keep activities at least this many kilometres long before cleaning.',
+  },
+  {
+    name: 'max-distance',
+    label: 'Maximum distance',
+    group: 'activities',
+    kind: { type: 'text', valueName: 'km' },
+    default: null,
+    automatic: 'no maximum',
+    help: 'Keep activities at most this many kilometres long before cleaning.',
   },
   {
     name: 'start-near',
@@ -435,10 +456,18 @@ function parseDay(name: string, value: string, end: boolean): number {
   const m = /^(\d{4})(?:-(\d{2})(?:-(\d{2}))?)?$/.exec(value);
   if (!m) throw new SettingsError(name, `expects YYYY-MM-DD, YYYY-MM or YYYY, got "${value}"`);
   const year = Number(m[1]);
-  if (m[2] === undefined) return new Date(year + (end ? 1 : 0), 0, 1).getTime();
-  const month = Number(m[2]) - 1;
-  if (m[3] === undefined) return new Date(year, month + (end ? 1 : 0), 1).getTime();
-  return new Date(year, month, Number(m[3]) + (end ? 1 : 0)).getTime();
+  const month = Number(m[2] ?? 1) - 1;
+  const day = Number(m[3] ?? 1);
+  const date = new Date(0);
+  date.setUTCFullYear(year, month, day);
+  if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month || date.getUTCDate() !== day)
+    throw new SettingsError(name, `expects a valid calendar date, got "${value}"`);
+  if (end && m[3] !== undefined) date.setUTCDate(day + 1);
+  else if (end && m[2] !== undefined) date.setUTCMonth(month + 1);
+  else if (end) date.setUTCFullYear(year + 1);
+  const local = new Date(0);
+  local.setFullYear(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate());
+  return local.setHours(0, 0, 0, 0);
 }
 
 function parsePosition(name: string, value: string): LatLon {
@@ -449,21 +478,28 @@ function parsePosition(name: string, value: string): LatLon {
   return position;
 }
 
-function parseSize(name: string, value: string): [width: number, height: number] {
-  const preset = SIZE_PRESETS[value];
-  if (preset) return preset;
+export function parseFrameSize(value: string): [width: number, height: number] {
+  if (Object.hasOwn(SIZE_PRESETS, value)) return SIZE_PRESETS[value];
   const m = /^(\d+)x(\d+)$/.exec(value);
   if (!m) {
     const presets = Object.keys(SIZE_PRESETS).join(', ');
-    throw new SettingsError(name, `expects WxH or one of ${presets}, got "${value}"`);
+    throw new SettingsError('size', `expects WxH or one of ${presets}, got "${value}"`);
   }
   const [width, height] = [Number(m[1]), Number(m[2])];
-  if (width === 0 || height === 0 || width % 2 || height % 2)
+  if (![width, height].every((n) => Number.isSafeInteger(n) && n > 0 && n % 2 === 0))
     throw new SettingsError(
-      name,
+      'size',
       `needs even numbers (a video format requirement), got "${value}"`,
     );
   return [width, height];
+}
+
+/** A nonnegative decimal distance, accepting either decimal separator. */
+export function parseDistanceKm(text: string): number {
+  const value = text.trim();
+  if (!/^(?:\d+(?:[.,]\d*)?|[.,]\d+)$/.test(value)) return NaN;
+  const km = Number(value.replace(',', '.'));
+  return Number.isFinite(km) ? km : NaN;
 }
 
 /**
@@ -545,6 +581,19 @@ export function parseSettings(input: SettingsInput): RenderSettings {
   if (sports !== null && sports.length === 0)
     throw new SettingsError('sport', `expects sports separated by commas, got "${sportText}"`);
 
+  const distance = (name: string): number | null => {
+    const value = text(name);
+    if (value === null) return null;
+    const km = parseDistanceKm(value);
+    if (Number.isNaN(km))
+      throw new SettingsError(name, `expects a distance of 0 km or more, got "${value}"`);
+    return km;
+  };
+  const minDistanceKm = distance('min-distance');
+  const maxDistanceKm = distance('max-distance');
+  if (minDistanceKm !== null && maxDistanceKm !== null && minDistanceKm > maxDistanceKm)
+    throw new SettingsError('max-distance', 'is below the minimum distance');
+
   const fieldsText = text('metrics-fields');
   const metricsFields =
     fieldsText === null ? null : fieldsText.split(',').map((field) => field.trim().toLowerCase());
@@ -563,13 +612,15 @@ export function parseSettings(input: SettingsInput): RenderSettings {
     if (input[radius] !== undefined) throw new SettingsError(radius, `only applies with ${place}`);
     return null;
   };
-  const [width, height] = parseSize('size', text('size') ?? '');
+  const [width, height] = parseFrameSize(text('size') ?? '');
 
   return {
     from,
     to,
     activities,
     sports,
+    minDistanceKm,
+    maxDistanceKm,
     startNear: near('start-near', 'start-radius'),
     endNear: near('end-near', 'end-radius'),
     duration: number('duration'),

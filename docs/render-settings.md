@@ -45,6 +45,8 @@ video's length or a value under Fine-tune playback makes the preset Custom.
 | Period end   | `--to`           | `YYYY-MM-DD`, `YYYY-MM` or `YYYY` | last activity                          |
 | Activities   | `--activity`     | activity ids, separated by commas | every activity the other settings keep |
 | Sports       | `--sport`        | comma-separated list              | every sport                            |
+| Distance min | `--min-distance` | nonnegative kilometres, inclusive | open                                   |
+| Distance max | `--max-distance` | nonnegative kilometres, inclusive | open                                   |
 | Starts near  | `--start-near`   | `lat,lon`                         | off                                    |
 | Start radius | `--start-radius` | 100–20000 m, with `--start-near`  | 1000 m                                 |
 | Ends near    | `--end-near`     | `lat,lon`                         | off                                    |
@@ -57,10 +59,14 @@ refused.
 The activity ids narrow what the other settings choose; the web app sets them when
 activities are unticked by hand in its list.
 
+Distance bounds apply before GPS cleaning and privacy trimming. For example,
+`--min-distance 5 --max-distance 10` keeps activities from 5 through 10 km. The web app
+offers the same bounds in Activities and uses the reported distance for a Strava activity.
+
 A period names whole days, months or years: `--from 2026-10 --to 2026-10` is October 2026.
 The web UI offers period shortcuts (today, yesterday, this month, last month, this year, last year,
 custom)
-that fill in the start and the end.
+that fill in the start and the end. In Custom, enter a day, month or year in either field.
 
 ### Timing
 
@@ -99,6 +105,9 @@ Trimmed exports default to the filename `replay.mp4`.
 | Street map        | `--map` / `--no-map` | on/off                                                                 | on      |
 | Frame size        | `--size`             | `WxH`, presets: story 1080x1920, square 1080x1080, landscape 1920x1080 | story   |
 | Frames per second | `--fps`              | 24, 30, 60                                                             | 30      |
+
+In Appearance, choose a frame preset or enter a custom size such as `640x480`. Both
+dimensions must be positive even numbers. Available encoder sizes depend on the device.
 
 The follow camera tracks the moving end of the route and pulls back to show the whole
 replay at the end. Each activity gets a zoom suited to its pace, and the camera widens

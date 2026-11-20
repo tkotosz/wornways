@@ -19,6 +19,8 @@ describe('parseSettings', () => {
       to: null,
       activities: null,
       sports: null,
+      minDistanceKm: null,
+      maxDistanceKm: null,
       startNear: null,
       endNear: null,
       duration: 30,
@@ -60,6 +62,10 @@ describe('parseSettings', () => {
 
     const days = parseSettings({ from: '2026-08-01', to: '2026-08-14' });
     expect(days.to).toBe(new Date(2026, 7, 15).getTime());
+    const leap = parseSettings({ from: '2024-02-29', to: '2024-02-29' });
+    expect(leap.from).toBe(new Date(2024, 1, 29).getTime());
+    expect(leap.to).toBe(new Date(2024, 2, 1).getTime());
+    expect(new Date(parseSettings({ from: '0099' }).from!).getFullYear()).toBe(99);
   });
 
   it('reads sports, places, size presets and switches', () => {
@@ -92,12 +98,21 @@ describe('parseSettings', () => {
     [{ 'group-pace': 'fast' }, 'group-pace: expects fit or real, got "fast"'],
     [{ camera: 'pan' }, 'camera: expects zoom or fixed or follow, got "pan"'],
     [{ from: 'October' }, 'from: expects YYYY-MM-DD, YYYY-MM or YYYY, got "October"'],
+    [{ from: '2026-02-29' }, 'from: expects a valid calendar date, got "2026-02-29"'],
+    [{ to: '2026-13' }, 'to: expects a valid calendar date, got "2026-13"'],
+    [{ to: '2026-04-31' }, 'to: expects a valid calendar date, got "2026-04-31"'],
     [{ from: '2026-10', to: '2026-09' }, 'to: is before the period start'],
+    [{ 'min-distance': '-1' }, 'min-distance: expects a distance of 0 km or more, got "-1"'],
+    [{ 'min-distance': '10', 'max-distance': '5' }, 'max-distance: is below the minimum distance'],
     [{ 'start-near': 'Budapest' }, 'start-near: expects latitude,longitude, got "Budapest"'],
     [{ 'end-radius': '500' }, 'end-radius: only applies with end-near'],
     [
       { size: '1081x1920' },
       'size: needs even numbers (a video format requirement), got "1081x1920"',
+    ],
+    [
+      { size: 'constructor' },
+      'size: expects WxH or one of story, square, landscape, got "constructor"',
     ],
     [{ fps: '25' }, 'fps: expects 24 or 30 or 60, got "25"'],
     [{ speed: '2000' }, 'speed: is not a setting'],
@@ -117,6 +132,17 @@ describe('parseSettings', () => {
 
   it('reads a list of activity ids', () => {
     expect(parseSettings({ activity: '12, 34,12,' }).activities).toEqual(['12', '34']);
+  });
+
+  it('reads open and fractional distance bounds in kilometres', () => {
+    expect(parseSettings({ 'min-distance': '2,5' })).toMatchObject({
+      minDistanceKm: 2.5,
+      maxDistanceKm: null,
+    });
+    expect(parseSettings({ 'max-distance': '0' })).toMatchObject({
+      minDistanceKm: null,
+      maxDistanceKm: 0,
+    });
   });
 
   it('reads the metrics card values in the order given', () => {

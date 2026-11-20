@@ -1,6 +1,6 @@
 // What the person chose in the Choose step, and the settings it stands for.
 
-import { parseSettings, type SettingsInput } from '@wornways/engine';
+import { parseDistanceKm, parseSettings, type SettingsInput } from '@wornways/engine';
 
 export type Period =
   | 'all'
@@ -130,9 +130,7 @@ export const placeMissing = (choice: Choice) =>
 export function distanceBound(text: string, open: number): number {
   const value = text.trim();
   if (!value) return open;
-  if (!/^(?:\d+(?:[.,]\d*)?|[.,]\d+)$/.test(value)) return NaN;
-  const km = Number(value.replace(',', '.'));
-  return Number.isFinite(km) ? km : NaN;
+  return parseDistanceKm(value);
 }
 
 export function distanceRange(choice: Choice): { min: number; max: number } | null {
@@ -164,13 +162,14 @@ export function placeSettings(choice: Choice, today: Date): SettingsInput {
 }
 
 /**
- * The settings of the whole choice. Include the ticked IDs when the engine's filters
- * alone cannot reproduce the list, including when the web app applies a distance bound.
+ * The settings of the whole file choice. Include the ticked IDs when activities were unticked.
  */
 export function choiceSettings(choice: Choice, matched: string[], today: Date): SettingsInput {
   const settings = filterSettings(choice, today);
-  const ticked = matched.filter((id) => !choice.excluded.includes(id));
-  if (ticked.length < matched.length || choice.minDistanceKm.trim() || choice.maxDistanceKm.trim())
-    settings.activity = ticked;
+  const excluded = new Set(choice.excluded);
+  const ticked = matched.filter((id) => !excluded.has(id));
+  if (ticked.length < matched.length) settings.activity = ticked;
+  if (choice.minDistanceKm.trim()) settings['min-distance'] = choice.minDistanceKm;
+  if (choice.maxDistanceKm.trim()) settings['max-distance'] = choice.maxDistanceKm;
   return settings;
 }

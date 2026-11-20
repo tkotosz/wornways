@@ -1,6 +1,7 @@
 <script setup lang="ts">
 // The app's frame: the header, the step bar and the current step. It holds what the steps
 // share: the library, the choice of activities, and which activities that choice matches.
+import { SETTINGS, type SettingsInput } from '@wornways/engine';
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { missingSupport } from './browser-support.ts';
 import {
@@ -16,14 +17,13 @@ import {
   distanceRange,
   filterSettings,
   placeMissing,
-  periodRange,
   type Choice,
 } from './choice.ts';
 import ModalPanel from './components/ModalPanel.vue';
 import type { EngineClient } from './engine-client.ts';
 import { install, installOffer } from './install.ts';
 import type { MadeVideo } from './made-video.ts';
-import type { ActivitySummary, MatchReport } from './messages.ts';
+import type { ActivitySummary, MatchReport, PlanReport } from './messages.ts';
 import ActivitiesStep from './steps/ActivitiesStep.vue';
 import AppearanceStep from './steps/AppearanceStep.vue';
 import ExportStep from './steps/ExportStep.vue';
@@ -130,19 +130,10 @@ const matched = computed<MatchReport>(() => {
   return { ids, problem: ids.length ? match.problem : 'No activities match the distance range.' };
 });
 
-const chosenIds = computed(() =>
-  matched.value.ids.filter((id) => !choice.value.excluded.includes(id)),
-);
-const chosenKm = computed(() => {
-  const ids = new Set(chosenIds.value);
-  return sourceRows.value.reduce((sum, a) => (ids.has(a.id) ? sum + a.distanceM : sum), 0);
+const chosenIds = computed(() => {
+  const excluded = new Set(choice.value.excluded);
+  return matched.value.ids.filter((id) => !excluded.has(id));
 });
-/** The chosen activities in date order. */
-const chosen = computed(() => {
-  const ids = new Set(chosenIds.value);
-  return sourceRows.value.filter((a) => ids.has(a.id)).sort((a, b) => a.startTime - b.startTime);
-});
-const period = computed(() => periodRange(choice.value, new Date()) ?? { from: null, to: null });
 
 // What was set in the Video and Text steps, kept for the next visit.
 const adjustments = computed({
@@ -155,12 +146,41 @@ const adjustments = computed({
 watch(fileAdjustments, saveAdjustments);
 
 /** The settings of the video: the chosen activities and the adjustments. */
-const settings = computed(() => ({
+const settings = computed<SettingsInput>(() => ({
   ...(strava.value
     ? { activity: chosenIds.value }
     : choiceSettings(choice.value, matched.value.ids, new Date())),
   ...adjustSettings(adjustments.value, countOf(chosenIds.value.length)),
 }));
+
+const plan = ref<PlanReport | null>(null);
+const planError = ref('');
+const planningSettings = computed(() => {
+  const input = settings.value;
+  return Object.fromEntries(
+    SETTINGS.filter(
+      (s) =>
+        ['activities', 'timing', 'privacy'].includes(s.group) ||
+        ['camera', 'end-card'].includes(s.name),
+    ).map(({ name }) => [name, input[name]]),
+  );
+});
+watch(
+  [() => stepIndex.value >= 2, () => JSON.stringify(planningSettings.value), strava],
+  async ([show, key], _, onCleanup) => {
+    plan.value = null;
+    planError.value = '';
+    if (!show) return;
+    let current = true;
+    onCleanup(() => (current = false));
+    try {
+      const result = await props.engine.plan(JSON.parse(key));
+      if (current) plan.value = result;
+    } catch (error) {
+      if (current) planError.value = error instanceof Error ? error.message : String(error);
+    }
+  },
+);
 
 // The last video made, in memory only. It stays while what it shows stays the same, so going
 // back and forward shows it again; any change to the settings or the library discards it.
@@ -238,6 +258,7 @@ watch(
   [() => JSON.stringify(fileFilters.value), library],
   async () => {
     const request = ++latest;
+    fileMatches.value = { ids: [], problem: null };
     try {
       const result = await props.engine.match(fileFilters.value);
       if (request === latest) fileMatches.value = result;
@@ -369,10 +390,8 @@ watch(
       <PlaybackStep
         v-else-if="step === 'playback'"
         v-model="adjustments"
-        :engine="engine"
-        :settings="settings"
-        :chosen="chosen"
-        :period="period"
+        :activities="chosenIds.length"
+        :plan="plan"
         @back="step = 'activities'"
         @next="step = 'appearance'"
       />
@@ -381,8 +400,8 @@ watch(
         v-model="adjustments"
         :engine="engine"
         :settings="settings"
-        :chosen="chosen"
-        :period="period"
+        :activities="chosenIds.length"
+        :plan="plan"
         @back="step = 'playback'"
         @next="step = 'export'"
       />
@@ -391,8 +410,8 @@ watch(
         v-model:video="video"
         :engine="engine"
         :settings="settings"
-        :activities="chosenIds.length"
-        :meters="chosenKm"
+        :plan="plan"
+        :plan-error="planError"
         @back="step = 'appearance'"
       />
     </template>
