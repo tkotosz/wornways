@@ -1,4 +1,4 @@
-import { distanceM, metresPerDegree } from './geo.ts';
+import { distanceM, longitudeDelta, metresPerDegree } from './geo.ts';
 import { STRIDE, type Track } from './types.ts';
 
 // Cleaning rules based on third-party MIT-licensed code (see THIRD_PARTY_NOTICES.md).
@@ -15,7 +15,7 @@ const MAX_SPEED: Record<string, number> = {
 const DEFAULT_MAX_SPEED = 25;
 
 export function maxSpeedFor(sport: string): number {
-  return MAX_SPEED[sport] ?? DEFAULT_MAX_SPEED;
+  return Object.hasOwn(MAX_SPEED, sport) ? MAX_SPEED[sport] : DEFAULT_MAX_SPEED;
 }
 
 export type CleanOptions = {
@@ -116,7 +116,7 @@ export function cleanTrack(track: Track, options: CleanOptions = {}): Track | nu
     if (dt <= 0) continue;
     const d = Math.hypot(
       (p[i * STRIDE + 1] - p[j * STRIDE + 1]) * perLat,
-      (p[i * STRIDE] - p[j * STRIDE]) * perLon,
+      longitudeDelta(p[j * STRIDE], p[i * STRIDE]) * perLon,
     );
     if (d > 50 && d / dt > maxSpeed) {
       if (++rejects >= maxRejects) break;

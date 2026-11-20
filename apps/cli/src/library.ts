@@ -12,7 +12,12 @@ import { homedir } from 'node:os';
 import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { setTimeout as delay } from 'node:timers/promises';
-import type { Track } from '@wornways/engine';
+import {
+  importFiles,
+  type ImportProgress,
+  type RandomAccessFile,
+  type Track,
+} from '@wornways/engine';
 
 type StoredActivity = Pick<Track, 'id' | 'name' | 'sport' | 'startTime'>;
 
@@ -93,18 +98,38 @@ export class Library {
   /** Stores the activities, replacing ones with the same id. */
   async put(activities: Track[]): Promise<void> {
     if (activities.length === 0) return;
-    await this.write(async (current) => {
-      await mkdir(path.join(this.folder, 'points'), { recursive: true });
-      for (const activity of activities) {
-        const { points } = activity;
-        await replaceFile(
-          this.pointsFile(activity.id),
-          new Uint8Array(points.buffer, points.byteOffset, points.byteLength),
-        );
-        current.set(activity.id, activity);
+    await this.write((current) => this.store(current, activities));
+  }
+
+  /** Imports files against the same library snapshot used to save their IDs. */
+  async add(files: RandomAccessFile[], onProgress: (progress: ImportProgress) => void) {
+    return this.write(async (current) => {
+      const result = await importFiles(files, { known: current, onProgress });
+      const renamed: Track[] = [];
+      for (const { id, name, sport } of result.listedSkipped) {
+        const known = current.get(id);
+        if (!known) continue;
+        const updated = { ...known, name: name || known.name, sport: sport || known.sport };
+        if (known.name !== updated.name || known.sport !== updated.sport) renamed.push(updated);
       }
-      await this.writeList(current);
+      const changed = [...result.activities, ...renamed];
+      if (changed.length) await this.store(current, changed);
+      this.activities = current;
+      return { ...result, renamed: renamed.length };
     });
+  }
+
+  private async store(current: Map<string, Track>, activities: Track[]): Promise<void> {
+    await mkdir(path.join(this.folder, 'points'), { recursive: true });
+    for (const activity of activities) {
+      const { points } = activity;
+      await replaceFile(
+        this.pointsFile(activity.id),
+        new Uint8Array(points.buffer, points.byteOffset, points.byteLength),
+      );
+      current.set(activity.id, activity);
+    }
+    await this.writeList(current);
   }
 
   async delete(ids: string[]): Promise<void> {
@@ -124,7 +149,7 @@ export class Library {
   }
 
   /** Serialize writers across CLI processes and reread the list once the lock is held. */
-  private async write(operation: (current: Map<string, Track>) => Promise<void>): Promise<void> {
+  private async write<T>(operation: (current: Map<string, Track>) => Promise<T>): Promise<T> {
     await mkdir(this.folder, { recursive: true });
     // SQLite provides a process-owned file lock that is released even if a command is killed.
     // The activity list and points keep their existing format.
@@ -141,7 +166,7 @@ export class Library {
         await delay(50);
       }
     }
-    await operation(await this.read());
+    return await operation(await this.read());
   }
 
   /** Ids may hold any character, so they are encoded for file names. */

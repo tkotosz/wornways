@@ -22,6 +22,15 @@ function decode(data: Uint8Array): string {
   return new TextDecoder('utf-8').decode(data);
 }
 
+function sportOf(type: string): string {
+  const key = type.toLowerCase();
+  return Object.hasOwn(GPX_SPORTS, key) ? GPX_SPORTS[key] : sportSlug(type) || 'unknown';
+}
+
+function validPosition(lat: number, lon: number): boolean {
+  return Math.abs(lat) <= 90 && Math.abs(lon) <= 180;
+}
+
 function inner(block: string, tag: string): string | null {
   const m = new RegExp(`<${tag}(?:\\s[^>]*)?>([^<]*)</${tag}>`).exec(block);
   return m ? m[1].trim() : null;
@@ -59,7 +68,7 @@ export function parseGpx(data: Uint8Array): ParsedActivity | null {
   const text = decode(data);
   if (!/<gpx[\s>]/.test(text)) throw new Error('not a GPX file');
   const type = inner(text, 'type') ?? '';
-  const sport = GPX_SPORTS[type.toLowerCase()] ?? (sportSlug(type) || 'unknown');
+  const sport = sportOf(type);
 
   const rows: number[] = [];
   const re = /<trkpt\b([^>]*)>([\s\S]*?)<\/trkpt>/g;
@@ -71,7 +80,8 @@ export function parseGpx(data: Uint8Array): ParsedActivity | null {
     const ms = Date.parse(time);
     const la = Number(lat[1]);
     const lo = Number(lon[1]);
-    if (!Number.isFinite(ms) || !Number.isFinite(la) || !Number.isFinite(lo)) continue;
+    if (!Number.isFinite(ms) || !lat[1].trim() || !lon[1].trim() || !validPosition(la, lo))
+      continue;
     const ele = inner(m[2], 'ele');
     rows.push(lo, la, ele === null ? NaN : Number(ele), ms);
   }
@@ -84,7 +94,7 @@ export function parseTcx(data: Uint8Array): ParsedActivity | null {
   const text = decode(data);
   if (!/<TrainingCenterDatabase[\s>]/.test(text)) throw new Error('not a TCX file');
   const tcxSport = /<Activity\b[^>]*\bSport\s*=\s*["']([^"']+)["']/.exec(text)?.[1] ?? '';
-  const sport = GPX_SPORTS[tcxSport.toLowerCase()] ?? (sportSlug(tcxSport) || 'unknown');
+  const sport = sportOf(tcxSport);
 
   const rows: number[] = [];
   const re = /<Trackpoint\b[^>]*>([\s\S]*?)<\/Trackpoint>/g;
@@ -96,7 +106,7 @@ export function parseTcx(data: Uint8Array): ParsedActivity | null {
     const ms = Date.parse(time);
     const la = Number(lat);
     const lo = Number(lon);
-    if (!Number.isFinite(ms) || !Number.isFinite(la) || !Number.isFinite(lo)) continue;
+    if (!Number.isFinite(ms) || !validPosition(la, lo)) continue;
     const ele = inner(m[1], 'AltitudeMeters');
     rows.push(lo, la, ele === null ? NaN : Number(ele), ms);
   }

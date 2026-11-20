@@ -17,6 +17,7 @@ import {
   distanceRange,
   filterSettings,
   placeMissing,
+  placeSettings,
   type Choice,
 } from './choice.ts';
 import ModalPanel from './components/ModalPanel.vue';
@@ -148,7 +149,7 @@ watch(fileAdjustments, saveAdjustments);
 /** The settings of the video: the chosen activities and the adjustments. */
 const settings = computed<SettingsInput>(() => ({
   ...(strava.value
-    ? { activity: chosenIds.value }
+    ? { ...placeSettings(choice.value, new Date()), activity: chosenIds.value }
     : choiceSettings(choice.value, matched.value.ids, new Date())),
   ...adjustSettings(adjustments.value, countOf(chosenIds.value.length)),
 }));

@@ -29,9 +29,11 @@ export function tilesForView(view: View, maxZoom = 14, maxTiles = 80): TileId[] 
   let z = Math.min(maxZoom, Math.max(0, Math.ceil(Math.log2(view.scale / 512))));
   for (;;) {
     const n = 2 ** z;
-    const clampIndex = (v: number) => Math.min(n - 1, Math.max(0, Math.floor(v * n)));
-    const x0 = clampIndex(-view.offX / view.scale);
-    const x1 = clampIndex((view.width - view.offX) / view.scale);
+    const clampIndex = (v: number, count = n) =>
+      Math.min(count - 1, Math.max(0, Math.floor(v * n)));
+    const columns = view.wrapLongitude ? 2 * n : n;
+    const x0 = clampIndex(-view.offX / view.scale, columns);
+    const x1 = clampIndex((view.width - view.offX) / view.scale, columns);
     const y0 = clampIndex(-view.offY / view.scale);
     const y1 = clampIndex((view.height - view.offY) / view.scale);
     if ((x1 - x0 + 1) * (y1 - y0 + 1) <= maxTiles || z === 0) {

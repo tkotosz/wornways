@@ -33,7 +33,7 @@ export type TileCache = {
 export type TileLoad = { tiles: Tile[]; downloaded: number };
 
 /** Loads the tiles with the given ids, from the cache where it has them. */
-export type TileLoader = (ids: TileId[]) => Promise<TileLoad>;
+export type TileLoader = (ids: TileId[], signal?: AbortSignal) => Promise<TileLoad>;
 
 export type TileLoaderOptions = {
   cache: TileCache;
@@ -41,7 +41,7 @@ export type TileLoaderOptions = {
   fetchTile?: (
     url: string,
     headers: Record<string, string>,
-    timeoutMs: number,
+    signal: AbortSignal,
   ) => Promise<Response>;
   /** Sent with every request where the platform allows it, naming the app. */
   userAgent?: string;
@@ -55,24 +55,27 @@ export function createTileLoader(options: TileLoaderOptions): TileLoader {
   const headers: Record<string, string> = options.userAgent
     ? { 'User-Agent': options.userAgent }
     : {};
-  const get = (url: string) =>
-    options.fetchTile
-      ? options.fetchTile(url, headers, TIMEOUT_MS)
-      : fetch(url, { headers, signal: AbortSignal.timeout(TIMEOUT_MS) });
+  const get = (url: string, signal: AbortSignal) => {
+    const request = AbortSignal.any([signal, AbortSignal.timeout(TIMEOUT_MS)]);
+    return options.fetchTile
+      ? options.fetchTile(url, headers, request)
+      : fetch(url, { headers, signal: request });
+  };
   // A disabled or full cache still allows the map to be drawn from the network.
   const readCached = (key: string) => cache.read(key).catch(() => undefined);
   const saveCached = (key: string, data: Uint8Array) => cache.write(key, data).catch(() => {});
 
   /** The current tile URL template. Falls back to the last one seen when offline. */
-  async function tileJson(): Promise<TileJson> {
+  async function tileJson(signal: AbortSignal): Promise<TileJson> {
     try {
-      const res = await get(TILEJSON_URL);
+      const res = await get(TILEJSON_URL, signal);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const json = (await res.json()) as TileJson;
       if (!json.tiles?.[0]) throw new Error('no tile URL in the response');
       await saveCached('tilejson.json', new TextEncoder().encode(JSON.stringify(json)));
       return json;
     } catch (err) {
+      signal.throwIfAborted();
       const cached = await readCached('tilejson.json');
       if (cached) return JSON.parse(new TextDecoder().decode(cached)) as TileJson;
       throw new Error(
@@ -82,8 +85,12 @@ export function createTileLoader(options: TileLoaderOptions): TileLoader {
     }
   }
 
-  return async (ids) => {
-    const template = (await tileJson()).tiles[0];
+  return async (ids, callerSignal) => {
+    const batch = new AbortController();
+    const signal = callerSignal ? AbortSignal.any([callerSignal, batch.signal]) : batch.signal;
+    signal.throwIfAborted();
+    const template = (await tileJson(signal)).tiles[0];
+    signal.throwIfAborted();
     // The template carries a dataset version (".../planet/20261101_080013_pt/{z}/..."); keep
     // versions apart so one map never mixes two snapshots of the data.
     const version = /\/([^/{}]+)\/\{z\}/.exec(template)?.[1] ?? 'unversioned';
@@ -98,14 +105,17 @@ export function createTileLoader(options: TileLoaderOptions): TileLoader {
 
     let downloaded = 0;
     async function load(id: TileId): Promise<Tile> {
-      const key = `${version}/${id.z}/${id.x}/${id.y}.pbf`;
+      // Tiles in the next world copy have the same data and a different drawing position.
+      const x = id.x % 2 ** id.z;
+      const key = `${version}/${id.z}/${x}/${id.y}.pbf`;
       let data = await readCached(key);
       if (data === undefined) {
         const url = template
           .replace('{z}', String(id.z))
-          .replace('{x}', String(id.x))
+          .replace('{x}', String(x))
           .replace('{y}', String(id.y));
-        const res = await get(url);
+        signal.throwIfAborted();
+        const res = await get(url, signal);
         if (res.status === 404 || res.status === 204)
           data = new Uint8Array(0); // nothing there, e.g. open sea
         else if (!res.ok) throw new Error(`map tile ${id.z}/${id.x}/${id.y}: HTTP ${res.status}`);
@@ -119,14 +129,21 @@ export function createTileLoader(options: TileLoaderOptions): TileLoader {
 
     const tiles: Tile[] = new Array(ids.length);
     let next = 0;
-    await Promise.all(
-      Array.from({ length: Math.min(CONCURRENCY, ids.length) }, async () => {
-        while (next < ids.length) {
-          const i = next++;
-          tiles[i] = await load(ids[i]);
-        }
-      }),
-    );
+    try {
+      await Promise.all(
+        Array.from({ length: Math.min(CONCURRENCY, ids.length) }, async () => {
+          while (next < ids.length) {
+            signal.throwIfAborted();
+            const i = next++;
+            tiles[i] = await load(ids[i]);
+          }
+        }),
+      );
+      signal.throwIfAborted();
+    } catch (error) {
+      batch.abort(error);
+      throw error;
+    }
     return { tiles, downloaded };
   };
 }

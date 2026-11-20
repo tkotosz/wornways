@@ -177,4 +177,41 @@ describe('selectTracks', () => {
     expect(track.points[0]).toBeCloseTo(HOME.lon - 250 / perLon, 9);
     expect(trackLengthM(track)).toBeCloseTo(2_500);
   });
+
+  it('protects an original endpoint even when GPS cleaning moves it', () => {
+    const samples = [
+      [0, 0],
+      [1_000, 1],
+      [2_000, 201],
+      [-1_000, 801],
+      [-3_000, 1201],
+    ];
+    const points = new Float64Array(
+      samples.flatMap(([east, time]) => [HOME.lon + east / perLon, HOME.lat, 100, time]),
+    );
+    const original = { ...library[0], points };
+    const selection = selectTracks([original], parseSettings({ 'trim-radius': '250' }));
+    expect(selection.trimmed[0]?.start).toBe(1);
+    const visible = selection.tracks[0];
+    expect(visible.points[0]).toBeCloseTo(HOME.lon - 250 / perLon, 9);
+    expect(visible.startTime).toBe(original.startTime);
+    expect(trackLengthM(visible)).toBeCloseTo(2_500);
+  });
+
+  it('keeps, filters, and trims a route across the date line using local distances', () => {
+    const longitudes = [179.999, 179.9995, -180, -179.9995, -179.999, -179.9985];
+    const points = new Float64Array(longitudes.flatMap((lon, i) => [lon, 0, 0, i * 20]));
+    const route = { ...library[0], points };
+    const selection = selectTracks(
+      [route],
+      parseSettings({
+        'start-near': '0,-180',
+        'start-radius': '120',
+        'max-distance': '0.3',
+        'trim-radius': '20',
+      }),
+    );
+    expect(selection.problem).toBeNull();
+    expect(trackLengthM(selection.tracks[0])).toBeCloseTo(238.3);
+  });
 });

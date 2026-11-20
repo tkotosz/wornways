@@ -15,7 +15,14 @@ declare class TextEncoder {
 
 declare class AbortSignal {
   static timeout(milliseconds: number): AbortSignal;
+  static any(signals: AbortSignal[]): AbortSignal;
   readonly aborted: boolean;
+  throwIfAborted(): void;
+}
+
+declare class AbortController {
+  readonly signal: AbortSignal;
+  abort(reason?: unknown): void;
 }
 
 declare class Response {

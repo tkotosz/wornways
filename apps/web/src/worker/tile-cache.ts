@@ -35,11 +35,11 @@ export function sessionTileLoader(signal: AbortSignal): TileLoader {
   const tiles = new Map<string, Uint8Array>();
   signal.addEventListener('abort', () => tiles.clear(), { once: true });
   return createTileLoader({
-    fetchTile: (url, headers, timeout) =>
+    fetchTile: (url, headers, request) =>
       fetch(url, {
         headers,
         cache: 'no-store',
-        signal: AbortSignal.any([signal, AbortSignal.timeout(timeout)]),
+        signal: AbortSignal.any([signal, request]),
       }),
     cache: {
       read: async (key) => tiles.get(key),

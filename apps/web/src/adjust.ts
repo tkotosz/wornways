@@ -34,6 +34,11 @@ export const countOf = (activities: number): ActivityCount =>
 
 /** Where the preset is kept: a single activity and several remember their own. */
 const presetKey = (count: ActivityCount) => (count === 'one' ? 'preset-one' : 'preset');
+const PLAYBACK_SETTINGS = SETTINGS.filter(
+  ({ group, name }) => (group === 'timing' && name !== 'preset') || name === 'camera',
+).map(({ name }) => name);
+const adjustmentKey = (name: string, count: ActivityCount) =>
+  count === 'one' && PLAYBACK_SETTINGS.includes(name) ? `one-${name}` : name;
 /** The presets offered for this many activities. Custom is not offered: it is what changing their values makes. */
 export const presetChoices = (count: ActivityCount): Preset[] =>
   PRESET_NAMES.filter((name) => PRESETS[name].activities === count);
@@ -70,21 +75,30 @@ const presetValues = (preset: PresetChoice): Record<string, string> =>
 export const playbackAdjustments = (
   adjustments: Adjustments,
   count: ActivityCount,
-): Adjustments => ({ ...adjustments, ...presetValues(presetOf(adjustments, count)) });
+): Adjustments => {
+  const values: Adjustments = {};
+  for (const name of PLAYBACK_SETTINGS) {
+    const value = adjustments[adjustmentKey(name, count)];
+    if (value !== undefined) values[name] = value;
+  }
+  return { ...values, ...presetValues(presetOf(adjustments, count)) };
+};
 
-/**
- * The adjustments with another preset picked. Under a preset its own settings come from
- * it; Custom starts from the values the video has now.
- */
+/** Picks a preset for this selection size. */
 export function withPreset(
   adjustments: Adjustments,
   preset: PresetChoice,
   count: ActivityCount,
 ): Adjustments {
   const key = presetKey(count);
-  if (preset === 'custom')
-    return { ...adjustments, ...presetValues(presetOf(adjustments, count)), [key]: preset };
   return { ...adjustments, [key]: preset };
+}
+
+/** Uses the engine's default playback settings for this selection size. */
+export function resetPlayback(adjustments: Adjustments, count: ActivityCount): Adjustments {
+  const names = new Set(PLAYBACK_SETTINGS.map((name) => adjustmentKey(name, count)));
+  const kept = Object.entries(adjustments).filter(([name]) => !names.has(name));
+  return withPreset(Object.fromEntries(kept), 'custom', count);
 }
 
 /**
@@ -98,19 +112,15 @@ export function fineTuned(
 ): Adjustments {
   const values = presetValues(presetOf(before, count));
   const effective = playbackAdjustments(before, count);
-  const names = new Set([...Object.keys(effective), ...Object.keys(after)]);
-  const changed = [...names].filter((name) => after[name] !== effective[name]);
-  const tuned: Record<string, string | boolean | undefined> = changed.some((name) =>
-    Object.hasOwn(values, name),
-  )
-    ? { ...effective, [presetKey(count)]: 'custom' }
-    : { ...before };
-  for (const name of changed) tuned[name] = after[name];
-  return Object.fromEntries(
-    Object.entries(tuned).filter(
-      (entry): entry is [string, string | boolean] => entry[1] !== undefined,
-    ),
-  );
+  const changed = PLAYBACK_SETTINGS.filter((name) => after[name] !== effective[name]);
+  const custom = changed.some((name) => Object.hasOwn(values, name));
+  const tuned = new Map(Object.entries(custom ? withPreset(before, 'custom', count) : before));
+  for (const name of custom ? PLAYBACK_SETTINGS : changed) {
+    const key = adjustmentKey(name, count);
+    if (after[name] === undefined) tuned.delete(key);
+    else tuned.set(key, after[name]);
+  }
+  return Object.fromEntries(tuned);
 }
 
 /** The panels of the Appearance step, after its Frame panel. */
@@ -253,7 +263,7 @@ export function valueOf(
   count: ActivityCount,
 ): string | boolean | null {
   const fromPreset: string | undefined = presetValues(presetOf(adjustments, count))[setting.name];
-  return fromPreset ?? adjustments[setting.name] ?? setting.default;
+  return fromPreset ?? adjustments[adjustmentKey(setting.name, count)] ?? setting.default;
 }
 
 /**
@@ -266,7 +276,7 @@ export function adjustSettings(adjustments: Adjustments, count: ActivityCount): 
   const fromPreset = presetValues(preset);
   const settings: SettingsInput = {};
   for (const setting of SETTINGS) {
-    const value = adjustments[setting.name];
+    const value = adjustments[adjustmentKey(setting.name, count)];
     if (value === undefined || setting.name === 'preset' || setting.name in fromPreset) continue;
     if (ADJUST_GROUPS.includes(setting.group)) settings[setting.name] = value;
   }
@@ -290,18 +300,22 @@ export function loadAdjustments(): Adjustments {
 /** Marks adjustments saved by the app with its five steps. */
 const SAVED_WITH = 'saved-with';
 const FIVE_STEPS = 'five-steps';
+const SEPARATE_PLAYBACK = 'separate-playback';
 
 /**
- * Adjustments saved by earlier versions of the app may name a preset that came from a card
- * no longer offered (Custom), or none: they start again from the first preset, so that one
- * is always picked. Values set by hand stay, for when a preset's value is changed.
+ * Older drafts share playback settings across selection sizes. Copy those values into
+ * both sets to preserve how each one plays.
  */
 export function fromEarlierVersions(adjustments: Adjustments): Adjustments {
-  if (adjustments[SAVED_WITH] === FIVE_STEPS) return adjustments;
-  const kept = Object.entries(adjustments).filter(
-    ([name]) => name !== presetKey('one') && name !== presetKey('several'),
-  );
-  return { ...Object.fromEntries(kept), [SAVED_WITH]: FIVE_STEPS };
+  if (adjustments[SAVED_WITH] === SEPARATE_PLAYBACK) return adjustments;
+  const migrated: Adjustments = { ...adjustments, [SAVED_WITH]: SEPARATE_PLAYBACK };
+  if (adjustments[SAVED_WITH] !== FIVE_STEPS) {
+    delete migrated['preset-one'];
+    delete migrated.preset;
+  }
+  for (const name of PLAYBACK_SETTINGS)
+    if (adjustments[name] !== undefined) migrated[adjustmentKey(name, 'one')] = adjustments[name];
+  return migrated;
 }
 export function saveAdjustments(adjustments: Adjustments): void {
   try {

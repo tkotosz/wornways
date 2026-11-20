@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { tilesForView } from '../../src/map/basemap.ts';
+import { projectTrack } from '../../src/replay/project.ts';
 import { mercatorX, mercatorY } from '../../src/track/geo.ts';
 import { STRIDE } from '../../src/track/types.ts';
 import { fitView, trackArea } from '../../src/replay/view.ts';
@@ -30,5 +32,16 @@ describe('fitView', () => {
 
   it('refuses to fit when there are no points', () => {
     expect(() => fitView([], 1080, 1920)).toThrow('No points to fit');
+  });
+
+  it('fits a date-line route in one local view and asks for tiles on both sides', () => {
+    const route = track([179.999, 0], [-179.999, 0]);
+    const view = fitView([route], 640, 480);
+    const projected = projectTrack(route, view, 0);
+    expect(projected.dist.at(-1)).toBeCloseTo(222.64);
+    expect(view.scale).toBeGreaterThan(1_000_000);
+    expect(projected.xy[0]).toBeCloseTo(640 * 0.06);
+    expect(projected.xy[2]).toBeCloseTo(640 * 0.94);
+    expect(new Set(tilesForView(view).map(({ x }) => x))).toEqual(new Set([16_383, 16_384]));
   });
 });

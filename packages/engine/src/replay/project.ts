@@ -1,6 +1,6 @@
-import { distanceM, mercatorX, mercatorY } from '../track/geo.ts';
+import { distanceM, mercatorY } from '../track/geo.ts';
 import { STRIDE, type Track } from '../track/types.ts';
-import type { View } from './view.ts';
+import { viewX, type View } from './view.ts';
 
 /** A track in the pixel coordinates of a view. */
 export type Projected = {
@@ -48,7 +48,7 @@ export function projectTrack(
         level = ele;
       } else if (level - ele >= CLIMB_STEP_M) level = ele;
     }
-    const x = mercatorX(p[o]) * view.scale + view.offX;
+    const x = viewX(p[o], view);
     const y = mercatorY(p[o + 1]) * view.scale + view.offY;
     const k = xy.length;
     if (i > 0 && i < n - 1 && Math.hypot(x - xy[k - 2], y - xy[k - 1]) < minGapPx) continue;

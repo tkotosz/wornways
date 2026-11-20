@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { readFile } from 'node:fs/promises';
 
 const activity = new URL(
   '../../../packages/engine/tests/import/fixtures/trail-run.tcx',
@@ -47,4 +48,37 @@ test('can retry loading the library after its database keeps closing', async ({ 
   await page.getByRole('button', { name: 'Try again' }).click();
   await expect(page.getByRole('button', { name: 'Choose files' })).toBeVisible();
   await expect(page.getByRole('alert')).toHaveCount(0);
+});
+
+test('preserves separate activities imported with the same name in two tabs', async ({
+  page,
+  context,
+}) => {
+  const second = await context.newPage();
+  const ride = new URL(
+    '../../../packages/engine/tests/import/fixtures/morning-ride.gpx',
+    import.meta.url,
+  );
+  const firstFile = {
+    name: 'workout.tcx',
+    mimeType: 'application/xml',
+    buffer: await readFile(activity),
+  };
+  const secondFile = {
+    name: 'workout.gpx',
+    mimeType: 'application/xml',
+    buffer: await readFile(ride),
+  };
+  await Promise.all([page.goto('/'), second.goto('/')]);
+  await Promise.all([
+    page.getByTestId('file-input').setInputFiles(firstFile),
+    second.getByTestId('file-input').setInputFiles(secondFile),
+  ]);
+  await Promise.all(
+    [page, second].map((tab) =>
+      expect(tab.getByTestId('import-report')).toContainText('1 activity added'),
+    ),
+  );
+  await page.reload();
+  await expect(page.getByTestId('chosen-count')).toContainText('2 activities');
 });

@@ -69,6 +69,7 @@ export async function makeVideo(
   const replay = await prepareReplay(tracks, settings, {
     createCanvas: (w, h) => new OffscreenCanvas(w, h) as unknown as CanvasLike,
     loadTiles,
+    signal,
   });
   if (signal.aborted) throw new Canceled();
 

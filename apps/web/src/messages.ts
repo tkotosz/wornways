@@ -6,9 +6,11 @@ import type { FrequentPlace, Grouping, SettingsInput, TrackEnd } from '@wornways
 
 import type { StravaGrant } from './strava-auth.ts';
 
+export type PickedFile = { path: string; file: File };
+
 export type Request =
   | { type: 'read-library'; id: number }
-  | { type: 'add-files'; id: number; files: File[] }
+  | { type: 'add-files'; id: number; files: PickedFile[] }
   /** Deletes the activities with these ids, or every activity. */
   | { type: 'delete-activities'; id: number; ids: string[] | 'all' }
   | { type: 'strava-start'; id: number; grant: StravaGrant }

@@ -7,7 +7,6 @@ import {
   matchActivities,
   nearPlacesText,
   parseSettings,
-  sameActivity,
   trackLengthM,
   type FrequentPlace,
   type RandomAccessFile,
@@ -15,7 +14,13 @@ import {
   type Track,
   type TrackEnd,
 } from '@wornways/engine';
-import type { ActivitySummary, ImportReport, MatchReport, Progress } from '../messages.ts';
+import type {
+  ActivitySummary,
+  ImportReport,
+  MatchReport,
+  PickedFile,
+  Progress,
+} from '../messages.ts';
 import { createActivityStore, type ActivityStore } from './store.ts';
 
 /** Starts (or ends) this close together count as one place. */
@@ -23,17 +28,19 @@ const PLACE_RADIUS_M = 500;
 const PLACES_SUGGESTED = 6;
 
 /** A picked file, read part by part, so a large archive is never read whole. */
-const randomAccess = (file: File): RandomAccessFile => ({
-  name: file.name,
+const randomAccess = ({ path, file }: PickedFile): RandomAccessFile => ({
+  name: path,
   size: file.size,
   read: async (offset, length) =>
     new Uint8Array(await file.slice(offset, offset + length).arrayBuffer()),
 });
 
 export class Library {
+  private pending: Promise<unknown> = Promise.resolve();
+
   private constructor(
     private readonly store: ActivityStore,
-    private readonly activities: Map<string, Track>,
+    private activities: Map<string, Track>,
   ) {}
 
   static async open(): Promise<Library> {
@@ -59,19 +66,25 @@ export class Library {
   }
 
   /** Reads the files and stores the activities that are new. */
-  async add(files: File[], onProgress: (progress: Progress) => void): Promise<ImportReport> {
+  add(files: PickedFile[], onProgress: (progress: Progress) => void): Promise<ImportReport> {
+    return this.update(() => this.import(files, onProgress));
+  }
+
+  private async import(
+    files: PickedFile[],
+    onProgress: (progress: Progress) => void,
+  ): Promise<ImportReport> {
     const result = await importFiles(files.map(randomAccess), {
-      skip: (id) => this.activities.has(id),
-      // The same activity from another file, e.g. a GPX file of a ride added as FIT before.
-      isKnown: (activity) => this.all().some((known) => sameActivity(known, activity)),
+      known: this.activities,
       onProgress: ({ done, total }) => onProgress({ stage: 'reading', done, total }),
     });
     // Activities added before without the export's activity list get its names and sports.
     const renamed: Track[] = [];
     for (const { id, name, sport } of result.listedSkipped) {
       const known = this.activities.get(id);
-      if (known && (known.name !== name || known.sport !== sport))
-        renamed.push({ ...known, name, sport });
+      if (!known) continue;
+      const updated = { ...known, name: name || known.name, sport: sport || known.sport };
+      if (known.name !== updated.name || known.sport !== updated.sport) renamed.push(updated);
     }
     onProgress({ stage: 'storing' });
     await this.store.put([...result.activities, ...renamed]);
@@ -87,14 +100,30 @@ export class Library {
     };
   }
 
-  async delete(ids: string[] | 'all'): Promise<void> {
-    if (ids === 'all') {
-      await this.store.deleteAll();
-      this.activities.clear();
-      return;
-    }
-    await this.store.delete(ids);
-    for (const id of ids) this.activities.delete(id);
+  delete(ids: string[] | 'all'): Promise<void> {
+    return this.update(async () => {
+      if (ids === 'all') {
+        await this.store.deleteAll();
+        this.activities.clear();
+      } else {
+        await this.store.delete(ids);
+        for (const id of ids) this.activities.delete(id);
+      }
+    });
+  }
+
+  /** Read and write under one lock so imports in two tabs cannot reuse the same ID. */
+  private update<T>(operation: () => Promise<T>): Promise<T> {
+    const update = async () => {
+      const stored = await this.store.readAll();
+      this.activities = new Map(stored.map((a) => [a.id, a]));
+      return operation();
+    };
+    const result = this.pending.then(
+      () => navigator.locks?.request('wornways-library', update) ?? update(),
+    );
+    this.pending = result.catch(() => {});
+    return result;
   }
 
   /** Which activities the settings choose. */

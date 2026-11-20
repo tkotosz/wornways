@@ -67,6 +67,19 @@ describe('createTileLoader', () => {
     expect(cache.keys()).toContain('v2/14/1/2.pbf');
   });
 
+  it('fetches the wrapped tile using the server column and keeps its drawing column', async () => {
+    tileServer('v2');
+    const cache = memoryCache({});
+    const load = createTileLoader({ cache });
+    const result = await load([{ z: 14, x: 16_384, y: 2 }]);
+    expect(result.tiles[0]).toMatchObject({ z: 14, x: 16_384, y: 2 });
+    expect(fetch).toHaveBeenLastCalledWith(
+      'https://tiles.example/planet/v2/14/0/2.pbf',
+      expect.anything(),
+    );
+    expect(cache.keys()).toContain('v2/14/0/2.pbf');
+  });
+
   it('returns downloaded tiles when the cache is unavailable', async () => {
     const unavailable = async () => {
       throw new Error('storage unavailable');
@@ -82,5 +95,29 @@ describe('createTileLoader', () => {
     const result = await load([{ z: 14, x: 1, y: 2 }]);
     expect(result.downloaded).toBe(1);
     expect(new TextDecoder().decode(result.tiles[0].data!)).toBe('tile');
+  });
+
+  it('aborts in-flight fetches and leaves queued tiles alone when a replay is canceled', async () => {
+    const cancel = new AbortController();
+    const fetchTile = vi.fn(
+      async (url: string, _headers: Record<string, string>, signal: AbortSignal) => {
+        if (url.endsWith('/planet'))
+          return Response.json({ tiles: ['https://tiles.example/v1/{z}/{x}/{y}.pbf'] });
+        return new Promise<Response>((_resolve, reject) => {
+          signal.addEventListener('abort', () => reject(signal.reason), { once: true });
+        });
+      },
+    );
+    const load = createTileLoader({ cache: memoryCache({}), fetchTile });
+    const loading = load(
+      Array.from({ length: 8 }, (_, x) => ({ z: 14, x, y: 2 })),
+      cancel.signal,
+    );
+    const rejected = expect(loading).rejects.toMatchObject({ name: 'AbortError' });
+    await vi.waitFor(() => expect(fetchTile).toHaveBeenCalledTimes(5));
+    cancel.abort();
+    await rejected;
+    expect(fetchTile).toHaveBeenCalledTimes(5);
+    expect(fetchTile.mock.calls.slice(1).every(([, , signal]) => signal.aborted)).toBe(true);
   });
 });

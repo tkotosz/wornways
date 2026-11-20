@@ -245,6 +245,7 @@ export function mapLevelViews(view: View, camera?: CameraPath): View[] {
     const k = 2 ** level;
     if (r.x0 > r.x1)
       return {
+        ...view,
         width: 2,
         height: 2,
         scale: view.scale * k,
@@ -252,6 +253,7 @@ export function mapLevelViews(view: View, camera?: CameraPath): View[] {
         offY: view.offY * k,
       };
     return {
+      ...view,
       width: Math.ceil((r.x1 - r.x0) * k) + 2,
       height: Math.ceil((r.y1 - r.y0) * k) + 2,
       scale: view.scale * k,
@@ -291,6 +293,7 @@ export function mapLevelWindows(view: View, camera: CameraPath): LevelWindow[][]
       byLevel[level].push({
         from,
         view: {
+          ...view,
           width: x1 - x0,
           height: y1 - y0,
           scale: view.scale * k,

@@ -90,16 +90,16 @@ async function summary(data: Summary): Promise<StravaActivity | null> {
 }
 
 function trackFromStreams(activity: ActivitySummary, streams: Streams): Track | null {
-  const coordinates = streams.latlng?.data;
+  const positions = streams.latlng?.data;
   const times = streams.time?.data;
   const elevations = streams.altitude?.data;
-  if (!coordinates || !times || coordinates.length !== times.length) return null;
-  const points = new Float64Array(coordinates.length * STRIDE);
+  if (!positions || !times || positions.length !== times.length) return null;
+  const points = new Float64Array(positions.length * STRIDE);
   let size = 0;
-  for (const [index, coordinate] of coordinates.entries()) {
-    if (!coordinate || !Number.isFinite(times[index])) continue;
-    const [lat, lon] = coordinate;
-    if (!Number.isFinite(lat) || !Number.isFinite(lon)) continue;
+  for (const [index, coordinate] of positions.entries()) {
+    const point = coordinates(coordinate);
+    if (!point || !Number.isFinite(times[index])) continue;
+    const { lat, lon } = point;
     points[size++] = lon;
     points[size++] = lat;
     points[size++] = Number.isFinite(elevations?.[index]) ? elevations![index]! : NaN;
@@ -110,7 +110,6 @@ function trackFromStreams(activity: ActivitySummary, streams: Streams): Track | 
   for (let i = 3; i < size; i += STRIDE) points[i] = points[i]! - offset;
   return {
     ...activity,
-    startTime: activity.startTime + offset * 1000,
     points: points.subarray(0, size),
   };
 }
@@ -331,7 +330,7 @@ export class StravaSession {
   private async loadTrack(row: StravaActivity, signal: AbortSignal): Promise<Track | null> {
     const cached = await this.browserCache.track(row.summary.id, row.version);
     signal.throwIfAborted();
-    if (cached) return { ...row.summary, ...cached };
+    if (cached) return { ...cached, ...row.summary };
 
     const res = await this.get(new URLSearchParams({ activity: row.summary.id }), signal, true);
     const track =

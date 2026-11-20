@@ -5,7 +5,7 @@ import { SETTINGS, type FrequentPlace, type SettingsInput, type TrackEnd } from 
 import { defineAsyncComponent, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import type { NearChoice } from '../choice.ts';
 import type { EngineClient } from '../engine-client.ts';
-import { distanceText } from '../format.ts';
+import ExactNumber from './ExactNumber.vue';
 
 // The map is a large library, so it is loaded only when a panel shows.
 const PlacePicker = defineAsyncComponent(() => import('./PlacePicker.vue'));
@@ -46,6 +46,11 @@ const radiusRange = (() => {
   const kind = SETTINGS.find((s) => s.name === `${props.end}-radius`)!.kind;
   return kind.type === 'number' ? kind : { min: 100, max: 20000 };
 })();
+
+function setRadius(radius: number): void {
+  radiusShown.value = radius;
+  update({ radius });
+}
 
 /** The typed place as the setting takes it, "latitude,longitude"; empty when it is no place. */
 function readPlace(text: string): string {
@@ -157,7 +162,7 @@ watch(
       :radius="radiusShown"
       @pick="setPlace"
     />
-    <label class="radius">
+    <div class="radius">
       <span>Near means within</span>
       <input
         type="range"
@@ -167,10 +172,17 @@ watch(
         :value="radiusShown"
         :aria-label="`${name} radius`"
         @input="radiusShown = Number(($event.target as HTMLInputElement).value)"
-        @change="update({ radius: radiusShown })"
+        @change="setRadius(radiusShown)"
       />
-      <strong>{{ distanceText(radiusShown) }}</strong>
-    </label>
+      <ExactNumber
+        :label="`Exact ${name.toLowerCase()} radius in metres`"
+        :min="radiusRange.min"
+        :max="radiusRange.max"
+        :value="radiusShown"
+        unit="m"
+        @change="setRadius"
+      />
+    </div>
   </div>
 </template>
 
@@ -217,14 +229,8 @@ watch(
   color: var(--muted);
 }
 
-.radius input {
+.radius input[type='range'] {
   flex: 1 1 10rem;
   accent-color: var(--accent);
-}
-
-.radius strong {
-  min-width: 4.5rem;
-  color: var(--text);
-  text-align: right;
 }
 </style>

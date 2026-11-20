@@ -12,12 +12,14 @@ import {
   playbackAdjustments,
   presetChoices,
   presetOf,
+  resetPlayback,
   settingHint,
   valueOf,
   withPreset,
   type Adjustments,
   type PresetChoice,
 } from '../adjust.ts';
+import ExactNumber from '../components/ExactNumber.vue';
 import PacingLine from '../components/PacingLine.vue';
 import PresetDrawing from '../components/PresetDrawing.vue';
 import SettingsGroups from '../components/SettingsGroups.vue';
@@ -99,7 +101,14 @@ const fineTuneOpen = ref(false);
             }}
           </p>
         </div>
-        <strong class="readout">{{ durationShown ?? duration }} seconds</strong>
+        <ExactNumber
+          label="Exact video length in seconds"
+          :min="durationRange.min"
+          :max="durationRange.max"
+          :value="durationShown ?? duration"
+          unit="s"
+          @change="setDuration"
+        />
       </div>
       <input
         type="range"
@@ -151,6 +160,14 @@ const fineTuneOpen = ref(false);
         :groups="PLAYBACK_PANELS"
         :count="count"
       />
+      <button
+        v-if="fineTuneOpen"
+        type="button"
+        class="link"
+        @click="adjustments = resetPlayback(adjustments, count)"
+      >
+        Reset playback to defaults
+      </button>
     </div>
 
     <div class="footer">
@@ -254,12 +271,7 @@ const fineTuneOpen = ref(false);
   margin-bottom: 0.6rem;
 }
 
-.readout {
-  white-space: nowrap;
-  color: var(--accent);
-}
-
-.length input {
+.length input[type='range'] {
   width: 100%;
   accent-color: var(--accent);
 }
@@ -329,6 +341,10 @@ const fineTuneOpen = ref(false);
 
 .fine-tune-panels {
   padding: 0 0.8rem 0.8rem;
+}
+
+.fine-tune .link {
+  margin: 0 0.8rem 0.8rem;
 }
 
 /* Phones: the cards as rows, the drawing beside the text. */

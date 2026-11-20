@@ -1,7 +1,7 @@
 // Where activities start and end: the places the "starts near" and "ends near" filters
 // compare with, and the places many activities start or end at, to suggest for them.
 
-import { distanceM } from './geo.ts';
+import { distanceM, longitudeDelta } from './geo.ts';
 import { STRIDE, type Track } from './types.ts';
 
 export type LatLon = { lat: number; lon: number };
@@ -45,13 +45,17 @@ function densest(points: LatLon[], radiusM: number): { center: LatLon; count: nu
   }
   let lat = 0;
   let lon = 0;
+  const seed = points[best];
   for (const p of points) {
-    if (distanceM(points[best].lat, points[best].lon, p.lat, p.lon) <= radiusM) {
+    if (distanceM(seed.lat, seed.lon, p.lat, p.lon) <= radiusM) {
       lat += p.lat;
-      lon += p.lon;
+      lon += longitudeDelta(seed.lon, p.lon);
     }
   }
-  return { center: { lat: lat / bestCount, lon: lon / bestCount }, count: bestCount };
+  return {
+    center: { lat: lat / bestCount, lon: longitudeDelta(0, seed.lon + lon / bestCount) },
+    count: bestCount,
+  };
 }
 
 /** A place many activities start or end at, as `frequentPlaces` finds it. */

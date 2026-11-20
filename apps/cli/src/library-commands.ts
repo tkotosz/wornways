@@ -2,7 +2,7 @@
 
 import { createInterface } from 'node:readline/promises';
 import { parseArgs } from 'node:util';
-import { importFiles, sameActivity, trackLengthM, type Track } from '@wornways/engine';
+import { trackLengthM } from '@wornways/engine';
 import { filesAt } from './files.ts';
 import { Library, libraryFolder } from './library.ts';
 import { fail, isoDay, oneLine } from './terminal.ts';
@@ -30,25 +30,12 @@ export async function importCommand(argv: string[]): Promise<void> {
 
   const files = await filesAt(positionals);
   const library = await Library.open();
-  const known = library.all();
   const progress = process.stderr.isTTY
     ? (text: string) => process.stderr.write(`\r${text}\x1b[K`)
     : () => {};
-  const result = await importFiles(files, {
-    skip: (id) => library.has(id),
-    // The same activity from another file, e.g. a GPX file of a ride imported as FIT before.
-    isKnown: (activity) => known.some((k) => sameActivity(k, activity)),
-    onProgress: ({ done, total }) => progress(`Reading ${done}/${total} files`),
-  });
-  progress('');
-  // Activities imported before without the export's activity list get its names and sports.
-  const renamed: Track[] = [];
-  for (const { id, name, sport } of result.listedSkipped) {
-    const activity = library.get(id);
-    if (activity && (activity.name !== name || activity.sport !== sport))
-      renamed.push({ ...activity, name, sport });
-  }
-  await library.put([...result.activities, ...renamed]);
+  const result = await library
+    .add(files, ({ done, total }) => progress(`Reading ${done}/${total} files`))
+    .finally(() => progress(''));
 
   const already = result.skipped + result.duplicates;
   console.log(
@@ -56,8 +43,8 @@ export async function importCommand(argv: string[]): Promise<void> {
       (already ? `, ${already} already there` : '') +
       `; ${count(library.size, 'activity', 'activities')} in all.`,
   );
-  if (renamed.length)
-    console.log(`${count(renamed.length, 'activity was', 'activities were')} renamed.`);
+  if (result.renamed)
+    console.log(`${count(result.renamed, 'activity was', 'activities were')} renamed.`);
   if (result.withoutGps.length)
     console.log(
       `${count(result.withoutGps.length, 'activity has', 'activities have')} no GPS route and ` +

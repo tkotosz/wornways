@@ -12,10 +12,10 @@ import {
   settingHint,
   settingLabel,
   sliderStep,
-  valueOf,
   type Adjustments,
 } from '../adjust.ts';
 import type { PlanReport } from '../messages.ts';
+import ExactNumber from './ExactNumber.vue';
 
 const props = defineProps<{
   /** The groups to show, in order. */
@@ -39,7 +39,7 @@ const groups = computed(() =>
   props.groups.map((group) => ({ group, main: offered(group) })).filter((g) => g.main.length > 0),
 );
 
-const value = (setting: SettingDefinition) => valueOf(adjustments.value, setting, props.count);
+const value = (setting: SettingDefinition) => adjustments.value[setting.name] ?? setting.default;
 
 /** Sets a setting; undefined puts it back to its default. */
 function set(name: string, newValue: string | boolean | undefined): void {
@@ -151,7 +151,7 @@ function toggleMetric(metric: Metric): void {
               </div>
 
               <!-- A number: a slider with its value. -->
-              <label v-else-if="setting.kind.type === 'number'" class="slider">
+              <div v-else-if="setting.kind.type === 'number'" class="slider">
                 <input
                   type="range"
                   :min="setting.kind.min"
@@ -166,8 +166,15 @@ function toggleMetric(metric: Metric): void {
                   "
                   @change="set(setting.name, ($event.target as HTMLInputElement).value)"
                 />
-                <strong>{{ sliderValue(setting) }}</strong>
-              </label>
+                <ExactNumber
+                  :label="`Exact ${setting.label.toLowerCase()} (${setting.kind.unit})`"
+                  :min="setting.kind.min"
+                  :max="setting.kind.max"
+                  :value="Number(value(setting))"
+                  :unit="setting.kind.unit"
+                  @change="set(setting.name, String($event))"
+                />
+              </div>
 
               <!-- On or off. -->
               <label v-else-if="setting.kind.type === 'switch'" class="switch">
@@ -314,13 +321,9 @@ function toggleMetric(metric: Metric): void {
   gap: 0.8rem;
 }
 
-.slider input {
+.slider input[type='range'] {
   flex: 1;
   max-width: 22rem;
-}
-
-.slider strong {
-  min-width: 4rem;
 }
 
 .switch {
