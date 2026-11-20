@@ -13,6 +13,7 @@ const props = defineProps<{
   library: ActivitySummary[];
   /** Which activities the filters match. */
   matched: MatchReport;
+  distanceScale: { min: number; max: number } | null;
   strava?: boolean;
   showSource?: boolean;
   busy?: string;
@@ -35,7 +36,13 @@ const ticked = computed(() => rows.value.filter((a) => !choice.value.excluded.in
       {{ strava ? 'Strava' : 'Files on this device' }}
       <button type="button" class="link" @click="emit('back')">Change source</button>
     </p>
-    <ActivityFilters v-model="choice" :engine="engine" :library="library" :strava="strava" />
+    <ActivityFilters
+      v-model="choice"
+      :engine="engine"
+      :library="library"
+      :strava="strava"
+      :distance-scale="distanceScale"
+    />
 
     <p v-if="busy" class="muted" role="status">{{ busy }}</p>
     <p v-if="notice" class="muted" role="status">{{ notice }}</p>

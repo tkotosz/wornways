@@ -234,6 +234,51 @@ test('chooses activities with filters and by hand', async ({ page }) => {
   await expect(page.getByRole('button', { name: 'Continue' })).toBeDisabled();
 });
 
+test('keeps the distance slider scale steady until other filters change', async ({ page }) => {
+  await page.goto('/');
+  await addFiles(page, 'morning-ride.fit', 'strava-export.zip');
+  await page.getByRole('button', { name: 'Continue' }).click();
+
+  const minimum = page.getByRole('textbox', { name: 'Minimum (km)' });
+  const maximum = page.getByRole('textbox', { name: 'Maximum (km)' });
+  const lower = page.getByRole('slider', { name: 'Minimum distance' });
+  const upper = page.getByRole('slider', { name: 'Maximum distance' });
+  await expect(lower).toBeVisible();
+  const low = Number(await lower.getAttribute('min'));
+  const high = Number(await upper.getAttribute('max'));
+  await expect(lower).toHaveValue(String(low));
+  await expect(upper).toHaveValue(String(high));
+  await expect(minimum).toHaveValue('');
+  await expect(maximum).toHaveValue('');
+
+  await lower.press('ArrowRight');
+  await expect(minimum).toHaveValue(String(low + 0.1));
+  await lower.press('Home');
+  await expect(minimum).toHaveValue('');
+  const track = await page.getByRole('group', { name: 'Distance' }).locator('.track').boundingBox();
+  if (!track) throw new Error('Distance slider track is missing');
+  const y = track.y + track.height / 2;
+  await page.mouse.move(track.x + track.width, y);
+  await page.mouse.down();
+  await page.mouse.move(track.x + track.width * 0.75, y, { steps: 8 });
+  await page.mouse.up();
+  await expect(maximum).not.toHaveValue('');
+  expect(Number(await maximum.inputValue())).toBeLessThan(high);
+  await maximum.fill('9,2');
+  await expect(page.getByTestId('chosen-count')).toContainText('of 1 activity');
+  await page.getByRole('checkbox', { name: 'Select all shown' }).uncheck();
+  await expect(upper).toHaveAttribute('max', String(high));
+  await expect(lower).toHaveAttribute('min', String(low));
+
+  await page.getByRole('button', { name: 'Ride', exact: true }).click();
+  await expect(lower).not.toHaveAttribute('min', String(low));
+  await expect(maximum).toHaveValue('9,2');
+  await page.getByRole('button', { name: 'Virtual ride', exact: true }).click();
+  await page.getByRole('button', { name: 'Ride', exact: true }).click();
+  await expect(lower).toHaveCount(0);
+  await expect(maximum).toHaveValue('9,2');
+});
+
 test('makes a video of activities within the chosen distance range', async ({ page, context }) => {
   const mapRequests = await offlineMap(context);
   await page.goto('/');

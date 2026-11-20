@@ -127,7 +127,7 @@ export function toggledSports(choice: Choice, sport: string): string[] | null {
 export const placeMissing = (choice: Choice) =>
   [choice.startNear, choice.endNear].some((near) => near.on && !near.place);
 
-function distanceBound(text: string, open: number): number {
+export function distanceBound(text: string, open: number): number {
   const value = text.trim();
   if (!value) return open;
   if (!/^(?:\d+(?:[.,]\d*)?|[.,]\d+)$/.test(value)) return NaN;
