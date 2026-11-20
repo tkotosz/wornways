@@ -27,6 +27,7 @@ describe('parseSettings', () => {
       groupPace: 'fit',
       overlap: 0,
       pace: 'time',
+      trimRadius: 0,
       camera: 'zoom',
       map: true,
       title: null,

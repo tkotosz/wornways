@@ -26,6 +26,7 @@ export type Loaded = {
 const PROBLEMS = {
   'nothing-matches': 'nothing matches the filters',
   'nothing-usable': 'no usable tracks after cleaning',
+  'nothing-after-trim': 'no usable route remains after trimming. Reduce --trim-radius',
 };
 
 /**
@@ -99,6 +100,7 @@ export async function loadTracks(paths: string[], settings: RenderSettings): Pro
     if (selection.problem === 'nothing-near') fail(`no activity ${nearPlacesText(settings)}`);
   }
   if (selection.problem === 'nothing-usable') fail(PROBLEMS['nothing-usable']);
+  if (selection.problem === 'nothing-after-trim') fail(PROBLEMS['nothing-after-trim']);
 
   const cleaned = selection.tracks;
   const km = cleaned.reduce((sum, t) => sum + trackLengthM(t), 0) / 1000;
@@ -115,5 +117,7 @@ export async function loadTracks(paths: string[], settings: RenderSettings): Pro
     console.log(
       `  left out ${isoDay(track.startTime)}  ${oneLine(track)}  (${track.sport}, under ${MIN_LENGTH_M} m on the map)`,
     );
+  if (selection.privacyOmitted)
+    console.log(`Trim       ${selection.privacyOmitted} left out after trimming`);
   return { tracks: cleaned, activities: activities.length, readMs, cleanMs };
 }

@@ -40,6 +40,7 @@ const count = computed(() => countOf(props.chosen.length));
 const GROUP_TITLES: Record<Panel, string> = {
   timing: 'Timing',
   camera: 'Camera',
+  privacy: 'Replay privacy',
   map: 'Map',
   title: 'Title',
   metrics: 'Metrics',
@@ -54,12 +55,19 @@ const value = (setting: SettingDefinition) => valueOf(adjustments.value, setting
 
 /** Sets a setting; undefined puts it back to its default. */
 function set(name: string, newValue: string | boolean | undefined): void {
+  if (adjustments.value[name] === newValue) return;
   adjustments.value = Object.fromEntries(
     Object.entries({ ...adjustments.value, [name]: newValue }).filter(([, v]) => v !== undefined),
   ) as Adjustments;
 }
 
-const unitText = (unit: string) => (unit === '%' ? '%' : ` ${unit}`);
+function sliderValue(setting: SettingDefinition): string {
+  if (setting.kind.type !== 'number') return '';
+  const current = value(setting);
+  if (setting.name === 'trim-radius' && current === '0') return 'Off';
+  const unit = setting.kind.unit;
+  return `${current}${unit === '%' ? '%' : ` ${unit}`}`;
+}
 
 // Title: the automatic one unless the person wrote another; empty for none.
 const autoTitle = computed(() =>
@@ -160,9 +168,14 @@ function toggleMetric(metric: Metric): void {
                   :step="sliderStep(setting.name)"
                   :value="Number(value(setting))"
                   :aria-label="settingLabel(setting)"
+                  :aria-valuetext="sliderValue(setting)"
+                  @input="
+                    setting.name === 'trim-radius' &&
+                    set(setting.name, ($event.target as HTMLInputElement).value)
+                  "
                   @change="set(setting.name, ($event.target as HTMLInputElement).value)"
                 />
-                <strong>{{ value(setting) }}{{ unitText(setting.kind.unit) }}</strong>
+                <strong>{{ sliderValue(setting) }}</strong>
               </label>
 
               <!-- On or off. -->

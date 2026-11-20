@@ -5,6 +5,7 @@ import {
   parseSettings,
   planReplay,
   selectTracks,
+  trackLengthM,
   type SettingsInput,
   type Track,
 } from '@wornways/engine';
@@ -18,6 +19,8 @@ export function planVideo(library: Track[], input: SettingsInput): PlanReport {
   const plan = planReplay(selection.tracks, settings);
   return {
     activities: selection.tracks.length,
+    meters: selection.tracks.reduce((sum, track) => sum + trackLengthM(track), 0),
+    privacyOmitted: selection.privacyOmitted,
     seconds: plan.timeline.duration,
     groups: plan.groups ?? null,
     realPace: settings.groupPace === 'real',

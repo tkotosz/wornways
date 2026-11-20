@@ -35,6 +35,8 @@ const FULL_HD_BITRATE = 8_000_000;
 export function problemText(problem: SelectionProblem, settings: RenderSettings): string {
   if (problem === 'nothing-matches') return 'No activity matches the settings.';
   if (problem === 'nothing-near') return `None of the activities ${nearPlacesText(settings)}.`;
+  if (problem === 'nothing-after-trim')
+    return 'No usable route remains. Reduce the trim radius to make this video.';
   return 'The chosen activities have no usable route.';
 }
 

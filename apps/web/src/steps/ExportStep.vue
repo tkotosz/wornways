@@ -9,7 +9,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { Canceled, type EngineClient } from '../engine-client.ts';
 import { countText, kmText } from '../format.ts';
 import type { MadeVideo } from '../made-video.ts';
-import type { Progress } from '../messages.ts';
+import type { PlanReport, Progress } from '../messages.ts';
 
 const props = defineProps<{
   engine: EngineClient;
@@ -28,6 +28,29 @@ const parsed = computed(() => {
     return null;
   }
 });
+const settingsKey = computed(() => JSON.stringify(props.settings));
+const trimRadius = computed(() => parsed.value?.trimRadius ?? 0);
+const trimmedPlan = ref<PlanReport | null>(null);
+const trimError = ref('');
+
+watch(
+  settingsKey,
+  async (key, _, onCleanup) => {
+    trimmedPlan.value = null;
+    trimError.value = '';
+    if (!trimRadius.value) return;
+    let current = true;
+    onCleanup(() => (current = false));
+    try {
+      const plan = await props.engine.plan(props.settings);
+      if (current && key === settingsKey.value) trimmedPlan.value = plan;
+    } catch (caught) {
+      if (current && key === settingsKey.value)
+        trimError.value = caught instanceof Error ? caught.message : String(caught);
+    }
+  },
+  { immediate: true },
+);
 
 /** The settings in words, e.g. "1080 × 1920 · 30 s + end card". */
 const summary = computed(() => {
@@ -55,13 +78,15 @@ let left = false;
 /** Draws the finished picture for the current settings, unless the video is made. */
 async function drawPoster(): Promise<void> {
   cancelPoster?.();
+  cancelPoster = null;
+  if (poster.value) URL.revokeObjectURL(poster.value);
+  poster.value = '';
   if (result.value) return;
   const task = props.engine.makePoster(props.settings);
   cancelPoster = task.cancel;
   try {
     const image = await task.result;
     if (left || cancelPoster !== task.cancel) return;
-    if (poster.value) URL.revokeObjectURL(poster.value);
     poster.value = URL.createObjectURL(image);
   } catch {
     // Without a picture the stage stays dark; the video can still be made. A newer
@@ -72,12 +97,20 @@ async function drawPoster(): Promise<void> {
 }
 
 onMounted(drawPoster);
-// Settings that change while the step shows (as they may from elsewhere) draw it again.
-watch(() => JSON.stringify(props.settings), drawPoster);
 
 const progress = ref<Progress | null>(null);
 const error = ref('');
 let cancel: (() => void) | null = null;
+
+// Settings that change while the step shows (as they may from elsewhere) draw it again.
+watch(settingsKey, () => {
+  cancel?.();
+  cancel = null;
+  progress.value = null;
+  result.value = null;
+  error.value = '';
+  void drawPoster();
+});
 
 const STAGES: Record<Progress['stage'], string> = {
   reading: 'Reading',
@@ -96,24 +129,34 @@ const percent = computed(() => {
 });
 
 async function make(): Promise<void> {
+  if (progress.value || (trimRadius.value && !trimmedPlan.value)) return;
+  const key = settingsKey.value;
   cancelPoster?.();
   result.value = null;
   error.value = '';
   progress.value = { stage: 'choosing' };
-  const task = props.engine.makeVideo(props.settings, (p) => (progress.value = p));
+  const task = props.engine.makeVideo(props.settings, (p) => {
+    if (cancel === task.cancel && key === settingsKey.value) progress.value = p;
+  });
   cancel = task.cancel;
   try {
     const { video, report } = await task.result;
-    if (left) return;
+    if (left || cancel !== task.cancel || key !== settingsKey.value) return;
     const file = new File([video], report.fileName, { type: 'video/mp4' });
-    const settingsKey = JSON.stringify(props.settings);
-    result.value = { file, url: URL.createObjectURL(file), report, settingsKey };
+    result.value = { file, url: URL.createObjectURL(file), report, settingsKey: key };
   } catch (caught) {
-    if (!(caught instanceof Canceled))
+    if (
+      !left &&
+      cancel === task.cancel &&
+      key === settingsKey.value &&
+      !(caught instanceof Canceled)
+    )
       error.value = caught instanceof Error ? caught.message : String(caught);
   } finally {
-    progress.value = null;
-    cancel = null;
+    if (cancel === task.cancel) {
+      progress.value = null;
+      cancel = null;
+    }
   }
 }
 
@@ -147,10 +190,23 @@ onBeforeUnmount(() => {
 <template>
   <section>
     <h1>Make your video</h1>
-    <p class="muted">
+    <p v-if="!trimRadius" class="muted">
       A replay of {{ countText(activities, 'activity', 'activities') }} ({{ kmText(meters) }}). It
       is made on this device.
     </p>
+    <p v-else class="muted" role="status">
+      {{ trimRadius }} m trim radius at each start and finish.
+      <template v-if="trimmedPlan">
+        {{ countText(trimmedPlan.activities, 'activity', 'activities') }} in the replay ({{
+          kmText(trimmedPlan.meters)
+        }}).
+        <template v-if="trimmedPlan.privacyOmitted">
+          {{ countText(trimmedPlan.privacyOmitted, 'activity', 'activities') }} omitted after
+          trimming.
+        </template>
+      </template>
+    </p>
+    <p v-if="trimError" class="error" role="alert">{{ trimError }}</p>
 
     <div class="stage" :style="stageStyle">
       <video
@@ -173,7 +229,13 @@ onBeforeUnmount(() => {
             <div class="bar"><div :style="{ width: `${percent}%` }" /></div>
             <button type="button" class="secondary" @click="cancel?.()">Cancel</button>
           </div>
-          <button v-else type="button" class="make" @click="make">
+          <button
+            v-else
+            type="button"
+            class="make"
+            :disabled="!!trimRadius && !trimmedPlan"
+            @click="make"
+          >
             <span class="play" aria-hidden="true">▶</span>
             Make video
           </button>
@@ -255,6 +317,11 @@ onBeforeUnmount(() => {
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
   font-size: 1.1rem;
   font-weight: 700;
+}
+
+.make:disabled {
+  opacity: 0.55;
+  cursor: default;
 }
 
 .play {

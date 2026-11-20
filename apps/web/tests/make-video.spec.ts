@@ -352,6 +352,65 @@ test('keeps the video while the choice stays the same', async ({ page, context }
   await expect(page.getByRole('button', { name: 'Make video' })).toBeVisible();
 });
 
+test('previews and exports trimmed routes and leaves out routes too short to show', async ({
+  page,
+  context,
+}) => {
+  await offlineMap(context);
+  await page.goto('/');
+  await addFiles(page, 'trail-run.tcx');
+  const shortRoute = `<gpx version="1.1"><trk><name>Short walk</name><trkseg>
+    <trkpt lat="51.43" lon="-0.143"><time>2026-04-25T12:00:00Z</time></trkpt>
+    <trkpt lat="51.433" lon="-0.143"><time>2026-04-25T12:05:00Z</time></trkpt>
+    <trkpt lat="51.436" lon="-0.143"><time>2026-04-25T12:10:00Z</time></trkpt>
+  </trkseg></trk></gpx>`;
+  await page.getByTestId('file-input').setInputFiles({
+    name: 'short-walk.gpx',
+    mimeType: 'application/gpx+xml',
+    buffer: Buffer.from(shortRoute),
+  });
+  await expect(page.getByTestId('activity-count')).toContainText('2 activities');
+  await page.getByRole('button', { name: 'Continue' }).click();
+  await page.getByRole('button', { name: 'Continue' }).click();
+  const length = page.getByRole('slider', { name: 'Video length' });
+  await length.fill('5');
+  await length.dispatchEvent('change');
+  await page.getByRole('button', { name: 'Continue' }).click();
+  const trim = page.getByRole('slider', { name: 'Trim start and finish' });
+  await expect(trim).toHaveAttribute('aria-valuetext', 'Off');
+  const preview = page.getByRole('img', { name: 'Preview: the last frame of the video' });
+  await expect(preview).toBeVisible();
+  const original = (await preview.getAttribute('src'))!;
+  await trim.fill('500');
+  await expect(trim).toHaveAttribute('aria-valuetext', '500 m');
+  await expect(preview).toBeVisible();
+  await expect(preview).not.toHaveAttribute('src', original);
+  await page.getByRole('button', { name: 'Continue' }).click();
+  await expect(page.getByText('1 activity omitted after trimming.')).toBeVisible();
+  const make = page.getByRole('button', { name: 'Make video' });
+  await make.click();
+  await expect(page.getByTestId('made')).toContainText('1 activity', { timeout: 150_000 });
+  await expect(page.getByRole('link', { name: 'Download' })).toHaveAttribute(
+    'download',
+    'replay.mp4',
+  );
+
+  await page.getByRole('button', { name: '← Back' }).click();
+  await expect(trim).toHaveValue('500');
+  await trim.press('ArrowRight');
+  await expect(trim).toHaveAttribute('aria-valuetext', '550 m');
+  await page.getByRole('button', { name: 'Continue' }).click();
+  await expect(page.getByRole('link', { name: 'Download' })).toHaveCount(0);
+  await expect(make).toBeEnabled();
+
+  await page.getByRole('button', { name: 'Activities', exact: true }).click();
+  await page.getByTestId('chosen').getByText('trail-run').click();
+  await page.getByRole('button', { name: 'Export', exact: true }).click();
+  await expect(page.getByRole('alert')).toContainText('No usable route remains');
+  await expect(make).toBeDisabled();
+  await expect(page.getByRole('link', { name: 'Download' })).toHaveCount(0);
+});
+
 test('shares the video where the browser can share files', async ({ page, context }) => {
   await offlineMap(context);
   // Chromium on Linux cannot share files; this stands in for a phone's share sheet.

@@ -94,6 +94,8 @@ export type Progress = {
 /** How a video will be paced. */
 export type PlanReport = {
   activities: number;
+  meters: number;
+  privacyOmitted: number;
   /** The replay's length in seconds, without the end card. */
   seconds: number;
   /**

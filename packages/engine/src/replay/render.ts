@@ -115,6 +115,8 @@ export type RenderOptions = {
   view?: View;
   /** Without a moving camera the frame stays on `view`. */
   camera?: CameraPath;
+  /** Keep the clipped path's vertices so shortcuts cannot cross its hidden areas. */
+  preserveRoutePoints?: boolean;
   /** Street map drawn under the heatmap, with one level per entry of `mapLevelViews`. */
   basemap?: Basemap;
   /** Bounded map and heat canvases for a camera that pans over long distances. */
@@ -289,8 +291,9 @@ export function createRenderer(
     throw new Error('A fixed camera takes a basemap with one level');
 
   // Points closer than a third of a pixel add nothing, at the closest the camera gets.
+  const minGapPx = options.preserveRoutePoints ? 0 : 0.35 / (camera?.maxZoom ?? 1);
   const prepared: Prepared[] = tracks.map((track) => ({
-    ...projectTrack(track, view, 0.35 / (camera?.maxZoom ?? 1)),
+    ...projectTrack(track, view, minGapPx),
     date: dateFormat.format(track.startTime),
     idx: 0,
     headX: 0,
