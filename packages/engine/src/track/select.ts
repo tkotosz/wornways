@@ -3,6 +3,7 @@
 import type { RenderSettings } from '../replay/settings.ts';
 import { cleanTrack, paceByDistance, trackLengthM, trimEdgeJumps } from './clean.ts';
 import { distanceFrom } from './places.ts';
+import { trimEndpoints } from './trim.ts';
 import { pointCount, type Track } from './types.ts';
 
 /** A track shorter than this on the map is left out: it is invisible at any useful zoom. */
@@ -18,7 +19,8 @@ export function sportIncluded(settings: Pick<RenderSettings, 'sports'>, sport: s
 }
 
 /** Why a selection has no tracks. */
-export type SelectionProblem = 'nothing-matches' | 'nothing-near' | 'nothing-usable';
+export type SelectionProblem =
+  'nothing-matches' | 'nothing-near' | 'nothing-usable' | 'nothing-after-trim';
 
 /** What the place filters ask for, in words, e.g. "starts near the chosen place". */
 export function nearPlacesText(settings: Pick<RenderSettings, 'startNear' | 'endNear'>): string {
@@ -53,6 +55,8 @@ export type Selection = Omit<Match, 'kept' | 'problem'> & {
   trimmed: { track: Track; start: number; end: number }[];
   /** Activities left out for being shorter than `MIN_LENGTH_M`. */
   tooShort: Track[];
+  /** Otherwise usable routes left out after applying the privacy radius. */
+  privacyOmitted: number;
   /** Points of the kept activities before cleaning, and of the tracks after it. */
   rawPoints: number;
   keptPoints: number;
@@ -108,6 +112,7 @@ export function selectTracks(activities: Track[], settings: RenderSettings): Sel
     nearPlaces: kept.length,
     trimmed: [],
     tooShort: [],
+    privacyOmitted: 0,
     rawPoints: 0,
     keptPoints: 0,
   };
@@ -127,11 +132,20 @@ export function selectTracks(activities: Track[], settings: RenderSettings): Sel
     selection.tooShort.push(t);
     cleaned.splice(cleaned.indexOf(t), 1);
   }
-  if (settings.pace === 'distance')
-    for (let i = 0; i < cleaned.length; i++) cleaned[i] = paceByDistance(cleaned[i]);
   if (cleaned.length === 0) return { ...selection, problem: 'nothing-usable' };
 
-  selection.tracks = cleaned;
-  selection.keptPoints = cleaned.reduce((n, t) => n + pointCount(t), 0);
+  const tracks = settings.trimRadius
+    ? cleaned.flatMap((track) => {
+        const visible = trimEndpoints(track, settings.trimRadius);
+        return visible && trackLengthM(visible) >= MIN_LENGTH_M ? [visible] : [];
+      })
+    : cleaned;
+  selection.privacyOmitted = cleaned.length - tracks.length;
+  if (tracks.length === 0) return { ...selection, problem: 'nothing-after-trim' };
+  if (settings.pace === 'distance')
+    for (let i = 0; i < tracks.length; i++) tracks[i] = paceByDistance(tracks[i]);
+
+  selection.tracks = tracks;
+  selection.keptPoints = tracks.reduce((n, t) => n + pointCount(t), 0);
   return selection;
 }

@@ -79,6 +79,18 @@ in from the finished picture); the groups share the time in between, each at
 least 0.3 s. The headline shows the playing group: an activity's or a day's date, a week's
 dates, a month, or the dates all activities span; in a race, the race clock.
 
+### Replay privacy
+
+| Setting               | CLI flag        | Values   | Default |
+| --------------------- | --------------- | -------- | ------- |
+| Trim start and finish | `--trim-radius` | 0–2000 m | off     |
+
+In the web app, the slider is under Appearance. It uses the same radius around the
+start and finish of each selected activity. The preview and export keep the longest
+continuous section outside both circles. Activities with less than 200 m left are
+omitted. Export shows the visible distance and the number of omitted activities.
+Trimmed exports default to the filename `replay.mp4`.
+
 ### Look
 
 | Setting           | CLI flag             | Values                                                                 | Default |
@@ -151,5 +163,3 @@ the metrics card.
 - Day numbers ("Day 1, Day 2…") for trips: a day grouping labels days with their dates.
 - A speed factor ("n times real speed"): the video length is easier to reason about.
 - "Only the last n activities": a period covers the same need.
-- Hiding where routes start and end near home: hiding around one place only helps the
-  activities that start or end there, so how to offer privacy is still open.

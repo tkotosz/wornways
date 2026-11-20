@@ -276,6 +276,7 @@ const isoDay = (ms: number) => {
  */
 export function videoFileName(tracks: Track[], settings: RenderSettings): string {
   if (tracks.length === 0) throw new Error('No tracks to name');
+  if (settings.trimRadius) return 'replay.mp4';
   if (tracks.length === 1) return `activity-${tracks[0].id}.mp4`;
   const { from, to } = settings;
   if (from !== null && to !== null) {

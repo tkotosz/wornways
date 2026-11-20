@@ -119,6 +119,7 @@ export async function prepareReplay(
   const renderer = createRenderer(tracks, plan.timeline, options.createCanvas, {
     view,
     camera,
+    preserveRoutePoints: settings.trimRadius > 0,
     basemap,
     levelWindows,
     width,

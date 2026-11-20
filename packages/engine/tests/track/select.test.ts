@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { parseSettings } from '../../src/replay/settings.ts';
+import { trackLengthM } from '../../src/track/clean.ts';
 import { metresPerDegree } from '../../src/track/geo.ts';
 import { selectTracks } from '../../src/track/select.ts';
 import { STRIDE, pointCount, type Track } from '../../src/track/types.ts';
@@ -126,5 +127,37 @@ describe('selectTracks', () => {
     const short = activity({ id: 'short', day: 7, lengthM: 120 });
 
     expect(selectTracks([short], parseSettings({})).problem).toBe('nothing-usable');
+  });
+
+  it('trims each route by the same radius and keeps the untrimmed activities for matching', () => {
+    const short = activity({ id: 'short', day: 7, lengthM: 900 });
+    const setting = parseSettings({ 'trim-radius': '500' });
+    const selection = selectTracks([short, ...library], setting);
+    expect(selection.privacyOmitted).toBe(1);
+    expect(selection.matched[0]).toBe(short);
+    expect(selection.tracks).toHaveLength(library.length);
+    for (const track of selection.tracks) {
+      const original = library.find(({ id }) => id === track.id)!;
+      expect(track.points[0]).toBeCloseTo(original.points[0] + 500 / perLon, 9);
+      expect(trackLengthM(track)).toBeCloseTo(5_000);
+      expect(track.points[3]).toBe(0);
+      expect(track.points.at(-1)).toBeCloseTo(5_000 / 3);
+      expect(track.startTime).toBe(original.startTime);
+    }
+    expect(selectTracks([short], setting).problem).toBe('nothing-after-trim');
+    expect(selectTracks([short], parseSettings({})).tracks).toHaveLength(1);
+  });
+
+  it('separates a section that passes through an endpoint between GPS samples', () => {
+    // A straight leg crosses the start circle without any recorded point inside it.
+    const positions = [0, 1_000, -1_000, -2_000, -3_000];
+    const points = new Float64Array(
+      positions.flatMap((east, i) => [HOME.lon + east / perLon, HOME.lat, 100, i * 200]),
+    );
+    const loop = { ...library[0], points };
+    const selection = selectTracks([loop], parseSettings({ 'trim-radius': '250' }));
+    const track = selection.tracks[0];
+    expect(track.points[0]).toBeCloseTo(HOME.lon - 250 / perLon, 9);
+    expect(trackLengthM(track)).toBeCloseTo(2_500);
   });
 });

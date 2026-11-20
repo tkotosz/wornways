@@ -106,9 +106,9 @@ export function fineTuned(
 }
 
 /** The panels of the Appearance step, after its Frame panel. */
-export const APPEARANCE_PANELS: Panel[] = ['title', 'metrics', 'map', 'brand'];
+export const APPEARANCE_PANELS: Panel[] = ['privacy', 'title', 'metrics', 'map', 'brand'];
 /** Every group the two steps offer. Which activities are chosen in the step before them. */
-const ADJUST_GROUPS: SettingGroup[] = ['timing', 'look', 'title', 'metrics', 'brand'];
+const ADJUST_GROUPS: SettingGroup[] = ['timing', 'privacy', 'look', 'title', 'metrics', 'brand'];
 
 /** Shorter labels for the screen than the settings table's. */
 const LABELS: Record<string, string> = {
@@ -178,6 +178,7 @@ const HINTS: Record<string, string> = {
   camera:
     'Follows the moving route and pulls back at the end. Activities within each group ' +
     'play in turn with this camera. Races use Zooms out.',
+  'trim-radius': 'Hide the route within this radius of each activity’s start and finish.',
   'metrics-fields': 'In the order picked; the first is shown large.',
 };
 
@@ -185,6 +186,7 @@ const HINTS: Record<string, string> = {
 const STEPS: Record<string, number> = {
   duration: 1,
   overlap: 10,
+  'trim-radius': 50,
   'title-size': 10,
   'metrics-size': 10,
 };
@@ -208,13 +210,14 @@ export const isRace = (adjustments: Adjustments) =>
   adjustments['group'] === 'all' && adjustments['group-pace'] === 'real';
 
 /** A panel of settings on the Video and Text steps. */
-export type Panel = 'timing' | 'camera' | 'map' | 'title' | 'metrics' | 'brand';
+export type Panel = 'timing' | 'camera' | 'privacy' | 'map' | 'title' | 'metrics' | 'brand';
 
 /** The settings of each panel on the screens, in order: mostly the settings table's groups. */
 const PANELS: Record<Panel, string[]> = {
   // The video's length has a control of its own above Fine-tune playback.
   timing: ['group', 'share', 'group-pace', 'overlap', 'pace'],
   camera: ['camera'],
+  privacy: ['trim-radius'],
   map: ['map'],
   title: ['title', 'title-position', 'title-size'],
   metrics: ['metrics', 'metrics-fields', 'metrics-position', 'metrics-size'],

@@ -45,6 +45,9 @@ export type RenderSettings = {
   overlap: number;
   pace: 'time' | 'distance';
 
+  /** Hide routes within this many metres of their start or finish. Zero shows the full route. */
+  trimRadius: number;
+
   // Look
   camera: 'zoom' | 'fixed' | 'follow';
   map: boolean;
@@ -93,11 +96,13 @@ export type SettingKind =
   /** A frame size: WxH or the name of a preset. */
   | { type: 'size' };
 
-export type SettingGroup = 'activities' | 'timing' | 'look' | 'title' | 'metrics' | 'brand';
+export type SettingGroup =
+  'activities' | 'timing' | 'privacy' | 'look' | 'title' | 'metrics' | 'brand';
 
 export const GROUP_LABELS: Record<SettingGroup, string> = {
   activities: 'Which activities',
   timing: 'Timing',
+  privacy: 'Replay privacy',
   look: 'Look',
   title: 'Title',
   metrics: 'Metrics card',
@@ -276,6 +281,14 @@ export const SETTINGS: readonly SettingDefinition[] = [
       'an even speed along the route.',
   },
 
+  {
+    name: 'trim-radius',
+    label: 'Trim start and finish',
+    group: 'privacy',
+    kind: { type: 'number', min: 0, max: 2000, unit: 'm' },
+    default: '0',
+    help: 'Radius in metres around each activity’s start and finish. 0 shows the full route.',
+  },
   {
     name: 'camera',
     label: 'Camera',
@@ -565,6 +578,7 @@ export function parseSettings(input: SettingsInput): RenderSettings {
     groupPace: choice<'fit' | 'real'>('group-pace'),
     overlap: number('overlap'),
     pace: choice<'time' | 'distance'>('pace'),
+    trimRadius: number('trim-radius'),
     camera: choice<RenderSettings['camera']>('camera'),
     map: flag('map'),
     title: text('title'),

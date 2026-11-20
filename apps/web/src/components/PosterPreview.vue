@@ -40,9 +40,6 @@ const shape = computed(() => {
 });
 
 async function draw(): Promise<void> {
-  cancel?.();
-  busy.value = true;
-  error.value = '';
   const task = props.engine.makePoster(props.settings);
   cancel = task.cancel;
   try {
@@ -53,16 +50,24 @@ async function draw(): Promise<void> {
     busy.value = false;
   } catch (caught) {
     // A newer drawing took over; it clears "busy" when it is done.
-    if (caught instanceof Canceled) return;
+    if (cancel !== task.cancel || caught instanceof Canceled) return;
     error.value = caught instanceof Error ? caught.message : String(caught);
     busy.value = false;
   }
 }
 
 watch(
-  () => JSON.stringify(props.settings),
-  () => {
+  [() => JSON.stringify(props.settings), () => props.settings['trim-radius']],
+  ([, radius], previous) => {
     clearTimeout(timer);
+    cancel?.();
+    cancel = null;
+    if (radius !== previous?.[1] && url.value) {
+      URL.revokeObjectURL(url.value);
+      url.value = '';
+    }
+    error.value = '';
+    busy.value = true;
     timer = setTimeout(() => void draw(), PAUSE_MS);
   },
   { immediate: true },
