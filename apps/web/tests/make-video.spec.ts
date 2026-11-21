@@ -787,8 +787,16 @@ test('offers Highlight for a single activity, and the other presets for several'
     'aria-pressed',
     'true',
   );
+  // Fine-tune the camera, and a value the preset sets, which makes it Custom; then reset.
+  await camera.getByRole('button', { name: 'Fixed', exact: true }).click();
+  await page.getByTestId('group-timing').getByRole('button', { name: 'Day', exact: true }).click();
+  await expect(page.getByTestId('replay-summary')).toContainText('Custom playback');
   await page.getByRole('button', { name: 'Reset playback to defaults' }).click();
-  await expect(page.getByTestId('pacing')).toHaveText('This video: 2 activities, 14.7 s each.');
+  await expect(preset('All at once')).toHaveAttribute('aria-checked', 'true');
+  await expect(camera.getByRole('button', { name: 'Zooms out' })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
   const exactLength = page.getByRole('spinbutton', { name: 'Exact video length in seconds' });
   await exactLength.fill('20.5');
   await exactLength.press('Enter');

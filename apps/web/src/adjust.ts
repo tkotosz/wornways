@@ -94,11 +94,16 @@ export function withPreset(
   return { ...adjustments, [key]: preset };
 }
 
-/** Uses the engine's default playback settings for this selection size. */
+/**
+ * Back to the default playback for this selection size: its first preset (see
+ * `presetChoices`), with nothing fine-tuned.
+ */
 export function resetPlayback(adjustments: Adjustments, count: ActivityCount): Adjustments {
-  const names = new Set(PLAYBACK_SETTINGS.map((name) => adjustmentKey(name, count)));
-  const kept = Object.entries(adjustments).filter(([name]) => !names.has(name));
-  return withPreset(Object.fromEntries(kept), 'custom', count);
+  const names = new Set([
+    presetKey(count),
+    ...PLAYBACK_SETTINGS.map((name) => adjustmentKey(name, count)),
+  ]);
+  return Object.fromEntries(Object.entries(adjustments).filter(([name]) => !names.has(name)));
 }
 
 /**

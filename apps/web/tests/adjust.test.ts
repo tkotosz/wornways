@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { SETTINGS, parseSettings } from '@wornways/engine';
+import { SETTINGS } from '@wornways/engine';
 import {
   adjustSettings,
   fineTuned,
@@ -144,11 +144,17 @@ describe('presets', () => {
     );
     expect(adjustSettings(several, 'one')).toEqual({ duration: '15', camera: 'fixed' });
     expect(adjustSettings(several, 'several')).toMatchObject({ duration: '22.5', camera: 'zoom' });
-    for (const count of ['one', 'several'] as const) {
-      expect(parseSettings(adjustSettings(resetPlayback(several, count), count))).toEqual(
-        parseSettings({}),
-      );
-    }
+    // A reset goes back to the first preset, with nothing fine-tuned, and only for its size.
+    const custom = withPreset(several, 'custom', 'several');
+    expect(presetOf(resetPlayback(custom, 'several'), 'several')).toBe('all-at-once');
+    expect(adjustSettings(resetPlayback(custom, 'several'), 'several')).toEqual({
+      preset: 'all-at-once',
+    });
+    expect(adjustSettings(resetPlayback(custom, 'several'), 'one')).toEqual({
+      duration: '15',
+      camera: 'fixed',
+    });
+    expect(adjustSettings(resetPlayback(single, 'one'), 'one')).toEqual({ preset: 'highlight' });
   });
 
   it('turns Custom when Fine-tune changes a value the preset sets, and only then', () => {
