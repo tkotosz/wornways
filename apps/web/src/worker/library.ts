@@ -67,7 +67,13 @@ export class Library {
 
   /** Reads the files and stores the activities that are new. */
   add(files: PickedFile[], onProgress: (progress: Progress) => void): Promise<ImportReport> {
-    return this.update(() => this.import(files, onProgress));
+    return this.locked(async () => {
+      // Another tab may have added activities since this one read the library. Read it
+      // again, so their IDs are not reused and their activities count as duplicates.
+      const stored = await this.store.readAll();
+      this.activities = new Map(stored.map((a) => [a.id, a]));
+      return this.import(files, onProgress);
+    });
   }
 
   private async import(
@@ -101,7 +107,7 @@ export class Library {
   }
 
   delete(ids: string[] | 'all'): Promise<void> {
-    return this.update(async () => {
+    return this.locked(async () => {
       if (ids === 'all') {
         await this.store.deleteAll();
         this.activities.clear();
@@ -112,15 +118,10 @@ export class Library {
     });
   }
 
-  /** Read and write under one lock so imports in two tabs cannot reuse the same ID. */
-  private update<T>(operation: () => Promise<T>): Promise<T> {
-    const update = async () => {
-      const stored = await this.store.readAll();
-      this.activities = new Map(stored.map((a) => [a.id, a]));
-      return operation();
-    };
+  /** Changes the library one change at a time, across tabs too. */
+  private locked<T>(operation: () => Promise<T>): Promise<T> {
     const result = this.pending.then(
-      () => navigator.locks?.request('wornways-library', update) ?? update(),
+      () => navigator.locks?.request('wornways-library', operation) ?? operation(),
     );
     this.pending = result.catch(() => {});
     return result;
