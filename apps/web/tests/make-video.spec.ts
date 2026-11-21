@@ -50,6 +50,14 @@ async function pickDay(page: Page, label: string, year: number, month: number, d
   await calendar.getByRole('button', { name: longDay.format(date), exact: true }).click();
 }
 
+/** The row of trail-run.tcx; strava-export.zip has another "Afternoon run", in March. */
+const trailRun = (page: Page) =>
+  page
+    .getByTestId('chosen')
+    .getByRole('row')
+    .filter({ hasText: 'Afternoon run' })
+    .filter({ hasText: 'Apr' });
+
 async function addFiles(page: Page, ...names: string[]): Promise<void> {
   await page.getByTestId('file-input').setInputFiles(names.map(fixture));
   await expect(page.getByTestId('import-report')).toBeVisible();
@@ -176,7 +184,7 @@ test('deletes one activity, then all of them', async ({ page }) => {
   // The library has no checkboxes: it is not a choice for the video.
   await expect(page.getByTestId('library').getByRole('checkbox')).toHaveCount(0);
 
-  await page.getByRole('button', { name: 'Delete trail-run' }).click();
+  await page.getByRole('button', { name: 'Delete Afternoon run' }).click();
   await expect(page.getByTestId('activity-count')).toHaveText('1 activity on this device');
 
   await page.getByRole('button', { name: 'Delete saved activities' }).click();
@@ -201,7 +209,7 @@ test('ticks and unticks every activity shown with the header box', async ({ page
   await selectAll.click();
   await expect(count).toContainText('0 of 5 activities selected');
   await expect(page.getByRole('button', { name: 'Continue' })).toBeDisabled();
-  await page.getByTestId('chosen').getByText('trail-run').click();
+  await trailRun(page).click();
   await expect(count).toContainText('1 of 5 activities selected');
   expect(await selectAll.evaluate((box) => (box as { indeterminate: boolean }).indeterminate)).toBe(
     true,
@@ -240,7 +248,7 @@ test('keeps the activity list in place while ticking and filtering', async ({ pa
   const asked = await matchRequests();
 
   // Ticking is not a filter: nothing is matched again.
-  await page.getByTestId('chosen').getByText('trail-run').click();
+  await trailRun(page).click();
   await expect(count).toContainText('4 of 5 activities selected');
   expect(await matchRequests()).toBe(asked);
 
@@ -280,7 +288,7 @@ test('chooses activities with filters and by hand', async ({ page }) => {
   await pickDay(page, 'To', 2026, 3, 31);
   await expect(page.getByRole('button', { name: /^To:/ })).toHaveText('31 Mar 2026');
   await expect(count).toContainText('of 3 activities');
-  await expect(chosen).not.toContainText('morning-ride');
+  await expect(chosen).not.toContainText('Morning ride');
 
   // Only sports with activities in the period are offered, but a picked one stays.
   const sports = page.getByRole('button', { name: /^(All|Ride|Run|Virtual ride)$/ });
@@ -447,7 +455,7 @@ test('keeps the video while the choice stays the same', async ({ page, context }
   await expect(page.getByRole('button', { name: 'Share', exact: true })).toHaveCount(0);
 
   await page.getByRole('button', { name: 'Activities', exact: true }).click();
-  await page.getByTestId('chosen').getByText('trail-run').click();
+  await trailRun(page).click();
   await page.getByRole('button', { name: 'Export', exact: true }).click();
   await expect(page.getByTestId('result')).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Make video' })).toBeVisible();
@@ -505,7 +513,7 @@ test('previews and exports trimmed routes and leaves out routes too short to sho
   await expect(make).toBeEnabled();
 
   await page.getByRole('button', { name: 'Activities', exact: true }).click();
-  await page.getByTestId('chosen').getByText('trail-run').click();
+  await trailRun(page).click();
   await page.getByRole('button', { name: 'Export', exact: true }).click();
   await expect(page.getByRole('alert')).toContainText('No usable route remains');
   await expect(make).toBeDisabled();
@@ -745,7 +753,7 @@ test('offers Highlight for a single activity, and the other presets for several'
   await page.goto('/');
   await addFiles(page, 'morning-ride.fit', 'trail-run.tcx');
   await page.getByRole('button', { name: 'Continue' }).click(); // to Activities
-  await page.getByTestId('chosen').getByText('trail-run').click();
+  await trailRun(page).click();
   await page.getByRole('button', { name: 'Continue' }).click(); // to Playback
   const presets = page.getByRole('radio');
   const preset = (name: string) => page.getByRole('radio', { name: new RegExp(`^${name}`) });
@@ -770,7 +778,7 @@ test('offers Highlight for a single activity, and the other presets for several'
 
   // Several: the presets for several, with their own default.
   await page.getByRole('button', { name: 'Activities', exact: true }).click();
-  await page.getByTestId('chosen').getByText('trail-run').click();
+  await trailRun(page).click();
   await page.getByRole('button', { name: 'Playback', exact: true }).click();
   await expect(presets).toHaveCount(3);
   await expect(preset('All at once')).toHaveAttribute('aria-checked', 'true');

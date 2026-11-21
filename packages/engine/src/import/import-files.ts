@@ -6,6 +6,7 @@
 import { distanceM } from '../track/geo.ts';
 import { trackStart } from '../track/places.ts';
 import type { ParsedActivity, Track } from '../track/types.ts';
+import { defaultActivityName } from './default-name.ts';
 import { FIT_FILE_ACTIVITY, fitFileType } from './fit.ts';
 import { findGarminEntry, isGarminList, parseGarminList, type GarminEntry } from './garmin-list.ts';
 import { parseActivitiesIndex, type IndexEntry } from './index-csv.ts';
@@ -235,12 +236,13 @@ export async function importFiles(
       const listName = entry?.name || garminEntry?.name;
       let id = fileId;
       for (let copy = 2; seen.has(id) || known.has(id); copy++) id = `${fileId}-${copy}`;
+      const sport = entry?.sport || garminEntry?.sport || parsed.sport;
       const activity = {
         ...parsed,
         id,
-        // The activity list's name, else the file's own, else the file name.
-        name: listName || parsed.name || idFromName(source.path),
-        sport: entry?.sport || garminEntry?.sport || parsed.sport,
+        // The activity list's name, else the file's own, else one from its time and sport.
+        name: listName || parsed.name || defaultActivityName(sport, parsed.startTime),
+        sport,
       };
       seen.add(id);
       result.activities.push(activity);
