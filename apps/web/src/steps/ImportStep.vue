@@ -1,6 +1,7 @@
 <script setup lang="ts">
-// Step 1: add activity files, folders or an export archive; see and delete what is stored.
-import { ref } from 'vue';
+// Step 1: choose where the activities come from: files saved on this device (added here, and
+// seen and deleted here), Strava, or the demo's made-up activities.
+import { computed, ref } from 'vue';
 import ActivityGrid from '../components/ActivityGrid.vue';
 import AddFiles from '../components/AddFiles.vue';
 import GettingFiles from '../components/GettingFiles.vue';
@@ -16,13 +17,20 @@ const props = defineProps<{
   stravaActive: boolean;
   stravaError: string;
   stravaBusy: string;
+  demoActive: boolean;
+  demoBusy: string;
+  demoError: string;
 }>();
 const emit = defineEmits<{
   changed: [library: ActivitySummary[]];
   next: [];
   files: [];
   disconnect: [];
+  demo: [];
 }>();
+
+/** Whether Strava or the demo is the source instead of the files on this device. */
+const otherSource = computed(() => props.stravaActive || props.demoActive);
 
 const error = ref('');
 const confirmingDeleteAll = ref(false);
@@ -52,23 +60,25 @@ async function remove(ids: string[] | 'all'): Promise<void> {
   <section>
     <h1>Choose an activity source</h1>
     <!-- What the app is for, while there is nothing in it yet. -->
-    <p v-if="!stravaActive && library.length === 0" class="intro" data-testid="intro">
+    <p v-if="!otherSource && library.length === 0" class="intro" data-testid="intro">
       Wornways turns your GPS activities into a short video: your routes build up over a street map,
       one after another or all at once, ready to share. Wornways makes your video on this device.
-      Files you add stay here.
+      Files you add stay here. Not ready to add yours?
+      <button type="button" class="link" :disabled="!!demoBusy" @click="emit('demo')">
+        See the demo first</button
+      >.
     </p>
-    <div :class="{ sources: stravaUrl || stravaActive }">
-      <section :class="{ 'source-card': stravaUrl || stravaActive }">
-        <header v-if="stravaUrl || stravaActive" class="source-heading">
+    <div class="sources">
+      <section class="source-card">
+        <header class="source-heading">
           <h2>Files</h2>
-          <p class="muted">Activities are saved on this device for next time.</p>
+          <p class="muted">
+            FIT, GPX or TCX files, a folder, or an export ZIP. Activities are saved on this device
+            for next time.
+          </p>
         </header>
-        <p v-else class="muted">
-          Add FIT, GPX or TCX files, a folder, or an export ZIP. Wornways reads them here in your
-          browser and keeps the activities on this device for next time.
-        </p>
         <div class="source-content">
-          <button v-if="stravaActive" type="button" class="secondary" @click="emit('files')">
+          <button v-if="otherSource" type="button" class="secondary" @click="emit('files')">
             Use files
           </button>
           <AddFiles v-else :engine="engine" @changed="emit('changed', $event)" />
@@ -111,11 +121,33 @@ async function remove(ids: string[] | 'all'): Promise<void> {
           </div>
         </div>
       </section>
+      <section class="source-card" data-testid="demo-source">
+        <header class="source-heading">
+          <h2>Demo</h2>
+          <p class="muted">
+            Not ready to add your own? Try Wornways with made-up rides and runs in Mallorca.
+          </p>
+        </header>
+        <div class="source-content">
+          <button
+            v-if="!demoActive"
+            type="button"
+            class="secondary"
+            :disabled="!!demoBusy"
+            @click="emit('demo')"
+          >
+            Try the demo
+          </button>
+          <p v-else class="muted">The demo is open.</p>
+        </div>
+      </section>
     </div>
     <p v-if="stravaBusy" class="muted" role="status">{{ stravaBusy }}</p>
+    <p v-if="demoBusy" class="muted" role="status">{{ demoBusy }}</p>
     <p v-if="stravaError" class="error" role="alert">{{ stravaError }}</p>
+    <p v-if="demoError" class="error" role="alert">{{ demoError }}</p>
     <p v-if="error" class="error" role="alert">{{ error }}</p>
-    <template v-if="!stravaActive && library.length">
+    <template v-if="!otherSource && library.length">
       <div class="library-head">
         <h2 data-testid="activity-count">
           {{ countText(library.length, 'activity', 'activities') }} on this device
@@ -137,7 +169,7 @@ async function remove(ids: string[] | 'all'): Promise<void> {
       <button
         type="button"
         class="primary"
-        :disabled="!stravaActive && library.length === 0"
+        :disabled="!otherSource && library.length === 0"
         @click="emit('next')"
       >
         Continue →

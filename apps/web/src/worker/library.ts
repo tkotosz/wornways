@@ -21,7 +21,7 @@ import type {
   PickedFile,
   Progress,
 } from '../messages.ts';
-import { createActivityStore, type ActivityStore } from './store.ts';
+import { createActivityStore, createMemoryStore, type ActivityStore } from './store.ts';
 
 /** Starts (or ends) this close together count as one place. */
 const PLACE_RADIUS_M = 500;
@@ -47,6 +47,11 @@ export class Library {
     const store = createActivityStore();
     const stored = await store.readAll();
     return new Library(store, new Map(stored.map((a) => [a.id, a])));
+  }
+
+  /** A library held in memory only, such as the demo's; nothing in it is saved. */
+  static inMemory(activities: Track[]): Library {
+    return new Library(createMemoryStore(activities), new Map(activities.map((a) => [a.id, a])));
   }
 
   /** Every activity, newest first. */

@@ -15,7 +15,6 @@ import {
   NO_CHOICE,
   choiceSettings,
   distanceRange,
-  filterSettings,
   placeMissing,
   placeSettings,
   type Choice,
@@ -24,12 +23,14 @@ import ModalPanel from './components/ModalPanel.vue';
 import type { EngineClient } from './engine-client.ts';
 import { install, installOffer } from './install.ts';
 import type { MadeVideo } from './made-video.ts';
-import type { ActivitySummary, MatchReport, PlanReport } from './messages.ts';
+import type { ActivitySummary, MatchReport, PlanReport, Source } from './messages.ts';
 import ActivitiesStep from './steps/ActivitiesStep.vue';
 import AppearanceStep from './steps/AppearanceStep.vue';
 import ExportStep from './steps/ExportStep.vue';
 import ImportStep from './steps/ImportStep.vue';
 import PlaybackStep from './steps/PlaybackStep.vue';
+import { useDemo } from './use-demo.ts';
+import { useMatches } from './use-matches.ts';
 import { useStrava } from './use-strava.ts';
 
 const props = defineProps<{ engine: EngineClient }>();
@@ -52,9 +53,13 @@ const library = ref<ActivitySummary[]>([]);
 const fileAdjustments = ref<Adjustments>(loadAdjustments());
 const stravaAdjustments = ref<Adjustments>({});
 const fileChoice = ref<Choice>({ ...NO_CHOICE });
-const fileMatches = ref<MatchReport>({ ids: [], problem: null });
-/** Whether the filters changed and the worker has not answered yet. */
-const fileMatching = ref(false);
+const { matches: fileMatches, matching: fileMatching } = useMatches(
+  props.engine,
+  'files',
+  fileChoice,
+  library,
+);
+const demo = useDemo(props.engine);
 const {
   active: strava,
   ready: stravaReady,
@@ -96,16 +101,37 @@ async function disconnectStrava(): Promise<void> {
 
 onBeforeUnmount(() => clearTimeout(toastTimer));
 
-const choice = computed({
-  get: () => (strava.value ? stravaChoice.value : fileChoice.value),
-  set: (after: Choice) => {
-    if (strava.value) stravaChoice.value = after;
-    else fileChoice.value = after;
-  },
+/** Where the activities come from: Strava or the demo while open, else this device. */
+const source = computed<Source>(() =>
+  strava.value ? 'strava' : demo.active.value ? 'demo' : 'files',
+);
+/** What each source keeps of its own: its activities, choice, matches and adjustments. */
+const current = computed(() => {
+  if (source.value === 'strava')
+    return {
+      rows: stravaRows,
+      choice: stravaChoice,
+      matches: stravaMatches,
+      matching: stravaMatching,
+      adjustments: stravaAdjustments,
+    };
+  if (source.value === 'demo') return demo;
+  return {
+    rows: library,
+    choice: fileChoice,
+    matches: fileMatches,
+    matching: fileMatching,
+    adjustments: fileAdjustments,
+  };
 });
-const sourceRows = computed(() => (strava.value ? stravaRows.value : library.value));
-const activityMatch = computed(() => (strava.value ? stravaMatches.value : fileMatches.value));
-const matching = computed(() => (strava.value ? stravaMatching.value : fileMatching.value));
+
+const choice = computed({
+  get: () => current.value.choice.value,
+  set: (after: Choice) => (current.value.choice.value = after),
+});
+const sourceRows = computed(() => current.value.rows.value);
+const activityMatch = computed(() => current.value.matches.value);
+const matching = computed(() => current.value.matching.value);
 const distances = computed(() => new Map(sourceRows.value.map((a) => [a.id, a.distanceM / 1000])));
 const awaitingPlace = computed(() => placeMissing(choice.value));
 const distanceScale = computed(() => {
@@ -142,11 +168,8 @@ const chosenIds = computed(() => {
 
 // What was set in the Video and Text steps, kept for the next visit.
 const adjustments = computed({
-  get: () => (strava.value ? stravaAdjustments.value : fileAdjustments.value),
-  set: (after: Adjustments) => {
-    if (strava.value) stravaAdjustments.value = after;
-    else fileAdjustments.value = after;
-  },
+  get: () => current.value.adjustments.value,
+  set: (after: Adjustments) => (current.value.adjustments.value = after),
 });
 watch(fileAdjustments, saveAdjustments);
 
@@ -171,7 +194,7 @@ const planningSettings = computed(() => {
   );
 });
 watch(
-  [() => stepIndex.value >= 2, () => JSON.stringify(planningSettings.value), strava],
+  [() => stepIndex.value >= 2, () => JSON.stringify(planningSettings.value), source],
   async ([show, key], _, onCleanup) => {
     plan.value = null;
     planError.value = '';
@@ -196,12 +219,12 @@ watch(video, (_, before) => {
 watch(settings, () => {
   if (video.value && video.value.settingsKey !== JSON.stringify(settings.value)) video.value = null;
 });
-watch(library, () => (video.value = null));
+watch([library, source], () => (video.value = null));
 
 /** Whether a step can be opened: later steps need activities, and a choice. */
 function reachable(id: Step): boolean {
   if (id === 'import') return true;
-  if (!strava.value && library.value.length === 0) return false;
+  if (source.value === 'files' && library.value.length === 0) return false;
   return (
     id === 'activities' ||
     (chosenIds.value.length > 0 && !awaitingPlace.value && !stravaBusy.value && !matching.value)
@@ -236,6 +259,19 @@ watch(topBar, (bar) => {
 });
 onBeforeUnmount(() => topBarSize.disconnect());
 
+/** Opens the demo in place of Strava or the files, and goes on to its activities. */
+async function openDemo(): Promise<void> {
+  if (strava.value) await endStrava();
+  if (await demo.open()) step.value = 'activities';
+}
+
+/** Leaves the demo, or Strava, for the files on this device. */
+async function useFiles(): Promise<void> {
+  if (strava.value) await endStrava();
+  await demo.close();
+  step.value = 'import';
+}
+
 // Each step starts at the top of the page.
 watch(step, () => window.scrollTo({ top: 0 }));
 
@@ -254,30 +290,6 @@ async function loadLibrary(): Promise<void> {
 onMounted(() => {
   if (unsupported) return;
   void loadLibrary();
-});
-
-// Find what the filters match whenever they or the library change; ticking activities is
-// not a filter, so it asks nothing. The last answer stays on screen until the next one
-// arrives, so the list does not empty and jump back to the top, but nobody can go on with
-// it meanwhile. A newer answer may arrive before an older one, so only the latest request's
-// answer is kept.
-let latest = 0;
-const fileFilters = computed(() => filterSettings(fileChoice.value, new Date()));
-watch([() => JSON.stringify(fileFilters.value), library], async () => {
-  const request = ++latest;
-  fileMatching.value = true;
-  try {
-    const result = await props.engine.match(fileFilters.value);
-    if (request === latest) fileMatches.value = result;
-  } catch (error) {
-    if (request === latest)
-      fileMatches.value = {
-        ids: [],
-        problem: error instanceof Error ? error.message : String(error),
-      };
-  } finally {
-    if (request === latest) fileMatching.value = false;
-  }
 });
 </script>
 
@@ -373,8 +385,12 @@ watch([() => JSON.stringify(fileFilters.value), library], async () => {
         :strava-active="strava"
         :strava-error="stravaError"
         :strava-busy="stravaBusy"
+        :demo-active="demo.active.value"
+        :demo-busy="demo.busy.value"
+        :demo-error="demo.error.value"
         @changed="library = $event"
-        @files="endStrava()"
+        @files="useFiles()"
+        @demo="openDemo()"
         @disconnect="disconnectStrava"
         @next="navigate('activities')"
       />
@@ -386,7 +402,7 @@ watch([() => JSON.stringify(fileFilters.value), library], async () => {
         :matched="matched"
         :distance-scale="distanceScale"
         :strava="strava"
-        :show-source="!!stravaUrl || strava"
+        :source="source"
         :busy="stravaBusy"
         :matching="matching"
         :notice="stravaNotice"
@@ -394,6 +410,7 @@ watch([() => JSON.stringify(fileFilters.value), library], async () => {
         @back="navigate('import')"
         @next="navigate('playback')"
         @retry="retryStrava()"
+        @leave-demo="useFiles()"
       />
       <PlaybackStep
         v-else-if="step === 'playback'"

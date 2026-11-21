@@ -3,6 +3,7 @@
 
 import { parseSettings, SettingsError } from '@wornways/engine';
 import type { Reply, Request } from '../messages.ts';
+import { DemoUnavailable, openDemo } from './demo.ts';
 import { Library } from './library.ts';
 import { planVideo } from './plan.ts';
 import { makePoster } from './poster.ts';
@@ -13,6 +14,8 @@ import { Canceled, VideoProblem, makeVideo } from './video.ts';
 
 let library: Promise<Library> | undefined;
 let strava: StravaSession | null = null;
+/** The demo's activities while the demo is open. */
+let demo: Promise<Library> | null = null;
 void pruneStravaCaches();
 
 function getLibrary(): Promise<Library> {
@@ -31,7 +34,12 @@ function reply(message: Reply, transfer: Transferable[] = []): void {
 /** The message shown to the person for an error. */
 function messageFor(error: unknown): string {
   if (error instanceof SettingsError) return `The setting "${error.setting}" ${error.message}.`;
-  if (error instanceof VideoProblem || error instanceof StravaError) return error.message;
+  if (
+    error instanceof VideoProblem ||
+    error instanceof StravaError ||
+    error instanceof DemoUnavailable
+  )
+    return error.message;
   console.error(error);
   if (error instanceof ActivityStoreUnavailable) return error.message;
   return `Something went wrong: ${error instanceof Error ? error.message : String(error)}`;
@@ -71,21 +79,42 @@ async function answer(request: Exclude<Request, { type: 'cancel' }>, signal: Abo
     case 'strava-prioritize':
       session?.prioritize(request.ids);
       return reply({ type: 'strava-prioritized', id });
+    case 'demo-start': {
+      demo ??= openDemo().catch((error: unknown) => {
+        demo = null;
+        throw error;
+      });
+      return reply({ type: 'demo-started', id, activities: (await demo).summaries() });
+    }
+    case 'demo-end':
+      demo = null;
+      return reply({ type: 'demo-ended', id });
   }
-  const source = 'strava' in request && request.strava;
-  if (source && !session)
+  const source = 'source' in request ? request.source : 'files';
+  const stravaSession = source === 'strava' ? session : null;
+  if (source === 'strava' && !stravaSession)
     throw new StravaExpired('No Strava session is open for this request. Connect again.');
-  if (source && session) {
+  if (stravaSession) {
     if (request.type === 'match')
-      return reply({ type: 'matched', id, match: session.match(request.settings) });
+      return reply({ type: 'matched', id, match: stravaSession.match(request.settings) });
     if (request.type === 'places')
-      return reply({ type: 'places', id, places: session.places(request.settings, request.end) });
+      return reply({
+        type: 'places',
+        id,
+        places: stravaSession.places(request.settings, request.end),
+      });
   }
-  const renderSignal = source && session ? AbortSignal.any([signal, session.signal]) : signal;
+  /** The library the request is about: this device's own, or the demo's. */
+  const library = async (): Promise<Library> => {
+    if (source !== 'demo') return getLibrary();
+    if (!demo) throw new DemoUnavailable();
+    return demo;
+  };
+  const renderSignal = stravaSession ? AbortSignal.any([signal, stravaSession.signal]) : signal;
   const tracks = async () => {
-    if (!source || !session || !('settings' in request)) return (await getLibrary()).all();
+    if (!stravaSession || !('settings' in request)) return (await library()).all();
     const settings = parseSettings(request.settings);
-    const selected = await session.selected(settings.activities ?? []);
+    const selected = await stravaSession.selected(settings.activities ?? []);
     renderSignal.throwIfAborted();
     return selected;
   };
@@ -103,12 +132,12 @@ async function answer(request: Exclude<Request, { type: 'cancel' }>, signal: Abo
       return reply({ type: 'library', id, activities: lib.summaries() });
     }
     case 'match':
-      return reply({ type: 'matched', id, match: (await getLibrary()).match(request.settings) });
+      return reply({ type: 'matched', id, match: (await library()).match(request.settings) });
     case 'places':
       return reply({
         type: 'places',
         id,
-        places: (await getLibrary()).places(request.settings, request.end),
+        places: (await library()).places(request.settings, request.end),
       });
     case 'plan':
       return reply({ type: 'planned', id, plan: planVideo(await tracks(), request.settings) });
@@ -117,7 +146,7 @@ async function answer(request: Exclude<Request, { type: 'cancel' }>, signal: Abo
         await tracks(),
         request.settings,
         renderSignal,
-        source ? session?.loadTiles : undefined,
+        stravaSession?.loadTiles,
       );
       renderSignal.throwIfAborted();
       return reply({ type: 'poster-made', id, image });
@@ -128,7 +157,7 @@ async function answer(request: Exclude<Request, { type: 'cancel' }>, signal: Abo
         request.settings,
         renderSignal,
         progress,
-        source ? session?.loadTiles : undefined,
+        stravaSession?.loadTiles,
       );
       renderSignal.throwIfAborted();
       return reply({ type: 'video-made', id, video, report }, [video]);
