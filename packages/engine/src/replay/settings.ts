@@ -319,7 +319,8 @@ export const SETTINGS: readonly SettingDefinition[] = [
     help:
       'zoom: start close and pull back smoothly as the routes spread. fixed: show the ' +
       'whole area from the first frame. follow: track the moving end of each route, then ' +
-      'pull back to show every route. Races use zoom.',
+      'pull back to show every route. Races, and activities drawn for under a second each, ' +
+      'use zoom.',
   },
   {
     name: 'map',

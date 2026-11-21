@@ -13,7 +13,14 @@ const UNITS = {
   month: ['month', 'months'],
 } as const;
 
-function pacingText({
+function pacingText(plan: PlanReport): string {
+  const text = groupsText(plan);
+  return plan.followTooShort
+    ? `${text} The activities are too short to follow, so the camera zooms out instead.`
+    : text;
+}
+
+function groupsText({
   activities,
   seconds,
   groups,

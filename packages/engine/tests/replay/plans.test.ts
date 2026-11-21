@@ -161,6 +161,34 @@ describe('planReplay', () => {
     expect(plan.timeline.progress(2, next!.start)).toBe(0);
   });
 
+  it('follows activities in turn while each gets long enough to follow', () => {
+    const plan = planReplay(august, parseSettings({ camera: 'follow', group: 'all' }));
+    const windows = plan.timeline.windows!;
+
+    expect(plan.camera).toBe('follow');
+    expect(windows[1]!.start).toBeCloseTo(windows[0]!.start + windows[0]!.duration);
+    expect(windows[0]!.duration).toBeGreaterThan(1);
+  });
+
+  it('films with the zoom camera and its pacing where following would jump', () => {
+    // Sixty activities in ten seconds: well under a second each.
+    const busy = Array.from({ length: 60 }, (_, i) => activity(2026, 8, 1 + (i % 28)));
+    const settings = { group: 'all', duration: '10' };
+    const followed = planReplay(busy, parseSettings({ ...settings, camera: 'follow' }));
+    const zoomed = planReplay(busy, parseSettings({ ...settings, camera: 'zoom' }));
+
+    expect(followed.camera).toBe('zoom');
+    expect(followed.note).toBe(zoomed.note);
+    expect(followed.timeline.windows).toEqual(zoomed.timeline.windows);
+  });
+
+  it('films a race with the zoom camera', () => {
+    const plan = planReplay(august, parseSettings({ preset: 'all-at-once', camera: 'follow' }));
+
+    expect(plan.timeline.mode).toBe('race');
+    expect(plan.camera).toBe('zoom');
+  });
+
   it('plays a single activity at its own pace, whatever the grouping', () => {
     for (const group of ['auto', 'all']) {
       const plan = planReplay([august[0]!], parseSettings({ group, 'group-pace': 'real' }));

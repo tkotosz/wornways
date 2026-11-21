@@ -195,7 +195,7 @@ const HINTS: Record<string, string> = {
     'down them, with long stops shortened. Even speed: at one steady speed along the route.',
   camera:
     'Follows the moving route and pulls back at the end. Activities within each group ' +
-    'play in turn with this camera. Races use Zooms out.',
+    'play in turn with this camera. Races, and activities too short to follow, use Zooms out.',
   'trim-radius': 'Hide the route within this radius of each activity’s start and finish.',
   'metrics-fields': 'In the order picked; the first is shown large.',
 };

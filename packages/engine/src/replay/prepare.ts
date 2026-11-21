@@ -7,7 +7,7 @@ import { MAP_ATTRIBUTION, MAX_TILE_ZOOM, type TileLoader } from '../map/tiles.ts
 import type { Track } from '../track/types.ts';
 import { followCamera, mapLevelViews, mapLevelWindows, type CameraPath } from './camera.ts';
 import { followRouteCamera } from './follow.ts';
-import { automaticTitle, planReplay, type Plan } from './plans.ts';
+import { automaticTitle, planReplay, type ReplayPlan } from './plans.ts';
 import { createRenderer, type CanvasFactory, type Renderer, type RenderOptions } from './render.ts';
 import type { RenderSettings } from './settings.ts';
 import { fitView } from './view.ts';
@@ -15,7 +15,7 @@ import { fitView } from './view.ts';
 export type ReplayParts = {
   /** Draws the frames, in order from 0. */
   renderer: Renderer;
-  plan: Plan;
+  plan: ReplayPlan;
   /** The title drawn at the top; empty for none. */
   title: string;
   width: number;
@@ -23,7 +23,7 @@ export type ReplayParts = {
   fps: number;
   /** The moving camera; undefined for a fixed one. */
   camera: CameraPath | undefined;
-  /** The camera in use after applying the fallback for races. */
+  /** The camera in use: the follow camera falls back to zoom where it cannot follow. */
   cameraMode: RenderSettings['camera'];
   /** What was loaded for the map; null when the settings leave the map out. */
   map: MapReport | null;
@@ -69,8 +69,7 @@ export async function prepareReplay(
   const plan = planReplay(tracks, settings);
   const title = settings.title ?? automaticTitle(tracks, settings);
   const view = fitView(tracks, width, height);
-  const cameraMode =
-    settings.camera === 'follow' && plan.timeline.mode === 'race' ? 'zoom' : settings.camera;
+  const cameraMode = plan.camera;
   const camera =
     cameraMode === 'follow'
       ? followRouteCamera(tracks, plan.timeline, view, fps)

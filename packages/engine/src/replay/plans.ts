@@ -1,6 +1,7 @@
 // Pacing rules: how long a video is and when each activity plays.
 
 import { trackLengthM } from '../track/clean.ts';
+import { canFollow } from './follow.ts';
 import { chronologicalTimeline, groupTimeline, raceTimeline, type Timeline } from './timeline.ts';
 import type { Track } from '../track/types.ts';
 import type { RenderSettings } from './settings.ts';
@@ -44,6 +45,8 @@ const HOLD_S = 2.5;
 const HOLD_BEFORE_END_CARD_S = 0.3;
 /** Automatic grouping takes the finest grouping that gives every group at least this long. */
 const SHORTEST_AUTO_GROUP_S = 1.5;
+/** The follow camera needs most activities drawn over at least this long. */
+const SHORTEST_FOLLOWED_S = 1;
 
 /** What one group covers: an activity, a calendar day, week or month, or every activity. */
 export type Grouping = 'activity' | 'day' | 'week' | 'month' | 'all';
@@ -215,19 +218,27 @@ export function activityPlan(track: Track, maxS: number, hold = HOLD_S): Plan {
   };
 }
 
+/** A plan and the camera that films it, which can differ from the one asked for. */
+export type ReplayPlan = Plan & { camera: RenderSettings['camera'] };
+
 /**
  * The pacing for the selected tracks, which must be in date order. A selection of exactly
  * one activity plays at that activity's own pace.
+ *
+ * The follow camera falls back to the zoom camera, with the zoom camera's pacing, where it
+ * cannot follow: a race draws every activity at once, and activities drawn for less than
+ * `SHORTEST_FOLLOWED_S` each would make it jump every few frames.
  */
-export function planReplay(tracks: Track[], settings: RenderSettings): Plan {
+export function planReplay(tracks: Track[], settings: RenderSettings): ReplayPlan {
   if (tracks.length === 0) throw new Error('No tracks to plan');
-  if (tracks.length === 1)
-    return activityPlan(
-      tracks[0],
-      settings.duration,
-      settings.endCard ? HOLD_BEFORE_END_CARD_S : HOLD_S,
-    );
-  return groupsPlan(tracks, settings);
+  if (tracks.length === 1) {
+    const hold = settings.endCard ? HOLD_BEFORE_END_CARD_S : HOLD_S;
+    return { ...activityPlan(tracks[0], settings.duration, hold), camera: settings.camera };
+  }
+  const plan = groupsPlan(tracks, settings);
+  if (settings.camera !== 'follow' || canFollow(plan.timeline, SHORTEST_FOLLOWED_S))
+    return { ...plan, camera: settings.camera };
+  return { ...groupsPlan(tracks, { ...settings, camera: 'zoom' }), camera: 'zoom' };
 }
 
 /** Whether the period from `from` up to (not including) `to` is exactly one calendar month. */

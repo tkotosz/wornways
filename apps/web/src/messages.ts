@@ -117,6 +117,8 @@ export type PlanReport = {
   realPace: boolean;
   /** Whether the camera follows the activities in each group in turn. */
   follows: boolean;
+  /** Whether the follow camera was asked for but the activities are too short to follow. */
+  followTooShort: boolean;
   /** How much of a group's time, in percent, the next group starts early. */
   overlap: number;
 };

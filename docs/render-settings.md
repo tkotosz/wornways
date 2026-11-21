@@ -120,7 +120,9 @@ The follow camera tracks the moving end of the route and pulls back to show the 
 replay at the end. Each activity gets a zoom suited to its pace, and the camera widens
 when gliding between distant routes. Activities within each group play in turn, with
 time shared by distance. During a group overlap the camera moves to the latest activity
-to start. Races use the zoom-out camera.
+to start. Races use the zoom-out camera, and so do videos whose activities are drawn for
+less than a second each (typically a year or more), where following would jump from one
+activity to the next every few frames.
 
 ### Title
 
