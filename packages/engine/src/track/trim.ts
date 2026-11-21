@@ -2,28 +2,48 @@ import { distanceM, longitudeDelta, mercatorY, metresPerDegree } from './geo.ts'
 import { trackEnd, trackStart, type LatLon } from './places.ts';
 import { STRIDE, type Track } from './types.ts';
 
-type Zone = { lon: number; y: number; scaleX: number; scaleY: number };
+type Zone = { lon: number; y: number; scaleX: number; scaleY: number; radius: number };
 type Interval = [from: number, to: number];
 
-function zoneAt({ lat, lon }: LatLon): Zone {
-  const { perLat, perLon } = metresPerDegree(lat);
+/**
+ * How much larger the hidden circle is than the radius asked for: its centre is at most
+ * half a grid cell's diagonal (radius / sqrt 2) from the endpoint, with a little to spare
+ * for the flat-earth distances.
+ */
+const GROWTH = 1 + 1.01 * Math.SQRT1_2;
+
+/**
+ * The circle hidden around an endpoint. A circle centred on the endpoint itself would give
+ * it away: every visible route starts on the circle's edge, and a few routes from the same
+ * place outline the circle and so its centre. Instead the circle is centred on the nearest
+ * point of a fixed grid, `radius` meters apart, which endpoints close together share. That
+ * point tells only that the endpoint is within half a cell of it. The circle is grown so
+ * that it still hides at least `radius` around the endpoint.
+ */
+export function hiddenCircle(point: LatLon, radius: number): { centre: LatLon; radius: number } {
+  const latStep = radius / metresPerDegree(0).perLat;
+  const lat = Math.round(point.lat / latStep) * latStep;
+  // Each grid row has its own spacing along it, so every point in the row snaps alike.
+  const lonStep = radius / Math.max(metresPerDegree(lat).perLon, 1e-6);
+  const lon = longitudeDelta(0, Math.round(point.lon / lonStep) * lonStep);
+  return { centre: { lat, lon }, radius: radius * GROWTH };
+}
+
+function zoneAt(point: LatLon, radius: number): Zone {
+  const { centre, radius: hidden } = hiddenCircle(point, radius);
+  const { perLat, perLon } = metresPerDegree(centre.lat);
   return {
-    lon,
-    y: mercatorY(lat),
+    lon: centre.lon,
+    y: mercatorY(centre.lat),
     scaleX: perLon,
-    scaleY: 360 * Math.cos((lat * Math.PI) / 180) * perLat,
+    scaleY: 360 * Math.cos((centre.lat * Math.PI) / 180) * perLat,
+    radius: hidden,
   };
 }
 
-/** The part of a map segment inside the endpoint's circle, in local metres. */
-function inside(
-  lon0: number,
-  y0: number,
-  lon1: number,
-  y1: number,
-  zone: Zone,
-  radius: number,
-): Interval | null {
+/** The part of a map segment inside a hidden circle, in local metres. */
+function inside(lon0: number, y0: number, lon1: number, y1: number, zone: Zone): Interval | null {
+  const { radius } = zone;
   const x = longitudeDelta(zone.lon, lon0) * zone.scaleX;
   const y = (y0 - zone.y) * zone.scaleY;
   const dx = longitudeDelta(lon0, lon1) * zone.scaleX;
@@ -58,7 +78,10 @@ function pointAt(points: Float64Array, index: number): Float64Array {
   return point;
 }
 
-/** Keep the longest continuous part of a cleaned route outside both endpoint circles. */
+/**
+ * Keep the longest continuous part of a cleaned route outside the circles hidden around its
+ * start and finish (see `hiddenCircle`).
+ */
 export function trimEndpoints(track: Track, radius: number, original: Track = track): Track | null {
   const p = track.points;
   const last = p.length / STRIDE - 1;
@@ -66,7 +89,7 @@ export function trimEndpoints(track: Track, radius: number, original: Track = tr
   // Cleaning can drop an endpoint that the surviving route visits again later.
   for (const point of [trackStart(original), trackEnd(original)])
     if (!ends.some(({ lat, lon }) => lat === point.lat && lon === point.lon)) ends.push(point);
-  const zones = ends.map(zoneAt);
+  const zones = ends.map((point) => zoneAt(point, radius));
   // Track a visible section with fractional point indices, so each cut can land
   // between two samples without joining separate sections.
   let start = 0;
@@ -89,7 +112,7 @@ export function trimEndpoints(track: Track, radius: number, original: Track = tr
     if (![p[a], y0, p[b], y1].every(Number.isFinite)) return null;
     const distance = distanceM(p[a + 1], p[a], p[b + 1], p[b]);
     const hidden = zones
-      .map((zone) => inside(p[a], y0, p[b], y1, zone, radius))
+      .map((zone) => inside(p[a], y0, p[b], y1, zone))
       .filter((interval) => interval !== null)
       .sort((a, b) => a[0] - b[0]);
     let shown = 0;
