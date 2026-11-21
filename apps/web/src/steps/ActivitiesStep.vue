@@ -5,6 +5,7 @@ import { computed } from 'vue';
 import { placeMissing, type Choice } from '../choice.ts';
 import ActivityFilters from '../components/ActivityFilters.vue';
 import ActivityGrid from '../components/ActivityGrid.vue';
+import DemoGuide from '../components/DemoGuide.vue';
 import type { EngineClient } from '../engine-client.ts';
 import type { ActivitySummary, MatchReport, Source } from '../messages.ts';
 
@@ -48,6 +49,7 @@ const ticked = computed(() => rows.value.filter((a) => !choice.value.excluded.in
       </button>
       <button v-else type="button" class="link" @click="emit('back')">Change source</button>
     </p>
+    <DemoGuide v-if="source === 'demo'" />
     <ActivityFilters
       v-model="choice"
       :engine="engine"

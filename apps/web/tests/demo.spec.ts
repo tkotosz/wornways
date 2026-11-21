@@ -21,6 +21,7 @@ test('tries the demo, makes a video of it, and leaves the own library as it was'
   await expect(page.getByTestId('source')).toContainText('Demo: made-up activities in Mallorca');
   const count = page.getByTestId('chosen-count');
   await expect(count).toContainText('25 of 25 activities selected');
+  await expect(page.getByTestId('demo-guide')).toContainText('Things to try');
 
   // Just one short run, to keep the video quick.
   await page.getByRole('checkbox', { name: 'Select all shown' }).click();
@@ -38,8 +39,27 @@ test('tries the demo, makes a video of it, and leaves the own library as it was'
   await expect(page.getByRole('heading', { name: 'Choose an activity source' })).toBeVisible();
   await expect(page.getByTestId('activity-count')).toHaveText('1 activity on this device');
   await page.reload();
+  // Back on the own files, which have no guide.
+  await expect(page.getByTestId('source')).toContainText('Files on this device');
+  await expect(page.getByTestId('demo-guide')).toHaveCount(0);
   await page.getByRole('button', { name: 'Source', exact: true }).click();
   await expect(page.getByTestId('activity-count')).toHaveText('1 activity on this device');
+});
+
+test('follows the guide to a highlight of the long ride', async ({ page }) => {
+  page.setDefaultTimeout(15_000);
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Try the demo' }).click();
+  await expect(page.getByTestId('demo-guide')).toContainText('Sa Calobra (18 April, 104 km)');
+
+  await page.getByRole('checkbox', { name: 'Select all shown' }).click();
+  const ride = page.getByTestId('chosen').getByRole('row').filter({ hasText: 'Sa Calobra' });
+  await expect(ride).toContainText('18 Apr');
+  await expect(ride).toContainText('104 km');
+  await ride.click();
+  await expect(page.getByTestId('chosen-count')).toContainText('1 of 25 activities selected');
+  await page.getByRole('button', { name: 'Continue' }).click();
+  await expect(page.getByTestId('replay-summary')).toContainText('Highlight');
 });
 
 test('loads the demo only when it is opened, not with the app', async ({ page }) => {
