@@ -24,9 +24,15 @@ export const PRESETS: Record<Preset, PresetDefinition> = {
     settings: { group: 'auto', share: 'even', 'group-pace': 'fit', duration: '30' },
   },
   'multiday-trip': {
-    help: 'one day after another, a longer day getting more time',
+    help: 'one day after another, a longer day getting more time, the camera following the route',
     activities: 'several',
-    settings: { group: 'day', share: 'distance', 'group-pace': 'fit', duration: '45' },
+    settings: {
+      group: 'day',
+      share: 'distance',
+      'group-pace': 'fit',
+      duration: '45',
+      camera: 'follow',
+    },
   },
   highlight: {
     help: 'for one activity: a 15-second clip, the camera following the route',

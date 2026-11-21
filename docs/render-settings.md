@@ -31,12 +31,12 @@ Single- and multi-activity replays remember their timing and camera settings ind
 Use **Reset playback to defaults** under Fine-tune playback for the same starting settings as
 `wornways render` without a preset.
 
-| Preset          | What it plays                                                               | Settings                                                      |
-| --------------- | --------------------------------------------------------------------------- | ------------------------------------------------------------- |
-| `all-at-once`   | every activity starts at the same moment and moves at its real pace         | `--group all --group-pace real --duration 30`                 |
-| `recap`         | activities in turn, grouped as needed (a week by activity, a year by month) | `--group auto --share even --group-pace fit --duration 30`    |
-| `multiday-trip` | one day after another, a longer day getting more time                       | `--group day --share distance --group-pace fit --duration 45` |
-| `highlight`     | for one activity: a 15-second clip with the camera following the route      | `--duration 15 --camera follow`                               |
+| Preset          | What it plays                                                                         | Settings                                                                      |
+| --------------- | ------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| `all-at-once`   | every activity starts at the same moment and moves at its real pace                   | `--group all --group-pace real --duration 30`                                 |
+| `recap`         | activities in turn, grouped as needed (a week by activity, a year by month)           | `--group auto --share even --group-pace fit --duration 30`                    |
+| `multiday-trip` | one day after another, a longer day getting more time, the camera following the route | `--group day --share distance --group-pace fit --duration 45 --camera follow` |
+| `highlight`     | for one activity: a 15-second clip with the camera following the route                | `--duration 15 --camera follow`                                               |
 
 ## Settings
 

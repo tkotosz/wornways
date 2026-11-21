@@ -118,12 +118,13 @@ describe('presets', () => {
   });
 
   it('takes the settings a preset sets from the preset, even when set under Custom', () => {
-    const trip = { preset: 'multiday-trip', duration: '20', camera: 'fixed' };
+    const trip = { preset: 'multiday-trip', duration: '20', camera: 'fixed', pace: 'distance' };
 
     expect(valueOf(trip, definition('group'), 'several')).toBe('day');
     expect(valueOf(trip, definition('duration'), 'several')).toBe('45');
-    expect(valueOf(trip, definition('camera'), 'several')).toBe('fixed');
-    expect(adjustSettings(trip, 'several')).toEqual({ preset: 'multiday-trip', camera: 'fixed' });
+    expect(valueOf(trip, definition('camera'), 'several')).toBe('follow');
+    expect(valueOf(trip, definition('pace'), 'several')).toBe('distance');
+    expect(adjustSettings(trip, 'several')).toEqual({ preset: 'multiday-trip', pace: 'distance' });
   });
 
   it('picks a preset and keeps existing overrides', () => {

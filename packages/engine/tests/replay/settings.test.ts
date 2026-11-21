@@ -171,6 +171,7 @@ describe('parseSettings', () => {
       share: 'distance',
       groupPace: 'fit',
       duration: 45,
+      camera: 'follow',
     });
     expect(parseSettings({ preset: 'multiday-trip', duration: '20' }).duration).toBe(20);
     expect(parseSettings({ preset: 'highlight' })).toMatchObject({
