@@ -347,7 +347,8 @@ export class StravaSession {
     allowMissing = false,
   ): Promise<Response> {
     signal.throwIfAborted();
-    if (this.grant.expiresAt <= Date.now()) throw new StravaExpired('Your Strava session expired.');
+    if (this.grant.expiresAt <= Date.now())
+      throw new StravaExpired('Your Strava session expired before this request. Connect again.');
     const res = await fetch(`${API}?${query}`, {
       cache: 'no-store',
       credentials: 'same-origin',
@@ -362,7 +363,12 @@ export class StravaSession {
       this.limited = true;
       throw new StravaError('Strava’s request limit was reached. Try again in a few minutes.');
     }
-    if (res.status === 401) throw new StravaExpired('Your Strava session ended. Connect again.');
+    if (res.status === 401)
+      throw new StravaExpired(
+        res.headers.get('X-Wornways-Strava-Reason') === 'strava-rejected'
+          ? 'Strava rejected the access token. Connect again.'
+          : 'Your Strava session cookie is missing or was replaced. Connect again.',
+      );
     if (!res.ok && !(allowMissing && res.status === 404))
       throw new StravaError('Strava could not load your activities. Try again.');
     return res;

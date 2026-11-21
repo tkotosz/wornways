@@ -291,7 +291,9 @@ test('clears the browser session when the Strava activity endpoint rejects acces
   mock.expireAccess();
 
   await page.getByRole('button', { name: 'This month', exact: true }).click();
-  await expect(page.getByRole('alert')).toContainText('Your Strava session ended');
+  await expect(page.getByRole('alert')).toContainText(
+    'Your Strava session cookie is missing or was replaced',
+  );
   await expect(page.getByTestId('chosen')).toHaveCount(0);
   await expect(page.getByRole('link', { name: 'Connect with Strava' })).toBeVisible();
   await expect.poll(() => mock.disconnects).toEqual([false]);

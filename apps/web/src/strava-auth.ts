@@ -56,7 +56,7 @@ async function oauthRequest(method: 'POST' | 'DELETE', body: object): Promise<Re
   });
   if (!res.ok) {
     const data = (await res.json().catch(() => null)) as { error?: string } | null;
-    throw new Error(data?.error ?? 'Strava could not complete the request. Try again.');
+    throw new Error(data?.error ?? 'The Wornways server sent an unexpected answer. Try again.');
   }
   return res;
 }
@@ -65,7 +65,7 @@ export async function finishStravaAuthorization(params: URLSearchParams): Promis
   const state = sessionStorage.getItem(STATE);
   sessionStorage.removeItem(STATE);
   if (!state || params.get('state') !== state)
-    throw new Error('The Strava sign-in expired. Connect again.');
+    throw new Error('This Strava sign-in expired or was started in another tab. Connect again.');
   const authorizationError = params.get('error');
   if (authorizationError === 'access_denied') throw new Error('Strava access was canceled.');
   if (authorizationError)
@@ -81,7 +81,7 @@ export async function finishStravaAuthorization(params: URLSearchParams): Promis
     !Number.isFinite(grant.expiresAt) ||
     grant.expiresAt <= Date.now()
   )
-    throw new Error('The Strava sign-in expired. Connect again.');
+    throw new Error('Wornways received an unusable Strava session. Connect again.');
   return grant;
 }
 
