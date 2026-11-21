@@ -212,6 +212,45 @@ test('ticks and unticks every activity shown with the header box', async ({ page
   await expect(page.getByRole('button', { name: /^Delete/ })).toHaveCount(0);
 });
 
+test('keeps the activity list in place while ticking and filtering', async ({ page }) => {
+  page.setDefaultTimeout(15_000);
+  // Count what the page asks the worker to match. The tests are type-checked without the
+  // browser's types, hence the explicit shape of what the script touches.
+  type Counter = {
+    matchRequests: number;
+    Worker: { prototype: { postMessage: (this: unknown, message: unknown) => void } };
+  };
+  await page.addInitScript(() => {
+    const scope = globalThis as unknown as Counter;
+    scope.matchRequests = 0;
+    const post = scope.Worker.prototype.postMessage;
+    scope.Worker.prototype.postMessage = function (message, ...rest: unknown[]) {
+      if ((message as { type?: string } | null)?.type === 'match') scope.matchRequests++;
+      return (post as (...args: unknown[]) => void).call(this, message, ...rest);
+    };
+  });
+  const matchRequests = () => page.evaluate(() => (globalThis as unknown as Counter).matchRequests);
+  await page.goto('/');
+  await addFiles(page, 'strava-export.zip', 'morning-ride.fit', 'trail-run.tcx');
+  await page.getByRole('button', { name: 'Continue' }).click();
+  const count = page.getByTestId('chosen-count');
+  await expect(count).toContainText('5 of 5 activities selected');
+  // The list is never emptied and drawn again, which would scroll the page to the top.
+  const list = await page.getByTestId('chosen').elementHandle();
+  const asked = await matchRequests();
+
+  // Ticking is not a filter: nothing is matched again.
+  await page.getByTestId('chosen').getByText('trail-run').click();
+  await expect(count).toContainText('4 of 5 activities selected');
+  expect(await matchRequests()).toBe(asked);
+
+  // A filter is matched again, with the earlier list shown until the answer arrives.
+  await page.getByRole('button', { name: 'Run', exact: true }).click();
+  await expect(count).toContainText('1 of 2 activities selected');
+  expect(await matchRequests()).toBe(asked + 1);
+  expect(await list!.evaluate((element) => element.isConnected)).toBe(true);
+});
+
 test('chooses activities with filters and by hand', async ({ page }) => {
   page.setDefaultTimeout(15_000);
   await page.goto('/');
