@@ -31,6 +31,13 @@ const emit = defineEmits<{
 
 /** Whether Strava or the demo is the source instead of the files on this device. */
 const otherSource = computed(() => props.stravaActive || props.demoActive);
+/**
+ * The demo is for trying Wornways before adding anything: it is offered while there are no
+ * activities on this device and Strava is not connected, and stays shown while it is open.
+ */
+const offerDemo = computed(
+  () => props.demoActive || (!props.stravaActive && props.library.length === 0),
+);
 
 const error = ref('');
 const confirmingDeleteAll = ref(false);
@@ -122,7 +129,7 @@ async function remove(ids: string[] | 'all'): Promise<void> {
           </div>
         </div>
       </section>
-      <section class="source-card" data-testid="demo-source">
+      <section v-if="offerDemo" class="source-card" data-testid="demo-source">
         <header class="source-heading">
           <h2>Demo</h2>
           <p v-if="demoActive" class="muted">

@@ -159,7 +159,9 @@ Sample activities to try the app with come later, once there are routes that may
 - Besides files (and Strava), the Source step offers a demo: made-up rides and runs on real
   roads in Mallorca, for trying Wornways before adding one's own activities. A month of
   rides and runs from one town (for a recap), a five-day tour of the island (for a
-  multiday trip) and one long climb (for a highlight).
+  multiday trip) and one long climb (for a highlight). It is offered only while there are no
+  activities on this device and Strava is not connected: it is for trying Wornways before
+  adding anything.
 - The activities ship with the app as `apps/web/public/demo/mallorca.zip`, shaped like a
   Strava export, and the importer reads them like any export. They are fetched only when
   the demo opens; the service worker does not store files under `demo/` in advance.

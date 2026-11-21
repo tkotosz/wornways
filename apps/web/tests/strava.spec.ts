@@ -346,6 +346,8 @@ test('reuses the selected track after a reload and socket interruption', async (
   await page.getByRole('checkbox', { name: 'Strava test ride' }).check();
   await page.getByRole('button', { name: '← Back', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Disconnect Strava' })).toBeVisible();
+  // With Strava connected, the demo is not offered.
+  await expect(page.getByTestId('demo-source')).toHaveCount(0);
   await page.getByRole('button', { name: 'Continue' }).click();
   await expect(page.getByRole('checkbox', { name: 'Strava test ride' })).toBeChecked();
   await page.getByRole('button', { name: 'Continue' }).click();
