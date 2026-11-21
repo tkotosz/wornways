@@ -62,7 +62,8 @@ export const PRESET_LABELS: Record<PresetChoice, string> = {
 export const PRESET_LINES: Record<PresetChoice, string> = {
   recap: 'Your activities one after another, grouped automatically by day, week or month.',
   'all-at-once': 'Every activity starts together and traces its route at its real pace.',
-  'multiday-trip': 'Each day in turn, with longer days getting more screen time.',
+  'multiday-trip':
+    'Each day in turn, with longer days getting more screen time and the camera following the route.',
   highlight: 'A 15-second clip with the camera following the route.',
   custom: 'Your own settings, set under Fine-tune playback.',
 };

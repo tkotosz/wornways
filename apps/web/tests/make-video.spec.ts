@@ -655,7 +655,9 @@ test('sets up the video and its text, and keeps both for the next visit', async 
   await expect(pacing).toHaveText('This video: 2 activities, 14.7 s each.');
   await preset('Multiday trip').click();
   await expect(summary).toHaveText('45 seconds · Multiday trip');
-  await expect(pacing).toHaveText(/^This video: 2 days \(2 activities\), [\d.]+–[\d.]+ s each\.$/);
+  await expect(pacing).toHaveText(
+    /^This video: 2 days \(2 activities\), [\d.]+–[\d.]+ s each, following each activity in turn\.$/,
+  );
   await preset('All at once').click();
   await expect(pacing).toHaveText('This video: a race of all 2 activities, each at its real pace.');
 
