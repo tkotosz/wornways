@@ -6,17 +6,13 @@ const ride = new URL(
   import.meta.url,
 ).pathname;
 
-test('tries the demo, makes a video of it, and leaves the own library as it was', async ({
+test('tries the demo, makes a video of it, and stores nothing on this device', async ({
   page,
   context,
 }) => {
   page.setDefaultTimeout(15_000);
   await offlineMap(context);
   await page.goto('/');
-  // One activity of the person's own, to see that the demo leaves it alone.
-  await page.getByTestId('file-input').setInputFiles(ride);
-  await expect(page.getByTestId('activity-count')).toHaveText('1 activity on this device');
-
   await page.getByRole('button', { name: 'Try the demo' }).click();
   await expect(page.getByTestId('source')).toContainText('Demo: made-up activities in Mallorca');
   const count = page.getByTestId('chosen-count');
@@ -36,14 +32,30 @@ test('tries the demo, makes a video of it, and leaves the own library as it was'
 
   await page.getByRole('button', { name: 'Activities', exact: true }).click();
   await page.getByRole('button', { name: 'Leave the demo' }).click();
-  await expect(page.getByRole('heading', { name: 'Choose an activity source' })).toBeVisible();
-  await expect(page.getByTestId('activity-count')).toHaveText('1 activity on this device');
+  // Back where it started: nothing of the demo was kept, so it is offered again.
+  await expect(page.getByTestId('intro')).toBeVisible();
+  await expect(page.getByTestId('activity-count')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Try the demo' })).toBeVisible();
   await page.reload();
-  // Back on the own files, which have no guide.
-  await expect(page.getByTestId('source')).toContainText('Files on this device');
-  await expect(page.getByTestId('demo-guide')).toHaveCount(0);
-  await page.getByRole('button', { name: 'Source', exact: true }).click();
+  await expect(page.getByTestId('intro')).toBeVisible();
+  await expect(page.getByTestId('activity-count')).toHaveCount(0);
+});
+
+test('stops offering the demo once there are activities on this device', async ({ page }) => {
+  page.setDefaultTimeout(15_000);
+  await page.goto('/');
+  await expect(page.getByTestId('demo-source')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'See the demo first' })).toBeVisible();
+
+  await page.getByTestId('file-input').setInputFiles(ride);
   await expect(page.getByTestId('activity-count')).toHaveText('1 activity on this device');
+  await expect(page.getByTestId('demo-source')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: /demo/ })).toHaveCount(0);
+
+  // Deleting them all offers it again.
+  await page.getByRole('button', { name: 'Delete saved activities' }).click();
+  await page.getByRole('button', { name: 'Delete all', exact: true }).click();
+  await expect(page.getByTestId('demo-source')).toBeVisible();
 });
 
 test('offers only the demo on the source step while it is open', async ({ page }) => {
