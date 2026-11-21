@@ -271,7 +271,7 @@ export function useStrava(
     // The last answer stays on screen until this one arrives; see `matching`.
     matching.value = true;
     try {
-      const result = await engine.match(filters.value, true);
+      const result = await engine.match(filters.value, 'strava');
       if (current !== matchRequest || currentRows !== rows.value || !ready.value) return;
       const shown = new Set(currentRows.map((row) => row.id));
       selection.value = { ids: result.ids.filter((id) => shown.has(id)), problem: result.problem };

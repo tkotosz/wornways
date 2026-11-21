@@ -117,3 +117,18 @@ export function createActivityStore(): ActivityStore {
     },
   };
 }
+
+/** A store that keeps activities in memory only, such as the demo's: nothing is saved. */
+export function createMemoryStore(activities: Track[]): ActivityStore {
+  const stored = new Map(activities.map((a) => [a.id, a]));
+  return {
+    readAll: async () => [...stored.values()],
+    put: async (added) => {
+      for (const activity of added) stored.set(activity.id, activity);
+    },
+    delete: async (ids) => {
+      for (const id of ids) stored.delete(id);
+    },
+    deleteAll: async () => stored.clear(),
+  };
+}

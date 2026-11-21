@@ -154,6 +154,29 @@ Sample activities to try the app with come later, once there are routes that may
   where it starts and ends) apart from its points, so the list and the filters are
   instant and only the selected activities' points are loaded.
 
+### Demo
+
+- Besides files (and Strava), the Source step offers a demo: made-up rides and runs on real
+  roads in Mallorca, for trying Wornways before adding one's own activities. A month of
+  rides and runs from one town (for a recap), a five-day tour of the island (for a
+  multiday trip) and one long climb (for a highlight).
+- The activities ship with the app as `apps/web/public/demo/mallorca.zip`, shaped like a
+  Strava export, and the importer reads them like any export. They are fetched only when
+  the demo opens; the service worker does not store files under `demo/` in advance.
+- While the demo is open, the worker holds its activities in a library of their own, in
+  memory. They never go into the person's library, and the demo's choice and adjustments
+  start fresh each time and are not saved. Leaving the demo or reloading the page lets
+  them go.
+- The file is built by `npm run demo-routes` (`apps/cli/src/demo`): a road network from the
+  road lines of zoom-13 map tiles, shortest paths between named places (quieter roads
+  preferred; paths only for runs), and recorded times at a sport's speed with a little
+  variation. The tiles have no elevation, so the demo has none. The same map data always
+  gives the same file. The download stays within OpenFreeMap's terms for offline use:
+  under 3,000 tiles, 4 requests at a time, a User-Agent naming the app.
+- The routes are drawn from OpenStreetMap data, so the ZIP is published under the Open
+  Database License with "© OpenStreetMap contributors" (in the ZIP's `README.txt` and in
+  `THIRD_PARTY_NOTICES.md`).
+
 ### Preview
 
 - The worker sets up the replay at preview size (the longer side 480 pixels), skips to the

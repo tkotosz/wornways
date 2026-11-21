@@ -10,6 +10,7 @@ import type {
   Progress,
   Reply,
   Request,
+  Source,
   VideoReport,
 } from './messages.ts';
 
@@ -26,7 +27,8 @@ export class StravaExpired extends Error {}
 
 export class EngineClient {
   private nextId = 1;
-  private strava = false;
+  /** Where the activities of the steps after Activities come from. */
+  private source: Source = 'files';
   private readonly pending = new Map<number, Pending>();
 
   constructor(private readonly worker: Worker) {
@@ -73,7 +75,7 @@ export class EngineClient {
   async startStrava(grant: StravaGrant): Promise<void> {
     const reply = await this.send({ type: 'strava-start', id: this.nextId++, grant });
     if (reply.type !== 'strava-started') throw this.errorFor(reply);
-    this.strava = true;
+    this.source = 'strava';
   }
 
   async listStrava(
@@ -103,14 +105,28 @@ export class EngineClient {
   }
 
   async endStrava(disconnect = false): Promise<void> {
-    this.strava = false;
+    if (this.source === 'strava') this.source = 'files';
     const reply = await this.send({ type: 'strava-end', id: this.nextId++, disconnect });
     if (reply.type !== 'strava-ended') throw this.errorFor(reply);
   }
 
-  /** Which activities the settings choose. */
-  async match(settings: SettingsInput, strava = false): Promise<MatchReport> {
-    const reply = await this.send({ type: 'match', id: this.nextId++, settings, strava });
+  /** Opens the demo: its activities, held in memory, are the source until it ends. */
+  async startDemo(): Promise<ActivitySummary[]> {
+    const reply = await this.send({ type: 'demo-start', id: this.nextId++ });
+    if (reply.type !== 'demo-started') throw this.errorFor(reply);
+    this.source = 'demo';
+    return reply.activities;
+  }
+
+  async endDemo(): Promise<void> {
+    if (this.source === 'demo') this.source = 'files';
+    const reply = await this.send({ type: 'demo-end', id: this.nextId++ });
+    if (reply.type !== 'demo-ended') throw this.errorFor(reply);
+  }
+
+  /** Which of the source's activities the settings choose. */
+  async match(settings: SettingsInput, source: Source): Promise<MatchReport> {
+    const reply = await this.send({ type: 'match', id: this.nextId++, settings, source });
     if (reply.type === 'matched') return reply.match;
     throw this.errorFor(reply);
   }
@@ -122,7 +138,7 @@ export class EngineClient {
       id: this.nextId++,
       settings,
       end,
-      strava: this.strava,
+      source: this.source,
     });
     if (reply.type === 'places') return reply.places;
     throw this.errorFor(reply);
@@ -134,7 +150,7 @@ export class EngineClient {
       type: 'plan',
       id: this.nextId++,
       settings,
-      strava: this.strava,
+      source: this.source,
     });
     if (reply.type === 'planned') return reply.plan;
     throw this.errorFor(reply);
@@ -147,7 +163,7 @@ export class EngineClient {
   ): { result: Promise<{ video: Blob; report: VideoReport }>; cancel: () => void } {
     const id = this.nextId++;
     const result = this.send(
-      { type: 'make-video', id, settings, strava: this.strava },
+      { type: 'make-video', id, settings, source: this.source },
       onProgress,
     ).then((reply) => {
       if (reply.type === 'video-made')
@@ -163,7 +179,7 @@ export class EngineClient {
   /** Draws the last frame of the video, small, as a preview; `cancel` stops it. */
   makePoster(settings: SettingsInput): { result: Promise<Blob>; cancel: () => void } {
     const id = this.nextId++;
-    const result = this.send({ type: 'make-poster', id, settings, strava: this.strava }).then(
+    const result = this.send({ type: 'make-poster', id, settings, source: this.source }).then(
       (reply) => {
         if (reply.type === 'poster-made') return reply.image;
         throw this.errorFor(reply);

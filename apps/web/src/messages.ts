@@ -8,6 +8,9 @@ import type { StravaGrant } from './strava-auth.ts';
 
 export type PickedFile = { path: string; file: File };
 
+/** Where a request's activities come from: this device's library, Strava, or the demo. */
+export type Source = 'files' | 'strava' | 'demo';
+
 export type Request =
   | { type: 'read-library'; id: number }
   | { type: 'add-files'; id: number; files: PickedFile[] }
@@ -24,15 +27,18 @@ export type Request =
   | { type: 'strava-prepare'; id: number; ids: string[] }
   | { type: 'strava-prioritize'; id: number; ids: string[] }
   | { type: 'strava-end'; id: number; disconnect: boolean }
+  /** Loads the demo's activities into memory, and lets them go again. */
+  | { type: 'demo-start'; id: number }
+  | { type: 'demo-end'; id: number }
   /** Which activities the "Which activities" settings choose. */
-  | { type: 'match'; id: number; settings: SettingsInput; strava: boolean }
+  | { type: 'match'; id: number; settings: SettingsInput; source: Source }
   /** The places most of the activities these settings choose start or end at, to suggest. */
-  | { type: 'places'; id: number; settings: SettingsInput; end: TrackEnd; strava: boolean }
-  | { type: 'make-video'; id: number; settings: SettingsInput; strava: boolean }
+  | { type: 'places'; id: number; settings: SettingsInput; end: TrackEnd; source: Source }
+  | { type: 'make-video'; id: number; settings: SettingsInput; source: Source }
   /** The last frame of the video the settings describe, small, as a preview. */
-  | { type: 'make-poster'; id: number; settings: SettingsInput; strava: boolean }
+  | { type: 'make-poster'; id: number; settings: SettingsInput; source: Source }
   /** How the video the settings describe will be paced, without drawing it. */
-  | { type: 'plan'; id: number; settings: SettingsInput; strava: boolean }
+  | { type: 'plan'; id: number; settings: SettingsInput; source: Source }
   /** Stops the request with the given id; that request then replies "canceled". */
   | { type: 'cancel'; id: number };
 
@@ -49,6 +55,8 @@ export type Reply =
   | { type: 'strava-listed'; id: number; activities: ActivitySummary[] }
   | { type: 'strava-prepared'; id: number; unavailable: string[] }
   | { type: 'strava-prioritized'; id: number }
+  | { type: 'demo-started'; id: number; activities: ActivitySummary[] }
+  | { type: 'demo-ended'; id: number }
   | { type: 'failed'; id: number; message: string; expired?: boolean }
   | { type: 'canceled'; id: number };
 

@@ -1,27 +1,11 @@
 import { copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { expect, test, type BrowserContext, type Page } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
+import { offlineMap } from './offline-map.ts';
 
 const fixtures = new URL('../../../packages/engine/tests/import/fixtures/', import.meta.url);
 const fixture = (name: string) => new URL(name, fixtures).pathname;
-
-/**
- * Answers map requests without the network: a tile address template, and an empty
- * response for every tile (as for open sea). Returns how many requests it answered.
- */
-async function offlineMap(context: BrowserContext): Promise<() => number> {
-  let requests = 0;
-  await context.route('https://tiles.openfreemap.org/**', async (route) => {
-    requests++;
-    if (route.request().url().endsWith('/planet'))
-      return route.fulfill({
-        json: { tiles: ['https://tiles.openfreemap.org/test/{z}/{x}/{y}.pbf'] },
-      });
-    return route.fulfill({ status: 204 });
-  });
-  return () => requests;
-}
 
 const longDay = new Intl.DateTimeFormat('en-GB', {
   weekday: 'long',

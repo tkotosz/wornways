@@ -5,8 +5,9 @@ import { computed } from 'vue';
 import { placeMissing, type Choice } from '../choice.ts';
 import ActivityFilters from '../components/ActivityFilters.vue';
 import ActivityGrid from '../components/ActivityGrid.vue';
+import DemoGuide from '../components/DemoGuide.vue';
 import type { EngineClient } from '../engine-client.ts';
-import type { ActivitySummary, MatchReport } from '../messages.ts';
+import type { ActivitySummary, MatchReport, Source } from '../messages.ts';
 
 const props = defineProps<{
   engine: EngineClient;
@@ -15,7 +16,8 @@ const props = defineProps<{
   matched: MatchReport;
   distanceScale: { min: number; max: number } | null;
   strava?: boolean;
-  showSource?: boolean;
+  /** Where the activities come from, told above the filters. */
+  source: Source;
   busy?: string;
   /** The filters changed and the list shown is still the one from before. */
   matching?: boolean;
@@ -23,7 +25,13 @@ const props = defineProps<{
   canRetry?: boolean;
 }>();
 const choice = defineModel<Choice>({ required: true });
-const emit = defineEmits<{ back: []; next: []; retry: [] }>();
+const emit = defineEmits<{ back: []; next: []; retry: []; leaveDemo: [] }>();
+
+const SOURCE_LABELS: Record<Source, string> = {
+  files: 'Files on this device',
+  strava: 'Strava',
+  demo: 'Demo: made-up activities in Mallorca',
+};
 
 const byId = computed(() => new Map(props.library.map((a) => [a.id, a])));
 const rows = computed(() => props.matched.ids.flatMap((id) => byId.value.get(id) ?? []));
@@ -34,10 +42,14 @@ const ticked = computed(() => rows.value.filter((a) => !choice.value.excluded.in
   <section>
     <h1>Choose your activities</h1>
 
-    <p v-if="showSource" class="muted source">
-      {{ strava ? 'Strava' : 'Files on this device' }}
-      <button type="button" class="link" @click="emit('back')">Change source</button>
+    <p class="muted source" data-testid="source">
+      {{ SOURCE_LABELS[source] }}
+      <button v-if="source === 'demo'" type="button" class="link" @click="emit('leaveDemo')">
+        Leave the demo
+      </button>
+      <button v-else type="button" class="link" @click="emit('back')">Change source</button>
     </p>
+    <DemoGuide v-if="source === 'demo'" />
     <ActivityFilters
       v-model="choice"
       :engine="engine"
