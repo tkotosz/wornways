@@ -53,6 +53,8 @@ const fileAdjustments = ref<Adjustments>(loadAdjustments());
 const stravaAdjustments = ref<Adjustments>({});
 const fileChoice = ref<Choice>({ ...NO_CHOICE });
 const fileMatches = ref<MatchReport>({ ids: [], problem: null });
+/** Whether the filters changed and the worker has not answered yet. */
+const fileMatching = ref(false);
 const {
   active: strava,
   ready: stravaReady,
@@ -61,6 +63,7 @@ const {
   error: stravaError,
   notice: stravaNotice,
   matched: stravaMatches,
+  matching: stravaMatching,
   rows: stravaRows,
   url: stravaUrl,
   connect: connectStrava,
@@ -102,6 +105,7 @@ const choice = computed({
 });
 const sourceRows = computed(() => (strava.value ? stravaRows.value : library.value));
 const activityMatch = computed(() => (strava.value ? stravaMatches.value : fileMatches.value));
+const matching = computed(() => (strava.value ? stravaMatching.value : fileMatching.value));
 const distances = computed(() => new Map(sourceRows.value.map((a) => [a.id, a.distanceM / 1000])));
 const awaitingPlace = computed(() => placeMissing(choice.value));
 const distanceScale = computed(() => {
@@ -199,7 +203,8 @@ function reachable(id: Step): boolean {
   if (id === 'import') return true;
   if (!strava.value && library.value.length === 0) return false;
   return (
-    id === 'activities' || (chosenIds.value.length > 0 && !awaitingPlace.value && !stravaBusy.value)
+    id === 'activities' ||
+    (chosenIds.value.length > 0 && !awaitingPlace.value && !stravaBusy.value && !matching.value)
   );
 }
 
@@ -251,28 +256,29 @@ onMounted(() => {
   void loadLibrary();
 });
 
-// Find what the filters match whenever they or the library change. A newer answer may
-// arrive before an older one, so only the latest request's answer is kept.
+// Find what the filters match whenever they or the library change; ticking activities is
+// not a filter, so it asks nothing. The last answer stays on screen until the next one
+// arrives, so the list does not empty and jump back to the top, but nobody can go on with
+// it meanwhile. A newer answer may arrive before an older one, so only the latest request's
+// answer is kept.
 let latest = 0;
 const fileFilters = computed(() => filterSettings(fileChoice.value, new Date()));
-watch(
-  [() => JSON.stringify(fileFilters.value), library],
-  async () => {
-    const request = ++latest;
-    fileMatches.value = { ids: [], problem: null };
-    try {
-      const result = await props.engine.match(fileFilters.value);
-      if (request === latest) fileMatches.value = result;
-    } catch (error) {
-      if (request === latest)
-        fileMatches.value = {
-          ids: [],
-          problem: error instanceof Error ? error.message : String(error),
-        };
-    }
-  },
-  { deep: true },
-);
+watch([() => JSON.stringify(fileFilters.value), library], async () => {
+  const request = ++latest;
+  fileMatching.value = true;
+  try {
+    const result = await props.engine.match(fileFilters.value);
+    if (request === latest) fileMatches.value = result;
+  } catch (error) {
+    if (request === latest)
+      fileMatches.value = {
+        ids: [],
+        problem: error instanceof Error ? error.message : String(error),
+      };
+  } finally {
+    if (request === latest) fileMatching.value = false;
+  }
+});
 </script>
 
 <template>
@@ -382,6 +388,7 @@ watch(
         :strava="strava"
         :show-source="!!stravaUrl || strava"
         :busy="stravaBusy"
+        :matching="matching"
         :notice="stravaNotice"
         :can-retry="strava && (!stravaReady || sourceRows.length === 0)"
         @back="navigate('import')"

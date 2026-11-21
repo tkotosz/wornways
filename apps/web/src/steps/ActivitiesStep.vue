@@ -17,6 +17,8 @@ const props = defineProps<{
   strava?: boolean;
   showSource?: boolean;
   busy?: string;
+  /** The filters changed and the list shown is still the one from before. */
+  matching?: boolean;
   notice?: string;
   canRetry?: boolean;
 }>();
@@ -72,7 +74,7 @@ const ticked = computed(() => rows.value.filter((a) => !choice.value.excluded.in
       <button
         type="button"
         class="primary"
-        :disabled="!!busy || ticked.length === 0 || placeMissing(choice)"
+        :disabled="!!busy || matching || ticked.length === 0 || placeMissing(choice)"
         @click="emit('next')"
       >
         Continue →

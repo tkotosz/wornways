@@ -29,6 +29,8 @@ export function useStrava(
   const busy = ref('');
   const notice = ref('');
   const selection = ref<MatchReport>({ ids: [], problem: null });
+  /** Whether the filters changed and the worker has not answered yet. */
+  const matching = ref(false);
   let callback = takeStravaCallback();
   let session: (Pick<StravaGrant, 'sessionId' | 'expiresAt'> & StravaDraftStore) | null = null;
   let initialSelection: string[] = [];
@@ -266,7 +268,8 @@ export function useStrava(
     const currentRows = rows.value;
     if (!ready.value || !currentRows.length) return;
     const current = ++matchRequest;
-    selection.value = { ids: [], problem: null };
+    // The last answer stays on screen until this one arrives; see `matching`.
+    matching.value = true;
     try {
       const result = await engine.match(filters.value, true);
       if (current !== matchRequest || currentRows !== rows.value || !ready.value) return;
@@ -274,6 +277,8 @@ export function useStrava(
       selection.value = { ids: result.ids.filter((id) => shown.has(id)), problem: result.problem };
     } catch (caught) {
       if (current === matchRequest && currentRows === rows.value && ready.value) failed(caught);
+    } finally {
+      if (current === matchRequest) matching.value = false;
     }
   });
   let matchRequest = 0;
@@ -325,6 +330,7 @@ export function useStrava(
     error,
     notice,
     matched,
+    matching,
     rows,
     url,
     connect,
