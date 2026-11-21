@@ -31,6 +31,9 @@ Built on
 - Videos are drawn with the Inter font, https://github.com/rsms/inter, SIL Open Font
   License 1.1, in full at /fonts/Inter-LICENSE.txt.
 - Map data: OpenFreeMap, © OpenMapTiles, data from OpenStreetMap contributors.
+- Demo activities: made-up routes drawn along roads from OpenStreetMap data,
+  © OpenStreetMap contributors, Open Database License 1.0,
+  https://opendatacommons.org/licenses/odbl/1-0/.
 
 `;
 

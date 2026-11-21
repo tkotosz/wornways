@@ -10,6 +10,8 @@ const SOURCE = new URL('./src/service-worker.js', import.meta.url);
 
 /** Files in public/ that tell the host how to serve the others, not served themselves. */
 const HOST_FILES = new Set(['_headers', '_routes.json']);
+/** Folders in public/ fetched only when needed, such as the demo's activities. */
+const ON_DEMAND = ['demo/'];
 
 export function serviceWorker(): Plugin {
   let base = '/';
@@ -31,6 +33,7 @@ export function serviceWorker(): Plugin {
         const path = join(publicDir, name);
         // Rules for the host (Cloudflare Pages) are never served, so they cannot be stored.
         if (HOST_FILES.has(name)) continue;
+        if (ON_DEMAND.some((folder) => name.startsWith(folder))) continue;
         if (statSync(path).isFile()) files.set(name, readFileSync(path));
       }
 

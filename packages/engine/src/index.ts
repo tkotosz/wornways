@@ -45,7 +45,8 @@ export {
   type RenderOptions,
   type Renderer,
 } from './replay/render.ts';
-export { distanceM } from './track/geo.ts';
+export { distanceM, mercatorX, mercatorY } from './track/geo.ts';
+export { MVT_LINE, decodeMvt, type MvtFeature, type MvtLayer } from './map/mvt.ts';
 export { fitView, trackArea, type View } from './replay/view.ts';
 export {
   tilesForView,

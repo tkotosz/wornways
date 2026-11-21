@@ -12,6 +12,8 @@
 - `npm run dev:phone`: the built web app over HTTPS on the local network, for trying it on
   a phone (see the README).
 - `npm run lint` / `npm run format`: ESLint and Prettier.
+- `npm run demo-routes`: rebuilds the web app's demo activities
+  (`apps/web/public/demo/mallorca.zip`) from map tiles; the same map data gives the same file.
 - `npm run icons`: draws the web app's PNG icons from the SVG marks in
   `apps/web/public/icons/`.
 - `npm run build`: TypeScript project build.

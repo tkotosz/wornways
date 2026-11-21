@@ -1,7 +1,8 @@
 # Third-party notices
 
-Wornways reuses code from one project and ships one font made by others. This file says
-exactly what, and carries the licenses that ask to be passed on.
+Wornways reuses code from one project, ships one font made by others, and ships demo
+activities drawn from OpenStreetMap data. This file says exactly what, and carries the
+licenses that ask to be passed on.
 
 ## strava-home-runs
 
@@ -49,3 +50,12 @@ SOFTWARE.
 - Used in: the web app draws the text of its videos with it
   (`apps/web/public/fonts/InterVariable.woff2`).
 - License: SIL Open Font License 1.1, in full in `apps/web/public/fonts/Inter-LICENSE.txt`.
+
+## OpenStreetMap data
+
+- Source: OpenStreetMap, through the OpenMapTiles vector tiles served by OpenFreeMap.
+- Used in: the web app's demo activities (`apps/web/public/demo/mallorca.zip`), made-up
+  routes drawn along its roads by `npm run demo-routes`.
+- License: © OpenStreetMap contributors, available under the Open Database License (ODbL)
+  1.0, https://opendatacommons.org/licenses/odbl/1-0/. The demo activities are published
+  under the same license; the ZIP's `README.txt` says so too.
