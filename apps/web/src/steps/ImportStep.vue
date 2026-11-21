@@ -68,8 +68,9 @@ async function remove(ids: string[] | 'all'): Promise<void> {
         See the demo first</button
       >.
     </p>
+    <!-- While the demo is open, only the demo is offered: leaving it brings the others back. -->
     <div class="sources">
-      <section class="source-card">
+      <section v-if="!demoActive" class="source-card">
         <header class="source-heading">
           <h2>Files</h2>
           <p class="muted">
@@ -85,7 +86,7 @@ async function remove(ids: string[] | 'all'): Promise<void> {
           <GettingFiles />
         </div>
       </section>
-      <section v-if="stravaUrl || stravaActive" class="source-card">
+      <section v-if="!demoActive && (stravaUrl || stravaActive)" class="source-card">
         <header class="source-heading">
           <h2>Strava</h2>
           <p class="muted">Your connection and cached activities last up to two hours.</p>
@@ -124,7 +125,11 @@ async function remove(ids: string[] | 'all'): Promise<void> {
       <section class="source-card" data-testid="demo-source">
         <header class="source-heading">
           <h2>Demo</h2>
-          <p class="muted">
+          <p v-if="demoActive" class="muted">
+            You are trying Wornways with made-up rides and runs in Mallorca. Leave the demo to add
+            your own files or connect Strava.
+          </p>
+          <p v-else class="muted">
             Not ready to add your own? Try Wornways with made-up rides and runs in Mallorca.
           </p>
         </header>
@@ -138,7 +143,9 @@ async function remove(ids: string[] | 'all'): Promise<void> {
           >
             Try the demo
           </button>
-          <p v-else class="muted">The demo is open.</p>
+          <button v-else type="button" class="secondary" @click="emit('files')">
+            Leave the demo
+          </button>
         </div>
       </section>
     </div>

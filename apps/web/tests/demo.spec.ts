@@ -46,6 +46,24 @@ test('tries the demo, makes a video of it, and leaves the own library as it was'
   await expect(page.getByTestId('activity-count')).toHaveText('1 activity on this device');
 });
 
+test('offers only the demo on the source step while it is open', async ({ page }) => {
+  page.setDefaultTimeout(15_000);
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Try the demo' }).click();
+  await expect(page.getByTestId('chosen-count')).toContainText('25 of 25');
+
+  await page.getByRole('button', { name: 'Source', exact: true }).click();
+  const demo = page.getByTestId('demo-source');
+  await expect(demo).toContainText('Leave the demo to add your own files or connect Strava');
+  await expect(page.getByRole('heading', { name: 'Files' })).toHaveCount(0);
+  await expect(page.getByTestId('file-input')).toHaveCount(0);
+
+  await demo.getByRole('button', { name: 'Leave the demo' }).click();
+  await expect(page.getByRole('heading', { name: 'Files' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Choose files' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Try the demo' })).toBeVisible();
+});
+
 test('follows the guide to a highlight of the long ride', async ({ page }) => {
   page.setDefaultTimeout(15_000);
   await page.goto('/');
