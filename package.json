@@ -21,7 +21,8 @@
     "dev:web:vite": "npm run dev -w @wornways/web",
     "test:web": "playwright test",
     "dev:phone": "npm run phone -w @wornways/web",
-    "icons": "node apps/web/scripts/make-icons.ts"
+    "icons": "node apps/web/scripts/make-icons.ts",
+    "demo-routes": "node --conditions=source --import tsx apps/cli/src/demo/main.ts"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
