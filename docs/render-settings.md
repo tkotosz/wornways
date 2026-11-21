@@ -97,9 +97,17 @@ dates, a month, or the dates all activities span; in a race, the race clock.
 | --------------------- | --------------- | -------- | ------- |
 | Trim start and finish | `--trim-radius` | 0–2000 m | off     |
 
-In the web app, the slider is under Appearance. It uses the same radius around the
+In the web app, the slider is under Appearance. It hides at least this radius around the
 start and finish of each selected activity. The preview and export keep the longest
-continuous section outside those circles. If GPS cleaning moves an endpoint,
+continuous section outside the hidden circles.
+
+A hidden circle is not centered on the start or finish itself: every visible route would
+begin on its edge, and a few routes from the same place would outline the circle and so
+its center. Instead the circle is centered on the nearest point of a fixed grid, spaced
+one radius apart, and is about 1.7 times the radius so that it still covers the radius
+around the real endpoint. Starts close together share a circle; its center tells only
+that they are within half a grid cell of it. Routes are trimmed only around their own
+start and finish, so a route that passes another activity's start stays visible there. If GPS cleaning moves an endpoint,
 the radius applies to its original and cleaned positions. Activities with less than 200 m left are
 omitted. Export shows the visible distance and the number of omitted activities.
 Trimmed exports default to the filename `replay.mp4`.

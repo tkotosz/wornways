@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { parseSettings } from '../../src/replay/settings.ts';
 import { trackLengthM } from '../../src/track/clean.ts';
-import { metresPerDegree } from '../../src/track/geo.ts';
+import { distanceM, metresPerDegree } from '../../src/track/geo.ts';
+import type { LatLon } from '../../src/track/places.ts';
 import { selectTracks } from '../../src/track/select.ts';
+import { hiddenCircle } from '../../src/track/trim.ts';
 import { STRIDE, pointCount, type Track } from '../../src/track/types.ts';
 
 const HOME = { lat: 47.5, lon: 19 };
@@ -24,6 +26,21 @@ function activity({ id, day, sport = 'ride', startEastM = 0, lengthM = 6_000 }: 
 }
 
 const ids = (tracks: Track[]) => tracks.map((t) => t.id);
+
+/** The position of point `i` of a track. */
+const at = (track: Track, i: number): LatLon => ({
+  lat: track.points[i * STRIDE + 1]!,
+  lon: track.points[i * STRIDE]!,
+});
+const metres = (a: LatLon, b: LatLon) => distanceM(a.lat, a.lon, b.lat, b.lon);
+/** How far a point is from the edge of the circle hidden around `endpoint`. */
+const offEdge = (point: LatLon, endpoint: LatLon, radius: number) => {
+  const circle = hiddenCircle(endpoint, radius);
+  return metres(point, circle.centre) - circle.radius;
+};
+/** The shortest distance from any point of the track to `place`. */
+const closest = (track: Track, place: LatLon) =>
+  Math.min(...Array.from({ length: pointCount(track) }, (_, i) => metres(at(track, i), place)));
 
 describe('selectTracks', () => {
   const library = [
@@ -155,10 +172,15 @@ describe('selectTracks', () => {
     expect(selection.tracks).toHaveLength(library.length);
     for (const track of selection.tracks) {
       const original = library.find(({ id }) => id === track.id)!;
-      expect(track.points[0]).toBeCloseTo(original.points[0] + 500 / perLon, 9);
-      expect(trackLengthM(track)).toBeCloseTo(5_000);
+      const [start, end] = [at(original, 0), at(original, pointCount(original) - 1)];
+      // Cut where the route leaves the hidden circles, never within 500 m of its ends.
+      expect(offEdge(at(track, 0), start, 500)).toBeCloseTo(0, 1);
+      expect(offEdge(at(track, pointCount(track) - 1), end, 500)).toBeCloseTo(0, 1);
+      expect(closest(track, start)).toBeGreaterThanOrEqual(500);
+      expect(closest(track, end)).toBeGreaterThanOrEqual(500);
+      expect(trackLengthM(track)).toBeLessThan(5_000);
       expect(track.points[3]).toBe(0);
-      expect(track.points.at(-1)).toBeCloseTo(5_000 / 3);
+      expect(track.points.at(-1)).toBeCloseTo(trackLengthM(track) / 3);
       expect(track.startTime).toBe(original.startTime);
     }
     expect(selectTracks([short], setting).problem).toBe('nothing-after-trim');
@@ -174,8 +196,11 @@ describe('selectTracks', () => {
     const loop = { ...library[0], points };
     const selection = selectTracks([loop], parseSettings({ 'trim-radius': '250' }));
     const track = selection.tracks[0];
-    expect(track.points[0]).toBeCloseTo(HOME.lon - 250 / perLon, 9);
-    expect(trackLengthM(track)).toBeCloseTo(2_500);
+    // The longest part left is the leg west of home, from the edge of the hidden circle.
+    expect(offEdge(at(track, 0), HOME, 250)).toBeCloseTo(0, 1);
+    expect(at(track, 0).lon).toBeLessThan(HOME.lon - 250 / perLon);
+    expect(closest(track, HOME)).toBeGreaterThanOrEqual(250);
+    expect(trackLengthM(track)).toBeGreaterThan(2_000);
   });
 
   it('protects an original endpoint even when GPS cleaning moves it', () => {
@@ -193,9 +218,10 @@ describe('selectTracks', () => {
     const selection = selectTracks([original], parseSettings({ 'trim-radius': '250' }));
     expect(selection.trimmed[0]?.start).toBe(1);
     const visible = selection.tracks[0];
-    expect(visible.points[0]).toBeCloseTo(HOME.lon - 250 / perLon, 9);
+    expect(offEdge(at(visible, 0), HOME, 250)).toBeCloseTo(0, 1);
+    expect(closest(visible, HOME)).toBeGreaterThanOrEqual(250);
     expect(visible.startTime).toBe(original.startTime);
-    expect(trackLengthM(visible)).toBeCloseTo(2_500);
+    expect(trackLengthM(visible)).toBeGreaterThan(2_000);
   });
 
   it('keeps, filters, and trims a route across the date line using local distances', () => {
@@ -212,6 +238,66 @@ describe('selectTracks', () => {
       }),
     );
     expect(selection.problem).toBeNull();
-    expect(trackLengthM(selection.tracks[0])).toBeCloseTo(238.3);
+    const track = selection.tracks[0]!;
+    const start = { lat: 0, lon: longitudes[0]! };
+    const end = { lat: 0, lon: longitudes.at(-1)! };
+    expect(closest(track, start)).toBeGreaterThanOrEqual(20);
+    expect(closest(track, end)).toBeGreaterThanOrEqual(20);
+    expect(trackLengthM(track)).toBeGreaterThan(100);
+    expect(trackLengthM(track)).toBeLessThan(238.3);
+  });
+
+  it('does not give away a start shared by several routes', () => {
+    // Four rides from one doorstep, heading north, east, south and west.
+    const doorstep = { lat: 47.5012, lon: 19.0047 };
+    const { perLon: lonM } = metresPerDegree(doorstep.lat);
+    const directions = [
+      [0, 1],
+      [1, 0],
+      [0, -1],
+      [-1, 0],
+    ];
+    const rides = directions.map(([east, north], day) => {
+      const points = new Float64Array(201 * STRIDE);
+      for (let i = 0; i < 201; i++) {
+        const lon = doorstep.lon + (east! * i * 30) / lonM;
+        const lat = doorstep.lat + (north! * i * 30) / 110_540;
+        points.set([lon, lat, 100, i * 10], i * STRIDE);
+      }
+      return { ...activity({ id: `ride-${day}`, day: day + 1 }), points };
+    });
+    const { tracks } = selectTracks(rides, parseSettings({ 'trim-radius': '300' }));
+    const circle = hiddenCircle(doorstep, 300);
+
+    expect(tracks).toHaveLength(4);
+    for (const track of tracks) {
+      // Every route starts on one circle, so its centre can be found, but that centre is a
+      // grid point, not the doorstep, which stays at least 300 m from every route.
+      expect(metres(at(track, 0), circle.centre)).toBeCloseTo(circle.radius, 1);
+      expect(closest(track, doorstep)).toBeGreaterThanOrEqual(300);
+    }
+    expect(metres(circle.centre, doorstep)).toBeGreaterThan(30);
+  });
+});
+
+describe('hiddenCircle', () => {
+  it('is shared by nearby endpoints and always hides the radius around each', () => {
+    const radius = 300;
+    const step = 7; // metres
+    let shared = 0;
+    for (let east = -150; east <= 150; east += step) {
+      for (let north = -150; north <= 150; north += step) {
+        const point = { lat: 47.3 + north / 110_540, lon: 19.2 + east / perLon };
+        const circle = hiddenCircle(point, radius);
+        expect(circle.radius - metres(point, circle.centre)).toBeGreaterThanOrEqual(radius);
+        if (metres(circle.centre, hiddenCircle({ lat: 47.3, lon: 19.2 }, radius).centre) < 1)
+          shared++;
+      }
+    }
+    // A grid cell is one radius wide, so most of this radius-wide square shares one centre.
+    expect(shared).toBeGreaterThan(0);
+    expect(hiddenCircle({ lat: 47.3, lon: 19.2 }, radius)).toEqual(
+      hiddenCircle({ lat: 47.3 + 5 / 110_540, lon: 19.2 + 5 / perLon }, radius),
+    );
   });
 });

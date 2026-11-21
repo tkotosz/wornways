@@ -308,7 +308,9 @@ export const SETTINGS: readonly SettingDefinition[] = [
     group: 'privacy',
     kind: { type: 'number', min: 0, max: 2000, unit: 'm' },
     default: '0',
-    help: 'Radius in metres around each activity’s start and finish. 0 shows the full route.',
+    help:
+      'Hide at least this radius in meters around each activity’s start and finish. 0 ' +
+      'shows the full route.',
   },
   {
     name: 'camera',
