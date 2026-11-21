@@ -147,7 +147,9 @@ Sample activities to try the app with come later, once there are routes that may
   (a ride as a FIT and as a GPX file, say): activities starting within a minute and
   200 m of each other are taken for one.
 - An activity's name comes from the export's activity list, else from the file itself
-  (GPX files carry one), else from the file name.
+  (GPX files carry one), else from the part of the day it started in and its sport, such
+  as "Morning ride". Export file names ("10004710540.fit") say nothing, so they are not
+  used.
 - The library keeps a short summary of every activity (name, sport, date, distance,
   where it starts and ends) apart from its points, so the list and the filters are
   instant and only the selected activities' points are loaded.

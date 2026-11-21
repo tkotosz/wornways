@@ -44,8 +44,8 @@ describe('importFiles', () => {
     expect([...byId.keys()]).toEqual(['1001', '1002', '1003']);
     expect(byId.get('1001')).toMatchObject({ name: 'Balaton loop, windy', sport: 'ride' });
     expect(byId.get('1002')).toMatchObject({ name: 'Zwift in Watopia', sport: 'virtual-ride' });
-    // Not in the list, and a TCX file has no name: named after its file.
-    expect(byId.get('1003')).toMatchObject({ name: '1003' });
+    // Not in the list, and a TCX file has no name: named after its start and sport.
+    expect(byId.get('1003')).toMatchObject({ name: 'Afternoon run' });
     expect(pointCount(byId.get('1001')!)).toBeGreaterThan(100);
     expect(result.ignored).toBe(1); // the photo
     expect(result.unreadable).toEqual([]);
@@ -61,8 +61,8 @@ describe('importFiles', () => {
     ]);
 
     expect(result.activities.map((a) => [a.id, a.name, a.sport])).toEqual([
-      ['morning-ride', 'morning-ride', 'ride'],
-      ['trail-run', 'trail-run', 'run'],
+      ['morning-ride', 'Morning ride', 'ride'],
+      ['trail-run', 'Afternoon run', 'run'],
     ]);
     expect(result.withoutGps).toEqual(['no-gps-data.gpx']);
     expect(result.unreadable).toEqual([
@@ -138,7 +138,7 @@ describe('importFiles', () => {
     const result = await importFiles([csv, ride, other]);
     expect(result.activities.map(({ id, name, sport }) => [id, name, sport])).toEqual([
       ['123', 'Sunday ride', 'ride'],
-      ['workout', 'workout', 'run'],
+      ['workout', 'Afternoon run', 'run'],
     ]);
   });
   it('leaves out an activity the caller knows already', async () => {
@@ -176,11 +176,11 @@ describe('importFiles', () => {
       expect(result.duplicates).toBe(1);
     });
 
-    it('names a file without its export after the file, without the email address', async () => {
+    it('takes the id of a file without its export from the file name, without the email address', async () => {
       const ride = fixture('morning-ride.fit');
       const result = await importFiles([{ ...ride, name: 'someone@example.com_3001.fit' }]);
 
-      expect(result.activities.map((a) => [a.id, a.name])).toEqual([['3001', '3001']]);
+      expect(result.activities.map((a) => [a.id, a.name])).toEqual([['3001', 'Morning ride']]);
     });
 
     it('skips activities known by their Garmin id, keeping their list name and sport', async () => {
