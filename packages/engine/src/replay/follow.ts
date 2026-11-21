@@ -6,6 +6,11 @@ import { trackArea, type View } from './view.ts';
 
 /** The fastest the map may scroll, in frame widths per second of video. */
 const PAN_RATE = 0.3;
+/**
+ * The same for a single activity, which is squeezed into a short clip: a slower scroll
+ * would keep it at nearly the whole-route view.
+ */
+const SINGLE_PAN_RATE = 0.45;
 /** The closest the camera gets: the track area is never narrower than this many metres. */
 const MIN_SPAN_M = 1500;
 /** Standard deviation, in seconds, of the Gaussian that smooths the camera's position. */
@@ -68,7 +73,7 @@ function gaussianBlur(src: Float64Array, sigma: number): Float64Array {
  * camera never drifts towards the next activity before the glide. Where the head turns
  * faster than the smoothing allows, the path is pulled towards it until the head stays
  * within `LEASH` of the middle. Each followed track gets the zoom at which the map never
- * scrolls faster than `PAN_RATE` frame widths per second, rounded down to a power of two
+ * scrolls faster than `PAN_RATE` (`SINGLE_PAN_RATE` for one track) frame widths per second, rounded down to a power of two
  * from 2x up; between tracks the zoom eases from one to the next, starting early enough
  * never to be closer than allowed.
  *
@@ -87,6 +92,7 @@ export function followRouteCamera(
   const centreX = area.x + area.w / 2;
   const centreY = area.y + area.h / 2;
   const sigma = Math.max(1, SMOOTHING_S * fps);
+  const panRate = tracks.length === 1 ? SINGLE_PAN_RATE : PAN_RATE;
 
   // Where the head is on every frame, in base-view pixels, and whose head it is: the track
   // that started last among those under way.
@@ -133,7 +139,7 @@ export function followRouteCamera(
   };
 
   // The zoom, per track followed: its smoothed path's speed (95th percentile, so a single
-  // burst does not decide it) may scroll the map by at most `PAN_RATE` frame widths per
+  // burst does not decide it) may scroll the map by at most `panRate` frame widths per
   // second; from 2x up it is rounded down to a power of two. Measured with every stretch
   // smoothed on its own, so the jumps between tracks do not count. On a short stretch the
   // smoothing flattens the speed to almost nothing, so it is never taken as slower than
@@ -160,7 +166,7 @@ export function followRouteCamera(
     // A stretch too short to measure takes its neighbours' zoom (see below).
     const fast =
       speeds.length >= fps / 2 ? Math.max(speeds[Math.floor(speeds.length * 0.95)], average) : 0;
-    let z = Math.min(closest, fast > 0 ? (PAN_RATE * view.width) / fast : closest);
+    let z = Math.min(closest, fast > 0 ? (panRate * view.width) / fast : closest);
     if (z >= 2) z = 2 ** Math.floor(Math.log2(z));
     allowed.fill(Math.log(Math.max(1, z)), from, to);
   }
