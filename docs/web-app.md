@@ -288,8 +288,8 @@ browser by an automated test that imports generated activity files and makes a v
 
 ## Not in the first version
 
-Accounts or syncing between devices; connections to Strava, Garmin or other services; a
-tilted or 3D camera; satellite maps; custom image overlays; imperial units; languages
+Accounts or syncing between devices; connections to services other than Strava, such as
+Garmin; a tilted or 3D camera; satellite maps; custom image overlays; imperial units; languages
 other than English.
 
 ## Open questions
