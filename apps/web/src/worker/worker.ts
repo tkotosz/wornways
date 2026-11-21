@@ -52,7 +52,8 @@ async function answer(request: Exclude<Request, { type: 'cancel' }>, signal: Abo
       if (session) await session.end(request.disconnect);
       return reply({ type: 'strava-ended', id });
     case 'strava-list': {
-      if (!session) throw new StravaExpired('Connect with Strava again.');
+      if (!session)
+        throw new StravaExpired('No Strava session is open to list activities. Connect again.');
       const activities = await session.list(
         request.from,
         request.to,
@@ -62,7 +63,8 @@ async function answer(request: Exclude<Request, { type: 'cancel' }>, signal: Abo
       return reply({ type: 'strava-listed', id, activities });
     }
     case 'strava-prepare': {
-      if (!session) throw new StravaExpired('Connect with Strava again.');
+      if (!session)
+        throw new StravaExpired('No Strava session is open to load tracks. Connect again.');
       const unavailable = await session.prepare(request.ids, signal);
       return reply({ type: 'strava-prepared', id, unavailable });
     }
@@ -71,7 +73,8 @@ async function answer(request: Exclude<Request, { type: 'cancel' }>, signal: Abo
       return reply({ type: 'strava-prioritized', id });
   }
   const source = 'strava' in request && request.strava;
-  if (source && !session) throw new StravaExpired('Connect with Strava again.');
+  if (source && !session)
+    throw new StravaExpired('No Strava session is open for this request. Connect again.');
   if (source && session) {
     if (request.type === 'match')
       return reply({ type: 'matched', id, match: session.match(request.settings) });

@@ -91,9 +91,11 @@ export async function onRequest({
     const response = await fetch(API + path, options);
     if (!response.ok) {
       const status = response.status;
+      // Tells the browser that Strava, not this site's session check, refused the token.
+      const reason = status === 401 ? { 'X-Wornways-Strava-Reason': 'strava-rejected' } : {};
       return new Response(null, {
         status: status === 401 || status === 429 || (track && status === 404) ? status : 502,
-        headers,
+        headers: { ...headers, ...reason },
       });
     }
     // The upstream request fixes the GPS fields. Stream the arrays without buffering them.

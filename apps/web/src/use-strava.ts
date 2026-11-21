@@ -145,7 +145,7 @@ export function useStrava(
     await new Promise<void>((resolve, reject) => {
       const unavailable = () => {
         clearTimeout(timer);
-        reject(new Error('Could not reach Strava. Try again when online.'));
+        reject(new Error('Could not open the Strava update connection. Try again when online.'));
       };
       const timer = setTimeout(unavailable, 8000);
       events.addEventListener(
@@ -160,7 +160,7 @@ export function useStrava(
       events.addEventListener('close', unavailable, { once: true });
     });
     if (socket !== events || events.readyState !== WebSocket.OPEN)
-      throw new Error('Could not reach Strava. Try again when online.');
+      throw new Error('The Strava update connection closed right after opening. Try again.');
   }
 
   async function resume() {
@@ -184,7 +184,7 @@ export function useStrava(
       const config = await stravaConfiguration();
       if (session !== attempt) return;
       if (config.clientId && config.session?.sessionId !== attempt.sessionId) {
-        failed(new StravaExpired('Your Strava session ended. Connect again.'));
+        failed(new StravaExpired('Your Strava session ended while reconnecting. Connect again.'));
         return;
       }
       busy.value = '';

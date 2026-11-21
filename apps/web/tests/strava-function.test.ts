@@ -136,7 +136,9 @@ describe('the Strava Pages Functions', () => {
         }),
         env,
       });
-    expect((await load(list, '')).status).toBe(401);
+    const missing = await load(list, '');
+    expect(missing.status).toBe(401);
+    expect(missing.headers.get('X-Wornways-Strava-Reason')).toBeNull();
     const expired = await signedIn(Date.now() - 1000);
     expect((await load(list, expired.cookie)).status).toBe(401);
     expect((await load(list, cookie, 'stale-session')).status).toBe(401);
@@ -160,7 +162,9 @@ describe('the Strava Pages Functions', () => {
     expect(upstream.mock.calls[1]?.[0]).toBe(
       `https://www.strava.com/api/v3/activities/${athlete}/streams?keys=latlng,time,altitude&key_by_type=true`,
     );
-    expect((await load(list, cookie)).status).toBe(401);
+    const rejected = await load(list, cookie);
+    expect(rejected.status).toBe(401);
+    expect(rejected.headers.get('X-Wornways-Strava-Reason')).toBe('strava-rejected');
   });
 
   it('revokes the cookie token on disconnect and leaves a newer session alone', async () => {
