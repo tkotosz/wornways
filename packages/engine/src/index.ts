@@ -75,6 +75,7 @@ export {
   videoFileName,
   type Grouping,
   type Plan,
+  type ReplayPlan,
 } from './replay/plans.ts';
 export { PRESETS, PRESET_NAMES, type Preset, type PresetDefinition } from './replay/presets.ts';
 export {

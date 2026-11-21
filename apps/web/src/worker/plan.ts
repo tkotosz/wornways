@@ -30,7 +30,9 @@ export function planVideo(library: Track[], input: SettingsInput): PlanReport {
     seconds: plan.timeline.duration,
     groups: plan.groups ?? null,
     realPace: settings.groupPace === 'real',
-    follows: settings.camera === 'follow' && plan.timeline.mode !== 'race',
+    follows: plan.camera === 'follow',
+    followTooShort:
+      settings.camera === 'follow' && plan.camera !== 'follow' && plan.timeline.mode !== 'race',
     overlap: settings.overlap,
   };
 }
