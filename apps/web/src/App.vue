@@ -19,6 +19,7 @@ import {
   placeSettings,
   type Choice,
 } from './choice.ts';
+import DownloadDialog from './components/DownloadDialog.vue';
 import ModalPanel from './components/ModalPanel.vue';
 import type { EngineClient } from './engine-client.ts';
 import { install, installOffer } from './install.ts';
@@ -76,6 +77,7 @@ const {
   end: endStrava,
   retry: retryStrava,
   prepare: prepareStrava,
+  download: stravaDownload,
 } = useStrava(
   props.engine,
   stravaAdjustments,
@@ -126,6 +128,12 @@ onBeforeUnmount(() => clearTimeout(toastTimer));
 /** Where the activities come from: Strava, Ride with GPS or the demo while open, else this device. */
 const source = computed<Source>(() =>
   strava.value ? 'strava' : rwgps.active.value ? 'rwgps' : demo.active.value ? 'demo' : 'files',
+);
+/** The tracks being downloaded before going on from the Activities step, if any. */
+const download = computed(() =>
+  source.value === 'strava'
+    ? { service: 'Strava', progress: stravaDownload.value }
+    : { service: 'Ride with GPS', progress: rwgps.download.value },
 );
 /** Whether a connected service is the source: its tracks are fetched before going on. */
 const remote = computed(() => source.value === 'strava' || source.value === 'rwgps');
@@ -491,6 +499,12 @@ onMounted(() => {
       />
     </template>
   </main>
+
+  <DownloadDialog
+    v-if="download.progress"
+    :service="download.service"
+    :progress="download.progress"
+  />
 
   <div class="toast-region" aria-live="polite" aria-atomic="true">
     <p v-if="toast" class="toast">{{ toast }}</p>

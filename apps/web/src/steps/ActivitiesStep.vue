@@ -6,6 +6,7 @@ import { placeMissing, type Choice } from '../choice.ts';
 import ActivityFilters from '../components/ActivityFilters.vue';
 import ActivityGrid from '../components/ActivityGrid.vue';
 import DemoGuide from '../components/DemoGuide.vue';
+import LoadingStatus from '../components/LoadingStatus.vue';
 import type { EngineClient } from '../engine-client.ts';
 import type { ActivitySummary, MatchReport, Source } from '../messages.ts';
 
@@ -59,7 +60,7 @@ const ticked = computed(() => rows.value.filter((a) => !choice.value.excluded.in
       :distance-scale="distanceScale"
     />
 
-    <p v-if="busy" class="muted" role="status">{{ busy }}</p>
+    <LoadingStatus v-if="busy" :text="busy" />
     <p v-if="notice" class="muted" role="status">{{ notice }}</p>
 
     <p v-if="placeMissing(choice)" class="error">

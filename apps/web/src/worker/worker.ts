@@ -81,7 +81,7 @@ async function answer(request: Exclude<Request, { type: 'cancel' }>, signal: Abo
     case 'strava-prepare': {
       if (!session)
         throw new StravaExpired('No Strava session is open to load tracks. Connect again.');
-      const unavailable = await session.prepare(request.ids, signal);
+      const unavailable = await session.prepare(request.ids, signal, progress);
       return reply({ type: 'strava-prepared', id, unavailable });
     }
     case 'strava-prioritize':

@@ -1,7 +1,12 @@
 import { computed, onBeforeUnmount, ref, watch, type Ref } from 'vue';
 import { fromEarlierVersions, type Adjustments } from './adjust.ts';
 import { NO_CHOICE, filterSettings, periodRange, type Choice } from './choice.ts';
-import { Canceled, StravaExpired, type EngineClient } from './engine-client.ts';
+import {
+  Canceled,
+  StravaExpired,
+  type DownloadProgress,
+  type EngineClient,
+} from './engine-client.ts';
 import type { ActivitySummary, MatchReport } from './messages.ts';
 import {
   finishStravaAuthorization,
@@ -238,13 +243,21 @@ export function useStrava(
     else void resume();
   }
 
+  /** Tracks being downloaded before going on; null when none are. */
+  const download = ref<DownloadProgress | null>(null);
+
   async function prepare(ids: string[]) {
     if (!ready.value) return false;
     const request = revision;
     busy.value = 'Loading selected tracks…';
     error.value = '';
+    notice.value = '';
+    const task = engine.prepareStrava(ids, ({ done = 0, total = ids.length }) => {
+      if (download.value) download.value = { ...download.value, done, total };
+    });
+    download.value = { done: 0, total: ids.length, cancel: task.cancel };
     try {
-      const missing = await engine.prepareStrava(ids);
+      const missing = await task.result;
       if (request !== revision) return false;
       if (missing.length) {
         const unavailable = new Set(missing);
@@ -254,9 +267,12 @@ export function useStrava(
       }
       return missing.length === 0;
     } catch (caught) {
+      if (caught instanceof Canceled && request === revision)
+        notice.value = 'Download canceled. Tracks downloaded so far are kept.';
       if (request === revision) failed(caught);
       return false;
     } finally {
+      download.value = null;
       if (request === revision) busy.value = '';
     }
   }
@@ -337,5 +353,6 @@ export function useStrava(
     end,
     retry,
     prepare,
+    download,
   };
 }

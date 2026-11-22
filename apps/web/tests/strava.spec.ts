@@ -299,6 +299,36 @@ test('clears the browser session when the Strava activity endpoint rejects acces
   await expect.poll(() => mock.disconnects).toEqual([false]);
 });
 
+test('shows a slow track download in a dialog that can be canceled', async ({ page }) => {
+  let releaseTrack: () => void = () => undefined;
+  const pendingTrack = new Promise<void>((resolve) => {
+    releaseTrack = resolve;
+  });
+  try {
+    const mock = await fakeStrava(page, { pendingTrack });
+    await page.goto('/');
+    await connect(page);
+    await page.getByRole('button', { name: 'Last year', exact: true }).click();
+    await expect(page.getByTestId('chosen')).toContainText('Strava test ride');
+    // Strava's list starts with nothing ticked.
+    await page.getByRole('checkbox', { name: 'Strava test ride' }).check();
+    await page.getByRole('button', { name: 'Continue' }).click();
+    const dialog = page.getByTestId('download');
+    await expect(dialog).toContainText('Downloading tracks from Strava');
+    await dialog.getByRole('button', { name: 'Cancel' }).click();
+    await expect(dialog).toBeHidden();
+    await expect(page.getByText('Download canceled.')).toBeVisible();
+
+    // The track under way still arrives and is kept: going on again does not fetch it twice.
+    releaseTrack();
+    await page.getByRole('button', { name: 'Continue' }).click();
+    await expect(page.getByTestId('replay-summary')).toBeVisible();
+    expect(mock.tracks.filter((id) => id === rideId)).toHaveLength(1);
+  } finally {
+    releaseTrack();
+  }
+});
+
 test('clears the session when Strava revokes access', async ({ page }) => {
   let releaseTrack: () => void = () => undefined;
   const pendingTrack = new Promise<void>((resolve) => {

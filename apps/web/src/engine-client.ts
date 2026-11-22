@@ -27,6 +27,12 @@ export class StravaExpired extends Error {}
 /** The Ride with GPS connection ended: connect again. */
 export class RideWithGpsDisconnected extends Error {}
 
+/** Tracks being downloaded: the ids without a usable track once done, and a way to stop. */
+export type Download = { result: Promise<string[]>; cancel: () => void };
+
+/** How far a download is, for the page to show. */
+export type DownloadProgress = { done: number; total: number; cancel: () => void };
+
 export class EngineClient {
   private nextId = 1;
   /** Where the activities of the steps after Activities come from. */
@@ -96,10 +102,17 @@ export class EngineClient {
     throw this.errorFor(reply);
   }
 
-  async prepareStrava(ids: string[]): Promise<string[]> {
-    const reply = await this.send({ type: 'strava-prepare', id: this.nextId++, ids });
-    if (reply.type === 'strava-prepared') return reply.unavailable;
-    throw this.errorFor(reply);
+  /**
+   * Fetches the chosen Strava activities' tracks not fetched yet; the result is the ids
+   * without one. Canceling keeps the tracks fetched so far.
+   */
+  prepareStrava(ids: string[], onProgress: (progress: Progress) => void): Download {
+    const id = this.nextId++;
+    const result = this.send({ type: 'strava-prepare', id, ids }, onProgress).then((reply) => {
+      if (reply.type === 'strava-prepared') return reply.unavailable;
+      throw this.errorFor(reply);
+    });
+    return { result, cancel: () => this.cancel(id) };
   }
 
   prioritizeStrava(ids: string[]): void {
@@ -120,11 +133,14 @@ export class EngineClient {
     return reply.activities;
   }
 
-  /** Fetches the chosen trips' tracks not fetched yet; returns the ids without one. */
-  async prepareRideWithGps(ids: string[], onProgress: (p: Progress) => void): Promise<string[]> {
-    const reply = await this.send({ type: 'rwgps-prepare', id: this.nextId++, ids }, onProgress);
-    if (reply.type === 'rwgps-prepared') return reply.unavailable;
-    throw this.errorFor(reply);
+  /** As prepareStrava, for the chosen Ride with GPS trips. */
+  prepareRideWithGps(ids: string[], onProgress: (progress: Progress) => void): Download {
+    const id = this.nextId++;
+    const result = this.send({ type: 'rwgps-prepare', id, ids }, onProgress).then((reply) => {
+      if (reply.type === 'rwgps-prepared') return reply.unavailable;
+      throw this.errorFor(reply);
+    });
+    return { result, cancel: () => this.cancel(id) };
   }
 
   prioritizeRideWithGps(ids: string[]): void {
@@ -225,6 +241,10 @@ export class EngineClient {
     );
     this.worker.postMessage(request);
     return reply;
+  }
+
+  private cancel(id: number): void {
+    this.worker.postMessage({ type: 'cancel', id } satisfies Request);
   }
 
   private errorFor(reply: Reply): Error {

@@ -160,9 +160,14 @@ Sample activities to try the app with come later, once there are routes that may
 - Ride with GPS is a source like Strava: while it is the source, the Activities step lists
   the account's trips, and tracks are downloaded only when needed. The newest few are
   fetched ahead, a trip ticked again moves to the front, and leaving the Activities step
-  fetches the chosen trips' missing tracks, a few at a time, with progress. This code is
-  shared with Strava (`worker/remote-activities.ts`); each service says how to list and
-  how to fetch one track.
+  fetches the chosen trips' missing tracks, a few at a time. This code is shared with
+  Strava (`worker/remote-activities.ts`); each service says how to list and how to fetch
+  one track.
+- For both services, a download that takes more than half a second opens a dialog with
+  the count, a percentage bar and Cancel (Escape cancels too). Canceling stops at once
+  and stays on the Activities step; downloads already under way finish and are kept, so
+  going on again fetches only the rest. Loading a list shows a moving bar in place of the
+  buttons of the source being opened, or above the activities.
 - Connecting: the page links to `/api/ridewithgps/connect`, a Pages Function that sends
   the person to Ride with GPS's authorization page with a random state, also kept in a
   short-lived cookie. Ride with GPS sends them back to `/api/ridewithgps/callback`, which

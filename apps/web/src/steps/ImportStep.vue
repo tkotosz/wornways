@@ -5,6 +5,7 @@ import { computed, ref } from 'vue';
 import ActivityGrid from '../components/ActivityGrid.vue';
 import AddFiles from '../components/AddFiles.vue';
 import GettingFiles from '../components/GettingFiles.vue';
+import LoadingStatus from '../components/LoadingStatus.vue';
 import type { EngineClient } from '../engine-client.ts';
 import { countText } from '../format.ts';
 import type { ActivitySummary } from '../messages.ts';
@@ -105,7 +106,8 @@ async function remove(ids: string[] | 'all'): Promise<void> {
           <p class="muted">Your connection and cached activities last up to two hours.</p>
         </header>
         <div class="source-content">
-          <button v-if="stravaActive" type="button" class="link" @click="emit('disconnect')">
+          <LoadingStatus v-if="stravaBusy" :text="stravaBusy" />
+          <button v-else-if="stravaActive" type="button" class="link" @click="emit('disconnect')">
             Disconnect Strava
           </button>
           <a
@@ -144,7 +146,8 @@ async function remove(ids: string[] | 'all'): Promise<void> {
           </p>
         </header>
         <div class="source-content">
-          <template v-if="rwgps.connected">
+          <LoadingStatus v-if="rwgps.busy" :text="rwgps.busy" />
+          <template v-else-if="rwgps.connected">
             <button
               v-if="!rwgps.active"
               type="button"
@@ -163,9 +166,7 @@ async function remove(ids: string[] | 'all'): Promise<void> {
               Disconnect Ride with GPS
             </button>
           </template>
-          <a v-else-if="!rwgps.busy" :href="CONNECT_URL" class="secondary">
-            Connect Ride with GPS
-          </a>
+          <a v-else :href="CONNECT_URL" class="secondary"> Connect Ride with GPS </a>
           <div v-if="!rwgps.connected" class="connect-help muted">
             <p>
               <a class="link" href="/privacy.html" target="_blank" rel="noopener noreferrer"
@@ -189,8 +190,9 @@ async function remove(ids: string[] | 'all'): Promise<void> {
           </p>
         </header>
         <div class="source-content">
+          <LoadingStatus v-if="demoBusy" :text="demoBusy" />
           <button
-            v-if="!demoActive"
+            v-else-if="!demoActive"
             type="button"
             class="secondary"
             :disabled="!!demoBusy"
@@ -204,10 +206,7 @@ async function remove(ids: string[] | 'all'): Promise<void> {
         </div>
       </section>
     </div>
-    <p v-if="rwgps.busy" class="muted" role="status">{{ rwgps.busy }}</p>
     <p v-if="rwgps.error" class="error" role="alert">{{ rwgps.error }}</p>
-    <p v-if="stravaBusy" class="muted" role="status">{{ stravaBusy }}</p>
-    <p v-if="demoBusy" class="muted" role="status">{{ demoBusy }}</p>
     <p v-if="stravaError" class="error" role="alert">{{ stravaError }}</p>
     <p v-if="demoError" class="error" role="alert">{{ demoError }}</p>
     <p v-if="error" class="error" role="alert">{{ error }}</p>
