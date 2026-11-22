@@ -55,11 +55,46 @@ export function useStrava(
     error.value = caught instanceof Error ? caught.message : String(caught);
   }
 
+  /**
+   * When the Strava connection ends, also while Strava is not the source; null when not
+   * connected. Switching to another source keeps it.
+   */
+  const until = ref<number | null>(null);
+  /** Whether the person just came back from Strava's sign-in page. */
+  const returning = callback !== null;
+
+  /** Reads whether this browser is connected to Strava, without opening it as the source. */
+  async function status(): Promise<void> {
+    const config = await stravaConfiguration();
+    if (config.clientId) url.value = stravaAuthorization(config.clientId);
+    const expiresAt = config.session?.expiresAt;
+    until.value = expiresAt && expiresAt > Date.now() ? expiresAt : null;
+  }
+
+  /** Stops being the source; the connection and its cached tracks stay for their two hours. */
+  async function close(): Promise<void> {
+    if (!session) return;
+    ++revision;
+    session = null;
+    clearTimeout(expiry);
+    closeEvents();
+    active.value = false;
+    ready.value = false;
+    rows.value = [];
+    selection.value = { ids: [], problem: null };
+    choice.value = initialChoice();
+    error.value = '';
+    busy.value = '';
+    notice.value = '';
+    await engine.closeStrava().catch(() => {});
+  }
+
   async function end(disconnect = false): Promise<boolean> {
     if (!session) return false;
     const ended = ++revision;
     session.end();
     session = null;
+    until.value = null;
     clearTimeout(expiry);
     closeEvents();
     active.value = false;
@@ -90,6 +125,7 @@ export function useStrava(
       const login = params ? await finishStravaAuthorization(params) : config.session;
       if (!login || login.expiresAt <= Date.now()) {
         clearStravaDraft();
+        until.value = null;
         return false;
       }
       const storage = await openStravaDraft(login, params !== null);
@@ -102,6 +138,7 @@ export function useStrava(
       adjustments.value = fromEarlierVersions(draft?.adjustments ?? defaultAdjustments);
       initialSelection = draft?.selected ?? [];
       active.value = true;
+      until.value = expiresAt;
       expiry = setTimeout(expired, expiresAt - Date.now());
       return true;
     } catch (caught) {
@@ -333,7 +370,11 @@ export function useStrava(
     matching,
     rows,
     url,
+    until,
+    returning,
+    status,
     connect,
+    close,
     end,
     retry,
     prepare,

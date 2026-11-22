@@ -63,6 +63,10 @@ async function answer(request: Exclude<Request, { type: 'cancel' }>, signal: Abo
       await session?.close();
       strava = new StravaSession(request.grant);
       return reply({ type: 'strava-started', id });
+    case 'strava-close':
+      strava = null;
+      session?.pause();
+      return reply({ type: 'strava-closed', id });
     case 'strava-end':
       strava = null;
       if (session) await session.end(request.disconnect);

@@ -127,6 +127,12 @@ export class StravaSession {
     return this.lifetime.signal;
   }
 
+  /** Stops its requests; the browser cache stays for when Strava is opened again. */
+  pause(): void {
+    this.lifetime.abort();
+    this.activities.clear();
+  }
+
   close(): Promise<unknown> {
     this.lifetime.abort();
     this.activities.clear();

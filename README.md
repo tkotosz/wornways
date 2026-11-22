@@ -12,8 +12,8 @@ Activity files you add stay there.
   or the whole account export ZIP from Strava or Garmin, with names and sports from its
   activity list.
 - **Connects to Strava** on deployments where it is configured. Pick a date range and
-  activities to replay. Wornways can restore your connection and downloaded tracks
-  after a reload for up to two hours.
+  activities to replay. Wornways keeps your connection and downloaded tracks for up to
+  two hours, also after a reload or while you use another source.
 - **Connects to Ride with GPS** on deployments where it is configured. Pick a period and
   trips to replay; tracks are downloaded when a video needs them and kept on the device
   until you disconnect.

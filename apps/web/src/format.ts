@@ -16,6 +16,11 @@ const shortDayFormat = new Intl.DateTimeFormat('en-GB', {
   year: '2-digit',
 });
 
+const timeFormat = new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit' });
+
+/** "14:35". */
+export const timeText = (ms: number) => timeFormat.format(ms);
+
 /** "2 May 26", for narrow screens. */
 export const shortDayText = (ms: number) => shortDayFormat.format(ms);
 
