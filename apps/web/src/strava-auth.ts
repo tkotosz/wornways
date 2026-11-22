@@ -1,11 +1,9 @@
 const ENDPOINT = '/api/strava/oauth';
 const STATE = 'wornways-strava-state';
 
-export type StravaGrant = {
-  expiresAt: number;
-  sessionId: string;
-  cacheKey: string;
-};
+import type { StravaGrant } from './messages.ts';
+
+export type { StravaGrant };
 
 type StravaConfiguration = { clientId?: string; session?: StravaGrant };
 

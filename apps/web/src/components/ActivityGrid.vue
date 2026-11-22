@@ -12,7 +12,9 @@ const props = defineProps<{
   mode: 'select' | 'delete';
   /** Names the grid for tests: the table gets it, its count line `<testId>-count`. */
   testId: string;
+  /** Each row links to the activity on the service it comes from. */
   strava?: boolean;
+  rwgps?: boolean;
 }>();
 /** In "select" mode: the ids of the unticked activities, kept when other rows come and go. */
 const excluded = defineModel<string[]>('excluded', { default: () => [] });
@@ -98,11 +100,20 @@ function toggleAll(): void {
             <a
               v-if="strava"
               :href="'https://www.strava.com/activities/' + a.id"
-              class="link strava-link"
+              class="link service-link"
               target="_blank"
               rel="noopener noreferrer"
               @click.stop
               >View on Strava</a
+            >
+            <a
+              v-if="rwgps"
+              :href="'https://ridewithgps.com/trips/' + a.id.replace(/^rwgps-/, '')"
+              class="link service-link"
+              target="_blank"
+              rel="noopener noreferrer"
+              @click.stop
+              >View on Ride with GPS</a
             >
           </td>
           <td class="sport muted">{{ sportText(a.sport) }}</td>
@@ -125,7 +136,7 @@ function toggleAll(): void {
 </template>
 
 <style scoped>
-.strava-link {
+.service-link {
   display: block;
   font-size: 0.75rem;
 }

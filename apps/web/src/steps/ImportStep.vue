@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // Step 1: choose where the activities come from: files saved on this device (added here, and
-// seen and deleted here), Strava, or the demo's made-up activities.
+// seen and deleted here), Strava, Ride with GPS, or the demo's made-up activities.
 import { computed, ref } from 'vue';
 import ActivityGrid from '../components/ActivityGrid.vue';
 import AddFiles from '../components/AddFiles.vue';
@@ -9,6 +9,7 @@ import type { EngineClient } from '../engine-client.ts';
 import { countText } from '../format.ts';
 import type { ActivitySummary } from '../messages.ts';
 import { rememberStravaState } from '../strava-auth.ts';
+import { CONNECT_URL } from '../use-ridewithgps.ts';
 
 const props = defineProps<{
   engine: EngineClient;
@@ -17,6 +18,8 @@ const props = defineProps<{
   stravaActive: boolean;
   stravaError: string;
   stravaBusy: string;
+  /** Ride with GPS: offered by this site, connected in this browser, the source now. */
+  rwgps: { available: boolean; connected: boolean; active: boolean; busy: string; error: string };
   demoActive: boolean;
   demoBusy: string;
   demoError: string;
@@ -27,16 +30,19 @@ const emit = defineEmits<{
   files: [];
   disconnect: [];
   demo: [];
+  useRideWithGps: [];
+  disconnectRideWithGps: [];
 }>();
 
-/** Whether Strava or the demo is the source instead of the files on this device. */
-const otherSource = computed(() => props.stravaActive || props.demoActive);
+/** Whether Strava, Ride with GPS or the demo is the source instead of the files here. */
+const otherSource = computed(() => props.stravaActive || props.rwgps.active || props.demoActive);
 /**
  * The demo is for trying Wornways before adding anything: it is offered while there are no
  * activities on this device and Strava is not connected, and stays shown while it is open.
  */
 const offerDemo = computed(
-  () => props.demoActive || (!props.stravaActive && props.library.length === 0),
+  () =>
+    props.demoActive || (!props.stravaActive && !props.rwgps.active && props.library.length === 0),
 );
 
 const error = ref('');
@@ -129,6 +135,48 @@ async function remove(ids: string[] | 'all'): Promise<void> {
           </div>
         </div>
       </section>
+      <section v-if="!demoActive && rwgps.available" class="source-card" data-testid="rwgps-source">
+        <header class="source-heading">
+          <h2>Ride with GPS</h2>
+          <p class="muted">
+            Your trips. Tracks are downloaded when a video needs them and kept on this device until
+            you disconnect.
+          </p>
+        </header>
+        <div class="source-content">
+          <template v-if="rwgps.connected">
+            <button
+              v-if="!rwgps.active"
+              type="button"
+              class="secondary"
+              :disabled="!!rwgps.busy"
+              @click="emit('useRideWithGps')"
+            >
+              Use Ride with GPS
+            </button>
+            <button
+              type="button"
+              class="link disconnect"
+              :disabled="!!rwgps.busy"
+              @click="emit('disconnectRideWithGps')"
+            >
+              Disconnect Ride with GPS
+            </button>
+          </template>
+          <a v-else-if="!rwgps.busy" :href="CONNECT_URL" class="secondary">
+            Connect Ride with GPS
+          </a>
+          <div v-if="!rwgps.connected" class="connect-help muted">
+            <p>
+              <a class="link" href="/privacy.html" target="_blank" rel="noopener noreferrer"
+                >Privacy</a
+              >
+              · Wornways reads trip names, dates, sports, distances, and GPS tracks, and never
+              changes your account.
+            </p>
+          </div>
+        </div>
+      </section>
       <section v-if="offerDemo" class="source-card" data-testid="demo-source">
         <header class="source-heading">
           <h2>Demo</h2>
@@ -156,6 +204,8 @@ async function remove(ids: string[] | 'all'): Promise<void> {
         </div>
       </section>
     </div>
+    <p v-if="rwgps.busy" class="muted" role="status">{{ rwgps.busy }}</p>
+    <p v-if="rwgps.error" class="error" role="alert">{{ rwgps.error }}</p>
     <p v-if="stravaBusy" class="muted" role="status">{{ stravaBusy }}</p>
     <p v-if="demoBusy" class="muted" role="status">{{ demoBusy }}</p>
     <p v-if="stravaError" class="error" role="alert">{{ stravaError }}</p>
@@ -225,6 +275,7 @@ async function remove(ids: string[] | 'all'): Promise<void> {
 }
 
 .source-card .source-content > button,
+.source-card .source-content > a.secondary,
 .strava-connect {
   align-self: start;
 }
@@ -276,6 +327,11 @@ async function remove(ids: string[] | 'all'): Promise<void> {
 .library-head h2 {
   margin: 0;
   font-size: 1.05rem;
+}
+
+.disconnect {
+  align-self: start;
+  margin-top: 0.9rem;
 }
 
 .confirm {

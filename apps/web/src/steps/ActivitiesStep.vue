@@ -30,6 +30,7 @@ const emit = defineEmits<{ back: []; next: []; retry: []; leaveDemo: [] }>();
 const SOURCE_LABELS: Record<Source, string> = {
   files: 'Files on this device',
   strava: 'Strava',
+  rwgps: 'Ride with GPS',
   demo: 'Demo: made-up activities in Mallorca',
 };
 
@@ -76,6 +77,7 @@ const ticked = computed(() => rows.value.filter((a) => !choice.value.excluded.in
       :excluded="choice.excluded"
       :rows="rows"
       :strava="strava"
+      :rwgps="source === 'rwgps'"
       mode="select"
       test-id="chosen"
       @update:excluded="choice = { ...choice, excluded: $event }"

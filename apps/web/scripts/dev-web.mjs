@@ -64,6 +64,8 @@ if (await ready(`http://${host}:${relayPort}`, 'Strava relay', () => true)) {
     '2024-11-11',
     '--binding',
     `STRAVA_ORIGIN=${origin}`,
+    '--binding',
+    `RWGPS_ORIGIN=${origin}`,
     '--do',
     'STRAVA_EVENTS=StravaEvents@wornways-strava-events',
   ]);

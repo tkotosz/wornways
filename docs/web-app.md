@@ -50,8 +50,9 @@ phone.
 1. **Import.** A drop zone and file and folder pickers, a report of what the last import
    added and what could not be read (closable), and the library as a grid with a header
    row (date, name, sport, distance) and a delete button per row. "Delete all my data"
-   removes everything the app stored, after a confirmation. A person who already has
-   activities starts at step 2.
+   removes everything the app stored, after a confirmation. Where the site offers them,
+   Strava and Ride with GPS can be the source instead (see below). A person who already
+   has activities starts at step 2.
 2. **Activities.** The filters (the "Which activities" settings): period with shortcuts
    and a calendar for custom days, sports (offered only when the period has them, with
    "All"), and two place filters, "Starts near a place" and "Ends near a place". Each
@@ -153,6 +154,41 @@ Sample activities to try the app with come later, once there are routes that may
 - The library keeps a short summary of every activity (name, sport, date, distance,
   where it starts and ends) apart from its points, so the list and the filters are
   instant and only the selected activities' points are loaded.
+
+### Ride with GPS
+
+- Ride with GPS is a source like Strava: while it is the source, the Activities step lists
+  the account's trips, and tracks are downloaded only when needed. The newest few are
+  fetched ahead, a trip ticked again moves to the front, and leaving the Activities step
+  fetches the chosen trips' missing tracks, a few at a time, with progress. This code is
+  shared with Strava (`worker/remote-activities.ts`); each service says how to list and
+  how to fetch one track.
+- Connecting: the page links to `/api/ridewithgps/connect`, a Pages Function that sends
+  the person to Ride with GPS's authorization page with a random state, also kept in a
+  short-lived cookie. Ride with GPS sends them back to `/api/ridewithgps/callback`, which
+  checks the state, trades the code for a token (this needs the client secret), seals
+  the token in an encrypted HttpOnly cookie for `/api/ridewithgps`, and sends the person
+  on to `/?ridewithgps=<outcome>`. The code and the token never reach page scripts.
+- Ride with GPS tokens do not expire and allow changing the account. The cookie lasts
+  30 days, and the Functions only read: the trip list and one trip at a time.
+- The trip list has no date filter, so it is read whole when Ride with GPS becomes the
+  source, 200 trips a page; the Function returns only the fields the app uses. The
+  filters then work on it in the worker, and "All time" is offered. Trips without a
+  route (indoor ones) are left out.
+- One trip comes through the Function as Ride with GPS sends it, unparsed (megabytes for
+  a long ride). The worker keeps longitude, latitude, elevation and time.
+- Downloaded tracks are kept in the browser's Cache Storage until disconnect, keyed by
+  trip and stored with when the trip last changed (`updated_at`): an edited trip is
+  fetched again, and the tracks of trips no longer in the list are removed when it is
+  read. Ride with GPS's terms allow keeping what the person chooses to use, so there is no
+  time limit as for Strava. Disconnecting revokes the token, ends the cookie and deletes
+  these tracks.
+- A reload opens Ride with GPS again when it was the source last, with the tab's filters
+  and selection; switching to files or the demo keeps the connection. The look of the
+  video (steps 3 and 4) is the same one files use.
+- Trips get the id `rwgps-<trip id>`, and Ride with GPS's activity types (`cycling:road`,
+  `running:trail`, ...) are mapped to the same sport names as files. There is no webhook:
+  changes on Ride with GPS show up the next time the list is read.
 
 ### Demo
 
@@ -288,8 +324,8 @@ browser by an automated test that imports generated activity files and makes a v
 
 ## Not in the first version
 
-Accounts or syncing between devices; connections to services other than Strava, such as
-Garmin; a tilted or 3D camera; satellite maps; custom image overlays; imperial units; languages
+Accounts or syncing between devices; connections to services other than Strava and Ride
+with GPS, such as Garmin; a tilted or 3D camera; satellite maps; custom image overlays; imperial units; languages
 other than English.
 
 ## Open questions

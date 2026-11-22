@@ -126,6 +126,7 @@ export {
   type RandomAccessFile,
   type ZipEntry,
 } from './import/zip.ts';
+export { defaultActivityName } from './import/default-name.ts';
 export {
   importFiles,
   sameActivity,

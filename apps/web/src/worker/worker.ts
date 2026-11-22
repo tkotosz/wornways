@@ -8,12 +8,19 @@ import { Library } from './library.ts';
 import { planVideo } from './plan.ts';
 import { makePoster } from './poster.ts';
 import { ActivityStoreUnavailable } from './store.ts';
+import {
+  forgetRideWithGps,
+  RideWithGpsDisconnected,
+  RideWithGpsError,
+  RideWithGpsSession,
+} from './ridewithgps.ts';
 import { pruneStravaCaches } from './strava-cache.ts';
 import { StravaError, StravaExpired, StravaSession } from './strava.ts';
 import { Canceled, VideoProblem, makeVideo } from './video.ts';
 
 let library: Promise<Library> | undefined;
 let strava: StravaSession | null = null;
+let rwgps: RideWithGpsSession | null = null;
 /** The demo's activities while the demo is open. */
 let demo: Promise<Library> | null = null;
 void pruneStravaCaches();
@@ -37,6 +44,7 @@ function messageFor(error: unknown): string {
   if (
     error instanceof VideoProblem ||
     error instanceof StravaError ||
+    error instanceof RideWithGpsError ||
     error instanceof DemoUnavailable
   )
     return error.message;
@@ -89,20 +97,39 @@ async function answer(request: Exclude<Request, { type: 'cancel' }>, signal: Abo
     case 'demo-end':
       demo = null;
       return reply({ type: 'demo-ended', id });
+    case 'rwgps-start': {
+      rwgps?.close();
+      const opened = new RideWithGpsSession();
+      rwgps = opened;
+      const activities = await opened.list(signal);
+      return reply({ type: 'rwgps-started', id, activities });
+    }
+    case 'rwgps-end':
+      rwgps?.close();
+      rwgps = null;
+      if (request.forget) await forgetRideWithGps();
+      return reply({ type: 'rwgps-ended', id });
+    case 'rwgps-prepare': {
+      if (!rwgps) throw new RideWithGpsDisconnected('Ride with GPS is not open. Choose it again.');
+      const unavailable = await rwgps.prepare(request.ids, signal, progress);
+      return reply({ type: 'rwgps-prepared', id, unavailable });
+    }
+    case 'rwgps-prioritize':
+      rwgps?.prioritize(request.ids);
+      return reply({ type: 'rwgps-prioritized', id });
   }
   const source = 'source' in request ? request.source : 'files';
-  const stravaSession = source === 'strava' ? session : null;
-  if (source === 'strava' && !stravaSession)
+  /** A connected service's activities, when one is the source. */
+  const remote = source === 'strava' ? session : source === 'rwgps' ? rwgps : null;
+  if (source === 'strava' && !remote)
     throw new StravaExpired('No Strava session is open for this request. Connect again.');
-  if (stravaSession) {
+  if (source === 'rwgps' && !remote)
+    throw new RideWithGpsDisconnected('Ride with GPS is not open. Choose it again.');
+  if (remote) {
     if (request.type === 'match')
-      return reply({ type: 'matched', id, match: stravaSession.match(request.settings) });
+      return reply({ type: 'matched', id, match: remote.match(request.settings) });
     if (request.type === 'places')
-      return reply({
-        type: 'places',
-        id,
-        places: stravaSession.places(request.settings, request.end),
-      });
+      return reply({ type: 'places', id, places: remote.places(request.settings, request.end) });
   }
   /** The library the request is about: this device's own, or the demo's. */
   const library = async (): Promise<Library> => {
@@ -110,11 +137,11 @@ async function answer(request: Exclude<Request, { type: 'cancel' }>, signal: Abo
     if (!demo) throw new DemoUnavailable();
     return demo;
   };
-  const renderSignal = stravaSession ? AbortSignal.any([signal, stravaSession.signal]) : signal;
+  const renderSignal = remote ? AbortSignal.any([signal, remote.signal]) : signal;
   const tracks = async () => {
-    if (!stravaSession || !('settings' in request)) return (await library()).all();
+    if (!remote || !('settings' in request)) return (await library()).all();
     const settings = parseSettings(request.settings);
-    const selected = await stravaSession.selected(settings.activities ?? []);
+    const selected = await remote.selected(settings.activities ?? []);
     renderSignal.throwIfAborted();
     return selected;
   };
@@ -146,7 +173,7 @@ async function answer(request: Exclude<Request, { type: 'cancel' }>, signal: Abo
         await tracks(),
         request.settings,
         renderSignal,
-        stravaSession?.loadTiles,
+        remote?.loadTiles,
       );
       renderSignal.throwIfAborted();
       return reply({ type: 'poster-made', id, image });
@@ -157,7 +184,7 @@ async function answer(request: Exclude<Request, { type: 'cancel' }>, signal: Abo
         request.settings,
         renderSignal,
         progress,
-        stravaSession?.loadTiles,
+        remote?.loadTiles,
       );
       renderSignal.throwIfAborted();
       return reply({ type: 'video-made', id, video, report }, [video]);
@@ -183,6 +210,7 @@ async function handle(request: Request): Promise<void> {
         id: request.id,
         message: messageFor(error),
         expired: error instanceof StravaExpired,
+        disconnected: error instanceof RideWithGpsDisconnected,
       });
   } finally {
     running.delete(request.id);

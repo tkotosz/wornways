@@ -31,6 +31,7 @@ import ImportStep from './steps/ImportStep.vue';
 import PlaybackStep from './steps/PlaybackStep.vue';
 import { useDemo } from './use-demo.ts';
 import { useMatches } from './use-matches.ts';
+import { useRideWithGps } from './use-ridewithgps.ts';
 import { useStrava } from './use-strava.ts';
 
 const props = defineProps<{ engine: EngineClient }>();
@@ -89,22 +90,45 @@ const {
   },
 );
 
+const rwgps = useRideWithGps(props.engine, () => {
+  step.value = 'import';
+  video.value = null;
+});
+
 const toast = ref('');
 let toastTimer: ReturnType<typeof setTimeout> | undefined;
 
-async function disconnectStrava(): Promise<void> {
-  if (!(await endStrava(true))) return;
-  toast.value = 'Strava disconnected and temporary activities cleared.';
+function showToast(text: string): void {
+  toast.value = text;
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => (toast.value = ''), 5000);
 }
 
+async function disconnectStrava(): Promise<void> {
+  if (!(await endStrava(true))) return;
+  showToast('Strava disconnected and temporary activities cleared.');
+}
+
+async function disconnectRideWithGps(): Promise<void> {
+  if (!(await rwgps.disconnect())) return;
+  showToast('Ride with GPS disconnected and its downloaded tracks cleared.');
+}
+
+/** Makes Ride with GPS the source in place of Strava, the demo or the files. */
+async function openRideWithGps(): Promise<void> {
+  if (strava.value) await endStrava();
+  await demo.close();
+  if (await rwgps.open()) step.value = 'activities';
+}
+
 onBeforeUnmount(() => clearTimeout(toastTimer));
 
-/** Where the activities come from: Strava or the demo while open, else this device. */
+/** Where the activities come from: Strava, Ride with GPS or the demo while open, else this device. */
 const source = computed<Source>(() =>
-  strava.value ? 'strava' : demo.active.value ? 'demo' : 'files',
+  strava.value ? 'strava' : rwgps.active.value ? 'rwgps' : demo.active.value ? 'demo' : 'files',
 );
+/** Whether a connected service is the source: its tracks are fetched before going on. */
+const remote = computed(() => source.value === 'strava' || source.value === 'rwgps');
 /** What each source keeps of its own: its activities, choice, matches and adjustments. */
 const current = computed(() => {
   if (source.value === 'strava')
@@ -114,6 +138,15 @@ const current = computed(() => {
       matches: stravaMatches,
       matching: stravaMatching,
       adjustments: stravaAdjustments,
+    };
+  if (source.value === 'rwgps')
+    return {
+      rows: rwgps.rows,
+      choice: rwgps.choice,
+      matches: rwgps.matches,
+      matching: rwgps.matching,
+      // The look of the video is the person's, whichever source: the same as for files.
+      adjustments: fileAdjustments,
     };
   if (source.value === 'demo') return demo;
   return {
@@ -175,7 +208,7 @@ watch(fileAdjustments, saveAdjustments);
 
 /** The settings of the video: the chosen activities and the adjustments. */
 const settings = computed<SettingsInput>(() => ({
-  ...(strava.value
+  ...(remote.value
     ? { ...placeSettings(choice.value, new Date()), activity: chosenIds.value }
     : choiceSettings(choice.value, matched.value.ids, new Date())),
   ...adjustSettings(adjustments.value, countOf(chosenIds.value.length)),
@@ -227,18 +260,23 @@ function reachable(id: Step): boolean {
   if (source.value === 'files' && library.value.length === 0) return false;
   return (
     id === 'activities' ||
-    (chosenIds.value.length > 0 && !awaitingPlace.value && !stravaBusy.value && !matching.value)
+    (chosenIds.value.length > 0 &&
+      !awaitingPlace.value &&
+      !stravaBusy.value &&
+      !rwgps.busy.value &&
+      !matching.value)
   );
 }
 
 async function navigate(id: Step): Promise<void> {
   if (!reachable(id)) return;
-  if (strava.value && step.value === 'activities' && id !== 'activities' && id !== 'import') {
+  if (remote.value && step.value === 'activities' && id !== 'activities' && id !== 'import') {
     const ids = chosenIds.value.join(',');
-    if (!(await prepareStrava(chosenIds.value))) return;
+    const prepare = strava.value ? prepareStrava : rwgps.prepare;
+    if (!(await prepare(chosenIds.value))) return;
     if (step.value !== 'activities' || ids !== chosenIds.value.join(',')) return;
   }
-  if (strava.value && step.value === 'import' && id !== 'activities' && id !== 'import') {
+  if (remote.value && step.value === 'import' && id !== 'activities' && id !== 'import') {
     // Returning from the source picker can use a selection edited in Activities.
     step.value = 'activities';
     await navigate(id);
@@ -262,12 +300,14 @@ onBeforeUnmount(() => topBarSize.disconnect());
 /** Opens the demo in place of Strava or the files, and goes on to its activities. */
 async function openDemo(): Promise<void> {
   if (strava.value) await endStrava();
+  await rwgps.close();
   if (await demo.open()) step.value = 'activities';
 }
 
-/** Leaves the demo, or Strava, for the files on this device. */
+/** Leaves the demo, Strava or Ride with GPS for the files on this device. */
 async function useFiles(): Promise<void> {
   if (strava.value) await endStrava();
+  await rwgps.close();
   await demo.close();
   step.value = 'import';
 }
@@ -282,6 +322,7 @@ async function loadLibrary(): Promise<void> {
     loaded.value = true;
     if (library.value.length > 0) step.value = 'activities';
     if (await connectStrava(fileAdjustments.value)) step.value = 'activities';
+    else if ((await rwgps.check()) && (await rwgps.open())) step.value = 'activities';
   } catch (error) {
     libraryError.value = error instanceof Error ? error.message : String(error);
   }
@@ -385,6 +426,13 @@ onMounted(() => {
         :strava-active="strava"
         :strava-error="stravaError"
         :strava-busy="stravaBusy"
+        :rwgps="{
+          available: rwgps.available.value,
+          connected: rwgps.connected.value,
+          active: rwgps.active.value,
+          busy: rwgps.busy.value,
+          error: rwgps.error.value,
+        }"
         :demo-active="demo.active.value"
         :demo-busy="demo.busy.value"
         :demo-error="demo.error.value"
@@ -392,6 +440,8 @@ onMounted(() => {
         @files="useFiles()"
         @demo="openDemo()"
         @disconnect="disconnectStrava"
+        @use-ride-with-gps="openRideWithGps()"
+        @disconnect-ride-with-gps="disconnectRideWithGps()"
         @next="navigate('activities')"
       />
       <ActivitiesStep
@@ -403,9 +453,9 @@ onMounted(() => {
         :distance-scale="distanceScale"
         :strava="strava"
         :source="source"
-        :busy="stravaBusy"
+        :busy="source === 'rwgps' ? rwgps.busy.value : stravaBusy"
         :matching="matching"
-        :notice="stravaNotice"
+        :notice="source === 'rwgps' ? rwgps.notice.value : stravaNotice"
         :can-retry="strava && (!stravaReady || sourceRows.length === 0)"
         @back="navigate('import')"
         @next="navigate('playback')"

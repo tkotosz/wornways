@@ -4,12 +4,20 @@
 
 import type { FrequentPlace, Grouping, SettingsInput, TrackEnd } from '@wornways/engine';
 
-import type { StravaGrant } from './strava-auth.ts';
-
 export type PickedFile = { path: string; file: File };
 
-/** Where a request's activities come from: this device's library, Strava, or the demo. */
-export type Source = 'files' | 'strava' | 'demo';
+/** An open Strava session, as the page and the worker know it (see strava-auth.ts). */
+export type StravaGrant = {
+  expiresAt: number;
+  sessionId: string;
+  cacheKey: string;
+};
+
+/**
+ * Where a request's activities come from: this device's library, Strava, Ride with GPS, or
+ * the demo.
+ */
+export type Source = 'files' | 'strava' | 'rwgps' | 'demo';
 
 export type Request =
   | { type: 'read-library'; id: number }
@@ -27,6 +35,12 @@ export type Request =
   | { type: 'strava-prepare'; id: number; ids: string[] }
   | { type: 'strava-prioritize'; id: number; ids: string[] }
   | { type: 'strava-end'; id: number; disconnect: boolean }
+  /** Opens Ride with GPS as the source and lists the account's trips. */
+  | { type: 'rwgps-start'; id: number }
+  | { type: 'rwgps-prepare'; id: number; ids: string[] }
+  | { type: 'rwgps-prioritize'; id: number; ids: string[] }
+  /** Closes it; `forget` also deletes the tracks kept on this device (on disconnect). */
+  | { type: 'rwgps-end'; id: number; forget: boolean }
   /** Loads the demo's activities into memory, and lets them go again. */
   | { type: 'demo-start'; id: number }
   | { type: 'demo-end'; id: number }
@@ -57,7 +71,11 @@ export type Reply =
   | { type: 'strava-prioritized'; id: number }
   | { type: 'demo-started'; id: number; activities: ActivitySummary[] }
   | { type: 'demo-ended'; id: number }
-  | { type: 'failed'; id: number; message: string; expired?: boolean }
+  | { type: 'rwgps-started'; id: number; activities: ActivitySummary[] }
+  | { type: 'rwgps-prepared'; id: number; unavailable: string[] }
+  | { type: 'rwgps-prioritized' | 'rwgps-ended'; id: number }
+  /** `expired`: the Strava session ended; `disconnected`: the Ride with GPS connection did. */
+  | { type: 'failed'; id: number; message: string; expired?: boolean; disconnected?: boolean }
   | { type: 'canceled'; id: number };
 
 /** Which activities the filters match. */
