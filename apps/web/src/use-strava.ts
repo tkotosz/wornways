@@ -13,6 +13,7 @@ import {
   stravaAuthorization,
   stravaConfiguration,
   takeStravaCallback,
+  takeUnansweredStravaSignIn,
   type StravaGrant,
 } from './strava-auth.ts';
 import { clearStravaDraft, openStravaDraft, type StravaDraftStore } from './strava-draft.ts';
@@ -65,8 +66,13 @@ export function useStrava(
    * connected. Switching to another source keeps it.
    */
   const until = ref<number | null>(null);
-  /** Whether the person just came back from Strava's sign-in page. */
-  const returning = callback !== null;
+  /**
+   * Whether the person came back from Strava's sign-in page without Strava's answer, for
+   * example after Strava refused because Wornways reached its limit of connected athletes.
+   */
+  const unanswered = ref(callback === null && takeUnansweredStravaSignIn());
+  /** Whether the person just came back from Strava's sign-in page, answered or not. */
+  const returning = callback !== null || unanswered.value;
 
   /**
    * Reads whether this browser is connected to Strava, without opening it as the source.
@@ -82,6 +88,7 @@ export function useStrava(
 
   /** Stops being the source; the connection and its cached tracks stay for their two hours. */
   async function close(): Promise<void> {
+    unanswered.value = false;
     if (!session) return;
     ++revision;
     session = null;
@@ -370,13 +377,19 @@ export function useStrava(
     if (session.expiresAt <= Date.now()) expired();
     else void resume();
   };
+  /** Back from Strava's page through the back-forward cache: the page did not load again. */
+  const restored = (event: PageTransitionEvent) => {
+    if (event.persisted && takeUnansweredStravaSignIn()) unanswered.value = true;
+  };
   document.addEventListener('visibilitychange', foreground);
   window.addEventListener('pageshow', foreground);
+  window.addEventListener('pageshow', restored);
   window.addEventListener('online', foreground);
   onBeforeUnmount(() => {
     clearTimeout(expiry);
     document.removeEventListener('visibilitychange', foreground);
     window.removeEventListener('pageshow', foreground);
+    window.removeEventListener('pageshow', restored);
     window.removeEventListener('online', foreground);
     closeEvents();
   });
@@ -394,6 +407,7 @@ export function useStrava(
     url,
     until,
     returning,
+    unanswered,
     status,
     connect,
     close,

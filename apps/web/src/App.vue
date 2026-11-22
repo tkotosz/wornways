@@ -76,6 +76,7 @@ const {
   url: stravaUrl,
   until: stravaUntil,
   returning: stravaReturning,
+  unanswered: stravaUnanswered,
   status: stravaStatus,
   connect: connectStrava,
   close: closeStrava,
@@ -549,6 +550,7 @@ onMounted(() => {
         :strava-until="stravaUntil"
         :strava-error="stravaError"
         :strava-busy="stravaBusy"
+        :strava-unanswered="stravaUnanswered"
         :rwgps="{
           available: rwgps.available.value,
           connected: rwgps.connected.value,
