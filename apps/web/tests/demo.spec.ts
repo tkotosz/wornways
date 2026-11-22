@@ -66,7 +66,8 @@ test('offers only the demo on the source step while it is open', async ({ page }
 
   await page.getByRole('button', { name: 'Source', exact: true }).click();
   const demo = page.getByTestId('demo-source');
-  await expect(demo).toContainText('Leave the demo to add your own files or connect Strava');
+  await expect(demo).toContainText('In use');
+  await expect(demo).toContainText('Leave the demo, or use another source, to add your own');
   await expect(page.getByRole('heading', { name: 'Files' })).toHaveCount(0);
   await expect(page.getByTestId('file-input')).toHaveCount(0);
 

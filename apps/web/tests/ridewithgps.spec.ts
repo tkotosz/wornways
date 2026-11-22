@@ -157,6 +157,8 @@ test('switches between Ride with GPS and files without disconnecting', async ({ 
   await expect(page.getByTestId('source')).toContainText('Ride with GPS');
 
   await page.getByRole('button', { name: 'Change source' }).click();
+  await expect(page.getByTestId('rwgps-source')).toContainText('In use');
+  await page.getByRole('button', { name: 'Use another source' }).click();
   await page.getByRole('button', { name: 'Use files' }).click();
   await expect(page.getByRole('button', { name: 'Use Ride with GPS' })).toBeVisible();
 

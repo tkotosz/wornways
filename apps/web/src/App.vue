@@ -329,8 +329,19 @@ async function loadLibrary(): Promise<void> {
     library.value = await props.engine.readLibrary();
     loaded.value = true;
     if (library.value.length > 0) step.value = 'activities';
-    if (await connectStrava(fileAdjustments.value)) step.value = 'activities';
-    else if ((await rwgps.check()) && (await rwgps.open())) step.value = 'activities';
+    // Either service may have just sent the person back from connecting; that one is the
+    // source then, and the other one lets go.
+    const [rwgpsStart, stravaOpen] = await Promise.all([
+      rwgps.check(),
+      connectStrava(fileAdjustments.value),
+    ]);
+    if (rwgpsStart === 'connected') {
+      if (stravaOpen) await endStrava();
+      if (await rwgps.open()) step.value = 'activities';
+    } else if (stravaOpen) {
+      await rwgps.close();
+      step.value = 'activities';
+    } else if (rwgpsStart === 'reopen' && (await rwgps.open())) step.value = 'activities';
   } catch (error) {
     libraryError.value = error instanceof Error ? error.message : String(error);
   }
