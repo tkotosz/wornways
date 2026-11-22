@@ -119,6 +119,13 @@ export class EngineClient {
     void this.send({ type: 'strava-prioritize', id: this.nextId++, ids });
   }
 
+  /** Stops using Strava as the source; its sign-in and cached tracks stay. */
+  async closeStrava(): Promise<void> {
+    if (this.source === 'strava') this.source = 'files';
+    const reply = await this.send({ type: 'strava-close', id: this.nextId++ });
+    if (reply.type !== 'strava-closed') throw this.errorFor(reply);
+  }
+
   async endStrava(disconnect = false): Promise<void> {
     if (this.source === 'strava') this.source = 'files';
     const reply = await this.send({ type: 'strava-end', id: this.nextId++, disconnect });

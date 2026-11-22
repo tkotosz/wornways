@@ -188,8 +188,11 @@ async function fakeStrava(
 
 async function connect(page: Page) {
   // From the list of sources (a first visit, or after "Change source"), Strava is picked first.
-  if (await page.getByTestId('sources').isVisible()) await pickSource(page, 'strava');
-  await page.getByRole('link', { name: 'Connect with Strava' }).click();
+  const sources = page.getByTestId('sources');
+  const link = page.getByRole('link', { name: 'Connect with Strava' });
+  await expect(sources.or(link)).toBeVisible();
+  if (await sources.isVisible()) await pickSource(page, 'strava');
+  await link.click();
   await expect(page.getByRole('heading', { name: 'Choose your activities' })).toBeVisible();
 }
 
@@ -239,34 +242,31 @@ test.describe('Strava on a phone', () => {
     await page.getByRole('button', { name: 'Go to Source' }).click();
     await expect(page.getByTestId('chosen-source')).toContainText('Current source: Strava');
     await page.getByRole('button', { name: 'Change source' }).click();
-    const ending = page.waitForResponse(
-      (response) =>
-        response.url().endsWith('/api/strava/oauth') && response.request().method() === 'DELETE',
-    );
     await pickSource(page, 'files');
-    await ending;
-    const [draft, ended] = await page.evaluate(() => [
-      sessionStorage.getItem('wornways-strava-draft'),
-      sessionStorage.getItem('wornways-strava-ended'),
-    ]);
-    expect(draft).toBeNull();
-    expect(ended).toMatch(/^[A-Za-z0-9+/]+={0,2}$/);
-    await expect
-      .poll(() =>
-        page.evaluate(
-          "caches.keys().then((names) => names.some((name) => name.startsWith('wornways-strava-')))",
-        ),
-      )
-      .toBe(false);
+    // Choosing files keeps the Strava connection and its cached tracks for their two hours.
     await expect(page.getByTestId('result')).toHaveCount(0);
     await expect(page.getByTestId('activity-count')).toContainText('3 activities');
+    expect(
+      await page.evaluate(
+        "caches.keys().then((names) => names.some((name) => name.startsWith('wornways-strava-')))",
+      ),
+    ).toBe(true);
     await page.reload();
     await expect(page.getByTestId('chosen')).toContainText('Balaton loop');
     await expect(page.getByTestId('chosen')).not.toContainText('Strava test ride');
+
+    // Strava opens again without signing in, with the track it already had.
+    await page.getByRole('button', { name: 'Change source' }).click();
+    await expect(page.getByTestId('choose-strava')).toContainText('Connected until');
+    await pickSource(page, 'strava');
+    await expect(page.getByTestId('strava-source')).toContainText('Connected to Strava until');
+    await page.getByRole('button', { name: 'Continue' }).click();
+    await expect(page.getByTestId('chosen')).toContainText('Strava test ride');
+    expect(mock.exchanges()).toBe(1);
     expect(mock.tracks.filter((id) => id === rideId)).toHaveLength(1);
     expect(mock.periods.length).toBeGreaterThan(1);
     expect(mock.directApiRequests).toEqual([]);
-    expect(mock.disconnects).toEqual([false]);
+    expect(mock.disconnects).toEqual([]);
   });
 });
 

@@ -10,7 +10,7 @@ import AddFiles from '../components/AddFiles.vue';
 import GettingFiles from '../components/GettingFiles.vue';
 import LoadingStatus from '../components/LoadingStatus.vue';
 import type { EngineClient } from '../engine-client.ts';
-import { countText } from '../format.ts';
+import { countText, timeText } from '../format.ts';
 import type { ActivitySummary, Source } from '../messages.ts';
 import { rememberStravaState } from '../strava-auth.ts';
 import { CONNECT_URL } from '../use-ridewithgps.ts';
@@ -26,6 +26,8 @@ const props = defineProps<{
   ready: boolean;
   stravaUrl: URL | null;
   stravaActive: boolean;
+  /** When the Strava connection ends; null when not connected. */
+  stravaUntil: number | null;
   stravaError: string;
   stravaBusy: string;
   /** Ride with GPS: offered by this site, connected in this browser, the source now. */
@@ -49,6 +51,9 @@ const NAMES: Record<Source, string> = {
   demo: 'Demo',
 };
 
+/** Whether this browser is connected to Strava, also while another source is chosen. */
+const stravaConnected = computed(() => !!props.stravaUntil && props.stravaUntil > Date.now());
+
 /** Whether the list of sources shows. */
 const listing = computed(() => props.picking || props.chosen === null);
 
@@ -66,8 +71,10 @@ const choices = computed(() => {
   if (props.stravaUrl || props.stravaActive)
     list.push({
       id: 'strava',
-      about: 'Your Strava activities, for up to two hours at a time.',
-      status: props.stravaActive ? 'Connected' : 'Not connected',
+      about: 'Your Strava activities, kept for up to two hours.',
+      status: stravaConnected.value
+        ? `Connected until ${timeText(props.stravaUntil!)}`
+        : 'Not connected',
     });
   if (props.rwgps.available)
     list.push({
@@ -155,39 +162,36 @@ async function remove(ids: string[] | 'all'): Promise<void> {
 
       <div v-else-if="chosen === 'strava'" class="screen" data-testid="strava-source">
         <LoadingStatus v-if="stravaBusy" :text="stravaBusy" />
-        <template v-else-if="stravaActive">
+        <template v-else-if="stravaActive && stravaUntil">
           <p>
-            Connected to Strava. The connection and the activities cached for it last up to two
-            hours.
+            Connected to Strava until {{ timeText(stravaUntil) }}. Tracks are downloaded when a
+            video needs them and kept on this device until then.
           </p>
           <button type="button" class="link" @click="emit('disconnect')">Disconnect Strava</button>
         </template>
         <template v-else>
           <p class="muted">
-            Your Strava activities, read for up to two hours at a time. Changing to another source
-            ends the connection.
+            Your Strava activities. Tracks are downloaded when a video needs them and kept on this
+            device for up to two hours after you connect.
           </p>
           <a v-if="stravaUrl" :href="stravaUrl.href" class="strava-connect" @click="authorize">
             <img src="/strava-connect.svg" alt="Connect with Strava" width="237" height="48" />
           </a>
-          <div class="connect-help muted">
-            <p>If Strava says its connection limit was reached, use activity files instead.</p>
-            <p>
-              <a class="link" href="/privacy.html" target="_blank" rel="noopener noreferrer"
-                >Privacy</a
-              >
-              · Wornways reads activity names, dates, sports, distance, and GPS tracks. Manage
-              access in
-              <a
-                class="link"
-                href="https://www.strava.com/settings/apps"
-                target="_blank"
-                rel="noopener noreferrer"
-                >Strava settings</a
-              >.
-            </p>
-          </div>
+          <p class="muted small">
+            If Strava says its connection limit was reached, use activity files instead.
+          </p>
         </template>
+        <p v-if="!stravaBusy" class="muted small">
+          <a class="link" href="/privacy.html" target="_blank" rel="noopener noreferrer">Privacy</a>
+          · Wornways reads activity names, dates, sports, distance, and GPS tracks. Manage access in
+          <a
+            class="link"
+            href="https://www.strava.com/settings/apps"
+            target="_blank"
+            rel="noopener noreferrer"
+            >Strava settings</a
+          >.
+        </p>
       </div>
 
       <div v-else-if="chosen === 'rwgps'" class="screen" data-testid="rwgps-source">
@@ -207,16 +211,12 @@ async function remove(ids: string[] | 'all'): Promise<void> {
             device until you disconnect.
           </p>
           <a :href="CONNECT_URL" class="secondary">Connect Ride with GPS</a>
-          <div class="connect-help muted">
-            <p>
-              <a class="link" href="/privacy.html" target="_blank" rel="noopener noreferrer"
-                >Privacy</a
-              >
-              · Wornways reads trip names, dates, sports, distances, and GPS tracks, and never
-              changes your account.
-            </p>
-          </div>
         </template>
+        <p v-if="!rwgps.busy" class="muted small">
+          <a class="link" href="/privacy.html" target="_blank" rel="noopener noreferrer">Privacy</a>
+          · Wornways reads trip names, dates, sports, distances, and GPS tracks, and never changes
+          your account.
+        </p>
       </div>
 
       <div v-else class="screen" data-testid="demo-source">
@@ -352,9 +352,7 @@ async function remove(ids: string[] | 'all'): Promise<void> {
   margin: 0;
 }
 
-.connect-help {
-  display: grid;
-  gap: 0.4rem;
+.small {
   font-size: 0.85rem;
 }
 

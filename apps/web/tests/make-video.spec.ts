@@ -45,7 +45,9 @@ const trailRun = (page: Page) =>
 
 async function addFiles(page: Page, ...names: string[]): Promise<void> {
   // On a first visit the Source step lists the sources; Files is picked to add some.
-  if (await page.getByTestId('sources').isVisible()) await pickSource(page, 'files');
+  const sources = page.getByTestId('sources');
+  await expect(sources.or(page.getByTestId('file-input'))).toBeAttached();
+  if (await sources.isVisible()) await pickSource(page, 'files');
   await page.getByTestId('file-input').setInputFiles(names.map(fixture));
   await expect(page.getByTestId('import-report')).toBeVisible();
 }

@@ -57,7 +57,8 @@ phone.
    be read (closable), and the library as a grid with a header row (date, name, sport,
    distance) and a delete button per row ("Delete saved activities" removes them all,
    after a confirmation); for Strava and Ride with GPS, connecting or the connection and a
-   way to disconnect; for the demo, what it holds and "Start the demo". The choice is
+   way to disconnect (a connection stays when another source is chosen: Strava's for its
+   two hours, Ride with GPS's until it is disconnected); for the demo, what it holds and "Start the demo". The choice is
    remembered for the next visit; a person whose chosen source is ready (files on the
    device, a service connected) starts at step 2.
 2. **Activities.** The filters (the "Which activities" settings): period with shortcuts
@@ -196,8 +197,8 @@ for exporting an account or a single activity from Strava or Garmin.
   these tracks.
 - A reload opens Ride with GPS again when it is the chosen source, with the tab's filters
   and selection; choosing files, Strava or the demo keeps the connection. When the person
-  comes back from connecting one service, that one is the chosen source and the other
-  one lets go (a Strava session ends). The look of the video (steps 3 and 4) is the same
+  comes back from connecting one service, that one is the chosen source; the other one's
+  connection stays. The look of the video (steps 3 and 4) is the same
   one files use.
 - Trips get the id `rwgps-<trip id>`, and Ride with GPS's activity types (`cycling:road`,
   `running:trail`, ...) are mapped to the same sport names as files. There is no webhook:

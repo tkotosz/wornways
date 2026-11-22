@@ -35,6 +35,8 @@ export type Request =
   | { type: 'strava-prepare'; id: number; ids: string[] }
   | { type: 'strava-prioritize'; id: number; ids: string[] }
   | { type: 'strava-end'; id: number; disconnect: boolean }
+  /** Stops using Strava as the source, keeping the sign-in and the cached tracks. */
+  | { type: 'strava-close'; id: number }
   /** Opens Ride with GPS as the source and lists the account's trips. */
   | { type: 'rwgps-start'; id: number }
   | { type: 'rwgps-prepare'; id: number; ids: string[] }
@@ -65,7 +67,7 @@ export type Reply =
   | { type: 'video-made'; id: number; video: ArrayBuffer; report: VideoReport }
   | { type: 'poster-made'; id: number; image: Blob }
   | { type: 'planned'; id: number; plan: PlanReport }
-  | { type: 'strava-started' | 'strava-ended'; id: number }
+  | { type: 'strava-started' | 'strava-ended' | 'strava-closed'; id: number }
   | { type: 'strava-listed'; id: number; activities: ActivitySummary[] }
   | { type: 'strava-prepared'; id: number; unavailable: string[] }
   | { type: 'strava-prioritized'; id: number }

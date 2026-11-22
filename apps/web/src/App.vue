@@ -73,7 +73,11 @@ const {
   matching: stravaMatching,
   rows: stravaRows,
   url: stravaUrl,
+  until: stravaUntil,
+  returning: stravaReturning,
+  status: stravaStatus,
   connect: connectStrava,
+  close: closeStrava,
   end: endStrava,
   retry: retryStrava,
   prepare: prepareStrava,
@@ -343,16 +347,19 @@ onBeforeUnmount(() => topBarSize.disconnect());
 
 /** Lets go of every source but the one given: they are never mixed. */
 async function release(keep: Source | null): Promise<void> {
-  if (keep !== 'strava' && strava.value) await endStrava();
+  // Strava's connection stays for its two hours, as Ride with GPS's does for its 30 days.
+  if (keep !== 'strava') await closeStrava();
   if (keep !== 'rwgps') await rwgps.close();
   if (keep !== 'demo') await demo.close();
 }
 
-/** Makes a source the chosen one and shows its screen; a connected Ride with GPS opens. */
+/** Makes a source the chosen one and shows its screen; a connected service opens. */
 async function choose(id: Source): Promise<void> {
   picking.value = false;
   chosen.value = id;
   await release(id);
+  if (id === 'strava' && !strava.value && stravaUntil.value)
+    await connectStrava(fileAdjustments.value);
   if (id === 'rwgps' && rwgps.connected.value && !rwgps.active.value) await rwgps.open();
 }
 
@@ -376,16 +383,14 @@ async function loadLibrary(): Promise<void> {
   try {
     library.value = await props.engine.readLibrary();
     loaded.value = true;
-    const [rwgpsJustConnected, stravaOpen] = await Promise.all([
-      rwgps.check(),
-      connectStrava(fileAdjustments.value),
-    ]);
-    // Coming back from connecting a service chooses it; a Strava session is open only while
-    // Strava is chosen. Visits from before sources were chosen had files.
+    const [rwgpsJustConnected] = await Promise.all([rwgps.check(), stravaStatus()]);
+    // Coming back from connecting a service chooses it. Visits from before sources were
+    // chosen had files.
     if (rwgpsJustConnected) chosen.value = 'rwgps';
-    else if (stravaOpen) chosen.value = 'strava';
+    else if (stravaReturning) chosen.value = 'strava';
     else if (chosen.value === null && library.value.length > 0) chosen.value = 'files';
-    await release(chosen.value);
+    // Only the chosen source opens; the other connections stay as they are.
+    if (chosen.value === 'strava') await connectStrava(fileAdjustments.value);
     if (chosen.value === 'rwgps' && rwgps.connected.value) await rwgps.open();
     if (usable.value) step.value = 'activities';
   } catch (error) {
@@ -492,6 +497,7 @@ onMounted(() => {
         :ready="usable || (chosen === 'demo' && !demo.busy.value)"
         :strava-url="stravaUrl"
         :strava-active="strava"
+        :strava-until="stravaUntil"
         :strava-error="stravaError"
         :strava-busy="stravaBusy"
         :rwgps="{
