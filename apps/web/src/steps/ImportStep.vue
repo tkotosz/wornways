@@ -402,7 +402,7 @@ async function remove(ids: string[] | 'all'): Promise<void> {
 
 .icon {
   flex: none;
-  width: 4.2rem;
+  height: 2.6rem;
 }
 
 .text {
@@ -466,8 +466,11 @@ async function remove(ids: string[] | 'all'): Promise<void> {
     align-items: center;
   }
 
+  /* A slot of one width, so the names line up; the icon sits in its middle. */
   .choice .icon {
     width: 3.4rem;
+    height: 2.2rem;
+    justify-content: center;
   }
 }
 
