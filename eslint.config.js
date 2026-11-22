@@ -24,7 +24,10 @@ export default tseslint.config(
   { languageOptions: { globals: globals.node } },
   {
     files: ['apps/web/src/**'],
-    languageOptions: { globals: { ...globals.browser, ...globals.worker } },
+    // WORNWAYS_VERSION is written in by the build (apps/web/version-build.ts).
+    languageOptions: {
+      globals: { ...globals.browser, ...globals.worker, WORNWAYS_VERSION: 'readonly' },
+    },
   },
   {
     rules: {

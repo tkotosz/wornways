@@ -31,6 +31,7 @@
 | `apps/web`                | The web app: Vue page in `src/`, all heavy work in `src/worker/`, browser tests in `tests/` |
 | `docs/architecture.md`    | Structure and key decisions                                                                 |
 | `docs/render-settings.md` | Every render setting: values and defaults                                                   |
+| `docs/skipped-features/`  | Features left out on purpose: why, and what would change that                               |
 
 ## Rules
 

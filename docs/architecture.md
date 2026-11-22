@@ -28,7 +28,8 @@ runs on the user's device: in a browser Web Worker for the web app, in Node for 
   `src/messages.ts` lists every message between the two. `src/service-worker.js` keeps the
   app's files for starting without a network; `service-worker-build.ts` writes it into the
   build with the list of those files. `licenses-build.ts` completes the list of the licenses
-  of what the app ships (`licenses.txt`).
+  of what the app ships (`licenses.txt`). `version-build.ts` works out the version shown
+  in the header: the release tag for a release build, otherwise branch · commit from git.
 
 ## Invariants
 
