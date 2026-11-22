@@ -498,16 +498,22 @@ onMounted(() => {
   height: 1.3rem;
 }
 
-/* The version in small type under the name, so the header grows only a little. */
+/* The version in small type under the name, so the header grows only a little. Line
+   heights of whole pixels keep the header a whole number of pixels tall: a fraction makes
+   the Back and Next bar shift by a pixel while the page scrolls. */
 .name {
   display: flex;
   flex-direction: column;
-  line-height: 1.1;
+}
+
+.name .wordmark {
+  line-height: 1.5rem;
 }
 
 .version {
   color: var(--muted);
   font-size: 0.7rem;
+  line-height: 0.75rem;
 }
 
 .aside {
