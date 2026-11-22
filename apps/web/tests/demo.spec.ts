@@ -46,7 +46,7 @@ test('tries the demo, makes a video of it, and stores nothing on this device', a
   await expect(page.getByRole('button', { name: 'Choose files' })).toBeVisible();
   await expect(page.getByTestId('activity-count')).toHaveCount(0);
   await page.reload();
-  await expect(page.getByTestId('chosen-source')).toContainText('Current source: Files');
+  await expect(page.getByTestId('chosen-source')).toHaveText('Files');
   await expect(page.getByTestId('activity-count')).toHaveCount(0);
 });
 
@@ -59,13 +59,13 @@ test('offers the demo next to the files on this device, and keeps them apart', a
 
   await page.getByRole('button', { name: 'Change source' }).click();
   await expect(page.getByTestId('choose-files')).toContainText('1 activity on this device');
-  await expect(page.getByTestId('choose-files')).toContainText('Current');
+  await expect(page.getByTestId('choose-files')).toHaveAttribute('aria-checked', 'true');
   await startDemo(page);
   await expect(page.getByTestId('chosen-count')).toContainText('25 of 25');
 
   // The demo's activities never join the files, and the files come back as they were.
   await page.getByRole('button', { name: 'Change source' }).click();
-  await expect(page.getByTestId('choose-demo')).toContainText('Current');
+  await expect(page.getByTestId('choose-demo')).toHaveAttribute('aria-checked', 'true');
   await pickSource(page, 'files');
   await expect(page.getByTestId('activity-count')).toHaveText('1 activity on this device');
 });
@@ -77,13 +77,13 @@ test("shows the demo's own screen, and Change source lists every source", async 
   await expect(page.getByTestId('chosen-count')).toContainText('25 of 25');
 
   await page.getByRole('button', { name: 'Source', exact: true }).click();
-  await expect(page.getByTestId('chosen-source')).toContainText('Current source: Demo');
+  await expect(page.getByTestId('chosen-source')).toHaveText('Demo');
   await expect(page.getByTestId('demo-source')).toBeVisible();
   await expect(page.getByTestId('file-input')).toHaveCount(0);
 
   await page.getByRole('button', { name: 'Change source' }).click();
   await expect(page.getByTestId('sources')).toContainText('Files');
-  await expect(page.getByTestId('choose-demo')).toContainText('Current');
+  await expect(page.getByTestId('choose-demo')).toHaveAttribute('aria-checked', 'true');
   await pickSource(page, 'files');
   await expect(page.getByRole('button', { name: 'Choose files' })).toBeVisible();
 });

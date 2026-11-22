@@ -50,15 +50,19 @@ phone.
 1. **Source.** Where the activities come from: files on this device, Strava, Ride with
    GPS (the last two where the site offers them) or the demo. One source is chosen at a
    time, and activities of different sources are never mixed. Until one is chosen, and
-   after "Change source", the step lists them, each with where it stands ("3 activities
-   on this device", "Connected", "Not connected") and the current one marked. Picking one
-   shows what it needs, under "Current source: … · Change source": for files, a drop zone
-   and file and folder pickers, a report of what the last import added and what could not
-   be read (closable), and the library as a grid with a header row (date, name, sport,
-   distance) and a delete button per row ("Delete saved activities" removes them all,
-   after a confirmation); for Strava and Ride with GPS, connecting or the connection and a
-   way to disconnect (a connection stays when another source is chosen: Strava's for its
-   two hours, Ride with GPS's until it is disconnected); for the demo, what it holds and "Start the demo". The choice is
+   after "Change source", the step lists them as cards like the playback presets, in the
+   order Demo, Files, Ride with GPS, Strava, each with an icon and where it stands ("3
+   activities on this device", "Connected", "Not connected") and the current one marked.
+   Ride with GPS's card shows its official icon; Strava's brand rules allow only its
+   connect button and badges, so its card has a drawing. Picking one shows what it needs,
+   under a "Current source" heading with the source's name, with "← Change source" at the
+   bottom left: for files, a drop zone and file and folder pickers, a report of what the
+   last import added and what could not be read (closable), and the library as a grid
+   with a header row (date, name, sport, distance) and a delete button per row ("Delete
+   saved activities" removes them all, after a confirmation); for Strava and Ride with
+   GPS, connecting or the connection and a way to disconnect (a connection stays when
+   another source is chosen: Strava's for its two hours, Ride with GPS's until it is
+   disconnected); for the demo, what it holds and "Start the demo". The choice is
    remembered for the next visit; a person whose chosen source is ready (files on the
    device, a service connected) starts at step 2.
 2. **Activities.** The filters (the "Which activities" settings): period with shortcuts

@@ -184,8 +184,9 @@ test('deletes one activity, then all of them', async ({ page }) => {
   await page.getByRole('button', { name: 'Delete saved activities' }).click();
   await page.getByRole('button', { name: 'Delete all', exact: true }).click();
   await expect(page.getByTestId('library')).toHaveCount(0);
+  // With nothing left, a reload stays on the files screen, which is still the chosen source.
   await page.reload();
-  await expect(page.getByRole('heading', { name: 'Choose an activity source' })).toBeVisible();
+  await expect(page.getByTestId('chosen-source')).toHaveText('Files');
 });
 
 test('ticks and unticks every activity shown with the header box', async ({ page }) => {

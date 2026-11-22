@@ -240,7 +240,7 @@ test.describe('Strava on a phone', () => {
     expect((await download).suggestedFilename()).toMatch(/\.mp4$/);
     await expect(page.getByRole('button', { name: 'Done', exact: true })).toHaveCount(0);
     await page.getByRole('button', { name: 'Go to Source' }).click();
-    await expect(page.getByTestId('chosen-source')).toContainText('Current source: Strava');
+    await expect(page.getByTestId('chosen-source')).toHaveText('Strava');
     await page.getByRole('button', { name: 'Change source' }).click();
     await pickSource(page, 'files');
     // Choosing files keeps the Strava connection and its cached tracks for their two hours.
@@ -375,7 +375,7 @@ test('keeps Ride with GPS connected and listed while Strava is the source', asyn
 
   // Strava is the source; Ride with GPS is still connected and listed with the others.
   await page.getByRole('button', { name: 'Change source' }).click();
-  await expect(page.getByTestId('choose-strava')).toContainText('Current');
+  await expect(page.getByTestId('choose-strava')).toHaveAttribute('aria-checked', 'true');
   await expect(page.getByTestId('choose-rwgps')).toContainText('Connected');
 
   // A reload keeps Strava, not the source chosen before it.
