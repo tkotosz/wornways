@@ -342,6 +342,38 @@ test('shows a slow track download in a dialog that can be canceled', async ({ pa
   }
 });
 
+test('shows the tracks downloaded while Strava is the source', async ({ page }) => {
+  const mock = await fakeStrava(page);
+  await page.goto('/');
+  await connect(page);
+  await page.getByRole('button', { name: 'Last year', exact: true }).click();
+  await page.getByRole('checkbox', { name: 'Strava test ride' }).check();
+  await page.getByRole('button', { name: 'Continue' }).click();
+  await expect(page.getByRole('heading', { name: 'How should your routes play?' })).toBeVisible();
+
+  await page.getByRole('button', { name: 'Source', exact: true }).click();
+  await expect(page.getByTestId('downloaded-count')).toHaveText(
+    '1 activity downloaded to this device',
+  );
+  await expect(page.getByTestId('downloaded')).toContainText('Strava test ride');
+  await page.getByRole('button', { name: 'Change source' }).click();
+  await expect(page.getByTestId('choose-strava')).toContainText('1 downloaded');
+
+  // A track cached before the list of kept tracks existed is listed once it is used again.
+  await page.evaluate(`caches.keys().then(async (names) => {
+    const cache = await caches.open(names.find((name) => name.startsWith('wornways-strava-')));
+    await cache.delete('/wornways-strava-cache/downloaded');
+  })`);
+  await page.reload();
+  await page.getByRole('button', { name: 'Last year', exact: true }).click();
+  await expect(page.getByRole('checkbox', { name: 'Strava test ride' })).toBeChecked();
+  await page.getByRole('button', { name: 'Continue' }).click();
+  await expect(page.getByRole('heading', { name: 'How should your routes play?' })).toBeVisible();
+  await page.getByRole('button', { name: 'Source', exact: true }).click();
+  await expect(page.getByTestId('downloaded')).toContainText('Strava test ride');
+  expect(mock.tracks.filter((id) => id === rideId)).toHaveLength(1);
+});
+
 test('keeps Ride with GPS connected and listed while Strava is the source', async ({ page }) => {
   await fakeStrava(page);
   // Ride with GPS, connected in this browser, with one trip.

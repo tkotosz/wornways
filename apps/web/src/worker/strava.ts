@@ -239,7 +239,11 @@ export class StravaSession {
   private async loadTrack(row: StravaActivity, signal: AbortSignal): Promise<Track | null> {
     const cached = await this.browserCache.track(row.summary.id, row.version);
     signal.throwIfAborted();
-    if (cached) return { ...cached, ...row.summary };
+    if (cached) {
+      // Tracks cached before the index existed are listed once they are used.
+      await this.browserCache.noteTrack(row.summary);
+      return { ...cached, ...row.summary };
+    }
 
     const res = await this.get(new URLSearchParams({ activity: row.summary.id }), signal, true);
     const track =
