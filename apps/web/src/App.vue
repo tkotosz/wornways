@@ -46,6 +46,7 @@ const steps: { id: Step; label: string }[] = [
 const stepIndex = computed(() => steps.findIndex((s) => s.id === step.value));
 
 const unsupported = missingSupport();
+const version = WORNWAYS_VERSION;
 const step = ref<Step>('import');
 const loaded = ref(false);
 const libraryError = ref('');
@@ -301,7 +302,10 @@ onMounted(() => {
     <header class="header">
       <span class="brand">
         <img class="mark" src="/icons/route.svg" alt="" />
-        <span class="wordmark"><b>worn</b>ways</span>
+        <span class="name">
+          <span class="wordmark"><b>worn</b>ways</span>
+          <span class="version" data-testid="version">{{ version }}</span>
+        </span>
       </span>
       <span class="aside">
         <span class="muted promise">Your files stay on this device</span>
@@ -492,6 +496,18 @@ onMounted(() => {
 
 .mark {
   height: 1.3rem;
+}
+
+/* The version in small type under the name, so the header grows only a little. */
+.name {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.1;
+}
+
+.version {
+  color: var(--muted);
+  font-size: 0.7rem;
 }
 
 .aside {

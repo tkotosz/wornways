@@ -19,6 +19,7 @@
     "src/**/*.vue",
     "vite.config.ts",
     "service-worker-build.ts",
-    "licenses-build.ts"
+    "licenses-build.ts",
+    "version-build.ts"
   ]
 }
