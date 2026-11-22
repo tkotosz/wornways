@@ -14,6 +14,8 @@ import { sessionTileLoader } from './tile-cache.ts';
 
 const API = '/api/strava/activities';
 const TRACK_REQUESTS = 3;
+/** Activities per page of the list, as functions/api/strava/activities.ts asks Strava for. */
+const PAGE_SIZE = 100;
 const textEncoder = new TextEncoder();
 
 type Summary = {
@@ -179,7 +181,8 @@ export class StravaSession {
         if (row && from <= row.summary.startTime && row.summary.startTime < to)
           rows.set(row.summary.id, row);
       }
-      if (batch.length === 0) break;
+      // A page shorter than a full one is the last: no need to ask for an empty one.
+      if (batch.length < PAGE_SIZE) break;
     }
 
     active.throwIfAborted();

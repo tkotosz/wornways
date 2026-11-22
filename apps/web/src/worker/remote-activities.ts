@@ -177,13 +177,6 @@ export class RemoteActivities {
     return unavailable;
   }
 
-  /** What the list says of these activities, newest first; ids not in it are left out. */
-  summaries(ids: string[]): ActivitySummary[] {
-    return ids
-      .flatMap((id) => this.activities.get(id)?.summary ?? [])
-      .sort((a, b) => b.startTime - a.startTime);
-  }
-
   /** Lets go of tracks held in memory, so they are fetched again when needed. */
   forget(ids: string[]): void {
     for (const id of ids) this.tracks.delete(id);

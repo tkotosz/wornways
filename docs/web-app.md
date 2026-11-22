@@ -185,10 +185,16 @@ for exporting an account or a single activity from Strava or Garmin.
   on to `/?ridewithgps=<outcome>`. The code and the token never reach page scripts.
 - Ride with GPS tokens do not expire and allow changing the account. The cookie lasts
   30 days, and the Functions only read: the trip list and one trip at a time.
-- The trip list has no date filter, so it is read whole when Ride with GPS becomes the
-  source, 200 trips a page; the Function returns only the fields the app uses. The
-  filters then work on it in the worker, and "All time" is offered. Trips without a
-  route (indoor ones) are left out.
+- The trip list has no date filter, so it is read whole when Continue leaves the Source
+  step (or a reload opens Ride with GPS), 200 trips a page, while the Activities step shows
+  it loading; the Function returns only the fields the app uses. The filters then work on
+  it in the worker, and "All time" is offered. Trips without a route (indoor ones) are
+  left out.
+- The Source step asks nothing of Strava or Ride with GPS: whether a service is connected
+  comes from this site's own Functions (the sign-in cookie), and what it keeps from the
+  stored copies (Ride with GPS stores each trip's name, date, sport and distance with its
+  track; Strava keeps an encrypted index beside its cache). A Strava list stops at the
+  first page that is not full.
 - One trip comes through the Function as Ride with GPS sends it, unparsed (megabytes for
   a long ride). The worker keeps longitude, latitude, elevation and time.
 - Downloaded tracks are kept in the browser's Cache Storage until disconnect, keyed by
@@ -200,8 +206,7 @@ for exporting an account or a single activity from Strava or Garmin.
 - A reload opens Ride with GPS again when it is the chosen source, with the tab's filters
   and selection; choosing files, Strava or the demo keeps the connection. When the person
   comes back from connecting one service, that one is the chosen source; the other one's
-  connection stays. The look of the video (steps 3 and 4) is the same
-  one files use.
+  connection stays. The look of the video (steps 3 and 4) is the same one files use.
 - Trips get the id `rwgps-<trip id>`, and Ride with GPS's activity types (`cycling:road`,
   `running:trail`, ...) are mapped to the same sport names as files. There is no webhook:
   changes on Ride with GPS show up the next time the list is read.

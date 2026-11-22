@@ -47,6 +47,7 @@ async function fakeRideWithGps(page: Page, options: { revoked?: boolean } = {}) 
   let connected = false;
   const fetched: number[] = [];
   const disconnects: number[] = [];
+  const lists: number[] = [];
   await page.context().route('**/api/ridewithgps/connect', async (route) => {
     connected = true;
     await route.fulfill({ status: 303, headers: { Location: '/?ridewithgps=connected' } });
@@ -62,12 +63,15 @@ async function fakeRideWithGps(page: Page, options: { revoked?: boolean } = {}) 
   await page.context().route('**/api/ridewithgps/trips?*', async (route) => {
     if (!connected || options.revoked) return route.fulfill({ status: 401 });
     const query = new URL(route.request().url()).searchParams;
-    if (query.has('page')) return route.fulfill({ json: { trips, pages: 1 } });
+    if (query.has('page')) {
+      lists.push(1);
+      return route.fulfill({ json: { trips, pages: 1 } });
+    }
     const trip = trips.find((t) => String(t.id) === query.get('trip'))!;
     fetched.push(trip.id);
     return route.fulfill({ json: { trip: { track_points: points(trip) } } });
   });
-  return { fetched, disconnects };
+  return { fetched, disconnects, lists };
 }
 
 test('uses Ride with GPS trips as the source, fetching tracks only when needed', async ({
@@ -138,11 +142,14 @@ test('uses Ride with GPS trips as the source, fetching tracks only when needed',
 });
 
 test('switches between Ride with GPS and files without disconnecting', async ({ page }) => {
-  await fakeRideWithGps(page);
+  await offlineMap(page.context());
+  const { fetched, lists } = await fakeRideWithGps(page);
   await page.goto('/');
   await pickSource(page, 'rwgps');
   await page.getByRole('link', { name: 'Connect Ride with GPS' }).click();
   await expect(page.getByTestId('source')).toContainText('Ride with GPS');
+  // The newest five are fetched ahead.
+  await expect.poll(() => fetched.length).toBe(5);
 
   await page.getByRole('button', { name: 'Change source' }).click();
   await expect(page.getByTestId('choose-rwgps')).toHaveAttribute('aria-checked', 'true');
@@ -154,10 +161,18 @@ test('switches between Ride with GPS and files without disconnecting', async ({ 
   await page.reload();
   await expect(page.getByTestId('chosen-source')).toHaveText('Files');
   await page.getByRole('button', { name: 'Change source' }).click();
-  await expect(page.getByTestId('choose-rwgps')).toContainText('Connected');
+  await expect(page.getByTestId('choose-rwgps')).toContainText('Connected · 5 downloaded');
+
+  // Its screen shows what is kept here without asking Ride with GPS; Continue reads the list.
+  const listed = lists.length;
   await pickSource(page, 'rwgps');
+  await expect(page.getByTestId('downloaded')).toContainText('Coast loop');
+  await expect(page.getByTestId('downloaded')).toContainText('Trail run');
+  expect(lists.length).toBe(listed);
   await page.getByRole('button', { name: 'Continue' }).click();
   await expect(page.getByTestId('source')).toContainText('Ride with GPS');
+  await expect(page.getByTestId('chosen-count')).toContainText('2 of 2 activities selected');
+  expect(lists.length).toBe(listed + 1);
 
   // And a reload now opens Ride with GPS again.
   await page.reload();

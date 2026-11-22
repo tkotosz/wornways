@@ -117,19 +117,25 @@ export function useRideWithGps(engine: EngineClient, onEnd: () => void) {
     return connected.value && outcome === 'connected';
   }
 
-  /** Makes Ride with GPS the source and lists the account's trips. */
+  /**
+   * Makes Ride with GPS the source and lists the account's trips. It is the source at once,
+   * so the Activities step can show the list loading; false when the list could not be read,
+   * and it is not the source then.
+   */
   async function open(): Promise<boolean> {
     error.value = '';
     notice.value = '';
+    rows.value = [];
+    active.value = true;
     busy.value = 'Reading your Ride with GPS trips…';
     try {
       rows.value = await engine.startRideWithGps();
-      active.value = true;
       if (!rows.value.length)
         notice.value = 'Your Ride with GPS account has no trips with a route.';
       return true;
     } catch (caught) {
       failed(caught);
+      active.value = false;
       return false;
     } finally {
       busy.value = '';

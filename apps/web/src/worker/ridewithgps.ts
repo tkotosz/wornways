@@ -10,10 +10,8 @@ import type { ActivitySummary, MatchReport, Progress } from '../messages.ts';
 import { RemoteActivities, type RemoteActivity } from './remote-activities.ts';
 import {
   cachedTrack,
-  cachedTrackIds,
   cacheTrack,
   clearCachedTracks,
-  deleteCachedTracks,
   keepCachedTracks,
 } from './ridewithgps-cache.ts';
 import { listedTrip, trackFromTrip, tripId, type TripPoint } from './ridewithgps-trip.ts';
@@ -96,16 +94,9 @@ export class RideWithGpsSession {
     return this.trips.selected(ids);
   }
 
-  /** The trips whose tracks this device keeps, newest first. */
-  async downloaded(): Promise<ActivitySummary[]> {
-    return this.trips.summaries(await cachedTrackIds());
-  }
-
-  /** Deletes kept tracks; they are fetched again when a video needs them. */
-  async forget(ids: string[] | 'all'): Promise<void> {
-    const all = ids === 'all' ? await cachedTrackIds() : ids;
-    this.trips.forget(all);
-    await deleteCachedTracks(all);
+  /** Lets go of tracks held in memory, after their stored copies were deleted. */
+  forget(ids: string[]): void {
+    this.trips.forget(ids);
   }
 
   private async loadTrack(row: RemoteActivity, signal: AbortSignal): Promise<Track | null> {
@@ -119,7 +110,7 @@ export class RideWithGpsSession {
     const data = (await res.json()) as { trip?: { track_points?: TripPoint[] } };
     signal.throwIfAborted();
     const track = trackFromTrip(row.summary, data.trip?.track_points ?? []);
-    if (track) await cacheTrack(track, row.version);
+    if (track) await cacheTrack(track, row.version, row.summary);
     return track;
   }
 
