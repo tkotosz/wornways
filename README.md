@@ -140,7 +140,10 @@ exactly what. Report security problems as described in [SECURITY.md](SECURITY.md
 
 The Source screen offers Strava when the deployment has the OAuth credentials and
 the event relay binding. The ordinary Vite server and on-demand PR previews serve
-the file workflow. For local OAuth testing, use Wrangler Pages dev.
+the file workflow. For local OAuth testing, use Wrangler Pages dev. Strava lets only 10
+athletes connect until it reviews the app; see
+[docs/skipped-features/strava-limits.md](docs/skipped-features/strava-limits.md) for the
+limits and the costs.
 
 1. Register a [Strava API application](https://www.strava.com/settings/api). Set its
    authorization callback domain to the Pages hostname you will use. The callback is
