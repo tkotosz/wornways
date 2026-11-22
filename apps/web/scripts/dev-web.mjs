@@ -62,10 +62,7 @@ if (await ready(`http://${host}:${relayPort}`, 'Strava relay', () => true)) {
     'apps/web/dist',
     '--compatibility-date',
     '2024-11-11',
-    '--binding',
-    `STRAVA_ORIGIN=${origin}`,
-    '--binding',
-    `RWGPS_ORIGIN=${origin}`,
+    // Every setting, the origins too, comes from .dev.vars, as in the Pages environment.
     '--do',
     'STRAVA_EVENTS=StravaEvents@wornways-strava-events',
   ]);

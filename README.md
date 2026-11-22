@@ -48,7 +48,7 @@ Requires Node 26 (see `.nvmrc`).
 
 ```sh
 npm install
-npm run dev:web      # local Pages preview with optional Strava on http://127.0.0.1:8788
+npm run dev:web      # local Pages preview with optional Strava and Ride with GPS on http://127.0.0.1:8788
 npm run dev:web:vite # file-only development with hot reload on http://localhost:5173
 ```
 
@@ -168,10 +168,11 @@ limits and the costs.
    for the first live test and include the on-device MP4 export and share flow when
    submitting the integration for wider access.
 
-For local testing, put `STRAVA_CLIENT_ID`, `STRAVA_CLIENT_SECRET`, and
-`STRAVA_WEBHOOK_TOKEN` in `.dev.vars` in the repo root. Run `npm run dev:web` to build
-the app and start both the Pages preview and the Strava relay. The command sets the
-local origin to `http://127.0.0.1:8788`. Strava needs a public HTTPS webhook URL to
+For local testing, put `STRAVA_CLIENT_ID`, `STRAVA_CLIENT_SECRET`,
+`STRAVA_WEBHOOK_TOKEN`, and `STRAVA_ORIGIN=http://127.0.0.1:8788` in `.dev.vars` in the
+repo root: the same settings as the Pages environment, with the local origin. Run
+`npm run dev:web` to build the app and start both the Pages preview and the Strava relay
+on `http://127.0.0.1:8788`. Strava needs a public HTTPS webhook URL to
 deliver real events.
 
 The Pages Functions exchange the OAuth code and fetch activity lists and GPS streams
@@ -192,13 +193,15 @@ The Source screen offers Ride with GPS when the deployment has an API client.
    redirect URI `<RWGPS_ORIGIN>/api/ridewithgps/callback`, for example
    `https://wornways.pages.dev/api/ridewithgps/callback`, and for local testing
    `http://127.0.0.1:8788/api/ridewithgps/callback`.
-2. Set `RWGPS_CLIENT_ID` (the client's OAuth client ID, not its API key) and
-   `RWGPS_ORIGIN` in the Pages environment (the origin as for Strava), and
-   `RWGPS_CLIENT_SECRET` (the OAuth client secret, not the API secret) as a Pages secret,
-   then redeploy Pages.
+2. In each Pages environment, set `RWGPS_CLIENT_ID` (the client's OAuth client ID, not its
+   API key) and `RWGPS_CLIENT_SECRET` (the OAuth client secret, not the API secret), and
+   the variable `RWGPS_ORIGIN`: the site's own origin, the same as `STRAVA_ORIGIN`
+   (`https://wornways.pages.dev` for production, `https://preview.wornways.pages.dev` for
+   the preview). Without it, or when it differs from the site's address, Ride with GPS is
+   not offered. Then redeploy Pages: changed settings apply to new deployments only.
 
-For local testing, put `RWGPS_CLIENT_ID` and `RWGPS_CLIENT_SECRET` in `.dev.vars` and run
-`npm run dev:web`, which sets `RWGPS_ORIGIN` to `http://127.0.0.1:8788`.
+For local testing, put `RWGPS_CLIENT_ID`, `RWGPS_CLIENT_SECRET`, and
+`RWGPS_ORIGIN=http://127.0.0.1:8788` in `.dev.vars` and run `npm run dev:web`.
 
 The Pages Functions trade the OAuth code for a token and read the trip list and the
 chosen trips. Ride with GPS tokens do not expire and also allow changes to the account,
