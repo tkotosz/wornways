@@ -304,7 +304,7 @@ onMounted(() => {
         <img class="mark" src="/icons/route.svg" alt="" />
         <span class="name">
           <span class="wordmark"><b>worn</b>ways</span>
-          <span class="version" data-testid="version">{{ version }}</span>
+          <span class="version" data-testid="version" :title="version">{{ version }}</span>
         </span>
       </span>
       <span class="aside">
@@ -490,12 +490,14 @@ onMounted(() => {
 
 .brand {
   display: flex;
+  min-width: 0;
   align-items: center;
   gap: 0.55rem;
 }
 
+/* As tall as the name and the version together, so the three read as one block. */
 .mark {
-  height: 1.3rem;
+  height: 2.25rem;
 }
 
 /* The version in small type under the name, so the header grows only a little. Line
@@ -503,6 +505,7 @@ onMounted(() => {
    the Back and Next bar shift by a pixel while the page scrolls. */
 .name {
   display: flex;
+  min-width: 0;
   flex-direction: column;
 }
 
@@ -511,13 +514,18 @@ onMounted(() => {
 }
 
 .version {
+  overflow: hidden;
   color: var(--muted);
   font-size: 0.7rem;
+  font-weight: 500;
   line-height: 0.75rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .aside {
   display: flex;
+  flex-shrink: 0;
   align-items: center;
   gap: 1rem;
 }
@@ -549,8 +557,13 @@ onMounted(() => {
   line-height: 1.5;
 }
 
-/* Phones: one row. The first step says that files stay on the device. */
+/* Phones: one row. The first step says that files stay on the device, and a long version
+   ends in … rather than moving About to a row of its own. */
 @media (max-width: 560px) {
+  .header {
+    flex-wrap: nowrap;
+  }
+
   .promise {
     display: none;
   }
