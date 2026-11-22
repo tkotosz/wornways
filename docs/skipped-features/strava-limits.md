@@ -18,8 +18,19 @@ Since 2026-06-01, Strava gates its API by how many athletes may connect to one a
 | Extended Access         | 10,000+       | Strava's approval                                 | Higher, plus partner APIs   |
 
 The Wornways app is at the upgraded level. Athlete 11 and later get Strava's "Limit of
-connected athletes exceeded" error when they try to connect. Wornways shows no message of
-its own for that yet. File and export ZIP import work for everyone.
+connected athletes exceeded" error when they try to connect. Strava shows it as an error
+page of its own (403) on `strava.com/oauth/authorize` and never sends the person back, so
+Wornways gets no callback and no error code to react to. What Wornways does instead:
+
+- Under the Connect with Strava button, a line says to use activity files if Strava reports
+  its connection limit.
+- When the person comes back from Strava's page on their own (Back, or opening Wornways
+  again in the same tab) while the sign-in is still waiting for Strava's answer, the Strava
+  screen says Strava did not connect, explains the limit, and offers "Use files instead".
+  That also shows after someone left Strava's page for other reasons, so the wording only
+  says what to do _if_ Strava named the limit.
+
+File and export ZIP import work for everyone.
 
 ## What it costs
 
@@ -74,11 +85,6 @@ development can use the same app. A second app is not needed for that.
    Developers report waits from about a week to several months, and some rejections
    without a reason.
 
-## Small things to do meanwhile
-
-- Catch the "Limit of connected athletes exceeded" error and tell the person to import
-  their export ZIP or files instead.
-
 ## Sources (checked 2026-11-22)
 
 - [Strava rate limits](https://developers.strava.com/docs/rate-limits/): capacity levels,
@@ -98,3 +104,6 @@ development can use the same app. A second app is not needed for that.
   subscription price and deadlines, the Standard and Extended tiers.
 - [AI Fitness API: Strava API in 2026](https://aifitnessapi.com/integrate/strava-api):
   reported review waits and rejections.
+- Reports of the limit page: [Wox.Plugin.Strava issue 1](https://github.com/qianlifeng/Wox.Plugin.Strava/issues/1)
+  and [ai-running-coach issue 723](https://github.com/philippe-ths/ai-running-coach/issues/723):
+  the 403 page is served by Strava's authorize page, and the app never sees a callback.

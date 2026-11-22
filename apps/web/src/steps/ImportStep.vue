@@ -29,6 +29,8 @@ const props = defineProps<{
   stravaUntil: number | null;
   stravaError: string;
   stravaBusy: string;
+  /** Whether the person came back from Strava's sign-in page without Strava's answer. */
+  stravaUnanswered: boolean;
   /** Ride with GPS: offered by this site, connected in this browser, the source now. */
   rwgps: { available: boolean; connected: boolean; active: boolean; busy: string; error: string };
   demoBusy: string;
@@ -253,10 +255,21 @@ async function remove(ids: string[] | 'all'): Promise<void> {
             Your Strava activities. Tracks are downloaded when a video needs them and kept on this
             device for up to two hours after you connect.
           </p>
+          <!-- Strava shows some refusals on its own page and never sends the person back. -->
+          <div v-if="stravaUnanswered" class="unanswered" data-testid="strava-unanswered">
+            <p role="status">
+              Strava did not connect. If Strava said “Limit of connected athletes exceeded”, Strava
+              lets no more people connect to Wornways for now. Use your Strava export ZIP instead:
+              it holds all your activities.
+            </p>
+            <button type="button" class="secondary" @click="emit('choose', 'files')">
+              Use files instead
+            </button>
+          </div>
           <a v-if="stravaUrl" :href="stravaUrl.href" class="strava-connect" @click="authorize">
             <img src="/strava-connect.svg" alt="Connect with Strava" width="237" height="48" />
           </a>
-          <p class="muted small">
+          <p v-if="!stravaUnanswered" class="muted small">
             If Strava says its connection limit was reached, use activity files instead.
           </p>
         </template>
@@ -474,6 +487,17 @@ async function remove(ids: string[] | 'all'): Promise<void> {
 
 .strava-connect {
   max-width: 100%;
+}
+
+.unanswered {
+  display: flex;
+  flex-direction: column;
+  align-items: start;
+  gap: 0.7rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel);
 }
 
 .strava-connect img {

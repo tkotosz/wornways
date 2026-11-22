@@ -34,6 +34,22 @@ export function rememberStravaState(url: URL): void {
   sessionStorage.setItem(STATE, url.searchParams.get('state') ?? '');
 }
 
+/**
+ * Whether a sign-in started in this tab is still waiting for Strava's answer, and forgets it.
+ * Ask only when the address holds no callback: the person then came back from Strava's page
+ * without Strava sending them back. Strava shows some refusals, like its limit of connected
+ * athletes, on its own page and never sends the person back.
+ */
+export function takeUnansweredStravaSignIn(): boolean {
+  try {
+    const started = sessionStorage.getItem(STATE) !== null;
+    sessionStorage.removeItem(STATE);
+    return started;
+  } catch {
+    return false;
+  }
+}
+
 export function takeStravaCallback(): URLSearchParams | null {
   const url = new URL(location.href);
   const params = new URLSearchParams(url.search);

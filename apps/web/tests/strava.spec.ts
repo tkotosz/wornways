@@ -578,10 +578,34 @@ test('offers the file workflow when Strava refuses a connection at capacity', as
   await page.goto('/');
   await pickSource(page, 'strava');
   await expect(page.getByText('If Strava says its connection limit was reached')).toBeVisible();
+  await expect(page.getByTestId('strava-unanswered')).toHaveCount(0);
   await page.getByRole('link', { name: 'Connect with Strava' }).click();
   await expect(page.getByText('Limit of connected athletes exceeded')).toBeVisible();
+  // Strava never sends the person back: they come back on their own, and the page loads again.
   await page.goBack();
-  await page.getByRole('button', { name: 'Change source' }).click();
-  await pickSource(page, 'files');
+  await expect(page.getByTestId('strava-unanswered')).toContainText('Strava did not connect');
+  await page.getByRole('button', { name: 'Use files instead' }).click();
   await expect(page.getByRole('button', { name: 'Choose files' })).toBeVisible();
+  // The message is about that one sign-in: it is gone when Strava is chosen again.
+  await page.reload();
+  await page.getByRole('button', { name: 'Change source' }).click();
+  await pickSource(page, 'strava');
+  await expect(page.getByRole('link', { name: 'Connect with Strava' })).toBeVisible();
+  await expect(page.getByTestId('strava-unanswered')).toHaveCount(0);
+});
+
+test('explains an unanswered Strava sign-in when the page comes back from the back-forward cache', async ({
+  page,
+}) => {
+  await fakeStrava(page);
+  await page.goto('/');
+  await pickSource(page, 'strava');
+  await expect(page.getByRole('link', { name: 'Connect with Strava' })).toBeVisible();
+  // The browsers used in tests never keep pages for Back, so the restore is played here.
+  await page.evaluate(`{
+    sessionStorage.setItem('wornways-strava-state', 'left-on-strava');
+    dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true }));
+  }`);
+  await expect(page.getByTestId('strava-unanswered')).toContainText('Strava did not connect');
+  expect(await page.evaluate(() => sessionStorage.getItem('wornways-strava-state'))).toBeNull();
 });
