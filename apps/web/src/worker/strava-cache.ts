@@ -153,10 +153,20 @@ export class StravaCache<T> {
     });
   }
 
+  /** Adds a track read from the cache that the index does not list yet. */
+  noteTrack(summary: ActivitySummary): Promise<unknown> {
+    return this.index((list) =>
+      list.some((row) => row.id === summary.id) ? list : [...list, summary],
+    );
+  }
+
+  /** Changes the index; a change that returns the same list writes nothing. */
   private index(change: (list: ActivitySummary[]) => ActivitySummary[]): Promise<unknown> {
     this.indexing = this.indexing
       .then(async () => {
-        const list = change((await this.readIndex()) ?? []);
+        const before = (await this.readIndex()) ?? [];
+        const list = change(before);
+        if (list === before) return;
         await this.use((cache) =>
           this.write(cache, 'downloaded', '1', encoder.encode(JSON.stringify(list)).buffer),
         );
