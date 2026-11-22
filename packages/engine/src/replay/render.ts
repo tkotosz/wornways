@@ -230,6 +230,30 @@ const rowOf = (position: Position) =>
   position.startsWith('top') ? 'top' : position.startsWith('middle') ? 'middle' : 'bottom';
 const wholeNumber = (n: number) => Math.round(n).toLocaleString('en-US');
 
+/** Points of a route closer together than this, in pixels as drawn, add nothing to the line. */
+const MIN_GAP_PX = 0.35;
+
+/**
+ * Adds the line through the first `count` points of `xy` ([x, y] per point) to the path,
+ * leaving out the points closer than `gap` to the last one drawn. The two ends are always
+ * drawn, so the pieces of a route still meet.
+ */
+function tracePoints(c: Context2DLike, xy: ArrayLike<number>, count: number, gap: number): void {
+  let lastX = xy[0];
+  let lastY = xy[1];
+  c.moveTo(lastX, lastY);
+  const end = count - 1;
+  for (let i = 1; i < end; i++) {
+    const x = xy[i * 2];
+    const y = xy[i * 2 + 1];
+    if ((x - lastX) ** 2 + (y - lastY) ** 2 < gap * gap) continue;
+    lastX = x;
+    lastY = y;
+    c.lineTo(x, y);
+  }
+  if (end > 0) c.lineTo(xy[end * 2], xy[end * 2 + 1]);
+}
+
 /** Sports whose speed is told as minutes per kilometre. */
 const isOnFoot = (sport: string) => /run|walk|hike/.test(sport);
 
@@ -298,8 +322,11 @@ export function createRenderer(
   if (!camera && (basemap?.levels.length ?? 1) !== 1)
     throw new Error('A fixed camera takes a basemap with one level');
 
-  // Points closer than a third of a pixel add nothing, at the closest the camera gets.
-  const minGapPx = options.preserveRoutePoints ? 0 : 0.35 / (camera?.maxZoom ?? 1);
+  // The routes keep the points the closest zoom of the camera can show. A wider zoom level
+  // strokes fewer of them: the ones its own pixels can show (see `strokePiece`).
+  const minGapPx = options.preserveRoutePoints ? 0 : MIN_GAP_PX / (camera?.maxZoom ?? 1);
+  /** The gap between a route's points on a level drawn at `k` times the base view's scale. */
+  const levelGap = (k: number) => (options.preserveRoutePoints ? 0 : MIN_GAP_PX / k);
   const prepared: Prepared[] = tracks.map((track) => ({
     ...projectTrack(track, view, minGapPx),
     date: dateFormat.format(track.startTime),
@@ -340,8 +367,8 @@ export function createRenderer(
     prepareHeat(pc, W, H);
     for (const tr of prepared) {
       pc.beginPath();
-      pc.moveTo(tr.xy[0], tr.xy[1]);
-      for (let i = 1; i < tr.count; i++) pc.lineTo(tr.xy[i * 2], tr.xy[i * 2 + 1]);
+      // At the base view's scale, with the points its level keeps.
+      tracePoints(pc, tr.xy, tr.count, levelGap(1));
       for (const s of strokes) {
         pc.lineWidth = s.width;
         pc.strokeStyle = s.style;
@@ -467,8 +494,11 @@ export function createRenderer(
     if (rect.x1 < 0 || rect.y1 < 0 || rect.x0 > level.width || rect.y0 > level.height) return;
     const c = level.heatCtx;
     c.beginPath();
-    c.moveTo(piece.xy[0], piece.xy[1]);
-    for (let j = 2; j < piece.xy.length; j += 2) c.lineTo(piece.xy[j], piece.xy[j + 1]);
+    // Points closer together than this level can show are left out. They add no detail,
+    // and with the noise of a GPS track between them they bend the line back and forth:
+    // its round joins then spill past the piece's flat ends, onto the pieces before and
+    // after it, where the pass is counted twice.
+    tracePoints(c, piece.xy, piece.xy.length / 2, levelGap(level.k));
     for (const s of strokes) {
       c.lineWidth = s.width / level.k;
       c.strokeStyle = s.style;

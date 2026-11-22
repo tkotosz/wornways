@@ -145,6 +145,62 @@ describe('zoom levels', () => {
   });
 });
 
+describe('a route with more points than a zoom level can show', () => {
+  const width = 270;
+  const height = 480;
+  const fps = 30;
+  const seconds = 6;
+
+  /**
+   * A straight 5 km route heading north-east with a point every meter, each one `noiseM`
+   * meters off the line, to one side and then the other, like the noise of a GPS track.
+   */
+  function denseRoute(noiseM: number): Track {
+    const count = 5000;
+    const points = new Float64Array(count * STRIDE);
+    for (let i = 0; i < count; i++) {
+      const off = (i % 2 === 0 ? 1 : -1) * noiseM;
+      const east = (i + off) * 0.7;
+      const north = (i - off) * 0.7;
+      points.set([19 + east / 75_000, 47.5 + north / 111_000, 0, i], i * STRIDE);
+    }
+    return { id: 'dense', sport: 'ride', startTime: Date.UTC(2026, 4, 2), points };
+  }
+
+  /** The heat line's pixels in the last frame, at the widest view of a camera that could zoom in far. */
+  function heatAtTheEnd(track: Track, options: Partial<RenderOptions> = {}): number {
+    const frames = seconds * fps;
+    const camera = {
+      zoom: new Float32Array(frames).fill(1),
+      tx: new Float32Array(frames),
+      ty: new Float32Array(frames),
+      // Routes keep the points this zoom could show: about 60 for each pixel of the widest view.
+      maxZoom: 64,
+    };
+    const renderer = createRenderer(
+      [track],
+      chronologicalTimeline([5_000], { duration: seconds }),
+      (w, h) => createCanvas(w, h) as unknown as CanvasLike,
+      { width, height, fps, camera, metrics: [], ...options },
+    );
+    for (let f = 0; f < renderer.replayFrames; f++) renderer.renderFrame(f);
+    return heatPixels(renderer.canvas, width, height);
+  }
+
+  it('is drawn as wide as a clean one, where every point drawn would make it wider', () => {
+    const clean = heatAtTheEnd(denseRoute(0));
+    // Half a meter of noise: a thirtieth of a pixel at this view.
+    const noisy = heatAtTheEnd(denseRoute(0.5));
+    // With every point kept, as for the trim radius: the noise bends the line at every
+    // point, and the round joins spill past the ends of each frame's piece.
+    const everyPoint = heatAtTheEnd(denseRoute(0.5), { preserveRoutePoints: true });
+
+    expect(clean).toBeGreaterThan(100);
+    expect(noisy).toBeLessThan(clean * 1.1);
+    expect(everyPoint).toBeGreaterThan(clean * 2);
+  });
+});
+
 /** Pixels where red clearly dominates (the heat line), in `height` rows from `top`. */
 function heatPixels(canvas: CanvasLike, width: number, height: number, top = 0): number {
   const { data } = (canvas.getContext('2d') as Context2DLike).getImageData(0, top, width, height);
