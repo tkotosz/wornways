@@ -75,6 +75,76 @@ describe('the follow camera', () => {
   });
 });
 
+describe('zoom levels', () => {
+  const width = 180;
+  const height = 320;
+  const pixels = (canvas: CanvasLike) =>
+    Buffer.from((canvas.getContext('2d') as Context2DLike).getImageData(0, 0, width, height).data);
+
+  /** A replay of one route, with the canvases it made and the number of tiles it loaded. */
+  async function prepare(input: { preset?: string }, lastFrameOnly = false) {
+    const canvases: CanvasLike[] = [];
+    let tiles = 0;
+    const settings = parseSettings({ ...input, size: `${width}x${height}`, 'end-card': false });
+    const replay = await prepareReplay([route()], settings, {
+      createCanvas(w, h) {
+        const canvas = createCanvas(w, h) as unknown as CanvasLike;
+        canvases.push(canvas);
+        return canvas;
+      },
+      async loadTiles(ids) {
+        tiles += ids.length;
+        return { tiles: ids.map((id) => ({ ...id, data: null })), downloaded: 0 };
+      },
+      lastFrameOnly,
+    });
+    return { ...replay, canvases, tiles };
+  }
+
+  it.each([
+    ['zoom', {}],
+    ['follow', { preset: 'highlight' }],
+  ])(
+    'set up for the last frame only, draw it as frame by frame (%s camera)',
+    async (mode, input) => {
+      const whole = await prepare(input);
+      const preview = await prepare(input, true);
+      expect(whole.cameraMode).toBe(mode);
+      expect(whole.camera!.maxZoom).toBeGreaterThan(1);
+
+      const last = whole.renderer.replayFrames - 1;
+      for (let frame = 0; frame <= last; frame++) whole.renderer.renderFrame(frame);
+      preview.renderer.skipTo(last);
+      preview.renderer.renderFrame(last);
+
+      // The route is in the picture, a thin line where the camera has pulled back.
+      expect(heatPixels(preview.renderer.canvas, width, height)).toBeGreaterThan(10);
+      expect(pixels(preview.renderer.canvas).equals(pixels(whole.renderer.canvas))).toBe(true);
+      // Less of the map is loaded and set up than for the whole replay.
+      expect(preview.tiles).toBeLessThan(whole.tiles);
+      expect(preview.canvases.length).toBeLessThan(whole.canvases.length);
+    },
+  );
+
+  it('are released once the camera has pulled back from them', async () => {
+    const { renderer, canvases, map } = await prepare({});
+    const levels = map!.zooms.length;
+    expect(levels).toBeGreaterThan(1);
+    const released = () => canvases.filter((canvas) => canvas.width === 1).length;
+
+    renderer.renderFrame(0);
+    expect(released()).toBe(0);
+    for (let frame = 1; frame < renderer.replayFrames; frame++) renderer.renderFrame(frame);
+    // Every level but the widest: its heat canvas and its map with the heat on it.
+    expect(released()).toBe(2 * (levels - 1));
+  });
+
+  it('refuse any other frame when set up for the last one', async () => {
+    const { renderer } = await prepare({}, true);
+    expect(() => renderer.renderFrame(0)).toThrow('only');
+  });
+});
+
 /** Pixels where red clearly dominates (the heat line), in `height` rows from `top`. */
 function heatPixels(canvas: CanvasLike, width: number, height: number, top = 0): number {
   const { data } = (canvas.getContext('2d') as Context2DLike).getImageData(0, top, width, height);

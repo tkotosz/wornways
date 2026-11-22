@@ -327,10 +327,15 @@ onBeforeUnmount(() => {
   overflow: hidden;
 }
 
+/*
+ * The bar moves in small steps, without a transition, on purpose. An animation here keeps
+ * the page drawing 60 times a second for as long as the video is made, and the browser
+ * then holds back the GPU work of the worker that draws the video: with a 0.2 s transition
+ * a video took about half as long again.
+ */
 .bar div {
   height: 100%;
   background: linear-gradient(90deg, var(--accent), var(--accent-strong));
-  transition: width 0.2s;
 }
 
 .summary {

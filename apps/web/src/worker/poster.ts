@@ -39,11 +39,12 @@ export async function makePoster(
     loadTiles,
     signal,
     size,
+    // The replay's last frame: the finished picture, not the end card after it.
+    lastFrameOnly: true,
   });
   if (signal.aborted) throw new Canceled();
 
   const { renderer } = replay;
-  // The replay's last frame: the finished picture, not the end card after it.
   const last = renderer.replayFrames - 1;
   renderer.skipTo(last);
   if (signal.aborted) throw new Canceled();

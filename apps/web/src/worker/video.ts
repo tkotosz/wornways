@@ -45,6 +45,31 @@ export class VideoProblem extends Error {}
 
 export class Canceled extends Error {}
 
+/**
+ * Makes the canvases of a video, and tells when one of them loses its content. A browser
+ * keeps canvases on the GPU; when the GPU restarts they come back empty, and the encoder
+ * never takes the next frame. `lost` then fails, so the video can end with a message
+ * instead of waiting forever.
+ */
+function watchedCanvases() {
+  let fail: (problem: VideoProblem) => void = () => {};
+  const lost = new Promise<never>((_, reject) => (fail = reject));
+  // Only ever waited for in a race with the work in progress.
+  lost.catch(() => {});
+  const createCanvas = (width: number, height: number) => {
+    const canvas = new OffscreenCanvas(width, height);
+    canvas.addEventListener('contextlost', () =>
+      fail(
+        new VideoProblem(
+          'The graphics of this device restarted while the video was being made. Make the video again.',
+        ),
+      ),
+    );
+    return canvas as unknown as CanvasLike;
+  };
+  return { createCanvas, lost };
+}
+
 export async function makeVideo(
   library: Track[],
   input: SettingsInput,
@@ -66,8 +91,9 @@ export async function makeVideo(
 
   onProgress({ stage: 'map' });
   await loadFont();
+  const canvases = watchedCanvases();
   const replay = await prepareReplay(tracks, settings, {
-    createCanvas: (w, h) => new OffscreenCanvas(w, h) as unknown as CanvasLike,
+    createCanvas: canvases.createCanvas,
     loadTiles,
     signal,
   });
@@ -89,11 +115,11 @@ export async function makeVideo(
     for (let f = 0; f < frames; f++) {
       if (signal.aborted) throw new Canceled();
       renderer.renderFrame(f);
-      await source.add(f / fps, 1 / fps);
+      await Promise.race([source.add(f / fps, 1 / fps), canvases.lost]);
       if (f % 15 === 0) onProgress({ stage: 'drawing', done: f + 1, total: frames });
     }
     onProgress({ stage: 'finishing' });
-    await output.finalize();
+    await Promise.race([output.finalize(), canvases.lost]);
   } catch (error) {
     await output.cancel();
     throw error;
