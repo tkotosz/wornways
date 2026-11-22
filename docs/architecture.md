@@ -48,3 +48,5 @@ runs on the user's device: in a browser Web Worker for the web app, in Node for 
 - In the browser, only the canvases whose pixels are read back on every frame ask to be
   kept in memory; the others are left on the GPU, so drawing one onto another needs no
   upload. See [render-performance.md](render-performance.md).
+- Nothing on the page animates while the worker draws: a page that redraws all the time
+  holds back the worker's GPU work. See [render-performance.md](render-performance.md).
