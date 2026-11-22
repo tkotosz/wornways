@@ -51,8 +51,11 @@ phone.
    added and what could not be read (closable), and the library as a grid with a header
    row (date, name, sport, distance) and a delete button per row. "Delete all my data"
    removes everything the app stored, after a confirmation. Where the site offers them,
-   Strava and Ride with GPS can be the source instead (see below). A person who already
-   has activities starts at step 2.
+   Strava and Ride with GPS can be the source instead (see below). One source is in use
+   at a time, and activities of different sources are never mixed: the step shows only
+   the card of the source in use, marked "In use", and "Use another source" shows every
+   source offered, to switch. With nothing to use yet (no files, nothing connected), all
+   of them show. A person who already has activities starts at step 2.
 2. **Activities.** The filters (the "Which activities" settings): period with shortcuts
    and a calendar for custom days, sports (offered only when the period has them, with
    "All"), and two place filters, "Starts near a place" and "Ends near a place". Each
@@ -184,7 +187,9 @@ Sample activities to try the app with come later, once there are routes that may
   time limit as for Strava. Disconnecting revokes the token, ends the cookie and deletes
   these tracks.
 - A reload opens Ride with GPS again when it was the source last, with the tab's filters
-  and selection; switching to files or the demo keeps the connection. The look of the
+  and selection; switching to files, Strava or the demo keeps the connection. When the
+  person comes back from connecting one service, that one is the source and the other
+  one lets go (a Strava session ends). The look of the
   video (steps 3 and 4) is the same one files use.
 - Trips get the id `rwgps-<trip id>`, and Ride with GPS's activity types (`cycling:road`,
   `running:trail`, ...) are mapped to the same sport names as files. There is no webhook:
@@ -192,7 +197,7 @@ Sample activities to try the app with come later, once there are routes that may
 
 ### Demo
 
-- Besides files (and Strava), the Source step offers a demo: made-up rides and runs on real
+- Besides files, Strava and Ride with GPS, the Source step offers a demo: made-up rides and runs on real
   roads in Mallorca, for trying Wornways before adding one's own activities. A month of
   rides and runs from one town (for a recap), a five-day tour of the island (for a
   multiday trip) and one long climb (for a highlight). It is offered only while there are no

@@ -101,10 +101,10 @@ export function useRideWithGps(engine: EngineClient, onEnd: () => void) {
   }
 
   /**
-   * Checks the connection. Returns whether Ride with GPS should open as the source: right
-   * after connecting, or when it was the source before this reload.
+   * Checks the connection. Returns why Ride with GPS should open as the source: "connected"
+   * right after connecting, "reopen" when it was the source before this reload; else null.
    */
-  async function check(): Promise<boolean> {
+  async function check(): Promise<'connected' | 'reopen' | null> {
     const outcome = takeOutcome();
     if (outcome && OUTCOMES[outcome]) error.value = OUTCOMES[outcome];
     try {
@@ -112,18 +112,19 @@ export function useRideWithGps(engine: EngineClient, onEnd: () => void) {
         cache: 'no-store',
         signal: AbortSignal.timeout(6000),
       });
-      if (!res.ok || !res.headers.get('Content-Type')?.includes('application/json')) return false;
+      if (!res.ok || !res.headers.get('Content-Type')?.includes('application/json')) return null;
       available.value = true;
       connected.value = ((await res.json()) as { connected?: boolean }).connected === true;
     } catch {
-      return false;
+      return null;
     }
     if (!connected.value) {
       // The connection ended while the app was closed: tracks kept for it go too.
       if (stored(() => localStorage, LAST_SOURCE)) await stop(true);
-      return false;
+      return null;
     }
-    return outcome === 'connected' || stored(() => localStorage, LAST_SOURCE) === 'open';
+    if (outcome === 'connected') return 'connected';
+    return stored(() => localStorage, LAST_SOURCE) === 'open' ? 'reopen' : null;
   }
 
   /** Makes Ride with GPS the source and lists the account's trips. */
@@ -148,10 +149,10 @@ export function useRideWithGps(engine: EngineClient, onEnd: () => void) {
 
   /** Goes back to another source; the connection and the downloaded tracks stay. */
   async function close(): Promise<void> {
+    store(() => localStorage, LAST_SOURCE, null);
     if (!active.value) return;
     active.value = false;
     rows.value = [];
-    store(() => localStorage, LAST_SOURCE, null);
     await engine.endRideWithGps(false).catch(() => {});
   }
 

@@ -204,6 +204,9 @@ test.describe('Strava on a phone', () => {
     );
     await page.getByTestId('file-input').setInputFiles(fixture.pathname);
     await expect(page.getByTestId('activity-count')).toContainText('3 activities');
+    // With files in use, only their card shows until another source is asked for.
+    await expect(page.getByTestId('strava-source')).toHaveCount(0);
+    await page.getByRole('button', { name: 'Use another source' }).click();
     await connect(page);
     await expect(page.getByRole('status')).toHaveText('No Strava activities in this period.');
     await page.getByRole('button', { name: 'Last year', exact: true }).click();
@@ -232,6 +235,8 @@ test.describe('Strava on a phone', () => {
     expect((await download).suggestedFilename()).toMatch(/\.mp4$/);
     await expect(page.getByRole('button', { name: 'Done', exact: true })).toHaveCount(0);
     await page.getByRole('button', { name: 'Go to Source' }).click();
+    await expect(page.getByTestId('strava-source')).toContainText('In use');
+    await page.getByRole('button', { name: 'Use another source' }).click();
     const ending = page.waitForResponse(
       (response) =>
         response.url().endsWith('/api/strava/oauth') && response.request().method() === 'DELETE',
@@ -297,6 +302,65 @@ test('clears the browser session when the Strava activity endpoint rejects acces
   await expect(page.getByTestId('chosen')).toHaveCount(0);
   await expect(page.getByRole('link', { name: 'Connect with Strava' })).toBeVisible();
   await expect.poll(() => mock.disconnects).toEqual([false]);
+});
+
+test('offers Ride with GPS again after connecting Strava, one source in use at a time', async ({
+  page,
+}) => {
+  await fakeStrava(page);
+  // Ride with GPS, connected in this browser, with one trip.
+  await page.route('**/api/ridewithgps/session', (route) =>
+    route.fulfill({ json: { connected: true } }),
+  );
+  await page.route('**/api/ridewithgps/trips?*', (route) =>
+    route.fulfill({
+      json: {
+        trips: [
+          {
+            id: 7,
+            name: 'Ride with GPS loop',
+            departed_at: new Date().toISOString(),
+            activity_type: 'cycling:road',
+            distance: 1000,
+            first_lat: 47.5,
+            first_lng: 19.04,
+            last_lat: 47.5,
+            last_lng: 19.04,
+            stationary: false,
+            updated_at: 'v1',
+          },
+        ],
+        pages: 1,
+      },
+    }),
+  );
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Use Ride with GPS' }).click();
+  await expect(page.getByTestId('source')).toContainText('Ride with GPS');
+
+  await page.getByRole('button', { name: 'Change source' }).click();
+  await expect(page.getByTestId('strava-source')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Use another source' }).click();
+  await connect(page);
+  await expect(page.getByTestId('source')).toContainText('Strava');
+
+  // Strava is in use; Ride with GPS is still connected and offered among the others.
+  await page.getByRole('button', { name: 'Change source' }).click();
+  await expect(page.getByTestId('strava-source')).toContainText('In use');
+  await expect(page.getByTestId('rwgps-source')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Use another source' }).click();
+  const rwgps = page.getByTestId('rwgps-source');
+  await expect(rwgps.getByRole('button', { name: 'Use Ride with GPS' })).toBeVisible();
+
+  // A reload keeps Strava, not the source used before it.
+  await page.reload();
+  await expect(page.getByTestId('source')).toContainText('Strava');
+
+  await page.getByRole('button', { name: 'Change source' }).click();
+  await page.getByRole('button', { name: 'Use another source' }).click();
+  await rwgps.getByRole('button', { name: 'Use Ride with GPS' }).click();
+  await expect(page.getByTestId('source')).toContainText('Ride with GPS');
+  await expect(page.getByTestId('chosen')).toContainText('Ride with GPS loop');
 });
 
 test('clears the session when Strava revokes access', async ({ page }) => {

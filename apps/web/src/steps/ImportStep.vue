@@ -1,7 +1,8 @@
 <script setup lang="ts">
 // Step 1: choose where the activities come from: files saved on this device (added here, and
-// seen and deleted here), Strava, Ride with GPS, or the demo's made-up activities.
-import { computed, ref } from 'vue';
+// seen and deleted here), Strava, Ride with GPS, or the demo's made-up activities. One source
+// is in use at a time, and only its card shows; "Use another source" shows them all to switch.
+import { computed, ref, watch } from 'vue';
 import ActivityGrid from '../components/ActivityGrid.vue';
 import AddFiles from '../components/AddFiles.vue';
 import GettingFiles from '../components/GettingFiles.vue';
@@ -45,6 +46,25 @@ const offerDemo = computed(
     props.demoActive || (!props.stravaActive && !props.rwgps.active && props.library.length === 0),
 );
 
+type SourceCard = 'files' | 'strava' | 'rwgps' | 'demo';
+/** The source in use; null while there is nothing to use yet (no files, nothing connected). */
+const inUse = computed<SourceCard | null>(() =>
+  props.stravaActive
+    ? 'strava'
+    : props.rwgps.active
+      ? 'rwgps'
+      : props.demoActive
+        ? 'demo'
+        : props.library.length
+          ? 'files'
+          : null,
+);
+/** Whether every source is shown to pick another one. */
+const choosing = ref(false);
+watch(inUse, () => (choosing.value = false));
+/** Whether a source's card shows: all of them while choosing, else only the one in use. */
+const shown = (card: SourceCard) => inUse.value === null || choosing.value || inUse.value === card;
+
 const error = ref('');
 const confirmingDeleteAll = ref(false);
 
@@ -81,11 +101,15 @@ async function remove(ids: string[] | 'all'): Promise<void> {
         See the demo first</button
       >.
     </p>
-    <!-- While the demo is open, only the demo is offered: leaving it brings the others back. -->
     <div class="sources">
-      <section v-if="!demoActive" class="source-card">
+      <section
+        v-if="shown('files')"
+        class="source-card"
+        :class="{ 'in-use': inUse === 'files' }"
+        data-testid="files-source"
+      >
         <header class="source-heading">
-          <h2>Files</h2>
+          <h2>Files <span v-if="inUse === 'files'" class="tag">In use</span></h2>
           <p class="muted">
             FIT, GPX or TCX files, a folder, or an export ZIP. Activities are saved on this device
             for next time.
@@ -99,9 +123,14 @@ async function remove(ids: string[] | 'all'): Promise<void> {
           <GettingFiles />
         </div>
       </section>
-      <section v-if="!demoActive && (stravaUrl || stravaActive)" class="source-card">
+      <section
+        v-if="shown('strava') && (stravaUrl || stravaActive)"
+        class="source-card"
+        :class="{ 'in-use': inUse === 'strava' }"
+        data-testid="strava-source"
+      >
         <header class="source-heading">
-          <h2>Strava</h2>
+          <h2>Strava <span v-if="inUse === 'strava'" class="tag">In use</span></h2>
           <p class="muted">Your connection and cached activities last up to two hours.</p>
         </header>
         <div class="source-content">
@@ -135,9 +164,14 @@ async function remove(ids: string[] | 'all'): Promise<void> {
           </div>
         </div>
       </section>
-      <section v-if="!demoActive && rwgps.available" class="source-card" data-testid="rwgps-source">
+      <section
+        v-if="shown('rwgps') && rwgps.available"
+        class="source-card"
+        :class="{ 'in-use': inUse === 'rwgps' }"
+        data-testid="rwgps-source"
+      >
         <header class="source-heading">
-          <h2>Ride with GPS</h2>
+          <h2>Ride with GPS <span v-if="inUse === 'rwgps'" class="tag">In use</span></h2>
           <p class="muted">
             Your trips. Tracks are downloaded when a video needs them and kept on this device until
             you disconnect.
@@ -177,12 +211,17 @@ async function remove(ids: string[] | 'all'): Promise<void> {
           </div>
         </div>
       </section>
-      <section v-if="offerDemo" class="source-card" data-testid="demo-source">
+      <section
+        v-if="shown('demo') && offerDemo"
+        class="source-card"
+        :class="{ 'in-use': inUse === 'demo' }"
+        data-testid="demo-source"
+      >
         <header class="source-heading">
-          <h2>Demo</h2>
+          <h2>Demo <span v-if="inUse === 'demo'" class="tag">In use</span></h2>
           <p v-if="demoActive" class="muted">
-            You are trying Wornways with made-up rides and runs in Mallorca. Leave the demo to add
-            your own files or connect Strava.
+            You are trying Wornways with made-up rides and runs in Mallorca. Leave the demo, or use
+            another source, to add your own.
           </p>
           <p v-else class="muted">
             Not ready to add your own? Try Wornways with made-up rides and runs in Mallorca.
@@ -204,6 +243,14 @@ async function remove(ids: string[] | 'all'): Promise<void> {
         </div>
       </section>
     </div>
+    <button
+      v-if="inUse && !choosing"
+      type="button"
+      class="secondary another"
+      @click="choosing = true"
+    >
+      Use another source
+    </button>
     <p v-if="rwgps.busy" class="muted" role="status">{{ rwgps.busy }}</p>
     <p v-if="rwgps.error" class="error" role="alert">{{ rwgps.error }}</p>
     <p v-if="stravaBusy" class="muted" role="status">{{ stravaBusy }}</p>
@@ -260,8 +307,28 @@ async function remove(ids: string[] | 'all'): Promise<void> {
 }
 
 .source-heading h2 {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
   margin: 0;
   font-size: 1rem;
+}
+
+.source-card.in-use {
+  border-color: var(--accent);
+}
+
+.tag {
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  color: #160a02;
+  background: var(--accent);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.another {
+  margin: -0.75rem 0 1.5rem;
 }
 
 .source-heading p {
