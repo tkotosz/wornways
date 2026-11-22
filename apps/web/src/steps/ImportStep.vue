@@ -108,22 +108,25 @@ const choices = computed(() => {
 const error = ref('');
 const confirmingDeleteAll = ref(false);
 
-/** What Strava or Ride with GPS keeps on this device while it is the open source. */
+/**
+ * What the chosen service keeps on this device, read from the stored copies: nothing is
+ * asked of Strava or Ride with GPS here.
+ */
 const downloaded = ref<ActivitySummary[]>([]);
-const openService = computed(() =>
-  props.chosen === 'strava' && props.stravaActive
+const connectedService = computed(() =>
+  props.chosen === 'strava' && stravaConnected.value
     ? 'strava'
-    : props.chosen === 'rwgps' && props.rwgps.active
+    : props.chosen === 'rwgps' && props.rwgps.connected
       ? 'rwgps'
       : null,
 );
 
 async function readDownloaded(): Promise<void> {
-  const service = openService.value;
+  const service = connectedService.value;
   downloaded.value = service ? await props.engine.downloaded(service).catch(() => []) : [];
 }
 onMounted(readDownloaded);
-watch(openService, readDownloaded);
+watch(connectedService, readDownloaded);
 onMounted(readCounts);
 watch(listing, (shown) => shown && void readCounts());
 
@@ -140,7 +143,7 @@ const held = computed(() => {
       testId: 'library',
       countId: 'activity-count',
     };
-  if (openService.value)
+  if (connectedService.value)
     return {
       rows: downloaded.value,
       heading: `${countText(downloaded.value.length, 'activity', 'activities')} downloaded to this device`,
@@ -172,7 +175,7 @@ function authorize(event: MouseEvent): void {
 async function remove(ids: string[] | 'all'): Promise<void> {
   error.value = '';
   try {
-    const service = openService.value;
+    const service = connectedService.value;
     if (service) downloaded.value = await props.engine.forgetDownloaded(service, ids);
     else emit('changed', await props.engine.deleteActivities(ids));
   } catch (caught) {
@@ -235,7 +238,7 @@ async function remove(ids: string[] | 'all'): Promise<void> {
 
       <div v-else-if="chosen === 'strava'" class="screen" data-testid="strava-source">
         <LoadingStatus v-if="stravaBusy" :text="stravaBusy" />
-        <template v-else-if="stravaActive && stravaUntil">
+        <template v-else-if="stravaConnected && stravaUntil">
           <p>
             Connected to Strava until {{ timeText(stravaUntil) }}. Tracks are downloaded when a
             video needs them and kept on this device until then.

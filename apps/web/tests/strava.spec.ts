@@ -259,10 +259,15 @@ test.describe('Strava on a phone', () => {
     await page.getByRole('button', { name: 'Change source' }).click();
     await expect(page.getByTestId('choose-strava')).toContainText('Connected until');
     await expect(page.getByTestId('choose-strava')).toContainText('1 downloaded');
+    // Its screen shows what is kept here without asking Strava; Continue reads the list.
+    const listed = mock.periods.length;
     await pickSource(page, 'strava');
     await expect(page.getByTestId('strava-source')).toContainText('Connected to Strava until');
+    await expect(page.getByTestId('downloaded')).toContainText('Strava test ride');
+    expect(mock.periods.length).toBe(listed);
     await page.getByRole('button', { name: 'Continue' }).click();
     await expect(page.getByTestId('chosen')).toContainText('Strava test ride');
+    expect(mock.periods.length).toBeGreaterThan(listed);
     expect(mock.exchanges()).toBe(1);
     expect(mock.tracks.filter((id) => id === rideId)).toHaveLength(1);
     expect(mock.periods.length).toBeGreaterThan(1);

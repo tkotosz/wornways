@@ -98,10 +98,12 @@ export function useStrava(
     await engine.closeStrava().catch(() => {});
   }
 
+  /** Ends the connection, also one that is not the source (Disconnect on its screen). */
   async function end(disconnect = false): Promise<boolean> {
-    if (!session) return false;
+    if (!session && !until.value) return false;
     const ended = ++revision;
-    session.end();
+    if (session) session.end();
+    else clearStravaDraft();
     session = null;
     until.value = null;
     clearTimeout(expiry);

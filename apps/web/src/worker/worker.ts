@@ -2,7 +2,7 @@
 // activities and answers the page's requests (see messages.ts).
 
 import { parseSettings, SettingsError } from '@wornways/engine';
-import type { Reply, Request } from '../messages.ts';
+import type { ActivitySummary, Reply, Request } from '../messages.ts';
 import { DemoUnavailable, openDemo } from './demo.ts';
 import { Library } from './library.ts';
 import { planVideo } from './plan.ts';
@@ -14,7 +14,7 @@ import {
   RideWithGpsError,
   RideWithGpsSession,
 } from './ridewithgps.ts';
-import { cachedTrackIds } from './ridewithgps-cache.ts';
+import { cachedSummaries, deleteCachedTracks } from './ridewithgps-cache.ts';
 import { pruneStravaCaches } from './strava-cache.ts';
 import { StravaError, StravaExpired, StravaSession } from './strava.ts';
 import { Canceled, VideoProblem, makeVideo } from './video.ts';
@@ -68,19 +68,27 @@ async function answer(request: Exclude<Request, { type: 'cancel' }>, signal: Abo
       pausedStrava = null;
       strava = new StravaSession(request.grant);
       return reply({ type: 'strava-started', id });
-    case 'downloaded-count': {
-      const count =
-        request.service === 'strava'
-          ? ((await (session ?? pausedStrava)?.downloaded())?.length ?? 0)
-          : (await cachedTrackIds()).length;
-      return reply({ type: 'downloaded-count', id, count });
-    }
+    // What Strava or Ride with GPS keeps on this device, read from the stored copies only.
+    case 'downloaded-count':
     case 'downloaded':
     case 'forget-downloaded': {
-      const remote = request.service === 'strava' ? session : rwgps;
-      if (!remote) return reply({ type: 'downloaded', id, activities: [] });
-      if (request.type === 'forget-downloaded') await remote.forget(request.ids);
-      return reply({ type: 'downloaded', id, activities: await remote.downloaded() });
+      let activities: ActivitySummary[];
+      if (request.service === 'strava') {
+        const kept = session ?? pausedStrava;
+        if (kept && request.type === 'forget-downloaded') await kept.forget(request.ids);
+        activities = kept ? await kept.downloaded() : [];
+      } else {
+        if (request.type === 'forget-downloaded') {
+          const ids =
+            request.ids === 'all' ? (await cachedSummaries()).map((a) => a.id) : request.ids;
+          rwgps?.forget(ids);
+          await deleteCachedTracks(ids);
+        }
+        activities = await cachedSummaries();
+      }
+      if (request.type === 'downloaded-count')
+        return reply({ type: 'downloaded-count', id, count: activities.length });
+      return reply({ type: 'downloaded', id, activities });
     }
     case 'strava-keep':
       if (!session) pausedStrava = new StravaSession(request.grant);
@@ -90,11 +98,14 @@ async function answer(request: Exclude<Request, { type: 'cancel' }>, signal: Abo
       session?.pause();
       if (session) pausedStrava = session;
       return reply({ type: 'strava-closed', id });
-    case 'strava-end':
+    case 'strava-end': {
+      // Also a connection that is not the source: disconnecting from its screen ends it.
+      const ending = session ?? pausedStrava;
       strava = null;
       pausedStrava = null;
-      if (session) await session.end(request.disconnect);
+      if (ending) await ending.end(request.disconnect);
       return reply({ type: 'strava-ended', id });
+    }
     case 'strava-list': {
       if (!session)
         throw new StravaExpired('No Strava session is open to list activities. Connect again.');
