@@ -106,6 +106,12 @@ export class EngineClient {
     void this.send({ type: 'strava-prioritize', id: this.nextId++, ids });
   }
 
+  /** Tells the worker of a Strava connection that is not the source, to count what it keeps. */
+  async keepStrava(grant: StravaGrant): Promise<void> {
+    const reply = await this.send({ type: 'strava-keep', id: this.nextId++, grant });
+    if (reply.type !== 'strava-kept') throw this.errorFor(reply);
+  }
+
   /** Stops using Strava as the source; its sign-in and cached tracks stay. */
   async closeStrava(): Promise<void> {
     if (this.source === 'strava') this.source = 'files';
@@ -143,6 +149,30 @@ export class EngineClient {
     if (this.source === 'rwgps') this.source = 'files';
     const reply = await this.send({ type: 'rwgps-end', id: this.nextId++, forget });
     if (reply.type !== 'rwgps-ended') throw this.errorFor(reply);
+  }
+
+  /** The activities whose tracks Strava or Ride with GPS keeps on this device, newest first. */
+  async downloaded(service: 'strava' | 'rwgps'): Promise<ActivitySummary[]> {
+    const reply = await this.send({ type: 'downloaded', id: this.nextId++, service });
+    if (reply.type === 'downloaded') return reply.activities;
+    throw this.errorFor(reply);
+  }
+
+  /** How many tracks Strava or Ride with GPS keeps on this device. */
+  async downloadedCount(service: 'strava' | 'rwgps'): Promise<number> {
+    const reply = await this.send({ type: 'downloaded-count', id: this.nextId++, service });
+    if (reply.type === 'downloaded-count') return reply.count;
+    throw this.errorFor(reply);
+  }
+
+  /** Deletes kept tracks (they are fetched again when needed); returns what is left. */
+  async forgetDownloaded(
+    service: 'strava' | 'rwgps',
+    ids: string[] | 'all',
+  ): Promise<ActivitySummary[]> {
+    const reply = await this.send({ type: 'forget-downloaded', id: this.nextId++, service, ids });
+    if (reply.type === 'downloaded') return reply.activities;
+    throw this.errorFor(reply);
   }
 
   /** Opens the demo: its activities, held in memory, are the source until it ends. */

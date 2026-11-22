@@ -353,6 +353,8 @@ async function choose(id: Source): Promise<void> {
   if (id === 'strava' && !strava.value && stravaUntil.value)
     await connectStrava(fileAdjustments.value);
   if (id === 'rwgps' && rwgps.connected.value && !rwgps.active.value) await rwgps.open();
+  // The demo's activities are loaded when it is picked, to show them on its screen.
+  if (id === 'demo' && !demo.active.value) await demo.open();
 }
 
 /** "Change source": back to the Source step, listing the sources. */
@@ -361,7 +363,7 @@ function changeSource(): void {
   step.value = 'import';
 }
 
-/** Continue on the Source step; the demo starts here, as it has nothing to set up. */
+/** Continue on the Source step; opens the demo if loading it failed when it was picked. */
 async function continueFromSource(): Promise<void> {
   if (chosen.value === 'demo' && !demo.active.value && !(await demo.open())) return;
   await navigate('activities');
@@ -375,7 +377,7 @@ async function loadLibrary(): Promise<void> {
   try {
     library.value = await props.engine.readLibrary();
     loaded.value = true;
-    const [rwgpsJustConnected] = await Promise.all([rwgps.check(), stravaStatus()]);
+    const [rwgpsJustConnected, stravaKept] = await Promise.all([rwgps.check(), stravaStatus()]);
     // Coming back from connecting a service chooses it. Visits from before sources were
     // chosen had files.
     if (rwgpsJustConnected) chosen.value = 'rwgps';
@@ -383,7 +385,9 @@ async function loadLibrary(): Promise<void> {
     else if (chosen.value === null && library.value.length > 0) chosen.value = 'files';
     // Only the chosen source opens; the other connections stay as they are.
     if (chosen.value === 'strava') await connectStrava(fileAdjustments.value);
+    else if (stravaKept) await props.engine.keepStrava(stravaKept).catch(() => {});
     if (chosen.value === 'rwgps' && rwgps.connected.value) await rwgps.open();
+    if (chosen.value === 'demo') await demo.open();
     if (usable.value) step.value = 'activities';
   } catch (error) {
     libraryError.value = error instanceof Error ? error.message : String(error);
@@ -501,6 +505,7 @@ onMounted(() => {
         }"
         :demo-busy="demo.busy.value"
         :demo-error="demo.error.value"
+        :demo-rows="demo.rows.value"
         @changed="library = $event"
         @choose="choose"
         @change-source="picking = true"

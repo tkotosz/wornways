@@ -10,8 +10,10 @@ import type { ActivitySummary, MatchReport, Progress } from '../messages.ts';
 import { RemoteActivities, type RemoteActivity } from './remote-activities.ts';
 import {
   cachedTrack,
+  cachedTrackIds,
   cacheTrack,
   clearCachedTracks,
+  deleteCachedTracks,
   keepCachedTracks,
 } from './ridewithgps-cache.ts';
 import { listedTrip, trackFromTrip, tripId, type TripPoint } from './ridewithgps-trip.ts';
@@ -92,6 +94,18 @@ export class RideWithGpsSession {
 
   selected(ids: string[]): Promise<Track[]> {
     return this.trips.selected(ids);
+  }
+
+  /** The trips whose tracks this device keeps, newest first. */
+  async downloaded(): Promise<ActivitySummary[]> {
+    return this.trips.summaries(await cachedTrackIds());
+  }
+
+  /** Deletes kept tracks; they are fetched again when a video needs them. */
+  async forget(ids: string[] | 'all'): Promise<void> {
+    const all = ids === 'all' ? await cachedTrackIds() : ids;
+    this.trips.forget(all);
+    await deleteCachedTracks(all);
   }
 
   private async loadTrack(row: RemoteActivity, signal: AbortSignal): Promise<Track | null> {

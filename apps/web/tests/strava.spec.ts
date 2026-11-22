@@ -258,6 +258,7 @@ test.describe('Strava on a phone', () => {
     // Strava opens again without signing in, with the track it already had.
     await page.getByRole('button', { name: 'Change source' }).click();
     await expect(page.getByTestId('choose-strava')).toContainText('Connected until');
+    await expect(page.getByTestId('choose-strava')).toContainText('1 downloaded');
     await pickSource(page, 'strava');
     await expect(page.getByTestId('strava-source')).toContainText('Connected to Strava until');
     await page.getByRole('button', { name: 'Continue' }).click();

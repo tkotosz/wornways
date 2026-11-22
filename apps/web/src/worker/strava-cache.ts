@@ -1,4 +1,5 @@
 import { STRIDE, type Track } from '@wornways/engine';
+import type { ActivitySummary } from '../messages.ts';
 
 const PREFIX = 'wornways-strava-';
 const encoder = new TextEncoder();
@@ -128,10 +129,40 @@ export class StravaCache<T> {
     );
   }
 
-  clearTrack(id: string): Promise<boolean | undefined> {
-    return this.use(async (cache) =>
+  async clearTrack(id: string): Promise<void> {
+    await this.use(async (cache) =>
       cache.delete('/wornways-strava-cache/' + (await this.trackPath(id))),
     );
+    await this.index((list) => list.filter((row) => row.id !== id));
+  }
+
+  /** What the stored tracks are, for the person to see what this device keeps. */
+  async downloaded(): Promise<ActivitySummary[]> {
+    await this.indexing;
+    return (await this.readIndex()) ?? [];
+  }
+
+  // The tracks' paths are hashes, so a list of what they are is kept beside them, encrypted
+  // the same way. Tracks are stored a few at a time, so its changes go one after another.
+  private indexing: Promise<unknown> = Promise.resolve();
+
+  private readIndex(): Promise<ActivitySummary[] | undefined> {
+    return this.use(async (cache) => {
+      const data = await this.read(cache, 'downloaded', '1');
+      return data ? (JSON.parse(new TextDecoder().decode(data)) as ActivitySummary[]) : [];
+    });
+  }
+
+  private index(change: (list: ActivitySummary[]) => ActivitySummary[]): Promise<unknown> {
+    this.indexing = this.indexing
+      .then(async () => {
+        const list = change((await this.readIndex()) ?? []);
+        await this.use((cache) =>
+          this.write(cache, 'downloaded', '1', encoder.encode(JSON.stringify(list)).buffer),
+        );
+      })
+      .catch(() => {});
+    return this.indexing;
   }
 
   track(id: string, version: string): Promise<Pick<Track, 'points' | 'startTime'> | undefined> {
@@ -150,12 +181,13 @@ export class StravaCache<T> {
     });
   }
 
-  async saveTrack(track: Track, version: string): Promise<void> {
+  async saveTrack(track: Track, version: string, summary: ActivitySummary): Promise<void> {
     await this.use(async (cache) => {
       const record = new Float64Array(track.points.length + 1);
       record[0] = track.startTime;
       record.set(track.points, 1);
       await this.write(cache, await this.trackPath(track.id), version, record.buffer);
     });
+    await this.index((list) => [...list.filter((row) => row.id !== summary.id), summary]);
   }
 }
