@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
 import { offlineMap } from './offline-map.ts';
+import { pickSource } from './sources.ts';
 
 const fixtures = new URL('../../../packages/engine/tests/import/fixtures/', import.meta.url);
 const fixture = (name: string) => new URL(name, fixtures).pathname;
@@ -43,16 +44,20 @@ const trailRun = (page: Page) =>
     .filter({ hasText: 'Apr' });
 
 async function addFiles(page: Page, ...names: string[]): Promise<void> {
+  // On a first visit the Source step lists the sources; Files is picked to add some.
+  if (await page.getByTestId('sources').isVisible()) await pickSource(page, 'files');
   await page.getByTestId('file-input').setInputFiles(names.map(fixture));
   await expect(page.getByTestId('import-report')).toBeVisible();
 }
 
 test('adds an account export and keeps it for the next visit', async ({ page }) => {
   await page.goto('/');
+  await expect(page.getByTestId('intro')).toBeVisible();
+  await pickSource(page, 'files');
+  await expect(page.getByTestId('intro')).toHaveCount(0);
   // The file instructions open on request.
   const guideLink = page.getByRole('button', { name: 'How to get your files' });
   const guide = page.getByRole('dialog', { name: 'How to get your files' });
-  await expect(page.getByTestId('intro')).toBeVisible();
   await expect(guide).toBeHidden();
   await guideLink.click();
   await expect(guide.getByRole('link', { name: 'Export Your Data' })).toBeVisible();
@@ -64,7 +69,6 @@ test('adds an account export and keeps it for the next visit', async ({ page }) 
   await page.keyboard.press('Escape');
   await expect(guide).toBeHidden();
   await addFiles(page, 'strava-export.zip');
-  await expect(page.getByTestId('intro')).toHaveCount(0);
 
   await expect(page.getByTestId('import-report')).toContainText('3 activities added');
   await expect(page.getByTestId('activity-count')).toHaveText('3 activities on this device');
@@ -153,6 +157,7 @@ test('uses the export metadata and skips planned routes when a folder is picked'
       ),
     ]);
     await page.goto('/');
+    await pickSource(page, 'files');
     await page.getByTestId('folder-input').setInputFiles(folder);
     await expect(page.getByTestId('import-report')).toContainText('1 activity added');
     await expect(page.getByTestId('library')).toContainText('Exported ride');

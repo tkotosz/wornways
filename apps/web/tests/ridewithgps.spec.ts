@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { offlineMap } from './offline-map.ts';
+import { pickSource } from './sources.ts';
 
 test.use({ serviceWorkers: 'block' });
 
@@ -75,10 +76,9 @@ test('uses Ride with GPS trips as the source, fetching tracks only when needed',
   await offlineMap(page.context());
   const { fetched, disconnects } = await fakeRideWithGps(page);
   await page.goto('/');
-  await page
-    .getByTestId('rwgps-source')
-    .getByRole('link', { name: 'Connect Ride with GPS' })
-    .click();
+  await expect(page.getByTestId('choose-rwgps')).toContainText('Not connected');
+  await pickSource(page, 'rwgps');
+  await page.getByRole('link', { name: 'Connect Ride with GPS' }).click();
 
   // Back from the sign-in: this month's trips, the one without a route left out.
   await expect(page.getByTestId('source')).toContainText('Ride with GPS');
@@ -107,9 +107,11 @@ test('uses Ride with GPS trips as the source, fetching tracks only when needed',
   expect(fetched.length).toBe(before);
 
   // Disconnecting goes back to the Source step and deletes the kept tracks.
+  // Disconnecting stays with Ride with GPS, ready to connect again.
   await page.getByRole('button', { name: 'Source' }).click();
   await page.getByRole('button', { name: 'Disconnect Ride with GPS' }).click();
   await expect(page.getByRole('link', { name: 'Connect Ride with GPS' })).toBeVisible();
+  await expect(page.getByTestId('chosen-source')).toContainText('Current source: Ride with GPS');
   await expect(page.getByText('Ride with GPS disconnected')).toBeVisible();
   expect(disconnects).toEqual([1]);
   // A string, as the tests are type-checked without the browser's types.
@@ -119,19 +121,26 @@ test('uses Ride with GPS trips as the source, fetching tracks only when needed',
 test('switches between Ride with GPS and files without disconnecting', async ({ page }) => {
   await fakeRideWithGps(page);
   await page.goto('/');
+  await pickSource(page, 'rwgps');
   await page.getByRole('link', { name: 'Connect Ride with GPS' }).click();
   await expect(page.getByTestId('source')).toContainText('Ride with GPS');
 
   await page.getByRole('button', { name: 'Change source' }).click();
-  await expect(page.getByTestId('rwgps-source')).toContainText('In use');
-  await page.getByRole('button', { name: 'Use another source' }).click();
-  await page.getByRole('button', { name: 'Use files' }).click();
-  await expect(page.getByRole('button', { name: 'Use Ride with GPS' })).toBeVisible();
+  await expect(page.getByTestId('choose-rwgps')).toContainText('Current');
+  await pickSource(page, 'files');
+  await expect(page.getByTestId('chosen-source')).toContainText('Current source: Files');
 
-  // Files were the source last, so a reload stays with them.
+  // Files were chosen last, so a reload stays with them; Ride with GPS is still connected.
   await page.reload();
-  await expect(page.getByRole('button', { name: 'Use Ride with GPS' })).toBeVisible();
-  await page.getByRole('button', { name: 'Use Ride with GPS' }).click();
+  await expect(page.getByTestId('chosen-source')).toContainText('Current source: Files');
+  await page.getByRole('button', { name: 'Change source' }).click();
+  await expect(page.getByTestId('choose-rwgps')).toContainText('Connected');
+  await pickSource(page, 'rwgps');
+  await page.getByRole('button', { name: 'Continue' }).click();
+  await expect(page.getByTestId('source')).toContainText('Ride with GPS');
+
+  // And a reload now opens Ride with GPS again.
+  await page.reload();
   await expect(page.getByTestId('source')).toContainText('Ride with GPS');
 });
 
@@ -140,6 +149,7 @@ test('goes back to the Source step when Ride with GPS no longer accepts the conn
 }) => {
   await fakeRideWithGps(page, { revoked: true });
   await page.goto('/');
+  await pickSource(page, 'rwgps');
   await page.getByRole('link', { name: 'Connect Ride with GPS' }).click();
   await expect(page.getByRole('alert')).toHaveText(
     'The Ride with GPS connection ended. Connect again.',
@@ -156,6 +166,6 @@ test('says so when the sign-in was canceled', async ({ page }) => {
 
 test('is not offered where the site has no Ride with GPS client', async ({ page }) => {
   await page.goto('/');
-  await expect(page.getByTestId('demo-source')).toBeVisible();
-  await expect(page.getByTestId('rwgps-source')).toHaveCount(0);
+  await expect(page.getByTestId('choose-demo')).toBeVisible();
+  await expect(page.getByTestId('choose-rwgps')).toHaveCount(0);
 });
