@@ -15,8 +15,7 @@ planned, and what was looked at and left alone.
 | 6   | Move the progress bar without a transition                | By itself 8–27% less time; counted in the figure of change 1        | No                                          | Built   |
 
 After changes 1, 2 and 6 most videos are made at about 10 ms per frame on a desktop: a 30
-second video in about 10 seconds. A video whose whole picture moves all the time is held by
-the H.264 encoder, at about 13 ms per frame.
+second video in about 10 seconds.
 
 ## How it was measured
 
@@ -111,8 +110,8 @@ Time to make each demo video in the app, in Chrome with a GPU:
 | Multiday trip, 25 activities | 1446   | 30.2 s | 27.9 s          | 19.4 s          | 15.6 s             |
 | Highlight, one activity      | 546    | 7.3 s  | 7.3 s           | 7.3 s           | 7.1 s              |
 
-The Highlight video does not gain: its picture pans all the time, and the encoder takes
-about 13 ms for each of its frames.
+The Highlight video does not gain from these changes: most of its time goes into stroking
+its route, which keeps the many points its close zoom can show (see change 4).
 
 Without a GPU (software rendering, as in the browser tests) the same videos take 7.8, 10.3,
 23.4 and 6.8 s.
