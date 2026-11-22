@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
+import { pickSource } from './sources.ts';
 
 const activity = new URL(
   '../../../packages/engine/tests/import/fixtures/trail-run.tcx',
@@ -32,6 +33,7 @@ async function closeConnections(
 test('saves the import after the database connection closes', async ({ page }) => {
   await closeConnections(page, 'readwrite', 1);
   await page.goto('/');
+  await pickSource(page, 'files');
   await expect(page.getByRole('button', { name: 'Choose files' })).toBeVisible();
   await page.getByTestId('file-input').setInputFiles(activity);
   await expect(page.getByTestId('import-report')).toContainText('1 activity added');
@@ -46,7 +48,7 @@ test('can retry loading the library after its database keeps closing', async ({ 
   await page.goto('/');
   await expect(page.getByRole('alert')).toContainText('lost access to the activity library');
   await page.getByRole('button', { name: 'Try again' }).click();
-  await expect(page.getByRole('button', { name: 'Choose files' })).toBeVisible();
+  await expect(page.getByTestId('choose-files')).toBeVisible();
   await expect(page.getByRole('alert')).toHaveCount(0);
 });
 
@@ -70,6 +72,7 @@ test('preserves separate activities imported with the same name in two tabs', as
     buffer: await readFile(ride),
   };
   await Promise.all([page.goto('/'), second.goto('/')]);
+  await Promise.all([pickSource(page, 'files'), pickSource(second, 'files')]);
   await Promise.all([
     page.getByTestId('file-input').setInputFiles(firstFile),
     second.getByTestId('file-input').setInputFiles(secondFile),

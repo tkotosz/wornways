@@ -4,8 +4,8 @@
 // (functions/api/ridewithgps): the page links to /api/ridewithgps/connect, and the callback
 // sends the person back with `?ridewithgps=<outcome>`.
 //
-// The connection lasts 30 days. The app reopens Ride with GPS after a reload when it was the
-// source last; the choice is kept for the tab, like Strava's.
+// The connection lasts 30 days. Which source is chosen is the app's to remember (App.vue);
+// the choice over the trips is kept for the tab, like Strava's.
 
 import { ref, watch } from 'vue';
 import { NO_CHOICE, type Choice } from './choice.ts';
@@ -20,8 +20,6 @@ import { useMatches } from './use-matches.ts';
 
 export const CONNECT_URL = '/api/ridewithgps/connect';
 const SESSION_URL = '/api/ridewithgps/session';
-/** Set while Ride with GPS is the source, so a reload opens it again. */
-const LAST_SOURCE = 'wornways-rwgps-source';
 /** The choice over the trips, for the tab's next reload. */
 const CHOICE = 'wornways-rwgps-choice';
 
@@ -89,7 +87,6 @@ export function useRideWithGps(engine: EngineClient, onEnd: () => void) {
     const wasActive = active.value;
     active.value = false;
     rows.value = [];
-    store(() => localStorage, LAST_SOURCE, null);
     store(() => sessionStorage, CHOICE, null);
     choice.value = initialChoice();
     await engine.endRideWithGps(forget).catch(() => {});
@@ -105,11 +102,8 @@ export function useRideWithGps(engine: EngineClient, onEnd: () => void) {
     }
   }
 
-  /**
-   * Checks the connection. Returns why Ride with GPS should open as the source: "connected"
-   * right after connecting, "reopen" when it was the source before this reload; else null.
-   */
-  async function check(): Promise<'connected' | 'reopen' | null> {
+  /** Checks the connection. Returns whether the person just came back from connecting. */
+  async function check(): Promise<boolean> {
     const outcome = takeOutcome();
     if (outcome && OUTCOMES[outcome]) error.value = OUTCOMES[outcome];
     try {
@@ -117,19 +111,15 @@ export function useRideWithGps(engine: EngineClient, onEnd: () => void) {
         cache: 'no-store',
         signal: AbortSignal.timeout(6000),
       });
-      if (!res.ok || !res.headers.get('Content-Type')?.includes('application/json')) return null;
+      if (!res.ok || !res.headers.get('Content-Type')?.includes('application/json')) return false;
       available.value = true;
       connected.value = ((await res.json()) as { connected?: boolean }).connected === true;
     } catch {
-      return null;
+      return false;
     }
-    if (!connected.value) {
-      // The connection ended while the app was closed: tracks kept for it go too.
-      if (stored(() => localStorage, LAST_SOURCE)) await stop(true);
-      return null;
-    }
-    if (outcome === 'connected') return 'connected';
-    return stored(() => localStorage, LAST_SOURCE) === 'open' ? 'reopen' : null;
+    // A connection that ended while the app was closed: the tracks kept for it go too.
+    if (!connected.value) await engine.endRideWithGps(true).catch(() => {});
+    return connected.value && outcome === 'connected';
   }
 
   /** Makes Ride with GPS the source and lists the account's trips. */
@@ -140,7 +130,6 @@ export function useRideWithGps(engine: EngineClient, onEnd: () => void) {
     try {
       rows.value = await engine.startRideWithGps();
       active.value = true;
-      store(() => localStorage, LAST_SOURCE, 'open');
       if (!rows.value.length)
         notice.value = 'Your Ride with GPS account has no trips with a route.';
       return true;
@@ -154,7 +143,6 @@ export function useRideWithGps(engine: EngineClient, onEnd: () => void) {
 
   /** Goes back to another source; the connection and the downloaded tracks stay. */
   async function close(): Promise<void> {
-    store(() => localStorage, LAST_SOURCE, null);
     if (!active.value) return;
     active.value = false;
     rows.value = [];

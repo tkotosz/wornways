@@ -47,15 +47,19 @@ one, which is outlined in orange. On a phone it shows "Step 3 of 5", the step's 
 bar with a segment per step; each segment opens its step. Each step is one column on a
 phone.
 
-1. **Import.** A drop zone and file and folder pickers, a report of what the last import
-   added and what could not be read (closable), and the library as a grid with a header
-   row (date, name, sport, distance) and a delete button per row. "Delete all my data"
-   removes everything the app stored, after a confirmation. Where the site offers them,
-   Strava and Ride with GPS can be the source instead (see below). One source is in use
-   at a time, and activities of different sources are never mixed: the step shows only
-   the card of the source in use, marked "In use", and "Use another source" shows every
-   source offered, to switch. With nothing to use yet (no files, nothing connected), all
-   of them show. A person who already has activities starts at step 2.
+1. **Source.** Where the activities come from: files on this device, Strava, Ride with
+   GPS (the last two where the site offers them) or the demo. One source is chosen at a
+   time, and activities of different sources are never mixed. Until one is chosen, and
+   after "Change source", the step lists them, each with where it stands ("3 activities
+   on this device", "Connected", "Not connected") and the current one marked. Picking one
+   shows what it needs, under "Current source: … · Change source": for files, a drop zone
+   and file and folder pickers, a report of what the last import added and what could not
+   be read (closable), and the library as a grid with a header row (date, name, sport,
+   distance) and a delete button per row ("Delete saved activities" removes them all,
+   after a confirmation); for Strava and Ride with GPS, connecting or the connection and a
+   way to disconnect; for the demo, what it holds and "Start the demo". The choice is
+   remembered for the next visit; a person whose chosen source is ready (files on the
+   device, a service connected) starts at step 2.
 2. **Activities.** The filters (the "Which activities" settings): period with shortcuts
    and a calendar for custom days, sports (offered only when the period has them, with
    "All"), and two place filters, "Starts near a place" and "Ends near a place". Each
@@ -99,10 +103,9 @@ phone.
    app through the system's share sheet. Share shows only where the browser can share
    files (mostly on phones) and is then the main button.
 
-While no activities are stored (on a first visit, or after deleting everything), step 1
-also says in a few words what the app does. "How to get your files" starts collapsed and
-opens instructions for exporting an account or a single activity from Strava or Garmin.
-Sample activities to try the app with come later, once there are routes that may be published.
+Until a source is chosen (on a first visit), step 1 also says in a few words what the app
+does. On the files screen, "How to get your files" starts collapsed and opens instructions
+for exporting an account or a single activity from Strava or Garmin.
 
 ## How it works
 
@@ -191,23 +194,22 @@ Sample activities to try the app with come later, once there are routes that may
   read. Ride with GPS's terms allow keeping what the person chooses to use, so there is no
   time limit as for Strava. Disconnecting revokes the token, ends the cookie and deletes
   these tracks.
-- A reload opens Ride with GPS again when it was the source last, with the tab's filters
-  and selection; switching to files, Strava or the demo keeps the connection. When the
-  person comes back from connecting one service, that one is the source and the other
-  one lets go (a Strava session ends). The look of the
-  video (steps 3 and 4) is the same one files use.
+- A reload opens Ride with GPS again when it is the chosen source, with the tab's filters
+  and selection; choosing files, Strava or the demo keeps the connection. When the person
+  comes back from connecting one service, that one is the chosen source and the other
+  one lets go (a Strava session ends). The look of the video (steps 3 and 4) is the same
+  one files use.
 - Trips get the id `rwgps-<trip id>`, and Ride with GPS's activity types (`cycling:road`,
   `running:trail`, ...) are mapped to the same sport names as files. There is no webhook:
   changes on Ride with GPS show up the next time the list is read.
 
 ### Demo
 
-- Besides files, Strava and Ride with GPS, the Source step offers a demo: made-up rides and runs on real
-  roads in Mallorca, for trying Wornways before adding one's own activities. A month of
-  rides and runs from one town (for a recap), a five-day tour of the island (for a
-  multiday trip) and one long climb (for a highlight). It is offered only while there are no
-  activities on this device and Strava is not connected: it is for trying Wornways before
-  adding anything.
+- Besides files, Strava and Ride with GPS, the Source step offers a demo: made-up rides and
+  runs on real roads in Mallorca, for trying Wornways before adding one's own activities.
+  A month of rides and runs from one town (for a recap), a five-day tour of the island
+  (for a multiday trip) and one long climb (for a highlight). It is a source like the
+  others, so it never mixes with one's own activities; it is always offered.
 - The activities ship with the app as `apps/web/public/demo/mallorca.zip`, shaped like a
   Strava export, and the importer reads them like any export. They are fetched only when
   the demo opens; the service worker does not store files under `demo/` in advance.

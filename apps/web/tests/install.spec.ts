@@ -20,7 +20,7 @@ test('starts without a network after the first visit', async ({ page, context })
   await context.setOffline(true);
   await page.reload();
   await expect(page.getByRole('navigation', { name: 'Steps' })).toBeVisible();
-  await expect(page.getByTestId('file-input')).toBeAttached();
+  await expect(page.getByTestId('sources')).toBeVisible();
   await context.setOffline(false);
 });
 

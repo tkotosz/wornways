@@ -1,70 +1,87 @@
 <script setup lang="ts">
-// Step 1: choose where the activities come from: files saved on this device (added here, and
-// seen and deleted here), Strava, Ride with GPS, or the demo's made-up activities. One source
-// is in use at a time, and only its card shows; "Use another source" shows them all to switch.
-import { computed, ref, watch } from 'vue';
+// Step 1: where the activities come from. One source is chosen at a time: files saved on
+// this device, Strava, Ride with GPS, or the demo's made-up activities; they are never mixed.
+// Until one is chosen, and after "Change source", the step lists them to pick from. Once one
+// is chosen, the step shows what that source needs: adding files, connecting, or starting
+// the demo.
+import { computed, ref } from 'vue';
 import ActivityGrid from '../components/ActivityGrid.vue';
 import AddFiles from '../components/AddFiles.vue';
 import GettingFiles from '../components/GettingFiles.vue';
 import LoadingStatus from '../components/LoadingStatus.vue';
 import type { EngineClient } from '../engine-client.ts';
 import { countText } from '../format.ts';
-import type { ActivitySummary } from '../messages.ts';
+import type { ActivitySummary, Source } from '../messages.ts';
 import { rememberStravaState } from '../strava-auth.ts';
 import { CONNECT_URL } from '../use-ridewithgps.ts';
 
 const props = defineProps<{
   engine: EngineClient;
   library: ActivitySummary[];
+  /** The source chosen; null until the person picks one. */
+  chosen: Source | null;
+  /** Whether to list the sources to pick from rather than show the chosen one. */
+  picking: boolean;
+  /** Whether the chosen source is ready to go on with. */
+  ready: boolean;
   stravaUrl: URL | null;
   stravaActive: boolean;
   stravaError: string;
   stravaBusy: string;
   /** Ride with GPS: offered by this site, connected in this browser, the source now. */
   rwgps: { available: boolean; connected: boolean; active: boolean; busy: string; error: string };
-  demoActive: boolean;
   demoBusy: string;
   demoError: string;
 }>();
 const emit = defineEmits<{
   changed: [library: ActivitySummary[]];
+  choose: [source: Source];
+  changeSource: [];
   next: [];
-  files: [];
   disconnect: [];
-  demo: [];
-  useRideWithGps: [];
   disconnectRideWithGps: [];
 }>();
 
-/** Whether Strava, Ride with GPS or the demo is the source instead of the files here. */
-const otherSource = computed(() => props.stravaActive || props.rwgps.active || props.demoActive);
-/**
- * The demo is for trying Wornways before adding anything: it is offered while there are no
- * activities on this device and Strava is not connected, and stays shown while it is open.
- */
-const offerDemo = computed(
-  () =>
-    props.demoActive || (!props.stravaActive && !props.rwgps.active && props.library.length === 0),
-);
+const NAMES: Record<Source, string> = {
+  files: 'Files',
+  strava: 'Strava',
+  rwgps: 'Ride with GPS',
+  demo: 'Demo',
+};
 
-type SourceCard = 'files' | 'strava' | 'rwgps' | 'demo';
-/** The source in use; null while there is nothing to use yet (no files, nothing connected). */
-const inUse = computed<SourceCard | null>(() =>
-  props.stravaActive
-    ? 'strava'
-    : props.rwgps.active
-      ? 'rwgps'
-      : props.demoActive
-        ? 'demo'
-        : props.library.length
-          ? 'files'
-          : null,
-);
-/** Whether every source is shown to pick another one. */
-const choosing = ref(false);
-watch(inUse, () => (choosing.value = false));
-/** Whether a source's card shows: all of them while choosing, else only the one in use. */
-const shown = (card: SourceCard) => inUse.value === null || choosing.value || inUse.value === card;
+/** Whether the list of sources shows. */
+const listing = computed(() => props.picking || props.chosen === null);
+
+/** The sources this site offers, each with where it stands. */
+const choices = computed(() => {
+  const list: { id: Source; about: string; status: string }[] = [
+    {
+      id: 'files',
+      about: 'FIT, GPX or TCX files, a folder, or an export ZIP, saved on this device.',
+      status: props.library.length
+        ? `${countText(props.library.length, 'activity', 'activities')} on this device`
+        : 'Nothing added yet',
+    },
+  ];
+  if (props.stravaUrl || props.stravaActive)
+    list.push({
+      id: 'strava',
+      about: 'Your Strava activities, for up to two hours at a time.',
+      status: props.stravaActive ? 'Connected' : 'Not connected',
+    });
+  if (props.rwgps.available)
+    list.push({
+      id: 'rwgps',
+      about: 'Your Ride with GPS trips.',
+      status: props.rwgps.connected ? 'Connected' : 'Not connected',
+    });
+  list.push({
+    id: 'demo',
+    about: 'Made-up rides and runs in Mallorca, to try Wornways first. Nothing is saved.',
+    status: '',
+  });
+  return list;
+});
 
 const error = ref('');
 const confirmingDeleteAll = ref(false);
@@ -93,62 +110,68 @@ async function remove(ids: string[] | 'all'): Promise<void> {
 <template>
   <section>
     <h1>Choose an activity source</h1>
-    <!-- What the app is for, while there is nothing in it yet. -->
-    <p v-if="!otherSource && library.length === 0" class="intro" data-testid="intro">
-      Wornways turns your GPS activities into a short video: your routes build up over a street map,
-      one after another or all at once, ready to share. Wornways makes your video on this device.
-      Files you add stay here. Not ready to add yours?
-      <button type="button" class="link" :disabled="!!demoBusy" @click="emit('demo')">
-        See the demo first</button
-      >.
-    </p>
-    <div class="sources">
-      <section
-        v-if="shown('files')"
-        class="source-card"
-        :class="{ 'in-use': inUse === 'files' }"
-        data-testid="files-source"
-      >
-        <header class="source-heading">
-          <h2>Files <span v-if="inUse === 'files'" class="tag">In use</span></h2>
-          <p class="muted">
-            FIT, GPX or TCX files, a folder, or an export ZIP. Activities are saved on this device
-            for next time.
+
+    <template v-if="listing">
+      <!-- What the app is for, until a source is chosen. -->
+      <p v-if="chosen === null" class="intro" data-testid="intro">
+        Wornways turns your GPS activities into a short video: your routes build up over a street
+        map, one after another or all at once, ready to share. Wornways makes your video on this
+        device. Pick where your activities come from.
+      </p>
+      <div class="choices" data-testid="sources">
+        <button
+          v-for="c in choices"
+          :key="c.id"
+          type="button"
+          class="choice"
+          :class="{ current: c.id === chosen }"
+          :data-testid="`choose-${c.id}`"
+          @click="emit('choose', c.id)"
+        >
+          <span class="choice-name">
+            {{ NAMES[c.id] }}
+            <span v-if="c.id === chosen" class="tag">Current</span>
+          </span>
+          <span class="muted">{{ c.about }}</span>
+          <span v-if="c.status" class="status">{{ c.status }}</span>
+        </button>
+      </div>
+    </template>
+
+    <template v-else-if="chosen">
+      <p class="muted chosen" data-testid="chosen-source">
+        Current source: {{ NAMES[chosen] }}
+        <button type="button" class="link" @click="emit('changeSource')">Change source</button>
+      </p>
+
+      <div v-if="chosen === 'files'" class="screen" data-testid="files-source">
+        <p class="muted">
+          FIT, GPX or TCX files, a folder, or an export ZIP. Activities are saved on this device for
+          next time.
+        </p>
+        <AddFiles :engine="engine" @changed="emit('changed', $event)" />
+        <GettingFiles />
+      </div>
+
+      <div v-else-if="chosen === 'strava'" class="screen" data-testid="strava-source">
+        <LoadingStatus v-if="stravaBusy" :text="stravaBusy" />
+        <template v-else-if="stravaActive">
+          <p>
+            Connected to Strava. The connection and the activities cached for it last up to two
+            hours.
           </p>
-        </header>
-        <div class="source-content">
-          <button v-if="otherSource" type="button" class="secondary" @click="emit('files')">
-            Use files
-          </button>
-          <AddFiles v-else :engine="engine" @changed="emit('changed', $event)" />
-          <GettingFiles />
-        </div>
-      </section>
-      <section
-        v-if="shown('strava') && (stravaUrl || stravaActive)"
-        class="source-card"
-        :class="{ 'in-use': inUse === 'strava' }"
-        data-testid="strava-source"
-      >
-        <header class="source-heading">
-          <h2>Strava <span v-if="inUse === 'strava'" class="tag">In use</span></h2>
-          <p class="muted">Your connection and cached activities last up to two hours.</p>
-        </header>
-        <div class="source-content">
-          <LoadingStatus v-if="stravaBusy" :text="stravaBusy" />
-          <button v-else-if="stravaActive" type="button" class="link" @click="emit('disconnect')">
-            Disconnect Strava
-          </button>
-          <a
-            v-else-if="stravaUrl && !stravaBusy"
-            :href="stravaUrl.href"
-            class="strava-connect"
-            @click="authorize"
-          >
+          <button type="button" class="link" @click="emit('disconnect')">Disconnect Strava</button>
+        </template>
+        <template v-else>
+          <p class="muted">
+            Your Strava activities, read for up to two hours at a time. Changing to another source
+            ends the connection.
+          </p>
+          <a v-if="stravaUrl" :href="stravaUrl.href" class="strava-connect" @click="authorize">
             <img src="/strava-connect.svg" alt="Connect with Strava" width="237" height="48" />
           </a>
-          <div v-if="!stravaActive" class="connect-help muted">
-            <p>If Strava says its connection limit was reached, go back and use activity files.</p>
+          <div class="connect-help muted">
+            <p>If Strava says its connection limit was reached, use activity files instead.</p>
             <p>
               <a class="link" href="/privacy.html" target="_blank" rel="noopener noreferrer"
                 >Privacy</a
@@ -164,44 +187,27 @@ async function remove(ids: string[] | 'all'): Promise<void> {
               >.
             </p>
           </div>
-        </div>
-      </section>
-      <section
-        v-if="shown('rwgps') && rwgps.available"
-        class="source-card"
-        :class="{ 'in-use': inUse === 'rwgps' }"
-        data-testid="rwgps-source"
-      >
-        <header class="source-heading">
-          <h2>Ride with GPS <span v-if="inUse === 'rwgps'" class="tag">In use</span></h2>
-          <p class="muted">
-            Your trips. Tracks are downloaded when a video needs them and kept on this device until
-            you disconnect.
+        </template>
+      </div>
+
+      <div v-else-if="chosen === 'rwgps'" class="screen" data-testid="rwgps-source">
+        <LoadingStatus v-if="rwgps.busy" :text="rwgps.busy" />
+        <template v-else-if="rwgps.connected">
+          <p>
+            Connected to Ride with GPS. Tracks are downloaded when a video needs them and kept on
+            this device until you disconnect.
           </p>
-        </header>
-        <div class="source-content">
-          <LoadingStatus v-if="rwgps.busy" :text="rwgps.busy" />
-          <template v-else-if="rwgps.connected">
-            <button
-              v-if="!rwgps.active"
-              type="button"
-              class="secondary"
-              :disabled="!!rwgps.busy"
-              @click="emit('useRideWithGps')"
-            >
-              Use Ride with GPS
-            </button>
-            <button
-              type="button"
-              class="link disconnect"
-              :disabled="!!rwgps.busy"
-              @click="emit('disconnectRideWithGps')"
-            >
-              Disconnect Ride with GPS
-            </button>
-          </template>
-          <a v-else :href="CONNECT_URL" class="secondary"> Connect Ride with GPS </a>
-          <div v-if="!rwgps.connected" class="connect-help muted">
+          <button type="button" class="link" @click="emit('disconnectRideWithGps')">
+            Disconnect Ride with GPS
+          </button>
+        </template>
+        <template v-else>
+          <p class="muted">
+            Your Ride with GPS trips. Tracks are downloaded when a video needs them and kept on this
+            device until you disconnect.
+          </p>
+          <a :href="CONNECT_URL" class="secondary">Connect Ride with GPS</a>
+          <div class="connect-help muted">
             <p>
               <a class="link" href="/privacy.html" target="_blank" rel="noopener noreferrer"
                 >Privacy</a
@@ -210,54 +216,27 @@ async function remove(ids: string[] | 'all'): Promise<void> {
               changes your account.
             </p>
           </div>
-        </div>
-      </section>
-      <section
-        v-if="shown('demo') && offerDemo"
-        class="source-card"
-        :class="{ 'in-use': inUse === 'demo' }"
-        data-testid="demo-source"
-      >
-        <header class="source-heading">
-          <h2>Demo <span v-if="inUse === 'demo'" class="tag">In use</span></h2>
-          <p v-if="demoActive" class="muted">
-            You are trying Wornways with made-up rides and runs in Mallorca. Leave the demo, or use
-            another source, to add your own.
+        </template>
+      </div>
+
+      <div v-else class="screen" data-testid="demo-source">
+        <LoadingStatus v-if="demoBusy" :text="demoBusy" />
+        <template v-else>
+          <p>
+            Try Wornways with made-up rides and runs in Mallorca: a month of rides and runs from one
+            town, a five-day tour of the island and one long climb. Nothing is saved.
           </p>
-          <p v-else class="muted">
-            Not ready to add your own? Try Wornways with made-up rides and runs in Mallorca.
-          </p>
-        </header>
-        <div class="source-content">
-          <LoadingStatus v-if="demoBusy" :text="demoBusy" />
-          <button
-            v-else-if="!demoActive"
-            type="button"
-            class="secondary"
-            :disabled="!!demoBusy"
-            @click="emit('demo')"
-          >
-            Try the demo
-          </button>
-          <button v-else type="button" class="secondary" @click="emit('files')">
-            Leave the demo
-          </button>
-        </div>
-      </section>
-    </div>
-    <button
-      v-if="inUse && !choosing"
-      type="button"
-      class="secondary another"
-      @click="choosing = true"
-    >
-      Use another source
-    </button>
+          <button type="button" class="secondary" @click="emit('next')">Start the demo</button>
+        </template>
+      </div>
+    </template>
+
     <p v-if="rwgps.error" class="error" role="alert">{{ rwgps.error }}</p>
     <p v-if="stravaError" class="error" role="alert">{{ stravaError }}</p>
     <p v-if="demoError" class="error" role="alert">{{ demoError }}</p>
     <p v-if="error" class="error" role="alert">{{ error }}</p>
-    <template v-if="!otherSource && library.length">
+
+    <template v-if="!listing && chosen === 'files' && library.length">
       <div class="library-head">
         <h2 data-testid="activity-count">
           {{ countText(library.length, 'activity', 'activities') }} on this device
@@ -276,12 +255,7 @@ async function remove(ids: string[] | 'all'): Promise<void> {
 
     <div class="footer">
       <span />
-      <button
-        type="button"
-        class="primary"
-        :disabled="!otherSource && library.length === 0"
-        @click="emit('next')"
-      >
+      <button type="button" class="primary" :disabled="!ready" @click="emit('next')">
         Continue →
       </button>
     </div>
@@ -289,32 +263,56 @@ async function remove(ids: string[] | 'all'): Promise<void> {
 </template>
 
 <style scoped>
-.sources {
+.intro {
+  margin: 0 0 0.8rem;
+  font-size: 1.05rem;
+  line-height: 1.5;
+}
+
+.choices {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 17rem), 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr));
   gap: 0.75rem;
   margin: 1rem 0 1.5rem;
 }
 
-.source-card {
-  display: grid;
-  grid-row: span 2;
-  grid-template-rows: subgrid;
+.choice {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.35rem;
   padding: 1rem;
   border: 1px solid var(--line);
   border-radius: 12px;
+  color: var(--text);
+  background: transparent;
+  text-align: left;
 }
 
-.source-heading h2 {
+.choice:hover {
+  border-color: var(--muted);
+}
+
+.choice:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.choice.current {
+  border-color: var(--accent);
+}
+
+.choice-name {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  margin: 0;
-  font-size: 1rem;
+  font-weight: 600;
 }
 
-.source-card.in-use {
-  border-color: var(--accent);
+.status {
+  margin-top: auto;
+  padding-top: 0.4rem;
+  font-size: 0.85rem;
 }
 
 .tag {
@@ -326,59 +324,48 @@ async function remove(ids: string[] | 'all'): Promise<void> {
   font-weight: 600;
 }
 
-.another {
-  margin: -0.75rem 0 1.5rem;
+.chosen {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.6rem;
 }
 
-.source-heading p {
-  margin: 0.35rem 0 0;
-}
-
-.source-card .source-content {
+.screen {
   display: flex;
   flex-direction: column;
-  min-width: 0;
+  gap: 0.9rem;
+  margin: 1rem 0 1.5rem;
 }
 
-.source-card .source-content > button,
-.source-card .source-content > a.secondary,
+.screen p {
+  margin: 0;
+}
+
+.screen > button,
+.screen > a.secondary,
 .strava-connect {
   align-self: start;
 }
 
-.strava-connect {
-  max-width: 100%;
-}
-
-.source-card :deep(.drop) {
+.screen :deep(.drop) {
   margin: 0;
-}
-
-.source-card :deep(.report) {
-  margin-top: 1rem;
 }
 
 .connect-help {
   display: grid;
   gap: 0.4rem;
-  margin-top: 0.9rem;
   font-size: 0.85rem;
 }
 
-.connect-help p {
-  margin: 0;
+.strava-connect {
+  max-width: 100%;
 }
 
 .strava-connect img {
   display: block;
   max-width: 100%;
   height: auto;
-}
-
-.intro {
-  margin: 0 0 0.8rem;
-  font-size: 1.05rem;
-  line-height: 1.5;
 }
 
 .library-head {
@@ -393,11 +380,6 @@ async function remove(ids: string[] | 'all'): Promise<void> {
 .library-head h2 {
   margin: 0;
   font-size: 1.05rem;
-}
-
-.disconnect {
-  align-self: start;
-  margin-top: 0.9rem;
 }
 
 .confirm {
