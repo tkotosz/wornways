@@ -5,7 +5,13 @@
 import { tilesForView, type Basemap, type MapLevel, type TileId } from '../map/basemap.ts';
 import { MAP_ATTRIBUTION, MAX_TILE_ZOOM, type TileLoader } from '../map/tiles.ts';
 import type { Track } from '../track/types.ts';
-import { followCamera, mapLevelViews, mapLevelWindows, type CameraPath } from './camera.ts';
+import {
+  followCamera,
+  levelsFor,
+  mapLevelViews,
+  mapLevelWindows,
+  type CameraPath,
+} from './camera.ts';
 import { followRouteCamera } from './follow.ts';
 import { automaticTitle, planReplay, type ReplayPlan } from './plans.ts';
 import { createRenderer, type CanvasFactory, type Renderer, type RenderOptions } from './render.ts';
@@ -45,6 +51,12 @@ export type PrepareOptions = {
   signal?: AbortSignal;
   /** Draw at this size instead of the settings' frame size, e.g. for a smaller preview. */
   size?: { width: number; height: number };
+  /**
+   * Only the replay's last frame will be drawn, as for a preview of the finished picture:
+   * the map is loaded and set up only for the zoom levels that frame shows. Draw it with
+   * `renderer.skipTo` and `renderer.renderFrame` of `renderer.replayFrames - 1`.
+   */
+  lastFrameOnly?: boolean;
 };
 
 /** Nouns for the counter and the verb for activities under way, by the one sport shown. */
@@ -79,6 +91,16 @@ export async function prepareReplay(
   let levelWindows: RenderOptions['levelWindows'];
   if (cameraMode === 'follow') levelWindows = { levels: mapLevelWindows(view, camera!) };
 
+  // For a single frame: whether it shows a zoom level (two while the camera is between them).
+  const onlyFrame = options.lastFrameOnly
+    ? Math.round(plan.timeline.duration * fps) - 1
+    : undefined;
+  const shows = (level: number, levelCount: number) => {
+    if (onlyFrame === undefined || !camera) return true;
+    const [a, b] = levelsFor(camera.zoom[onlyFrame], levelCount - 1);
+    return level === a || level === b;
+  };
+
   let basemap: Basemap | undefined;
   let map: MapReport | null = null;
   if (settings.map) {
@@ -86,7 +108,12 @@ export async function prepareReplay(
     try {
       if (levelWindows) {
         const key = ({ z, x, y }: TileId) => `${z}/${x}/${y}`;
-        const windows = levelWindows.levels.flat();
+        // For a single frame: at each level it shows, the window open on that frame.
+        const windows = levelWindows.levels.flatMap((entries, level, all) => {
+          if (onlyFrame === undefined) return entries;
+          const open = entries.findLast((entry) => entry.from <= onlyFrame);
+          return open && shows(level, all.length) ? [open] : [];
+        });
         const ids = windows.map((window) => tilesForView(window.view, MAX_TILE_ZOOM));
         const unique = new Map(ids.flat().map((id) => [key(id), id]));
         const loaded = await options.loadTiles([...unique.values()], options.signal);
@@ -100,7 +127,13 @@ export async function prepareReplay(
         map.zooms = [...new Set([...unique.values()].map((id) => id.z))];
       } else {
         const levels: MapLevel[] = [];
-        for (const levelView of mapLevelViews(view, camera)) {
+        const levelViews = mapLevelViews(view, camera);
+        for (const [level, levelView] of levelViews.entries()) {
+          // A level the single frame does not show is never set up: it needs no tiles.
+          if (!shows(level, levelViews.length)) {
+            levels.push({ view: levelView, tiles: [] });
+            continue;
+          }
           const ids = tilesForView(levelView, MAX_TILE_ZOOM);
           const loaded = await options.loadTiles(ids, options.signal);
           levels.push({ view: levelView, tiles: loaded.tiles });
@@ -139,6 +172,7 @@ export async function prepareReplay(
     metricsScale: settings.metricsSize / 100,
     endCard: settings.endCard,
     watermark: settings.watermark,
+    onlyFrame,
   });
   return { renderer, plan, title, width, height, fps, camera, cameraMode, map };
 }

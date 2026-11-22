@@ -146,6 +146,11 @@ export type RenderOptions = {
   titleScale?: number;
   /** Scales the metrics card; default 1. */
   metricsScale?: number;
+  /**
+   * The one frame of the replay that will be drawn, after `skipTo` it: the zoom levels it
+   * does not show are not set up, and drawing any other frame is an error.
+   */
+  onlyFrame?: number;
   /** End the video with the Wornways card (see end-card.ts), after the replay. Default false. */
   endCard?: boolean;
   /** Draw the small Wornways mark on the map credit's line. Default false. */
@@ -282,6 +287,9 @@ export function createRenderer(
   const frameCount = replayFrames + (options.endCard ? endCardFrames(fps) : 0);
   if (camera && camera.zoom.length < replayFrames)
     throw new Error('Camera path is shorter than the video');
+  const { onlyFrame } = options;
+  if (onlyFrame !== undefined && !(onlyFrame >= 0 && onlyFrame < replayFrames))
+    throw new Error(`Frame ${onlyFrame} is not one of the replay's ${replayFrames} frames`);
 
   const view = options.view ?? fitView(tracks, W, H);
   const readback = options.readbackHint === false ? undefined : { willReadFrequently: true };
@@ -403,12 +411,45 @@ export function createRenderer(
     };
   }
 
+  // Without windows, every level covers all that is shown at its zoom, and a level is kept
+  // only as long as a frame still to draw shows it. `lastShown` is that frame for each
+  // level, -1 for a level no frame shows: a camera that only pulls back lets go of its
+  // closer levels one by one.
+  const levelSources: { view: View; tiles?: Tile[] }[] = windows
+    ? []
+    : (basemap?.levels ?? mapLevelViews(view, camera).map((levelView) => ({ view: levelView })));
+  const lastShown = new Int32Array(levelSources.length).fill(-1);
+  if (levelSources.length > 0) {
+    const first = onlyFrame ?? 0;
+    const last = onlyFrame ?? replayFrames - 1;
+    for (let f = first; f <= last; f++) {
+      const [a, b] = camera ? levelsFor(camera.zoom[f], levelSources.length - 1) : [0, 0];
+      lastShown[a] = f;
+      lastShown[b] = f;
+    }
+  }
   const levels: (Level | undefined)[] = windows
     ? windows.map(() => undefined)
-    : basemap
-      ? basemap.levels.map(({ view, tiles }) => createLevel(view, tiles))
-      : mapLevelViews(view, camera).map((levelView) => createLevel(levelView));
+    : levelSources.map(({ view, tiles }, i) =>
+        lastShown[i] >= 0 ? createLevel(view, tiles) : undefined,
+      );
   const windowIndices = windows?.map(() => -1);
+
+  /** Gives a level's canvases back at once, which matters on phones, and forgets the level. */
+  function releaseLevel(i: number): void {
+    const level = levels[i];
+    if (!level) return;
+    level.heat.width = 1;
+    level.heat.height = 1;
+    level.composed.width = 1;
+    level.composed.height = 1;
+    levels[i] = undefined;
+  }
+
+  /** Releases the levels that no frame from `index` on shows. Windows are released as they close. */
+  function releaseLevelsBefore(index: number): void {
+    for (let i = 0; i < lastShown.length; i++) if (lastShown[i] < index) releaseLevel(i);
+  }
   // Windows opened later need the route as it was originally stroked, including where
   // pieces meet. Replaying the same pieces preserves pass counts at those joins.
   const history: RoutePiece[] = [];
@@ -579,14 +620,8 @@ export function createRenderer(
           const entries = windows[i];
           while (entries[windowIndices[i] + 1]?.from <= index) windowIndices[i]++;
         }
-        if (level && (!active || previous !== windowIndices[i])) {
-          // Release backing stores before opening replacements, including on mobile.
-          level.heat.width = 1;
-          level.heat.height = 1;
-          level.composed.width = 1;
-          level.composed.height = 1;
-          levels[i] = undefined;
-        }
+        // Before opening replacements, so both are never held at once.
+        if (level && (!active || previous !== windowIndices[i])) releaseLevel(i);
       }
       for (const i of a === b ? [a] : [a, b]) {
         if (levels[i]) continue;
@@ -880,6 +915,8 @@ export function createRenderer(
     renderFrame(index: number): void {
       if (index !== nextFrame)
         throw new Error(`Frames must be rendered in order: expected ${nextFrame}, got ${index}`);
+      if (onlyFrame !== undefined && index !== onlyFrame)
+        throw new Error(`This renderer draws frame ${onlyFrame} only, not frame ${index}`);
       nextFrame++;
       if (index >= replayFrames) {
         if (!lastReplayFrame) {
@@ -894,6 +931,7 @@ export function createRenderer(
         return;
       }
       const t = index / fps;
+      releaseLevelsBefore(index);
       advance(t);
       const [zoom, tx, ty] = camera
         ? [camera.zoom[index], camera.tx[index], camera.ty[index]]
@@ -905,6 +943,8 @@ export function createRenderer(
       // The end card is drawn over the replay's last frame, so it cannot be skipped to.
       if (index < nextFrame || index >= replayFrames)
         throw new Error(`Cannot skip from frame ${nextFrame} to frame ${index}`);
+      // The frames skipped show nothing, so only the levels shown from `index` on get routes.
+      releaseLevelsBefore(index);
       for (; nextFrame < index; nextFrame++) advance(nextFrame / fps);
     },
   };
