@@ -9,7 +9,12 @@
 
 import { ref, watch } from 'vue';
 import { NO_CHOICE, type Choice } from './choice.ts';
-import { Canceled, RideWithGpsDisconnected, type EngineClient } from './engine-client.ts';
+import {
+  Canceled,
+  RideWithGpsDisconnected,
+  type DownloadProgress,
+  type EngineClient,
+} from './engine-client.ts';
 import type { ActivitySummary } from './messages.ts';
 import { useMatches } from './use-matches.ts';
 
@@ -150,17 +155,21 @@ export function useRideWithGps(engine: EngineClient, onEnd: () => void) {
     await engine.endRideWithGps(false).catch(() => {});
   }
 
+  /** Tracks being downloaded before going on; null when none are. */
+  const download = ref<DownloadProgress | null>(null);
+
   /** Fetches the chosen trips' tracks before going on; false when that did not work out. */
   async function prepare(ids: string[]): Promise<boolean> {
     if (!active.value) return false;
     error.value = '';
     notice.value = '';
-    busy.value = 'Fetching tracks from Ride with GPS…';
+    busy.value = 'Loading selected tracks…';
+    const task = engine.prepareRideWithGps(ids, ({ done = 0, total = ids.length }) => {
+      if (download.value) download.value = { ...download.value, done, total };
+    });
+    download.value = { done: 0, total: ids.length, cancel: task.cancel };
     try {
-      const missing = await engine.prepareRideWithGps(ids, (p) => {
-        if (p.total)
-          busy.value = `Fetching tracks from Ride with GPS: ${p.done ?? 0} of ${p.total}…`;
-      });
+      const missing = await task.result;
       if (missing.length) {
         const unavailable = new Set(missing);
         rows.value = rows.value.filter((row) => !unavailable.has(row.id));
@@ -169,9 +178,12 @@ export function useRideWithGps(engine: EngineClient, onEnd: () => void) {
       }
       return missing.length === 0;
     } catch (caught) {
+      if (caught instanceof Canceled)
+        notice.value = 'Download canceled. Tracks downloaded so far are kept.';
       failed(caught);
       return false;
     } finally {
+      download.value = null;
       busy.value = '';
     }
   }
@@ -235,6 +247,7 @@ export function useRideWithGps(engine: EngineClient, onEnd: () => void) {
     open,
     close,
     prepare,
+    download,
     disconnect,
   };
 }

@@ -20,6 +20,16 @@ import type { ActivitySummary, MatchReport } from '../messages.ts';
 
 const PREFETCH_COUNT = 5;
 
+/** The task's result, or an abort error as soon as the signal ends; the task goes on. */
+function untilAborted<T>(task: Promise<T>, signal: AbortSignal): Promise<T> {
+  if (signal.aborted) return Promise.reject(signal.reason as Error);
+  return new Promise((resolve, reject) => {
+    const stop = () => reject(signal.reason as Error);
+    signal.addEventListener('abort', stop, { once: true });
+    task.then(resolve, reject).finally(() => signal.removeEventListener('abort', stop));
+  });
+}
+
 /** One activity of the list. `version` changes whenever its track may have changed. */
 export type RemoteActivity = {
   summary: ActivitySummary;
@@ -137,7 +147,8 @@ export class RemoteActivities {
 
   /**
    * Fetches the tracks of these activities that are not here yet, `requests` at a time.
-   * Returns the ids of those without a usable track.
+   * Returns the ids of those without a usable track. Canceling stops at once; downloads
+   * already under way still finish and are kept for next time.
    */
   async prepare(
     ids: string[],
@@ -155,7 +166,7 @@ export class RemoteActivities {
       while (!active.aborted && !stopped && next < ids.length) {
         const id = ids[next++]!;
         try {
-          if (!(await this.load(id))) unavailable.push(id);
+          if (!(await untilAborted(this.load(id), active))) unavailable.push(id);
           onProgress?.(++done, ids.length);
         } catch (error) {
           stopped = true;

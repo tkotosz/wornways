@@ -6,7 +6,7 @@ import {
   type Track,
   type TrackEnd,
 } from '@wornways/engine';
-import type { ActivitySummary, MatchReport } from '../messages.ts';
+import type { ActivitySummary, MatchReport, Progress } from '../messages.ts';
 import { clearStravaAccess, type StravaGrant } from '../strava-auth.ts';
 import { RemoteActivities, type RemoteActivity } from './remote-activities.ts';
 import { StravaCache } from './strava-cache.ts';
@@ -213,8 +213,10 @@ export class StravaSession {
     this.activities.prioritize(ids);
   }
 
-  prepare(ids: string[], signal: AbortSignal): Promise<string[]> {
-    return this.activities.prepare(ids, signal, TRACK_REQUESTS);
+  prepare(ids: string[], signal: AbortSignal, onProgress: (p: Progress) => void) {
+    return this.activities.prepare(ids, signal, TRACK_REQUESTS, (done, total) =>
+      onProgress({ stage: 'reading', done, total }),
+    );
   }
 
   selected(ids: string[]): Promise<Track[]> {

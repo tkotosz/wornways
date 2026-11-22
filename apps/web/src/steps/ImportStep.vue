@@ -8,6 +8,7 @@ import { computed, onMounted, ref, watch } from 'vue';
 import ActivityGrid from '../components/ActivityGrid.vue';
 import AddFiles from '../components/AddFiles.vue';
 import GettingFiles from '../components/GettingFiles.vue';
+import LoadingStatus from '../components/LoadingStatus.vue';
 import SourceIcon from '../components/SourceIcon.vue';
 import type { EngineClient } from '../engine-client.ts';
 import { countText, timeText } from '../format.ts';
@@ -237,7 +238,7 @@ async function remove(ids: string[] | 'all'): Promise<void> {
       </div>
 
       <div v-else-if="chosen === 'strava'" class="screen" data-testid="strava-source">
-        <p v-if="stravaBusy" class="muted" role="status">{{ stravaBusy }}</p>
+        <LoadingStatus v-if="stravaBusy" :text="stravaBusy" />
         <template v-else-if="stravaConnected && stravaUntil">
           <p>
             Connected to Strava until {{ timeText(stravaUntil) }}. Tracks are downloaded when a
@@ -273,7 +274,7 @@ async function remove(ids: string[] | 'all'): Promise<void> {
       </div>
 
       <div v-else-if="chosen === 'rwgps'" class="screen" data-testid="rwgps-source">
-        <p v-if="rwgps.busy" class="muted" role="status">{{ rwgps.busy }}</p>
+        <LoadingStatus v-if="rwgps.busy" :text="rwgps.busy" />
         <template v-else-if="rwgps.connected">
           <p>
             Connected to Ride with GPS. Tracks are downloaded when a video needs them and kept on
@@ -298,7 +299,7 @@ async function remove(ids: string[] | 'all'): Promise<void> {
       </div>
 
       <div v-else class="screen" data-testid="demo-source">
-        <p v-if="demoBusy" class="muted" role="status">{{ demoBusy }}</p>
+        <LoadingStatus v-if="demoBusy" :text="demoBusy" />
         <template v-else>
           <p>
             Try Wornways with made-up rides and runs in Mallorca: a month of rides and runs from one

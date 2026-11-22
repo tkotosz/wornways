@@ -43,7 +43,10 @@ const points = (trip: (typeof trips)[number]) =>
   }));
 
 /** Answers the site's Ride with GPS Functions the way they answer a connected account. */
-async function fakeRideWithGps(page: Page, options: { revoked?: boolean } = {}) {
+async function fakeRideWithGps(
+  page: Page,
+  options: { revoked?: boolean; pendingTracks?: Promise<void> } = {},
+) {
   let connected = false;
   const fetched: number[] = [];
   const disconnects: number[] = [];
@@ -69,6 +72,7 @@ async function fakeRideWithGps(page: Page, options: { revoked?: boolean } = {}) 
     }
     const trip = trips.find((t) => String(t.id) === query.get('trip'))!;
     fetched.push(trip.id);
+    await options.pendingTracks;
     return route.fulfill({ json: { trip: { track_points: points(trip) } } });
   });
   return { fetched, disconnects, lists };
@@ -139,6 +143,37 @@ test('uses Ride with GPS trips as the source, fetching tracks only when needed',
   expect(disconnects).toEqual([1]);
   // A string, as the tests are type-checked without the browser's types.
   expect(await page.evaluate("caches.has('wornways-rwgps-tracks')")).toBe(false);
+});
+
+test('shows the download in a dialog that can be canceled', async ({ page }) => {
+  await offlineMap(page.context());
+  let release: () => void = () => undefined;
+  const pendingTracks = new Promise<void>((resolve) => (release = resolve));
+  const { fetched } = await fakeRideWithGps(page, { pendingTracks });
+  await page.goto('/');
+  await pickSource(page, 'rwgps');
+  await page.getByRole('link', { name: 'Connect Ride with GPS' }).click();
+  await page.getByRole('button', { name: 'All time' }).click();
+  await expect(page.getByTestId('chosen-count')).toContainText('7 of 7 activities selected');
+
+  await page.getByRole('button', { name: 'Continue' }).click();
+  const dialog = page.getByTestId('download');
+  await expect(dialog).toBeVisible();
+  await expect(dialog).toContainText('Downloading tracks from Ride with GPS');
+  await expect(dialog).toContainText('0 of 7 tracks, 0%');
+  await dialog.getByRole('button', { name: 'Cancel' }).click();
+  await expect(dialog).toBeHidden();
+  await expect(page.getByText('Download canceled.')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Choose your activities' })).toBeVisible();
+
+  // The downloads under way finish; going on again fetches only the rest.
+  release();
+  await expect.poll(() => fetched.length).toBeGreaterThanOrEqual(5);
+  const before = new Set(fetched);
+  await page.getByRole('button', { name: 'Continue' }).click();
+  await expect(page.getByTestId('replay-summary')).toBeVisible();
+  expect(fetched.filter((id) => before.has(id)).length).toBe(before.size);
+  expect(new Set(fetched).size).toBe(fetched.length);
 });
 
 test('switches between Ride with GPS and files without disconnecting', async ({ page }) => {
