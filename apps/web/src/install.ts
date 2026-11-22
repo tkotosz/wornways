@@ -1,8 +1,9 @@
 // Making the app installable and able to start without a network.
 //
 // Chrome and Edge offer to install the app with an event; the app keeps that offer for its
-// Install button, which can use it once. Safari and Firefox install from their own menus
-// and send no such event, so the button stays hidden there.
+// Install button, which can use it once. Safari on iPhone and iPad sends no such event and
+// installs only from its Share menu, so there the button explains how instead. Other
+// browsers, such as Firefox, install from their own menus, and the button stays hidden.
 
 import { shallowRef } from 'vue';
 
@@ -20,6 +21,21 @@ export function listenForInstallOffer(): void {
     installOffer.value = event as InstallOffer;
   });
   window.addEventListener('appinstalled', () => (installOffer.value = null));
+}
+
+/**
+ * Whether the Install button should explain Safari's Add to Home Screen: on an iPhone, iPod
+ * or iPad, and not already running as the installed app. iPadOS reports itself as a Mac, so
+ * a Mac with a touch screen counts as an iPad.
+ */
+export function showsAppleInstallHelp(): boolean {
+  const agent = navigator.userAgent;
+  const appleMobile =
+    /iPhone|iPad|iPod/.test(agent) || (/Macintosh/.test(agent) && navigator.maxTouchPoints > 1);
+  const installed =
+    matchMedia('(display-mode: standalone)').matches ||
+    (navigator as Navigator & { standalone?: boolean }).standalone === true;
+  return appleMobile && !installed;
 }
 
 export async function install(): Promise<void> {

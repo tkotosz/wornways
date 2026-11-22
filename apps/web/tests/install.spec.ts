@@ -43,3 +43,18 @@ test('installs from its own button when the browser offers it', async ({ page })
   expect(await page.evaluate('window.installAsked')).toBe(true);
   await expect(install).toBeHidden();
 });
+
+test.describe('on an iPhone', () => {
+  test.use({
+    userAgent:
+      'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1',
+    hasTouch: true,
+  });
+
+  test('explains Add to Home Screen, as Safari never offers installing', async ({ page }) => {
+    await page.goto('/');
+    await page.getByRole('button', { name: 'Install app' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Install Wornways' });
+    await expect(dialog.getByText('Add to Home Screen')).toBeVisible();
+  });
+});

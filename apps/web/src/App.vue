@@ -22,7 +22,7 @@ import {
 import DownloadDialog from './components/DownloadDialog.vue';
 import ModalPanel from './components/ModalPanel.vue';
 import type { EngineClient } from './engine-client.ts';
-import { install, installOffer } from './install.ts';
+import { install, installOffer, showsAppleInstallHelp } from './install.ts';
 import type { MadeVideo } from './made-video.ts';
 import type { ActivitySummary, MatchReport, PlanReport, Source } from './messages.ts';
 import ActivitiesStep from './steps/ActivitiesStep.vue';
@@ -48,6 +48,7 @@ const steps: { id: Step; label: string }[] = [
 const stepIndex = computed(() => steps.findIndex((s) => s.id === step.value));
 
 const unsupported = missingSupport();
+const version = WORNWAYS_VERSION;
 const step = ref<Step>('import');
 const loaded = ref(false);
 const libraryError = ref('');
@@ -102,6 +103,8 @@ const rwgps = useRideWithGps(props.engine, () => {
 });
 
 const toast = ref('');
+/** iPhone and iPad install only from Safari's Share menu; the Install button explains how. */
+const appleInstallHelp = showsAppleInstallHelp();
 let toastTimer: ReturnType<typeof setTimeout> | undefined;
 
 function showToast(text: string): void {
@@ -439,7 +442,10 @@ onMounted(() => {
     <header class="header">
       <span class="brand">
         <img class="mark" src="/icons/route.svg" alt="" />
-        <span class="wordmark"><b>worn</b>ways</span>
+        <span class="name">
+          <span class="wordmark"><b>worn</b>ways</span>
+          <span class="version" data-testid="version" :title="version">{{ version }}</span>
+        </span>
       </span>
       <span class="aside">
         <span class="muted promise">Your files stay on this device</span>
@@ -470,6 +476,21 @@ onMounted(() => {
         <button v-if="installOffer" type="button" class="secondary install" @click="install">
           Install app
         </button>
+        <ModalPanel v-else-if="appleInstallHelp" title="Install Wornways">
+          <template #trigger="{ open }">
+            <button type="button" class="secondary install" aria-haspopup="dialog" @click="open">
+              Install app
+            </button>
+          </template>
+          <ol class="install-steps">
+            <li>Tap <b>Share</b> (the square with an arrow) in the browser's toolbar.</li>
+            <li>
+              Choose <b>Add to Home Screen</b>. You may need to scroll down, or tap <b>More</b>, to
+              see it.
+            </li>
+            <li>Tap <b>Add</b>. Wornways then opens from your Home Screen like an app.</li>
+          </ol>
+        </ModalPanel>
       </span>
     </header>
     <nav v-if="!unsupported && loaded" class="steps-row" aria-label="Steps">
@@ -626,16 +647,42 @@ onMounted(() => {
 
 .brand {
   display: flex;
+  min-width: 0;
   align-items: center;
   gap: 0.55rem;
 }
 
+/* As tall as the name and the version together, so the three read as one block. */
 .mark {
-  height: 1.3rem;
+  height: 2.25rem;
+}
+
+/* The version in small type under the name, so the header grows only a little. Line
+   heights of whole pixels keep the header a whole number of pixels tall: a fraction makes
+   the Back and Next bar shift by a pixel while the page scrolls. */
+.name {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+}
+
+.name .wordmark {
+  line-height: 1.5rem;
+}
+
+.version {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 0.7rem;
+  font-weight: 500;
+  line-height: 0.75rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .aside {
   display: flex;
+  flex-shrink: 0;
   align-items: center;
   gap: 1rem;
 }
@@ -659,8 +706,21 @@ onMounted(() => {
   font-size: 0.85rem;
 }
 
-/* Phones: one row. The first step says that files stay on the device. */
+.install-steps {
+  display: grid;
+  gap: 0.6rem;
+  margin: 0;
+  padding-left: 1.3rem;
+  line-height: 1.5;
+}
+
+/* Phones: one row. The first step says that files stay on the device, and a long version
+   ends in … rather than moving About to a row of its own. */
 @media (max-width: 560px) {
+  .header {
+    flex-wrap: nowrap;
+  }
+
   .promise {
     display: none;
   }

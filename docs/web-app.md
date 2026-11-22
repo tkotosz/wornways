@@ -278,8 +278,9 @@ for exporting an account or a single activity from Strava or Garmin.
   sites (map tiles) are left alone, and the map tiles the app keeps let it make videos of
   areas it has drawn before without a network.
 - Chrome and Edge offer to install the app with an event; the app keeps the offer and
-  shows an "Install app" button in its header. Safari and Firefox install from their own
-  menus.
+  shows an "Install app" button in its header. Safari on iPhone and iPad sends no such
+  event, so there the button explains its Share → Add to Home Screen steps instead.
+  Firefox installs from its own menu, and the button stays hidden.
 
 ## Rules
 
@@ -295,7 +296,7 @@ for exporting an account or a single activity from Strava or Garmin.
   (https://github.com/mdn/browser-compat-data, checked 2026-11-16): video encoding
   (WebCodecs) needs Chrome or Edge 94, Safari 16.4 (also on iPhone) or desktop Firefox
   130, and is missing in Firefox for Android; sharing a file works in Chrome for Android
-  and in Safari (also on iPhone), not in Firefox; a page can show its own install button
+  and in Safari (also on iPhone), not in Firefox; a page can start installing itself
   in Chrome and Edge, not in Firefox or Safari, which install from their own menus.
 - **Personal data never enters the repository.** Tests use generated activity files.
 
@@ -352,8 +353,9 @@ browser by an automated test that imports generated activity files and makes a v
 ## Not in the first version
 
 Accounts or syncing between devices; connections to services other than Strava and Ride
-with GPS, such as Garmin; a tilted or 3D camera; satellite maps; custom image overlays; imperial units; languages
-other than English.
+with GPS, such as Garmin (see [skipped-features/garmin-connect.md](skipped-features/garmin-connect.md)
+for why); a tilted or 3D camera; satellite maps; custom image overlays; imperial units;
+languages other than English.
 
 ## Open questions
 
