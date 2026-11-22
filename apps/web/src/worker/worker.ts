@@ -14,12 +14,15 @@ import {
   RideWithGpsError,
   RideWithGpsSession,
 } from './ridewithgps.ts';
+import { cachedTrackIds } from './ridewithgps-cache.ts';
 import { pruneStravaCaches } from './strava-cache.ts';
 import { StravaError, StravaExpired, StravaSession } from './strava.ts';
 import { Canceled, VideoProblem, makeVideo } from './video.ts';
 
 let library: Promise<Library> | undefined;
 let strava: StravaSession | null = null;
+/** Strava's session while another source is open: its cache stays, to count what it keeps. */
+let pausedStrava: StravaSession | null = null;
 let rwgps: RideWithGpsSession | null = null;
 /** The demo's activities while the demo is open. */
 let demo: Promise<Library> | null = null;
@@ -61,14 +64,35 @@ async function answer(request: Exclude<Request, { type: 'cancel' }>, signal: Abo
   switch (request.type) {
     case 'strava-start':
       await session?.close();
+      // Reopening the same sign-in uses the same cache, so it is not cleared here.
+      pausedStrava = null;
       strava = new StravaSession(request.grant);
       return reply({ type: 'strava-started', id });
+    case 'downloaded-count': {
+      const count =
+        request.service === 'strava'
+          ? ((await (session ?? pausedStrava)?.downloaded())?.length ?? 0)
+          : (await cachedTrackIds()).length;
+      return reply({ type: 'downloaded-count', id, count });
+    }
+    case 'downloaded':
+    case 'forget-downloaded': {
+      const remote = request.service === 'strava' ? session : rwgps;
+      if (!remote) return reply({ type: 'downloaded', id, activities: [] });
+      if (request.type === 'forget-downloaded') await remote.forget(request.ids);
+      return reply({ type: 'downloaded', id, activities: await remote.downloaded() });
+    }
+    case 'strava-keep':
+      if (!session) pausedStrava = new StravaSession(request.grant);
+      return reply({ type: 'strava-kept', id });
     case 'strava-close':
       strava = null;
       session?.pause();
+      if (session) pausedStrava = session;
       return reply({ type: 'strava-closed', id });
     case 'strava-end':
       strava = null;
+      pausedStrava = null;
       if (session) await session.end(request.disconnect);
       return reply({ type: 'strava-ended', id });
     case 'strava-list': {

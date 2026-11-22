@@ -7,10 +7,11 @@ const ride = new URL(
   import.meta.url,
 ).pathname;
 
-/** Picks the demo and starts it from its screen. */
+/** Picks the demo, which lists its activities, and goes on to choose from them. */
 async function startDemo(page: Page): Promise<void> {
   await pickSource(page, 'demo');
-  await page.getByRole('button', { name: 'Start the demo' }).click();
+  await expect(page.getByTestId('demo-count')).toHaveText('25 made-up activities');
+  await page.getByRole('button', { name: 'Continue' }).click();
 }
 
 test('tries the demo, makes a video of it, and stores nothing on this device', async ({
@@ -80,6 +81,9 @@ test("shows the demo's own screen, and Change source lists every source", async 
   await expect(page.getByTestId('chosen-source')).toHaveText('Demo');
   await expect(page.getByTestId('demo-source')).toBeVisible();
   await expect(page.getByTestId('file-input')).toHaveCount(0);
+  // The demo's activities are shown, but cannot be deleted.
+  await expect(page.getByTestId('demo-activities')).toContainText('Sa Calobra');
+  await expect(page.getByTestId('demo-activities').getByRole('button')).toHaveCount(0);
 
   await page.getByRole('button', { name: 'Change source' }).click();
   await expect(page.getByTestId('sources')).toContainText('Files');
@@ -104,7 +108,7 @@ test('follows the guide to a highlight of the long ride', async ({ page }) => {
   await expect(page.getByTestId('replay-summary')).toContainText('Highlight');
 });
 
-test('loads the demo only when it is started, not with the app', async ({ page }) => {
+test('loads the demo only when it is picked, not with the app', async ({ page }) => {
   const worker = await (await page.request.get('/sw.js')).text();
   expect(worker).toContain('/index.html');
   expect(worker).not.toContain('demo/');
@@ -114,7 +118,9 @@ test('loads the demo only when it is started, not with the app', async ({ page }
     if (request.url().includes('/demo/')) demoRequests.push(request.url());
   });
   await page.goto('/');
-  await pickSource(page, 'demo');
-  await expect(page.getByRole('button', { name: 'Start the demo' })).toBeVisible();
+  await expect(page.getByTestId('choose-demo')).toBeVisible();
   expect(demoRequests).toEqual([]);
+  await pickSource(page, 'demo');
+  await expect(page.getByTestId('demo-count')).toHaveText('25 made-up activities');
+  expect(demoRequests.length).toBeGreaterThan(0);
 });

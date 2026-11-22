@@ -52,19 +52,22 @@ phone.
    time, and activities of different sources are never mixed. Until one is chosen, and
    after "Change source", the step lists them as cards like the playback presets, in the
    order Demo, Files, Ride with GPS, Strava, each with an icon and where it stands ("3
-   activities on this device", "Connected", "Not connected") and the current one marked.
-   Ride with GPS's card shows its official icon; Strava's brand rules allow only its
-   connect button and badges, so its card has a drawing. Picking one shows what it needs,
-   under a "Current source" heading with the source's name, with "← Change source" at the
-   bottom left: for files, a drop zone and file and folder pickers, a report of what the
-   last import added and what could not be read (closable), and the library as a grid
-   with a header row (date, name, sport, distance) and a delete button per row ("Delete
-   saved activities" removes them all, after a confirmation); for Strava and Ride with
-   GPS, connecting or the connection and a way to disconnect (a connection stays when
-   another source is chosen: Strava's for its two hours, Ride with GPS's until it is
-   disconnected); for the demo, what it holds and "Start the demo". The choice is
-   remembered for the next visit; a person whose chosen source is ready (files on the
-   device, a service connected) starts at step 2.
+   activities on this device", "Connected · 12 downloaded", "Not connected") and the
+   current one marked. Ride with GPS's card shows its official icon; Strava's brand rules
+   allow only its connect button and badges, so its card has a drawing. Picking one shows
+   what it needs, under a "Current source" heading with the source's name, with "← Change
+   source" at the bottom left: for files, a drop zone and file and folder pickers, a
+   report of what the last import added and what could not be read (closable), and the
+   library as a grid with a header row (date, name, sport, distance) and a delete button
+   per row ("Delete saved activities" removes them all, after a confirmation); for Strava
+   and Ride with GPS, connecting, or the connection with a Disconnect button and the
+   activities whose tracks are downloaded to this device, in the same grid, each
+   deletable ("Delete downloaded tracks" removes them all; a deleted track is downloaded
+   again when a video needs it) (a connection stays when another source is chosen:
+   Strava's for its two hours, Ride with GPS's until it is disconnected); for the demo,
+   what it holds and its activities in the grid, without delete buttons; picking the demo
+   loads them. The choice is remembered for the next visit; a person whose chosen source
+   is ready (files on the device, a service connected) starts at step 2.
 2. **Activities.** The filters (the "Which activities" settings): period with shortcuts
    and a calendar for custom days, sports (offered only when the period has them, with
    "All"), and two place filters, "Starts near a place" and "Ends near a place". Each
@@ -217,7 +220,7 @@ for exporting an account or a single activity from Strava or Garmin.
   others, so it never mixes with one's own activities; it is always offered.
 - The activities ship with the app as `apps/web/public/demo/mallorca.zip`, shaped like a
   Strava export, and the importer reads them like any export. They are fetched only when
-  the demo opens; the service worker does not store files under `demo/` in advance.
+  the demo is picked; the service worker does not store files under `demo/` in advance.
 - While the demo is open, the worker holds its activities in a library of their own, in
   memory. They never go into the person's library, and the demo's choice and adjustments
   start fresh each time and are not saved. Leaving the demo or reloading the page lets

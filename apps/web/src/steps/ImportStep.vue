@@ -4,7 +4,7 @@
 // Until one is chosen, and after "Change source", the step lists them to pick from. Once one
 // is chosen, the step shows what that source needs: adding files, connecting, or starting
 // the demo.
-import { computed, ref } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import ActivityGrid from '../components/ActivityGrid.vue';
 import AddFiles from '../components/AddFiles.vue';
 import GettingFiles from '../components/GettingFiles.vue';
@@ -35,6 +35,8 @@ const props = defineProps<{
   rwgps: { available: boolean; connected: boolean; active: boolean; busy: string; error: string };
   demoBusy: string;
   demoError: string;
+  /** The demo's activities while it is open. */
+  demoRows: ActivitySummary[];
 }>();
 const emit = defineEmits<{
   changed: [library: ActivitySummary[]];
@@ -54,6 +56,18 @@ const NAMES: Record<Source, string> = {
 
 /** Whether this browser is connected to Strava, also while another source is chosen. */
 const stravaConnected = computed(() => !!props.stravaUntil && props.stravaUntil > Date.now());
+
+/** How many tracks each service keeps on this device, for the source list. */
+const counts = ref({ strava: 0, rwgps: 0 });
+const withCount = (status: string, count: number) =>
+  count ? `${status} · ${count} downloaded` : status;
+
+async function readCounts(): Promise<void> {
+  const count = (service: 'strava' | 'rwgps') =>
+    props.engine.downloadedCount(service).catch(() => 0);
+  const [strava, rwgps] = await Promise.all([count('strava'), count('rwgps')]);
+  counts.value = { strava, rwgps };
+}
 
 /** Whether the list of sources shows. */
 const listing = computed(() => props.picking || props.chosen === null);
@@ -78,14 +92,14 @@ const choices = computed(() => {
     list.push({
       id: 'rwgps',
       about: 'Your Ride with GPS trips.',
-      status: props.rwgps.connected ? 'Connected' : 'Not connected',
+      status: props.rwgps.connected ? withCount('Connected', counts.value.rwgps) : 'Not connected',
     });
   if (props.stravaUrl || props.stravaActive)
     list.push({
       id: 'strava',
       about: 'Your Strava activities, kept for up to two hours.',
       status: stravaConnected.value
-        ? `Connected until ${timeText(props.stravaUntil!)}`
+        ? withCount(`Connected until ${timeText(props.stravaUntil!)}`, counts.value.strava)
         : 'Not connected',
     });
   return list;
@@ -93,6 +107,57 @@ const choices = computed(() => {
 
 const error = ref('');
 const confirmingDeleteAll = ref(false);
+
+/** What Strava or Ride with GPS keeps on this device while it is the open source. */
+const downloaded = ref<ActivitySummary[]>([]);
+const openService = computed(() =>
+  props.chosen === 'strava' && props.stravaActive
+    ? 'strava'
+    : props.chosen === 'rwgps' && props.rwgps.active
+      ? 'rwgps'
+      : null,
+);
+
+async function readDownloaded(): Promise<void> {
+  const service = openService.value;
+  downloaded.value = service ? await props.engine.downloaded(service).catch(() => []) : [];
+}
+onMounted(readDownloaded);
+watch(openService, readDownloaded);
+onMounted(readCounts);
+watch(listing, (shown) => shown && void readCounts());
+
+/**
+ * The activities the chosen source holds, shown under its screen: the files on this device,
+ * the tracks a service keeps, or the demo's. The demo's cannot be deleted.
+ */
+const held = computed(() => {
+  if (props.chosen === 'files')
+    return {
+      rows: props.library,
+      heading: `${countText(props.library.length, 'activity', 'activities')} on this device`,
+      deleteAll: 'Delete saved activities',
+      testId: 'library',
+      countId: 'activity-count',
+    };
+  if (openService.value)
+    return {
+      rows: downloaded.value,
+      heading: `${countText(downloaded.value.length, 'activity', 'activities')} downloaded to this device`,
+      deleteAll: 'Delete downloaded tracks',
+      testId: 'downloaded',
+      countId: 'downloaded-count',
+    };
+  if (props.chosen === 'demo')
+    return {
+      rows: props.demoRows,
+      heading: `${countText(props.demoRows.length, 'made-up activity', 'made-up activities')}`,
+      deleteAll: null,
+      testId: 'demo-activities',
+      countId: 'demo-count',
+    };
+  return null;
+});
 
 function authorize(event: MouseEvent): void {
   try {
@@ -103,10 +168,13 @@ function authorize(event: MouseEvent): void {
   }
 }
 
+/** Deletes files from the library, or tracks a service keeps (fetched again when needed). */
 async function remove(ids: string[] | 'all'): Promise<void> {
   error.value = '';
   try {
-    emit('changed', await props.engine.deleteActivities(ids));
+    const service = openService.value;
+    if (service) downloaded.value = await props.engine.forgetDownloaded(service, ids);
+    else emit('changed', await props.engine.deleteActivities(ids));
   } catch (caught) {
     error.value = caught instanceof Error ? caught.message : String(caught);
   } finally {
@@ -172,7 +240,9 @@ async function remove(ids: string[] | 'all'): Promise<void> {
             Connected to Strava until {{ timeText(stravaUntil) }}. Tracks are downloaded when a
             video needs them and kept on this device until then.
           </p>
-          <button type="button" class="link" @click="emit('disconnect')">Disconnect Strava</button>
+          <button type="button" class="secondary" @click="emit('disconnect')">
+            Disconnect Strava
+          </button>
         </template>
         <template v-else>
           <p class="muted">
@@ -206,7 +276,7 @@ async function remove(ids: string[] | 'all'): Promise<void> {
             Connected to Ride with GPS. Tracks are downloaded when a video needs them and kept on
             this device until you disconnect.
           </p>
-          <button type="button" class="link" @click="emit('disconnectRideWithGps')">
+          <button type="button" class="secondary" @click="emit('disconnectRideWithGps')">
             Disconnect Ride with GPS
           </button>
         </template>
@@ -231,7 +301,6 @@ async function remove(ids: string[] | 'all'): Promise<void> {
             Try Wornways with made-up rides and runs in Mallorca: a month of rides and runs from one
             town, a five-day tour of the island and one long climb. Nothing is saved.
           </p>
-          <button type="button" class="secondary" @click="emit('next')">Start the demo</button>
         </template>
       </div>
     </template>
@@ -241,21 +310,28 @@ async function remove(ids: string[] | 'all'): Promise<void> {
     <p v-if="demoError" class="error" role="alert">{{ demoError }}</p>
     <p v-if="error" class="error" role="alert">{{ error }}</p>
 
-    <template v-if="!listing && chosen === 'files' && library.length">
+    <template v-if="!listing && held && held.rows.length">
       <div class="library-head">
-        <h2 data-testid="activity-count">
-          {{ countText(library.length, 'activity', 'activities') }} on this device
-        </h2>
-        <span v-if="confirmingDeleteAll" class="confirm">
-          Delete all of them?
-          <button type="button" class="danger" @click="remove('all')">Delete all</button>
-          <button type="button" class="link" @click="confirmingDeleteAll = false">Keep them</button>
-        </span>
-        <button v-else type="button" class="link" @click="confirmingDeleteAll = true">
-          Delete saved activities
-        </button>
+        <h2 :data-testid="held.countId">{{ held.heading }}</h2>
+        <template v-if="held.deleteAll">
+          <span v-if="confirmingDeleteAll" class="confirm">
+            Delete all of them?
+            <button type="button" class="danger" @click="remove('all')">Delete all</button>
+            <button type="button" class="link" @click="confirmingDeleteAll = false">
+              Keep them
+            </button>
+          </span>
+          <button v-else type="button" class="link" @click="confirmingDeleteAll = true">
+            {{ held.deleteAll }}
+          </button>
+        </template>
       </div>
-      <ActivityGrid :rows="library" mode="delete" test-id="library" @delete="remove([$event])" />
+      <ActivityGrid
+        :rows="held.rows"
+        :mode="held.deleteAll ? 'delete' : 'list'"
+        :test-id="held.testId"
+        @delete="remove([$event])"
+      />
     </template>
 
     <div class="footer">

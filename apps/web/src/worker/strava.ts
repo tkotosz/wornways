@@ -220,6 +220,19 @@ export class StravaSession {
     return this.activities.selected(ids);
   }
 
+  /** The activities whose tracks this device keeps for the session, newest first. */
+  async downloaded(): Promise<ActivitySummary[]> {
+    const list = await this.browserCache.downloaded();
+    return list.sort((a, b) => b.startTime - a.startTime);
+  }
+
+  /** Deletes kept tracks; they are fetched again when a video needs them. */
+  async forget(ids: string[] | 'all'): Promise<void> {
+    const all = ids === 'all' ? (await this.browserCache.downloaded()).map((row) => row.id) : ids;
+    this.activities.forget(all);
+    await Promise.all(all.map((id) => this.browserCache.clearTrack(id)));
+  }
+
   private async loadTrack(row: StravaActivity, signal: AbortSignal): Promise<Track | null> {
     const cached = await this.browserCache.track(row.summary.id, row.version);
     signal.throwIfAborted();
@@ -229,7 +242,7 @@ export class StravaSession {
     const track =
       res.status === 404 ? null : trackFromStreams(row.summary, (await res.json()) as Streams);
     signal.throwIfAborted();
-    if (track) await this.browserCache.saveTrack(track, row.version);
+    if (track) await this.browserCache.saveTrack(track, row.version, row.summary);
     signal.throwIfAborted();
     return track;
   }

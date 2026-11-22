@@ -68,12 +68,16 @@ export function useStrava(
   /** Whether the person just came back from Strava's sign-in page. */
   const returning = callback !== null;
 
-  /** Reads whether this browser is connected to Strava, without opening it as the source. */
-  async function status(): Promise<void> {
+  /**
+   * Reads whether this browser is connected to Strava, without opening it as the source.
+   * Returns the connection, so what it keeps on this device can be counted.
+   */
+  async function status(): Promise<StravaGrant | null> {
     const config = await stravaConfiguration();
     if (config.clientId) url.value = stravaAuthorization(config.clientId);
-    const expiresAt = config.session?.expiresAt;
-    until.value = expiresAt && expiresAt > Date.now() ? expiresAt : null;
+    const session = config.session;
+    until.value = session && session.expiresAt > Date.now() ? session.expiresAt : null;
+    return until.value ? session! : null;
   }
 
   /** Stops being the source; the connection and its cached tracks stay for their two hours. */

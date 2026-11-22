@@ -49,6 +49,22 @@ export async function cacheTrack(track: Track, version: string): Promise<void> {
   });
 }
 
+/** The ids of the trips whose tracks are stored. */
+export async function cachedTrackIds(): Promise<string[]> {
+  return (
+    (await use(async (cache) =>
+      (await cache.keys()).map((request) =>
+        decodeURIComponent(new URL(request.url).pathname.split('/').pop() ?? ''),
+      ),
+    )) ?? []
+  );
+}
+
+/** Deletes these trips' stored tracks. */
+export async function deleteCachedTracks(ids: string[]): Promise<void> {
+  await use((cache) => Promise.all(ids.map((id) => cache.delete(address(id)))));
+}
+
 /** Removes the tracks of trips that are no longer in the account's list. */
 export async function keepCachedTracks(ids: Set<string>): Promise<void> {
   await use(async (cache) => {

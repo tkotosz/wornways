@@ -110,7 +110,26 @@ test('uses Ride with GPS trips as the source, fetching tracks only when needed',
   await expect(page.getByTestId('replay-summary')).toBeVisible();
   expect(fetched.length).toBe(before);
 
-  // Disconnecting goes back to the Source step and deletes the kept tracks.
+  // The Source step shows which trips' tracks are kept here; deleting one only removes the copy.
+  const kept = new Set(fetched).size;
+  await page.getByRole('button', { name: 'Source' }).click();
+  await expect(page.getByTestId('downloaded-count')).toHaveText(
+    `${kept} activities downloaded to this device`,
+  );
+  await page.getByTestId('downloaded').getByRole('button', { name: 'Delete Coast loop' }).click();
+  await expect(page.getByTestId('downloaded-count')).toHaveText(
+    `${kept - 1} activities downloaded to this device`,
+  );
+  await page.getByRole('button', { name: 'Delete downloaded tracks' }).click();
+  await page.getByRole('button', { name: 'Delete all', exact: true }).click();
+  await expect(page.getByTestId('downloaded')).toHaveCount(0);
+  // Going on fetches the chosen trip again.
+  const beforeContinue = fetched.length;
+  await page.getByRole('button', { name: 'Continue' }).click();
+  await page.getByRole('button', { name: 'Continue' }).click();
+  await expect(page.getByTestId('replay-summary')).toBeVisible();
+  expect(fetched.length).toBeGreaterThan(beforeContinue);
+
   // Disconnecting stays with Ride with GPS, ready to connect again.
   await page.getByRole('button', { name: 'Source' }).click();
   await page.getByRole('button', { name: 'Disconnect Ride with GPS' }).click();
@@ -162,6 +181,7 @@ test('switches between Ride with GPS and files without disconnecting', async ({ 
 
   await page.getByRole('button', { name: 'Change source' }).click();
   await expect(page.getByTestId('choose-rwgps')).toHaveAttribute('aria-checked', 'true');
+  await expect(page.getByTestId('choose-rwgps')).toContainText(/Connected · \d+ downloaded/);
   await pickSource(page, 'files');
   await expect(page.getByTestId('chosen-source')).toHaveText('Files');
 
