@@ -47,11 +47,29 @@ one, which is outlined in orange. On a phone it shows "Step 3 of 5", the step's 
 bar with a segment per step; each segment opens its step. Each step is one column on a
 phone.
 
-1. **Import.** A drop zone and file and folder pickers, a report of what the last import
-   added and what could not be read (closable), and the library as a grid with a header
-   row (date, name, sport, distance) and a delete button per row. "Delete all my data"
-   removes everything the app stored, after a confirmation. A person who already has
-   activities starts at step 2.
+1. **Source.** Where the activities come from: files on this device, Strava, Ride with
+   GPS (the last two where the site offers them) or the demo. One source is chosen at a
+   time, and activities of different sources are never mixed. Until one is chosen the
+   step lists them as cards like the playback presets, in the order Demo, Files, Ride
+   with GPS, Strava, each with an icon and where it stands ("25 made-up activities", "3
+   activities on this device", "Connected · 12 downloaded", "Not connected"). Until a
+   source is picked, Continue and the later steps are disabled. Ride with GPS's card
+   shows its official icon; Strava's brand rules allow only its connect button and
+   badges, so its card has a drawing. Picking one shows what it needs, under a "Current
+   source" heading with the source's name, with "← Change source" at the bottom left,
+   which clears the choice and lists the sources again (connections stay): for files, a
+   drop zone and file and folder pickers, a report of what the last import added and what
+   could not be read (closable), and the library as a grid with a header row (date, name,
+   sport, distance) and a delete button per row ("Delete saved activities" removes them
+   all, after a confirmation); for Strava and Ride with GPS, connecting, or the
+   connection with a Disconnect button and the activities whose tracks are downloaded to
+   this device, in the same grid, each deletable ("Delete downloaded tracks" removes them
+   all; a deleted track is downloaded again when a video needs it) (a connection stays
+   when another source is chosen: Strava's for its two hours, Ride with GPS's until it is
+   disconnected); for the demo, what it holds and its activities in the grid, without
+   delete buttons; picking the demo loads them. The choice is remembered for the next
+   visit (without one, the list shows); a person whose chosen source is ready (files on
+   the device, a service connected) starts at step 2.
 2. **Activities.** The filters (the "Which activities" settings): period with shortcuts
    and a calendar for custom days, sports (offered only when the period has them, with
    "All"), and two place filters, "Starts near a place" and "Ends near a place". Each
@@ -95,10 +113,9 @@ phone.
    app through the system's share sheet. Share shows only where the browser can share
    files (mostly on phones) and is then the main button.
 
-While no activities are stored (on a first visit, or after deleting everything), step 1
-also says in a few words what the app does. "How to get your files" starts collapsed and
-opens instructions for exporting an account or a single activity from Strava or Garmin.
-Sample activities to try the app with come later, once there are routes that may be published.
+Until a source is chosen (on a first visit), step 1 also says in a few words what the app
+does. On the files screen, "How to get your files" starts collapsed and opens instructions
+for exporting an account or a single activity from Strava or Garmin.
 
 ## How it works
 
@@ -154,17 +171,58 @@ Sample activities to try the app with come later, once there are routes that may
   where it starts and ends) apart from its points, so the list and the filters are
   instant and only the selected activities' points are loaded.
 
+### Ride with GPS
+
+- Ride with GPS is a source like Strava: while it is the source, the Activities step lists
+  the account's trips, and tracks are downloaded only when needed. The newest few are
+  fetched ahead, a trip ticked again moves to the front, and leaving the Activities step
+  fetches the chosen trips' missing tracks, a few at a time, with progress. This code is
+  shared with Strava (`worker/remote-activities.ts`); each service says how to list and
+  how to fetch one track.
+- Connecting: the page links to `/api/ridewithgps/connect`, a Pages Function that sends
+  the person to Ride with GPS's authorization page with a random state, also kept in a
+  short-lived cookie. Ride with GPS sends them back to `/api/ridewithgps/callback`, which
+  checks the state, trades the code for a token (this needs the client secret), seals
+  the token in an encrypted HttpOnly cookie for `/api/ridewithgps`, and sends the person
+  on to `/?ridewithgps=<outcome>`. The code and the token never reach page scripts.
+- Ride with GPS tokens do not expire and allow changing the account. The cookie lasts
+  30 days, and the Functions only read: the trip list and one trip at a time.
+- The trip list has no date filter, so it is read whole when Continue leaves the Source
+  step (or a reload opens Ride with GPS), 200 trips a page, while the Activities step shows
+  it loading; the Function returns only the fields the app uses. The filters then work on
+  it in the worker, and "All time" is offered. Trips without a route (indoor ones) are
+  left out.
+- The Source step asks nothing of Strava or Ride with GPS: whether a service is connected
+  comes from this site's own Functions (the sign-in cookie), and what it keeps from the
+  stored copies (Ride with GPS stores each trip's name, date, sport and distance with its
+  track; Strava keeps an encrypted index beside its cache). A Strava list stops at the
+  first page that is not full.
+- One trip comes through the Function as Ride with GPS sends it, unparsed (megabytes for
+  a long ride). The worker keeps longitude, latitude, elevation and time.
+- Downloaded tracks are kept in the browser's Cache Storage until disconnect, keyed by
+  trip and stored with when the trip last changed (`updated_at`): an edited trip is
+  fetched again, and the tracks of trips no longer in the list are removed when it is
+  read. Ride with GPS's terms allow keeping what the person chooses to use, so there is no
+  time limit as for Strava. Disconnecting revokes the token, ends the cookie and deletes
+  these tracks.
+- A reload opens Ride with GPS again when it is the chosen source, with the tab's filters
+  and selection; choosing files, Strava or the demo keeps the connection. When the person
+  comes back from connecting one service, that one is the chosen source; the other one's
+  connection stays. The look of the video (steps 3 and 4) is the same one files use.
+- Trips get the id `rwgps-<trip id>`, and Ride with GPS's activity types (`cycling:road`,
+  `running:trail`, ...) are mapped to the same sport names as files. There is no webhook:
+  changes on Ride with GPS show up the next time the list is read.
+
 ### Demo
 
-- Besides files (and Strava), the Source step offers a demo: made-up rides and runs on real
-  roads in Mallorca, for trying Wornways before adding one's own activities. A month of
-  rides and runs from one town (for a recap), a five-day tour of the island (for a
-  multiday trip) and one long climb (for a highlight). It is offered only while there are no
-  activities on this device and Strava is not connected: it is for trying Wornways before
-  adding anything.
+- Besides files, Strava and Ride with GPS, the Source step offers a demo: made-up rides and
+  runs on real roads in Mallorca, for trying Wornways before adding one's own activities.
+  A month of rides and runs from one town (for a recap), a five-day tour of the island
+  (for a multiday trip) and one long climb (for a highlight). It is a source like the
+  others, so it never mixes with one's own activities; it is always offered.
 - The activities ship with the app as `apps/web/public/demo/mallorca.zip`, shaped like a
   Strava export, and the importer reads them like any export. They are fetched only when
-  the demo opens; the service worker does not store files under `demo/` in advance.
+  the demo is picked; the service worker does not store files under `demo/` in advance.
 - While the demo is open, the worker holds its activities in a library of their own, in
   memory. They never go into the person's library, and the demo's choice and adjustments
   start fresh each time and are not saved. Leaving the demo or reloading the page lets
@@ -289,9 +347,9 @@ browser by an automated test that imports generated activity files and makes a v
 
 ## Not in the first version
 
-Accounts or syncing between devices; connections to services other than Strava, such as
-Garmin (see [skipped-features/garmin-connect.md](skipped-features/garmin-connect.md) for
-why); a tilted or 3D camera; satellite maps; custom image overlays; imperial units;
+Accounts or syncing between devices; connections to services other than Strava and Ride
+with GPS, such as Garmin (see [skipped-features/garmin-connect.md](skipped-features/garmin-connect.md)
+for why); a tilted or 3D camera; satellite maps; custom image overlays; imperial units;
 languages other than English.
 
 ## Open questions

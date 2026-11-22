@@ -1,25 +1,21 @@
 import {
-  distanceM,
-  frequentPlacesAt,
-  nearPlacesText,
-  parseSettings,
-  sportIncluded,
   sportSlug,
   STRIDE,
   type LatLon,
-  type RenderSettings,
   type SettingsInput,
   type Track,
   type TrackEnd,
 } from '@wornways/engine';
 import type { ActivitySummary, MatchReport } from '../messages.ts';
 import { clearStravaAccess, type StravaGrant } from '../strava-auth.ts';
+import { RemoteActivities, type RemoteActivity } from './remote-activities.ts';
 import { StravaCache } from './strava-cache.ts';
 import { sessionTileLoader } from './tile-cache.ts';
 
 const API = '/api/strava/activities';
-const PREFETCH_COUNT = 5;
 const TRACK_REQUESTS = 3;
+/** Activities per page of the list, as functions/api/strava/activities.ts asks Strava for. */
+const PAGE_SIZE = 100;
 const textEncoder = new TextEncoder();
 
 type Summary = {
@@ -38,7 +34,7 @@ type Summary = {
   map?: { summary_polyline?: string };
 };
 
-type StravaActivity = { summary: ActivitySummary; start?: LatLon; end?: LatLon; version: string };
+type StravaActivity = RemoteActivity;
 
 async function routeVersion(data: Summary): Promise<string> {
   const details = JSON.stringify([
@@ -117,30 +113,31 @@ function trackFromStreams(activity: ActivitySummary, streams: Streams): Track | 
 /** One replay's Strava activities and temporary browser cache. */
 export class StravaSession {
   private readonly lifetime = new AbortController();
-  private range = new AbortController();
-  private activities = new Map<string, StravaActivity>();
-  private tracks = new Map<string, Promise<Track | null>>();
-  private limited = false;
-  private preparing = false;
-  private prefetching = false;
-  private ahead: string[] = [];
+  private readonly activities: RemoteActivities;
   private readonly browserCache: StravaCache<StravaActivity>;
 
   readonly loadTiles = sessionTileLoader(this.signal);
 
   constructor(private readonly grant: StravaGrant) {
     this.browserCache = new StravaCache(grant.sessionId, grant.expiresAt, grant.cacheKey);
+    this.activities = new RemoteActivities('Strava', this.signal, (row, signal) =>
+      this.loadTrack(row, signal),
+    );
   }
 
   get signal(): AbortSignal {
     return this.lifetime.signal;
   }
 
+  /** Stops its requests; the browser cache stays for when Strava is opened again. */
+  pause(): void {
+    this.lifetime.abort();
+    this.activities.clear();
+  }
+
   close(): Promise<unknown> {
     this.lifetime.abort();
     this.activities.clear();
-    this.tracks.clear();
-    this.ahead = [];
     return this.browserCache.clear();
   }
 
@@ -162,12 +159,7 @@ export class StravaSession {
     signal: AbortSignal,
     activityChanged: boolean,
   ): Promise<ActivitySummary[]> {
-    this.range.abort();
-    this.range = new AbortController();
-    this.activities.clear();
-    this.tracks = new Map();
-    this.ahead = [];
-    const range = this.range.signal;
+    const range = this.activities.startList();
     const active = AbortSignal.any([this.signal, range, signal]);
     if (activityChanged) await this.browserCache.clear();
     active.throwIfAborted();
@@ -189,7 +181,8 @@ export class StravaSession {
         if (row && from <= row.summary.startTime && row.summary.startTime < to)
           rows.set(row.summary.id, row);
       }
-      if (batch.length === 0) break;
+      // A page shorter than a full one is the last: no need to ask for an empty one.
+      if (batch.length < PAGE_SIZE) break;
     }
 
     active.throwIfAborted();
@@ -205,138 +198,56 @@ export class StravaSession {
     }
     await this.browserCache.saveList([...rows.values()]);
     active.throwIfAborted();
-    const ordered = [...rows.values()]
-      .map((row) => row.summary)
-      .sort((a, b) => b.startTime - a.startTime);
-    this.activities = rows;
-    this.prioritize(ordered.slice(0, PREFETCH_COUNT).map((row) => row.id));
-    return ordered;
-  }
-
-  private filtered(settings: RenderSettings) {
-    return [...this.activities.values()]
-      .sort((a, b) => b.summary.startTime - a.summary.startTime)
-      .filter(
-        ({ summary }) =>
-          sportIncluded(settings, summary.sport) &&
-          (settings.from === null || summary.startTime >= settings.from) &&
-          (settings.to === null || summary.startTime < settings.to),
-      );
+    return this.activities.setList([...rows.values()]);
   }
 
   match(input: SettingsInput): MatchReport {
-    const settings = parseSettings(input);
-    const rows = this.filtered(settings);
-    const within = (point: LatLon | undefined, filter: RenderSettings['startNear']) =>
-      !filter ||
-      (point &&
-        distanceM(point.lat, point.lon, filter.place.lat, filter.place.lon) <= filter.radius);
-    const ids = rows
-      .filter((row) => within(row.start, settings.startNear) && within(row.end, settings.endNear))
-      .map((row) => row.summary.id);
-    const problem =
-      ids.length || !rows.length || (!settings.startNear && !settings.endNear)
-        ? null
-        : 'No Strava activity ' + nearPlacesText(settings) + '.';
-    return { ids, problem };
+    return this.activities.match(input);
   }
 
   places(input: SettingsInput, end: TrackEnd) {
-    const points = this.filtered(parseSettings(input)).flatMap((row) => {
-      const point = row[end];
-      return point ? [{ ...point, time: row.summary.startTime }] : [];
-    });
-    return frequentPlacesAt(points, 500, 6, 1);
+    return this.activities.places(input, end);
   }
 
   prioritize(ids: string[]): void {
-    this.ahead = [...new Set([...ids, ...this.ahead])]
-      .filter((id) => this.activities.has(id) && !this.tracks.has(id))
-      .slice(0, PREFETCH_COUNT);
-    void this.prefetch();
+    this.activities.prioritize(ids);
   }
 
-  private async prefetch(): Promise<void> {
-    if (this.prefetching) return;
-    this.prefetching = true;
-    try {
-      while (!this.signal.aborted && !this.limited && !this.preparing && this.ahead.length) {
-        const range = this.range.signal;
-        try {
-          await this.load(this.ahead.shift()!);
-        } catch {
-          // A new date range can replace this queue while an old request is in flight.
-          if (range === this.range.signal) return;
-        }
-      }
-    } finally {
-      this.prefetching = false;
-    }
+  prepare(ids: string[], signal: AbortSignal): Promise<string[]> {
+    return this.activities.prepare(ids, signal, TRACK_REQUESTS);
   }
 
-  async prepare(ids: string[], signal: AbortSignal): Promise<string[]> {
-    const unavailable: string[] = [];
-    const active = AbortSignal.any([signal, this.signal, this.range.signal]);
-    let next = 0;
-    this.preparing = true;
-    let stopped = false;
-    const fetchTracks = async () => {
-      while (!active.aborted && !stopped && next < ids.length) {
-        const id = ids[next++]!;
-        try {
-          if (!(await this.load(id))) unavailable.push(id);
-        } catch (error) {
-          stopped = true;
-          throw error;
-        }
-      }
-    };
-    try {
-      const results = await Promise.allSettled(
-        Array.from({ length: Math.min(ids.length, TRACK_REQUESTS) }, fetchTracks),
-      );
-      const failed = results.find((result) => result.status === 'rejected');
-      if (failed) throw failed.reason;
-    } finally {
-      this.preparing = false;
-      void this.prefetch();
-      active.throwIfAborted();
-    }
-    return unavailable;
+  selected(ids: string[]): Promise<Track[]> {
+    return this.activities.selected(ids);
   }
 
-  async selected(ids: string[]): Promise<Track[]> {
-    const tracks = await Promise.all(ids.map((id) => this.tracks.get(id)));
-    this.signal.throwIfAborted();
-    return tracks.filter((track): track is Track => !!track);
+  /** The activities whose tracks this device keeps for the session, newest first. */
+  async downloaded(): Promise<ActivitySummary[]> {
+    const list = await this.browserCache.downloaded();
+    return list.sort((a, b) => b.startTime - a.startTime);
   }
 
-  private load(id: string): Promise<Track | null> {
-    const existing = this.tracks.get(id);
-    if (existing) return existing;
-
-    const row = this.activities.get(id);
-    if (!row) return Promise.resolve(null);
-    const cache = this.tracks;
-    const active = AbortSignal.any([this.signal, this.range.signal]);
-    const task = this.loadTrack(row, active).catch((error: unknown) => {
-      cache.delete(id);
-      throw error;
-    });
-    cache.set(id, task);
-    return task;
+  /** Deletes kept tracks; they are fetched again when a video needs them. */
+  async forget(ids: string[] | 'all'): Promise<void> {
+    const all = ids === 'all' ? (await this.browserCache.downloaded()).map((row) => row.id) : ids;
+    this.activities.forget(all);
+    await Promise.all(all.map((id) => this.browserCache.clearTrack(id)));
   }
 
   private async loadTrack(row: StravaActivity, signal: AbortSignal): Promise<Track | null> {
     const cached = await this.browserCache.track(row.summary.id, row.version);
     signal.throwIfAborted();
-    if (cached) return { ...cached, ...row.summary };
+    if (cached) {
+      // Tracks cached before the index existed are listed once they are used.
+      await this.browserCache.noteTrack(row.summary);
+      return { ...cached, ...row.summary };
+    }
 
     const res = await this.get(new URLSearchParams({ activity: row.summary.id }), signal, true);
     const track =
       res.status === 404 ? null : trackFromStreams(row.summary, (await res.json()) as Streams);
     signal.throwIfAborted();
-    if (track) await this.browserCache.saveTrack(track, row.version);
+    if (track) await this.browserCache.saveTrack(track, row.version, row.summary);
     signal.throwIfAborted();
     return track;
   }
@@ -360,7 +271,7 @@ export class StravaSession {
       throw new StravaError('Could not reach Strava. Check your connection and try again.');
     });
     if (res.status === 429) {
-      this.limited = true;
+      this.activities.limited = true;
       throw new StravaError('Strava’s request limit was reached. Try again in a few minutes.');
     }
     if (res.status === 401)

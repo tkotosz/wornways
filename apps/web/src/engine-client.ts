@@ -24,6 +24,8 @@ type Pending = {
 /** The request was canceled before it finished. */
 export class Canceled extends Error {}
 export class StravaExpired extends Error {}
+/** The Ride with GPS connection ended: connect again. */
+export class RideWithGpsDisconnected extends Error {}
 
 export class EngineClient {
   private nextId = 1;
@@ -104,10 +106,73 @@ export class EngineClient {
     void this.send({ type: 'strava-prioritize', id: this.nextId++, ids });
   }
 
+  /** Tells the worker of a Strava connection that is not the source, to count what it keeps. */
+  async keepStrava(grant: StravaGrant): Promise<void> {
+    const reply = await this.send({ type: 'strava-keep', id: this.nextId++, grant });
+    if (reply.type !== 'strava-kept') throw this.errorFor(reply);
+  }
+
+  /** Stops using Strava as the source; its sign-in and cached tracks stay. */
+  async closeStrava(): Promise<void> {
+    if (this.source === 'strava') this.source = 'files';
+    const reply = await this.send({ type: 'strava-close', id: this.nextId++ });
+    if (reply.type !== 'strava-closed') throw this.errorFor(reply);
+  }
+
   async endStrava(disconnect = false): Promise<void> {
     if (this.source === 'strava') this.source = 'files';
     const reply = await this.send({ type: 'strava-end', id: this.nextId++, disconnect });
     if (reply.type !== 'strava-ended') throw this.errorFor(reply);
+  }
+
+  /** Opens Ride with GPS as the source; returns the account's trips, newest first. */
+  async startRideWithGps(): Promise<ActivitySummary[]> {
+    const reply = await this.send({ type: 'rwgps-start', id: this.nextId++ });
+    if (reply.type !== 'rwgps-started') throw this.errorFor(reply);
+    this.source = 'rwgps';
+    return reply.activities;
+  }
+
+  /** Fetches the chosen trips' tracks not fetched yet; returns the ids without one. */
+  async prepareRideWithGps(ids: string[], onProgress: (p: Progress) => void): Promise<string[]> {
+    const reply = await this.send({ type: 'rwgps-prepare', id: this.nextId++, ids }, onProgress);
+    if (reply.type === 'rwgps-prepared') return reply.unavailable;
+    throw this.errorFor(reply);
+  }
+
+  prioritizeRideWithGps(ids: string[]): void {
+    void this.send({ type: 'rwgps-prioritize', id: this.nextId++, ids });
+  }
+
+  /** Closes Ride with GPS as the source; `forget` also deletes the tracks kept here. */
+  async endRideWithGps(forget = false): Promise<void> {
+    if (this.source === 'rwgps') this.source = 'files';
+    const reply = await this.send({ type: 'rwgps-end', id: this.nextId++, forget });
+    if (reply.type !== 'rwgps-ended') throw this.errorFor(reply);
+  }
+
+  /** The activities whose tracks Strava or Ride with GPS keeps on this device, newest first. */
+  async downloaded(service: 'strava' | 'rwgps'): Promise<ActivitySummary[]> {
+    const reply = await this.send({ type: 'downloaded', id: this.nextId++, service });
+    if (reply.type === 'downloaded') return reply.activities;
+    throw this.errorFor(reply);
+  }
+
+  /** How many tracks Strava or Ride with GPS keeps on this device. */
+  async downloadedCount(service: 'strava' | 'rwgps'): Promise<number> {
+    const reply = await this.send({ type: 'downloaded-count', id: this.nextId++, service });
+    if (reply.type === 'downloaded-count') return reply.count;
+    throw this.errorFor(reply);
+  }
+
+  /** Deletes kept tracks (they are fetched again when needed); returns what is left. */
+  async forgetDownloaded(
+    service: 'strava' | 'rwgps',
+    ids: string[] | 'all',
+  ): Promise<ActivitySummary[]> {
+    const reply = await this.send({ type: 'forget-downloaded', id: this.nextId++, service, ids });
+    if (reply.type === 'downloaded') return reply.activities;
+    throw this.errorFor(reply);
   }
 
   /** Opens the demo: its activities, held in memory, are the source until it ends. */
@@ -201,8 +266,11 @@ export class EngineClient {
 
   private errorFor(reply: Reply): Error {
     if (reply.type === 'canceled') return new Canceled('Canceled');
-    if (reply.type === 'failed')
-      return reply.expired ? new StravaExpired(reply.message) : new Error(reply.message);
+    if (reply.type === 'failed') {
+      if (reply.expired) return new StravaExpired(reply.message);
+      if (reply.disconnected) return new RideWithGpsDisconnected(reply.message);
+      return new Error(reply.message);
+    }
     return new Error(`Unexpected reply: ${reply.type}`);
   }
 }

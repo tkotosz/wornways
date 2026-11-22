@@ -1,7 +1,8 @@
 <script setup lang="ts">
 // Activities as a grid with a header row. In "select" mode every row has a checkbox, all
 // ticked at first, with a select-all box in the header: the ticked ones are what the video
-// shows. In "delete" mode every row has a button that deletes the activity.
+// shows. In "delete" mode every row has a button that deletes the activity. In "list" mode
+// the rows are only shown.
 import { computed, ref, watch } from 'vue';
 import { countText, dayText, kmText, shortDayText, sportText } from '../format.ts';
 import type { ActivitySummary } from '../messages.ts';
@@ -9,16 +10,19 @@ import type { ActivitySummary } from '../messages.ts';
 const props = defineProps<{
   /** The activities shown, newest first. */
   rows: ActivitySummary[];
-  mode: 'select' | 'delete';
+  mode: 'select' | 'delete' | 'list';
   /** Names the grid for tests: the table gets it, its count line `<testId>-count`. */
   testId: string;
+  /** Each row links to the activity on the service it comes from. */
   strava?: boolean;
+  rwgps?: boolean;
 }>();
 /** In "select" mode: the ids of the unticked activities, kept when other rows come and go. */
 const excluded = defineModel<string[]>('excluded', { default: () => [] });
 const emit = defineEmits<{ delete: [id: string] }>();
 
 const selecting = computed(() => props.mode === 'select');
+const deleting = computed(() => props.mode === 'delete');
 const ticked = computed(() => props.rows.filter((a) => !excluded.value.includes(a.id)));
 const tickedKm = computed(() => ticked.value.reduce((sum, a) => sum + a.distanceM, 0));
 const allTicked = computed(
@@ -70,7 +74,7 @@ function toggleAll(): void {
           <th>Name</th>
           <th class="sport">Sport</th>
           <th class="km">Distance</th>
-          <th v-if="!selecting" class="remove"><span class="hidden">Delete</span></th>
+          <th v-if="deleting" class="remove"><span class="hidden">Delete</span></th>
         </tr>
       </thead>
       <tbody>
@@ -98,16 +102,25 @@ function toggleAll(): void {
             <a
               v-if="strava"
               :href="'https://www.strava.com/activities/' + a.id"
-              class="link strava-link"
+              class="link service-link"
               target="_blank"
               rel="noopener noreferrer"
               @click.stop
               >View on Strava</a
             >
+            <a
+              v-if="rwgps"
+              :href="'https://ridewithgps.com/trips/' + a.id.replace(/^rwgps-/, '')"
+              class="link service-link"
+              target="_blank"
+              rel="noopener noreferrer"
+              @click.stop
+              >View on Ride with GPS</a
+            >
           </td>
           <td class="sport muted">{{ sportText(a.sport) }}</td>
           <td class="km muted">{{ kmText(a.distanceM) }}</td>
-          <td v-if="!selecting" class="remove">
+          <td v-if="deleting" class="remove">
             <button
               type="button"
               class="link"
@@ -125,7 +138,7 @@ function toggleAll(): void {
 </template>
 
 <style scoped>
-.strava-link {
+.service-link {
   display: block;
   font-size: 0.75rem;
 }

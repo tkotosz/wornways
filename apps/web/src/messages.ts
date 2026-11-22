@@ -4,12 +4,20 @@
 
 import type { FrequentPlace, Grouping, SettingsInput, TrackEnd } from '@wornways/engine';
 
-import type { StravaGrant } from './strava-auth.ts';
-
 export type PickedFile = { path: string; file: File };
 
-/** Where a request's activities come from: this device's library, Strava, or the demo. */
-export type Source = 'files' | 'strava' | 'demo';
+/** An open Strava session, as the page and the worker know it (see strava-auth.ts). */
+export type StravaGrant = {
+  expiresAt: number;
+  sessionId: string;
+  cacheKey: string;
+};
+
+/**
+ * Where a request's activities come from: this device's library, Strava, Ride with GPS, or
+ * the demo.
+ */
+export type Source = 'files' | 'strava' | 'rwgps' | 'demo';
 
 export type Request =
   | { type: 'read-library'; id: number }
@@ -27,6 +35,22 @@ export type Request =
   | { type: 'strava-prepare'; id: number; ids: string[] }
   | { type: 'strava-prioritize'; id: number; ids: string[] }
   | { type: 'strava-end'; id: number; disconnect: boolean }
+  /** A Strava connection that is not the source, to count the tracks it keeps here. */
+  | { type: 'strava-keep'; id: number; grant: StravaGrant }
+  /** Stops using Strava as the source, keeping the sign-in and the cached tracks. */
+  | { type: 'strava-close'; id: number }
+  /** Opens Ride with GPS as the source and lists the account's trips. */
+  | { type: 'rwgps-start'; id: number }
+  | { type: 'rwgps-prepare'; id: number; ids: string[] }
+  | { type: 'rwgps-prioritize'; id: number; ids: string[] }
+  /** Closes it; `forget` also deletes the tracks kept on this device (on disconnect). */
+  | { type: 'rwgps-end'; id: number; forget: boolean }
+  /** The activities whose tracks a connected service's source keeps on this device. */
+  | { type: 'downloaded'; id: number; service: 'strava' | 'rwgps' }
+  /** How many tracks a service keeps on this device, also while it is not the source. */
+  | { type: 'downloaded-count'; id: number; service: 'strava' | 'rwgps' }
+  /** Deletes some of those tracks, or all; they are fetched again when needed. */
+  | { type: 'forget-downloaded'; id: number; service: 'strava' | 'rwgps'; ids: string[] | 'all' }
   /** Loads the demo's activities into memory, and lets them go again. */
   | { type: 'demo-start'; id: number }
   | { type: 'demo-end'; id: number }
@@ -51,13 +75,19 @@ export type Reply =
   | { type: 'video-made'; id: number; video: ArrayBuffer; report: VideoReport }
   | { type: 'poster-made'; id: number; image: Blob }
   | { type: 'planned'; id: number; plan: PlanReport }
-  | { type: 'strava-started' | 'strava-ended'; id: number }
+  | { type: 'strava-started' | 'strava-ended' | 'strava-closed' | 'strava-kept'; id: number }
   | { type: 'strava-listed'; id: number; activities: ActivitySummary[] }
   | { type: 'strava-prepared'; id: number; unavailable: string[] }
   | { type: 'strava-prioritized'; id: number }
+  | { type: 'downloaded'; id: number; activities: ActivitySummary[] }
+  | { type: 'downloaded-count'; id: number; count: number }
   | { type: 'demo-started'; id: number; activities: ActivitySummary[] }
   | { type: 'demo-ended'; id: number }
-  | { type: 'failed'; id: number; message: string; expired?: boolean }
+  | { type: 'rwgps-started'; id: number; activities: ActivitySummary[] }
+  | { type: 'rwgps-prepared'; id: number; unavailable: string[] }
+  | { type: 'rwgps-prioritized' | 'rwgps-ended'; id: number }
+  /** `expired`: the Strava session ended; `disconnected`: the Ride with GPS connection did. */
+  | { type: 'failed'; id: number; message: string; expired?: boolean; disconnected?: boolean }
   | { type: 'canceled'; id: number };
 
 /** Which activities the filters match. */

@@ -12,8 +12,11 @@ Activity files you add stay there.
   or the whole account export ZIP from Strava or Garmin, with names and sports from its
   activity list.
 - **Connects to Strava** on deployments where it is configured. Pick a date range and
-  activities to replay. Wornways can restore your connection and downloaded tracks
-  after a reload for up to two hours.
+  activities to replay. Wornways keeps your connection and downloaded tracks for up to
+  two hours, also after a reload or while you use another source.
+- **Connects to Ride with GPS** on deployments where it is configured. Pick a period and
+  trips to replay; tracks are downloaded when a video needs them and kept on the device
+  until you disconnect.
 - **Lets you choose what to show:** a period (today, yesterday, this month, a custom
   range…), sports, activities that start or end near a place, and any activity ticked or
   unticked by hand.
@@ -35,7 +38,9 @@ Activity files you add stay there.
 
 The map comes from [OpenFreeMap](https://openfreemap.org) (OpenMapTiles, OpenStreetMap
 data). Tile requests tell the map provider which area is drawn. With Strava, Wornways
-also connects to Strava for sign-in and to read the athlete's selected activities.
+also connects to Strava for sign-in and to read the athlete's selected activities. With
+Ride with GPS, it connects to Ride with GPS for sign-in and to read the trip list and the
+chosen trips.
 
 ## Running it
 
@@ -178,3 +183,24 @@ Ending the session clears the cache. Expired entries are removed on the next
 visit if the browser was closed. The current tab can also restore its filters,
 selection, and video settings. Previews and the in-app MP4 stay in memory. The
 Pages Function and event relay use no server-side activity or session storage.
+
+### Enabling Ride with GPS
+
+The Source screen offers Ride with GPS when the deployment has an API client.
+
+1. Create an API client at https://ridewithgps.com/api/api_clients. Add the OAuth
+   redirect URI `<RWGPS_ORIGIN>/api/ridewithgps/callback`, for example
+   `https://wornways.pages.dev/api/ridewithgps/callback`, and for local testing
+   `http://127.0.0.1:8788/api/ridewithgps/callback`.
+2. Set `RWGPS_CLIENT_ID` (the client's OAuth client ID, not its API key) and
+   `RWGPS_ORIGIN` in the Pages environment (the origin as for Strava), and
+   `RWGPS_CLIENT_SECRET` (the OAuth client secret, not the API secret) as a Pages secret,
+   then redeploy Pages.
+
+For local testing, put `RWGPS_CLIENT_ID` and `RWGPS_CLIENT_SECRET` in `.dev.vars` and run
+`npm run dev:web`, which sets `RWGPS_ORIGIN` to `http://127.0.0.1:8788`.
+
+The Pages Functions trade the OAuth code for a token and read the trip list and the
+chosen trips. Ride with GPS tokens do not expire and also allow changes to the account,
+so the token stays in an encrypted, HttpOnly cookie for 30 days and only the Functions
+use it, to read. Downloaded tracks stay in the browser until the person disconnects.

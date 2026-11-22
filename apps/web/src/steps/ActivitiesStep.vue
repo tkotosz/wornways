@@ -25,11 +25,12 @@ const props = defineProps<{
   canRetry?: boolean;
 }>();
 const choice = defineModel<Choice>({ required: true });
-const emit = defineEmits<{ back: []; next: []; retry: []; leaveDemo: [] }>();
+const emit = defineEmits<{ back: []; changeSource: []; next: []; retry: [] }>();
 
 const SOURCE_LABELS: Record<Source, string> = {
   files: 'Files on this device',
   strava: 'Strava',
+  rwgps: 'Ride with GPS',
   demo: 'Demo: made-up activities in Mallorca',
 };
 
@@ -43,11 +44,8 @@ const ticked = computed(() => rows.value.filter((a) => !choice.value.excluded.in
     <h1>Choose your activities</h1>
 
     <p class="muted source" data-testid="source">
-      {{ SOURCE_LABELS[source] }}
-      <button v-if="source === 'demo'" type="button" class="link" @click="emit('leaveDemo')">
-        Leave the demo
-      </button>
-      <button v-else type="button" class="link" @click="emit('back')">Change source</button>
+      Current source: {{ SOURCE_LABELS[source] }}
+      <button type="button" class="link" @click="emit('changeSource')">Change source</button>
     </p>
     <DemoGuide v-if="source === 'demo'" />
     <ActivityFilters
@@ -76,6 +74,7 @@ const ticked = computed(() => rows.value.filter((a) => !choice.value.excluded.in
       :excluded="choice.excluded"
       :rows="rows"
       :strava="strava"
+      :rwgps="source === 'rwgps'"
       mode="select"
       test-id="chosen"
       @update:excluded="choice = { ...choice, excluded: $event }"

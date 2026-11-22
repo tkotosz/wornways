@@ -1,4 +1,5 @@
 import { expect, test, type Page, type WebSocketRoute } from '@playwright/test';
+import { pickSource } from './sources.ts';
 
 const olderYear = new Date().getFullYear() - 1;
 const csrf = 'strava-test-state';
@@ -186,7 +187,12 @@ async function fakeStrava(
 }
 
 async function connect(page: Page) {
-  await page.getByRole('link', { name: 'Connect with Strava' }).click();
+  // From the list of sources (a first visit, or after "Change source"), Strava is picked first.
+  const sources = page.getByTestId('sources');
+  const link = page.getByRole('link', { name: 'Connect with Strava' });
+  await expect(sources.or(link)).toBeVisible();
+  if (await sources.isVisible()) await pickSource(page, 'strava');
+  await link.click();
   await expect(page.getByRole('heading', { name: 'Choose your activities' })).toBeVisible();
 }
 
@@ -202,8 +208,10 @@ test.describe('Strava on a phone', () => {
       '../../../packages/engine/tests/import/fixtures/strava-export.zip',
       import.meta.url,
     );
+    await pickSource(page, 'files');
     await page.getByTestId('file-input').setInputFiles(fixture.pathname);
     await expect(page.getByTestId('activity-count')).toContainText('3 activities');
+    await page.getByRole('button', { name: 'Change source' }).click();
     await connect(page);
     await expect(page.getByRole('status')).toHaveText('No Strava activities in this period.');
     await page.getByRole('button', { name: 'Last year', exact: true }).click();
@@ -232,34 +240,39 @@ test.describe('Strava on a phone', () => {
     expect((await download).suggestedFilename()).toMatch(/\.mp4$/);
     await expect(page.getByRole('button', { name: 'Done', exact: true })).toHaveCount(0);
     await page.getByRole('button', { name: 'Go to Source' }).click();
-    const ending = page.waitForResponse(
-      (response) =>
-        response.url().endsWith('/api/strava/oauth') && response.request().method() === 'DELETE',
-    );
-    await page.getByRole('button', { name: 'Use files', exact: true }).click();
-    await ending;
-    const [draft, ended] = await page.evaluate(() => [
-      sessionStorage.getItem('wornways-strava-draft'),
-      sessionStorage.getItem('wornways-strava-ended'),
-    ]);
-    expect(draft).toBeNull();
-    expect(ended).toMatch(/^[A-Za-z0-9+/]+={0,2}$/);
-    await expect
-      .poll(() =>
-        page.evaluate(
-          "caches.keys().then((names) => names.some((name) => name.startsWith('wornways-strava-')))",
-        ),
-      )
-      .toBe(false);
+    await expect(page.getByTestId('chosen-source')).toHaveText('Strava');
+    await page.getByRole('button', { name: 'Change source' }).click();
+    await pickSource(page, 'files');
+    // Choosing files keeps the Strava connection and its cached tracks for their two hours.
     await expect(page.getByTestId('result')).toHaveCount(0);
     await expect(page.getByTestId('activity-count')).toContainText('3 activities');
+    expect(
+      await page.evaluate(
+        "caches.keys().then((names) => names.some((name) => name.startsWith('wornways-strava-')))",
+      ),
+    ).toBe(true);
     await page.reload();
     await expect(page.getByTestId('chosen')).toContainText('Balaton loop');
     await expect(page.getByTestId('chosen')).not.toContainText('Strava test ride');
+
+    // Strava opens again without signing in, with the track it already had.
+    await page.getByRole('button', { name: 'Change source' }).click();
+    await expect(page.getByTestId('choose-strava')).toContainText('Connected until');
+    await expect(page.getByTestId('choose-strava')).toContainText('1 downloaded');
+    // Its screen shows what is kept here without asking Strava; Continue reads the list.
+    const listed = mock.periods.length;
+    await pickSource(page, 'strava');
+    await expect(page.getByTestId('strava-source')).toContainText('Connected to Strava until');
+    await expect(page.getByTestId('downloaded')).toContainText('Strava test ride');
+    expect(mock.periods.length).toBe(listed);
+    await page.getByRole('button', { name: 'Continue' }).click();
+    await expect(page.getByTestId('chosen')).toContainText('Strava test ride');
+    expect(mock.periods.length).toBeGreaterThan(listed);
+    expect(mock.exchanges()).toBe(1);
     expect(mock.tracks.filter((id) => id === rideId)).toHaveLength(1);
     expect(mock.periods.length).toBeGreaterThan(1);
     expect(mock.directApiRequests).toEqual([]);
-    expect(mock.disconnects).toEqual([false]);
+    expect(mock.disconnects).toEqual([]);
   });
 });
 
@@ -297,6 +310,96 @@ test('clears the browser session when the Strava activity endpoint rejects acces
   await expect(page.getByTestId('chosen')).toHaveCount(0);
   await expect(page.getByRole('link', { name: 'Connect with Strava' })).toBeVisible();
   await expect.poll(() => mock.disconnects).toEqual([false]);
+});
+
+test('shows the tracks downloaded while Strava is the source', async ({ page }) => {
+  const mock = await fakeStrava(page);
+  await page.goto('/');
+  await connect(page);
+  await page.getByRole('button', { name: 'Last year', exact: true }).click();
+  await page.getByRole('checkbox', { name: 'Strava test ride' }).check();
+  await page.getByRole('button', { name: 'Continue' }).click();
+  await expect(page.getByRole('heading', { name: 'How should your routes play?' })).toBeVisible();
+
+  await page.getByRole('button', { name: 'Source', exact: true }).click();
+  await expect(page.getByTestId('downloaded-count')).toHaveText(
+    '1 activity downloaded to this device',
+  );
+  await expect(page.getByTestId('downloaded')).toContainText('Strava test ride');
+  await page.getByRole('button', { name: 'Change source' }).click();
+  await expect(page.getByTestId('choose-strava')).toContainText('1 downloaded');
+
+  // A track cached before the list of kept tracks existed is listed once it is used again.
+  await page.evaluate(`caches.keys().then(async (names) => {
+    const cache = await caches.open(names.find((name) => name.startsWith('wornways-strava-')));
+    await cache.delete('/wornways-strava-cache/downloaded');
+  })`);
+  await page.reload();
+  await pickSource(page, 'strava');
+  await page.getByRole('button', { name: 'Continue' }).click();
+  await page.getByRole('button', { name: 'Last year', exact: true }).click();
+  await expect(page.getByRole('checkbox', { name: 'Strava test ride' })).toBeChecked();
+  await page.getByRole('button', { name: 'Continue' }).click();
+  await expect(page.getByRole('heading', { name: 'How should your routes play?' })).toBeVisible();
+  await page.getByRole('button', { name: 'Source', exact: true }).click();
+  await expect(page.getByTestId('downloaded')).toContainText('Strava test ride');
+  expect(mock.tracks.filter((id) => id === rideId)).toHaveLength(1);
+});
+
+test('keeps Ride with GPS connected and listed while Strava is the source', async ({ page }) => {
+  await fakeStrava(page);
+  // Ride with GPS, connected in this browser, with one trip.
+  await page.route('**/api/ridewithgps/session', (route) =>
+    route.fulfill({ json: { connected: true } }),
+  );
+  await page.route('**/api/ridewithgps/trips?*', (route) =>
+    route.fulfill({
+      json: {
+        trips: [
+          {
+            id: 7,
+            name: 'Ride with GPS loop',
+            departed_at: new Date().toISOString(),
+            activity_type: 'cycling:road',
+            distance: 1000,
+            first_lat: 47.5,
+            first_lng: 19.04,
+            last_lat: 47.5,
+            last_lng: 19.04,
+            stationary: false,
+            updated_at: 'v1',
+          },
+        ],
+        pages: 1,
+      },
+    }),
+  );
+  await page.goto('/');
+  await pickSource(page, 'rwgps');
+  await page.getByRole('button', { name: 'Continue' }).click();
+  await expect(page.getByTestId('source')).toContainText('Ride with GPS');
+
+  await page.getByRole('button', { name: 'Change source' }).click();
+  await connect(page);
+  await expect(page.getByTestId('source')).toContainText('Strava');
+
+  // Strava is the source; Ride with GPS is still connected and listed with the others.
+  await page.getByRole('button', { name: 'Change source' }).click();
+  await expect(page.getByTestId('choose-strava')).toContainText('Connected until');
+  await expect(page.getByTestId('choose-rwgps')).toContainText('Connected');
+
+  // Chosen again, Strava stays the source after a reload.
+  await pickSource(page, 'strava');
+  await page.getByRole('button', { name: 'Continue' }).click();
+  await expect(page.getByTestId('source')).toContainText('Strava');
+  await page.reload();
+  await expect(page.getByTestId('source')).toContainText('Strava');
+
+  await page.getByRole('button', { name: 'Change source' }).click();
+  await pickSource(page, 'rwgps');
+  await page.getByRole('button', { name: 'Continue' }).click();
+  await expect(page.getByTestId('source')).toContainText('Ride with GPS');
+  await expect(page.getByTestId('chosen')).toContainText('Ride with GPS loop');
 });
 
 test('clears the session when Strava revokes access', async ({ page }) => {
@@ -346,8 +449,6 @@ test('reuses the selected track after a reload and socket interruption', async (
   await page.getByRole('checkbox', { name: 'Strava test ride' }).check();
   await page.getByRole('button', { name: '← Back', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Disconnect Strava' })).toBeVisible();
-  // With Strava connected, the demo is not offered.
-  await expect(page.getByTestId('demo-source')).toHaveCount(0);
   await page.getByRole('button', { name: 'Continue' }).click();
   await expect(page.getByRole('checkbox', { name: 'Strava test ride' })).toBeChecked();
   await page.getByRole('button', { name: 'Continue' }).click();
@@ -409,7 +510,7 @@ test('validates cached activities on reload and removes deleted tracks', async (
 
 test('prunes expired Strava caches when Wornways starts', async ({ page }) => {
   await page.goto('/');
-  await expect(page.getByRole('button', { name: 'Choose files' })).toBeVisible();
+  await expect(page.getByTestId('sources')).toBeVisible();
   await page.evaluate(`caches.open('wornways-strava-1-expired').then(() => undefined)`);
   await page.reload();
   await expect
@@ -445,9 +546,12 @@ test('filters Strava rides by both start and finish using activity summaries', a
 test('offers the file workflow when Strava refuses a connection at capacity', async ({ page }) => {
   await fakeStrava(page, { capacityReached: true });
   await page.goto('/');
+  await pickSource(page, 'strava');
   await expect(page.getByText('If Strava says its connection limit was reached')).toBeVisible();
   await page.getByRole('link', { name: 'Connect with Strava' }).click();
   await expect(page.getByText('Limit of connected athletes exceeded')).toBeVisible();
   await page.goBack();
+  await page.getByRole('button', { name: 'Change source' }).click();
+  await pickSource(page, 'files');
   await expect(page.getByRole('button', { name: 'Choose files' })).toBeVisible();
 });
