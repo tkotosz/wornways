@@ -1,18 +1,18 @@
 # Render performance: findings and changes
 
-Where making a video spends its time, what was changed about it and why, what is still
-planned, and what was looked at and left alone.
+Where making a video spends its time, what was changed about it and why, and what was
+looked at and left alone.
 
 ## Summary
 
-| #   | Change                                                    | Gain                                                                | Changes the picture                         | Status  |
-| --- | --------------------------------------------------------- | ------------------------------------------------------------------- | ------------------------------------------- | ------- |
-| 1   | In the browser, leave the composed map levels to the GPU  | With change 6: three of four demo videos in 35–50% less time        | No (differences below what the eye sees)    | Built   |
-| 2   | Release a zoom level once the camera no longer shows it   | Up to 20% for videos of hundreds of activities; removes a 1 s stall | No, pixel for pixel                         | Built   |
-| 3   | For the preview picture, set up only what its frame shows | Preview drawn in about half the time                                | No, pixel for pixel                         | Built   |
-| 4   | Leave out route points a zoom level cannot show           | Setup 40% shorter and less drawing for hundreds of activities       | Yes: zoomed-out routes smoother and thinner | Planned |
-| 5   | Stop with a message when the GPU resets during a video    | No speed gain: before, the video then never finished                | No                                          | Built   |
-| 6   | Move the progress bar without a transition                | By itself 8–27% less time; counted in the figure of change 1        | No                                          | Built   |
+| #   | Change                                                    | Gain                                                                | Changes the picture                         | Status |
+| --- | --------------------------------------------------------- | ------------------------------------------------------------------- | ------------------------------------------- | ------ |
+| 1   | In the browser, leave the composed map levels to the GPU  | With change 6: three of four demo videos in 35–50% less time        | No (differences below what the eye sees)    | Built  |
+| 2   | Release a zoom level once the camera no longer shows it   | Up to 20% for videos of hundreds of activities; removes a 1 s stall | No, pixel for pixel                         | Built  |
+| 3   | For the preview picture, set up only what its frame shows | Preview drawn in about half the time                                | No, pixel for pixel                         | Built  |
+| 4   | Leave out route points a zoom level cannot show           | Setup 40% shorter for hundreds of activities; Highlight 20% faster  | Yes: zoomed-out routes smoother and thinner | Built  |
+| 5   | Stop with a message when the GPU resets during a video    | No speed gain: before, the video then never finished                | No                                          | Built  |
+| 6   | Move the progress bar without a transition                | By itself 8–27% less time; counted in the figure of change 1        | No                                          | Built  |
 
 After changes 1, 2 and 6 most videos are made at about 10 ms per frame on a desktop: a 30
 second video in about 10 seconds.
@@ -103,15 +103,15 @@ it as well; nothing here is done for the CLI alone.
 
 Time to make each demo video in the app, in Chrome with a GPU:
 
-| Video                        | Frames | Before | Changes 2 and 6 | Changes 1 and 2 | Changes 1, 2 and 6 |
-| ---------------------------- | ------ | ------ | --------------- | --------------- | ------------------ |
-| All at once, 25 activities   | 996    | 16.2 s | 11.9 s          | 14.4 s          | 10.2 s             |
-| Recap, 25 activities         | 996    | 17.4 s | 13.9 s          | 14.4 s          | 9.7 s              |
-| Multiday trip, 25 activities | 1446   | 30.2 s | 27.9 s          | 19.4 s          | 15.6 s             |
-| Highlight, one activity      | 546    | 7.3 s  | 7.3 s           | 7.3 s           | 7.1 s              |
+| Video                        | Frames | Before | Changes 2 and 6 | Changes 1 and 2 | Changes 1, 2 and 6 | All six |
+| ---------------------------- | ------ | ------ | --------------- | --------------- | ------------------ | ------- |
+| All at once, 25 activities   | 996    | 16.2 s | 11.9 s          | 14.4 s          | 10.2 s             | 10.0 s  |
+| Recap, 25 activities         | 996    | 17.4 s | 13.9 s          | 14.4 s          | 9.7 s              | 10.0 s  |
+| Multiday trip, 25 activities | 1446   | 30.2 s | 27.9 s          | 19.4 s          | 15.6 s             | 14.4 s  |
+| Highlight, one activity      | 546    | 7.3 s  | 7.3 s           | 7.3 s           | 7.1 s              | 5.6 s   |
 
-The Highlight video does not gain from these changes: most of its time goes into stroking
-its route, which keeps the many points its close zoom can show (see change 4).
+The Highlight video gains only from change 4: most of its time went into stroking its
+route, which keeps the many points its close zoom can show.
 
 Without a GPU (software rendering, as in the browser tests) the same videos take 7.8, 10.3,
 23.4 and 6.8 s.
@@ -180,30 +180,33 @@ Pixel for pixel the same picture. Time to draw the preview in Node:
 | A year, all at once         | 1.64 s | 0.73 s        | 0.78 s               |
 | Multiday trip, 8 days       | 0.29 s | 0.25 s        |                      |
 | 450 activities              | 2.55 s | 1.96 s        | 1.06 s               |
-| 770 activities, every sport | 2.92 s | 1.29 s        | 1.25 s               |
+| 770 activities, every sport | 2.92 s | 1.29 s        | 1.22 s               |
 
 In the browser every tile is one read from the cache, so loading fewer of them should
 count for more there than in Node.
 
-### 4. Leave out route points a zoom level cannot show (planned)
+### 4. Leave out route points a zoom level cannot show
 
 Routes are thinned once, for the closest zoom of the camera: a point closer than 0.35
 pixels to the one before it is left out. When the camera can zoom in 30 times, that keeps
-points 0.01 pixels apart at the widest level, and every level strokes all of them.
+points 0.01 pixels apart at the widest level, and every level stroked all of them.
 
-Thin per level instead: when a piece of route is stroked onto a level, leave out the
-points closer than 0.35 of that level's pixels to the last one kept; a piece always keeps
-its two ends, so pieces still meet. The heat scale probe thins the same way, as it draws
-at the widest level's scale. Not when route points are preserved for the trim radius.
+Routes are now thinned per level as well: when a piece of route is stroked onto a level,
+the points closer than 0.35 of that level's pixels to the last one drawn are left out; a
+piece always keeps its two ends, so pieces still meet. The heat scale probe thins the same
+way, as it draws at the widest level's scale. Not when route points are preserved for the
+trim radius.
 
-- 450 activities in turn: setup 3.9 to 2.3 s in Chrome (5.6 to 3.4 s in Node); drawing
-  7.1 to 4.9 ms per frame in Node.
-- Videos whose camera does not zoom in far are unchanged.
+- 450 activities in turn: setup 5.6 to 3.4 s and drawing 7.1 to 5.0 ms per frame in Node;
+  setup 3.9 to 2.3 s in Chrome.
+- The Highlight demo video is made in 5.6 s instead of 7.1 s: the follow camera strokes the
+  route onto its wider levels too, and draws it again whenever it opens a map window.
+- The closest level is drawn as before, and so is a video whose camera does not zoom in.
 
 **This changes the look.** On zoomed-out levels the routes come out smoother and a little
 thinner, and the heat scale moves slightly (32.5 to 32.0 passes for the 450 activities,
-5.16 to 5.09 for the month). In the last frame of the 450 activities, 1.2% of the pixels
-differ by more than 2 levels and 0.35% by more than 24.
+5.16 to 5.06 for the month). In the last frame of the 450 activities, 1.2% of the pixels
+differ by more than 2 levels and 0.34% by more than 24.
 
 The reason is in how a frame's piece of route is stroked: with flat ends, so that it meets
 the pieces before and after it without overlapping them, and with round joins. Points
@@ -211,6 +214,8 @@ much closer together than a pixel, with the noise of a GPS track between them, m
 round joins spill past both ends by up to half the line's width. A piece 3 pixels long
 that should cover 27 pixels covers 44 to 90. Where it spills, it overlaps its neighbors
 and counts twice. Thinning removes most of those joins, so a pass counts closer to once.
+It does so for noise smaller than the gap; a track that wanders by more than a third of
+a pixel is still drawn as it wanders.
 
 ### 5. Stop with a message when the GPU resets during a video
 
