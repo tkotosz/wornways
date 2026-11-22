@@ -21,7 +21,7 @@ import {
 } from './choice.ts';
 import ModalPanel from './components/ModalPanel.vue';
 import type { EngineClient } from './engine-client.ts';
-import { install, installOffer } from './install.ts';
+import { install, installOffer, showsAppleInstallHelp } from './install.ts';
 import type { MadeVideo } from './made-video.ts';
 import type { ActivitySummary, MatchReport, PlanReport, Source } from './messages.ts';
 import ActivitiesStep from './steps/ActivitiesStep.vue';
@@ -90,6 +90,8 @@ const {
 );
 
 const toast = ref('');
+/** iPhone and iPad install only from Safari's Share menu; the Install button explains how. */
+const appleInstallHelp = showsAppleInstallHelp();
 let toastTimer: ReturnType<typeof setTimeout> | undefined;
 
 async function disconnectStrava(): Promise<void> {
@@ -330,6 +332,21 @@ onMounted(() => {
         <button v-if="installOffer" type="button" class="secondary install" @click="install">
           Install app
         </button>
+        <ModalPanel v-else-if="appleInstallHelp" title="Install Wornways">
+          <template #trigger="{ open }">
+            <button type="button" class="secondary install" aria-haspopup="dialog" @click="open">
+              Install app
+            </button>
+          </template>
+          <ol class="install-steps">
+            <li>Tap <b>Share</b> (the square with an arrow) in the browser's toolbar.</li>
+            <li>
+              Choose <b>Add to Home Screen</b>. You may need to scroll down, or tap <b>More</b>, to
+              see it.
+            </li>
+            <li>Tap <b>Add</b>. Wornways then opens from your Home Screen like an app.</li>
+          </ol>
+        </ModalPanel>
       </span>
     </header>
     <nav v-if="!unsupported && loaded" class="steps-row" aria-label="Steps">
@@ -500,6 +517,14 @@ onMounted(() => {
 .install {
   padding: 0.35rem 0.8rem;
   font-size: 0.85rem;
+}
+
+.install-steps {
+  display: grid;
+  gap: 0.6rem;
+  margin: 0;
+  padding-left: 1.3rem;
+  line-height: 1.5;
 }
 
 /* Phones: one row. The first step says that files stay on the device. */
