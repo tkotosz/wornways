@@ -187,7 +187,6 @@ test('switches between Ride with GPS and files without disconnecting', async ({ 
   await expect.poll(() => fetched.length).toBe(5);
 
   await page.getByRole('button', { name: 'Change source' }).click();
-  await expect(page.getByTestId('choose-rwgps')).toHaveAttribute('aria-checked', 'true');
   await expect(page.getByTestId('choose-rwgps')).toContainText(/Connected · \d+ downloaded/);
   await pickSource(page, 'files');
   await expect(page.getByTestId('chosen-source')).toHaveText('Files');

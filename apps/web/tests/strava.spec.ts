@@ -365,6 +365,8 @@ test('shows the tracks downloaded while Strava is the source', async ({ page }) 
     await cache.delete('/wornways-strava-cache/downloaded');
   })`);
   await page.reload();
+  await pickSource(page, 'strava');
+  await page.getByRole('button', { name: 'Continue' }).click();
   await page.getByRole('button', { name: 'Last year', exact: true }).click();
   await expect(page.getByRole('checkbox', { name: 'Strava test ride' })).toBeChecked();
   await page.getByRole('button', { name: 'Continue' }).click();
@@ -413,10 +415,13 @@ test('keeps Ride with GPS connected and listed while Strava is the source', asyn
 
   // Strava is the source; Ride with GPS is still connected and listed with the others.
   await page.getByRole('button', { name: 'Change source' }).click();
-  await expect(page.getByTestId('choose-strava')).toHaveAttribute('aria-checked', 'true');
+  await expect(page.getByTestId('choose-strava')).toContainText('Connected until');
   await expect(page.getByTestId('choose-rwgps')).toContainText('Connected');
 
-  // A reload keeps Strava, not the source chosen before it.
+  // Chosen again, Strava stays the source after a reload.
+  await pickSource(page, 'strava');
+  await page.getByRole('button', { name: 'Continue' }).click();
+  await expect(page.getByTestId('source')).toContainText('Strava');
   await page.reload();
   await expect(page.getByTestId('source')).toContainText('Strava');
 

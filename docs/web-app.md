@@ -49,25 +49,27 @@ phone.
 
 1. **Source.** Where the activities come from: files on this device, Strava, Ride with
    GPS (the last two where the site offers them) or the demo. One source is chosen at a
-   time, and activities of different sources are never mixed. Until one is chosen, and
-   after "Change source", the step lists them as cards like the playback presets, in the
-   order Demo, Files, Ride with GPS, Strava, each with an icon and where it stands ("3
-   activities on this device", "Connected · 12 downloaded", "Not connected") and the
-   current one marked. Ride with GPS's card shows its official icon; Strava's brand rules
-   allow only its connect button and badges, so its card has a drawing. Picking one shows
-   what it needs, under a "Current source" heading with the source's name, with "← Change
-   source" at the bottom left: for files, a drop zone and file and folder pickers, a
-   report of what the last import added and what could not be read (closable), and the
-   library as a grid with a header row (date, name, sport, distance) and a delete button
-   per row ("Delete saved activities" removes them all, after a confirmation); for Strava
-   and Ride with GPS, connecting, or the connection with a Disconnect button and the
-   activities whose tracks are downloaded to this device, in the same grid, each
-   deletable ("Delete downloaded tracks" removes them all; a deleted track is downloaded
-   again when a video needs it) (a connection stays when another source is chosen:
-   Strava's for its two hours, Ride with GPS's until it is disconnected); for the demo,
-   what it holds and its activities in the grid, without delete buttons; picking the demo
-   loads them. The choice is remembered for the next visit; a person whose chosen source
-   is ready (files on the device, a service connected) starts at step 2.
+   time, and activities of different sources are never mixed. Until one is chosen the
+   step lists them as cards like the playback presets, in the order Demo, Files, Ride
+   with GPS, Strava, each with an icon and where it stands ("25 made-up activities", "3
+   activities on this device", "Connected · 12 downloaded", "Not connected"). Until a
+   source is picked, Continue and the later steps are disabled. Ride with GPS's card
+   shows its official icon; Strava's brand rules allow only its connect button and
+   badges, so its card has a drawing. Picking one shows what it needs, under a "Current
+   source" heading with the source's name, with "← Change source" at the bottom left,
+   which clears the choice and lists the sources again (connections stay): for files, a
+   drop zone and file and folder pickers, a report of what the last import added and what
+   could not be read (closable), and the library as a grid with a header row (date, name,
+   sport, distance) and a delete button per row ("Delete saved activities" removes them
+   all, after a confirmation); for Strava and Ride with GPS, connecting, or the
+   connection with a Disconnect button and the activities whose tracks are downloaded to
+   this device, in the same grid, each deletable ("Delete downloaded tracks" removes them
+   all; a deleted track is downloaded again when a video needs it) (a connection stays
+   when another source is chosen: Strava's for its two hours, Ride with GPS's until it is
+   disconnected); for the demo, what it holds and its activities in the grid, without
+   delete buttons; picking the demo loads them. The choice is remembered for the next
+   visit (without one, the list shows); a person whose chosen source is ready (files on
+   the device, a service connected) starts at step 2.
 2. **Activities.** The filters (the "Which activities" settings): period with shortcuts
    and a calendar for custom days, sports (offered only when the period has them, with
    "All"), and two place filters, "Starts near a place" and "Ends near a place". Each

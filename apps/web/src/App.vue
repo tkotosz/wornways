@@ -126,6 +126,7 @@ onBeforeUnmount(() => clearTimeout(toastTimer));
 const CHOSEN = 'wornways-source';
 const SOURCES: Source[] = ['files', 'strava', 'rwgps', 'demo'];
 
+/** The source chosen on the last visit; null when none is remembered. */
 function rememberedSource(): Source | null {
   try {
     const saved = localStorage.getItem(CHOSEN);
@@ -145,8 +146,6 @@ watch(chosen, (id) => {
     // Remembering is optional when browser storage is blocked.
   }
 });
-/** Whether the Source step lists the sources to pick from, after "Change source". */
-const picking = ref(false);
 
 /** Whether the chosen source has activities to go on with. */
 const usable = computed(() => {
@@ -317,7 +316,6 @@ function reachable(id: Step): boolean {
 
 async function navigate(id: Step): Promise<void> {
   if (!reachable(id)) return;
-  if (id === 'import') picking.value = false;
   if (remote.value && step.value === 'activities' && id !== 'activities' && id !== 'import') {
     const ids = chosenIds.value.join(',');
     const prepare = strava.value ? prepareStrava : rwgps.prepare;
@@ -359,7 +357,6 @@ async function release(keep: Source | null): Promise<void> {
  * which ship with the app, to show them.
  */
 async function choose(id: Source): Promise<void> {
-  picking.value = false;
   chosen.value = id;
   await release(id);
   if (id === 'demo' && !demo.active.value) await demo.open();
@@ -387,10 +384,14 @@ async function openRideWithGps(): Promise<void> {
   if (!(await opening)) step.value = 'import';
 }
 
-/** "Change source": back to the Source step, listing the sources. */
-function changeSource(): void {
-  picking.value = true;
+/**
+ * "Change source": no source is chosen any more, so the Source step lists them all and the
+ * later steps wait for a new choice. Connections stay as they are.
+ */
+async function changeSource(): Promise<void> {
+  chosen.value = null;
   step.value = 'import';
+  await release(null);
 }
 
 /** Continue on the Source step: opens the chosen source; its list loads on the next step. */
@@ -411,11 +412,9 @@ async function loadLibrary(): Promise<void> {
     library.value = await props.engine.readLibrary();
     loaded.value = true;
     const [rwgpsJustConnected, stravaKept] = await Promise.all([rwgps.check(), stravaStatus()]);
-    // Coming back from connecting a service chooses it. Visits from before sources were
-    // chosen had files.
+    // Coming back from connecting a service chooses it.
     if (rwgpsJustConnected) chosen.value = 'rwgps';
     else if (stravaReturning) chosen.value = 'strava';
-    else if (chosen.value === null && library.value.length > 0) chosen.value = 'files';
     // Only the chosen source opens, and its list loads on the Activities step; the other
     // connections stay as they are.
     if (chosen.value === 'strava') await connectStrava(fileAdjustments.value);
@@ -523,7 +522,6 @@ onMounted(() => {
         :engine="engine"
         :library="library"
         :chosen="chosen"
-        :picking="picking"
         :ready="startable"
         :strava-url="stravaUrl"
         :strava-active="strava"
@@ -542,7 +540,7 @@ onMounted(() => {
         :demo-rows="demo.rows.value"
         @changed="library = $event"
         @choose="choose"
-        @change-source="picking = true"
+        @change-source="changeSource()"
         @disconnect="disconnectStrava"
         @disconnect-ride-with-gps="disconnectRideWithGps()"
         @next="continueFromSource()"

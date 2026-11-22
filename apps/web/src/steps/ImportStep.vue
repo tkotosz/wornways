@@ -21,8 +21,6 @@ const props = defineProps<{
   library: ActivitySummary[];
   /** The source chosen; null until the person picks one. */
   chosen: Source | null;
-  /** Whether to list the sources to pick from rather than show the chosen one. */
-  picking: boolean;
   /** Whether the chosen source is ready to go on with. */
   ready: boolean;
   stravaUrl: URL | null;
@@ -70,7 +68,13 @@ async function readCounts(): Promise<void> {
 }
 
 /** Whether the list of sources shows. */
-const listing = computed(() => props.picking || props.chosen === null);
+const listing = computed(() => props.chosen === null);
+
+/**
+ * How many activities the demo holds (public/demo/mallorca.zip). It loads only when picked,
+ * so its card says it from here; a browser test checks the two agree.
+ */
+const DEMO_ACTIVITIES = 25;
 
 /** The sources this site offers, in this order, each with where it stands. */
 const choices = computed(() => {
@@ -78,7 +82,7 @@ const choices = computed(() => {
     {
       id: 'demo',
       about: 'Made-up rides and runs in Mallorca, to try Wornways first. Nothing is saved.',
-      status: '',
+      status: countText(DEMO_ACTIVITIES, 'made-up activity', 'made-up activities'),
     },
     {
       id: 'files',
@@ -196,14 +200,12 @@ async function remove(ids: string[] | 'all'): Promise<void> {
         map, one after another or all at once, ready to share. Wornways makes your video on this
         device. Pick where your activities come from.
       </p>
-      <div class="choices" role="radiogroup" aria-label="Activity source" data-testid="sources">
+      <div class="choices" data-testid="sources">
         <button
           v-for="c in choices"
           :key="c.id"
           type="button"
-          role="radio"
           class="choice"
-          :aria-checked="c.id === chosen"
           :data-testid="`choose-${c.id}`"
           @click="emit('choose', c.id)"
         >
@@ -213,7 +215,6 @@ async function remove(ids: string[] | 'all'): Promise<void> {
             <span class="muted">{{ c.about }}</span>
             <span v-if="c.status" class="status">{{ c.status }}</span>
           </span>
-          <span v-if="c.id === chosen" class="check" aria-hidden="true">✓</span>
         </button>
       </div>
     </template>
@@ -341,10 +342,6 @@ async function remove(ids: string[] | 'all'): Promise<void> {
       <button v-if="!listing" type="button" class="secondary" @click="emit('changeSource')">
         ← Change source
       </button>
-      <!-- Listing after "Change source": back to the source still chosen. -->
-      <button v-else-if="chosen" type="button" class="secondary" @click="emit('choose', chosen)">
-        ← Back
-      </button>
       <span v-else />
       <button type="button" class="primary" :disabled="!ready" @click="emit('next')">
         Continue →
@@ -368,10 +365,8 @@ async function remove(ids: string[] | 'all'): Promise<void> {
   margin: 1rem 0 1.5rem;
 }
 
-/* A card like a playback preset: the icon above, the name and its lines under it, a check
-   on the current one. */
+/* A card like a playback preset: the icon above, the name and its lines under it. */
 .choice {
-  position: relative;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
@@ -394,12 +389,6 @@ async function remove(ids: string[] | 'all'): Promise<void> {
   outline-offset: 2px;
 }
 
-.choice[aria-checked='true'] {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 1px var(--accent);
-  background: linear-gradient(160deg, rgba(255, 138, 42, 0.1), var(--panel));
-}
-
 .icon {
   flex: none;
   height: 2.6rem;
@@ -409,7 +398,6 @@ async function remove(ids: string[] | 'all'): Promise<void> {
   display: flex;
   flex-direction: column;
   gap: 0.3rem;
-  padding-right: 1.4rem;
 }
 
 .text .muted {
@@ -419,21 +407,6 @@ async function remove(ids: string[] | 'all'): Promise<void> {
 .status {
   font-size: 0.82rem;
   font-weight: 600;
-}
-
-.check {
-  position: absolute;
-  top: 0.9rem;
-  right: 0.9rem;
-  display: grid;
-  place-items: center;
-  width: 1.4rem;
-  height: 1.4rem;
-  border-radius: 50%;
-  color: #1a110b;
-  background: var(--accent);
-  font-size: 0.8rem;
-  font-weight: 800;
 }
 
 .chosen {
