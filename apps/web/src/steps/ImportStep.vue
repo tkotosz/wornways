@@ -8,6 +8,7 @@ import { computed, ref } from 'vue';
 import ActivityGrid from '../components/ActivityGrid.vue';
 import AddFiles from '../components/AddFiles.vue';
 import GettingFiles from '../components/GettingFiles.vue';
+import SourceIcon from '../components/SourceIcon.vue';
 import type { EngineClient } from '../engine-client.ts';
 import { countText, timeText } from '../format.ts';
 import type { ActivitySummary, Source } from '../messages.ts';
@@ -56,9 +57,14 @@ const stravaConnected = computed(() => !!props.stravaUntil && props.stravaUntil 
 /** Whether the list of sources shows. */
 const listing = computed(() => props.picking || props.chosen === null);
 
-/** The sources this site offers, each with where it stands. */
+/** The sources this site offers, in this order, each with where it stands. */
 const choices = computed(() => {
   const list: { id: Source; about: string; status: string }[] = [
+    {
+      id: 'demo',
+      about: 'Made-up rides and runs in Mallorca, to try Wornways first. Nothing is saved.',
+      status: '',
+    },
     {
       id: 'files',
       about: 'FIT, GPX or TCX files, a folder, or an export ZIP, saved on this device.',
@@ -67,6 +73,12 @@ const choices = computed(() => {
         : 'Nothing added yet',
     },
   ];
+  if (props.rwgps.available)
+    list.push({
+      id: 'rwgps',
+      about: 'Your Ride with GPS trips.',
+      status: props.rwgps.connected ? 'Connected' : 'Not connected',
+    });
   if (props.stravaUrl || props.stravaActive)
     list.push({
       id: 'strava',
@@ -75,17 +87,6 @@ const choices = computed(() => {
         ? `Connected until ${timeText(props.stravaUntil!)}`
         : 'Not connected',
     });
-  if (props.rwgps.available)
-    list.push({
-      id: 'rwgps',
-      about: 'Your Ride with GPS trips.',
-      status: props.rwgps.connected ? 'Connected' : 'Not connected',
-    });
-  list.push({
-    id: 'demo',
-    about: 'Made-up rides and runs in Mallorca, to try Wornways first. Nothing is saved.',
-    status: '',
-  });
   return list;
 });
 
@@ -115,40 +116,44 @@ async function remove(ids: string[] | 'all'): Promise<void> {
 
 <template>
   <section>
-    <h1>Choose an activity source</h1>
-
     <template v-if="listing">
+      <h1>Choose an activity source</h1>
       <!-- What the app is for, until a source is chosen. -->
       <p v-if="chosen === null" class="intro" data-testid="intro">
         Wornways turns your GPS activities into a short video: your routes build up over a street
         map, one after another or all at once, ready to share. Wornways makes your video on this
         device. Pick where your activities come from.
       </p>
-      <div class="choices" data-testid="sources">
+      <div class="choices" role="radiogroup" aria-label="Activity source" data-testid="sources">
         <button
           v-for="c in choices"
           :key="c.id"
           type="button"
+          role="radio"
           class="choice"
-          :class="{ current: c.id === chosen }"
+          :aria-checked="c.id === chosen"
           :data-testid="`choose-${c.id}`"
           @click="emit('choose', c.id)"
         >
-          <span class="choice-name">
-            {{ NAMES[c.id] }}
-            <span v-if="c.id === chosen" class="tag">Current</span>
+          <SourceIcon class="icon" :source="c.id" />
+          <span class="text">
+            <strong>{{ NAMES[c.id] }}</strong>
+            <span class="muted">{{ c.about }}</span>
+            <span v-if="c.status" class="status">{{ c.status }}</span>
           </span>
-          <span class="muted">{{ c.about }}</span>
-          <span v-if="c.status" class="status">{{ c.status }}</span>
+          <span v-if="c.id === chosen" class="check" aria-hidden="true">✓</span>
         </button>
       </div>
     </template>
 
     <template v-else-if="chosen">
-      <p class="muted chosen" data-testid="chosen-source">
-        Current source: {{ NAMES[chosen] }}
-        <button type="button" class="link" @click="emit('changeSource')">Change source</button>
-      </p>
+      <header class="chosen">
+        <SourceIcon class="icon" :source="chosen" />
+        <div>
+          <p class="kicker">Current source</p>
+          <h1 data-testid="chosen-source">{{ NAMES[chosen] }}</h1>
+        </div>
+      </header>
 
       <div v-if="chosen === 'files'" class="screen" data-testid="files-source">
         <p class="muted">
@@ -253,7 +258,14 @@ async function remove(ids: string[] | 'all'): Promise<void> {
     </template>
 
     <div class="footer">
-      <span />
+      <button v-if="!listing" type="button" class="secondary" @click="emit('changeSource')">
+        ← Change source
+      </button>
+      <!-- Listing after "Change source": back to the source still chosen. -->
+      <button v-else-if="chosen" type="button" class="secondary" @click="emit('choose', chosen)">
+        ← Back
+      </button>
+      <span v-else />
       <button type="button" class="primary" :disabled="!ready" @click="emit('next')">
         Continue →
       </button>
@@ -270,22 +282,27 @@ async function remove(ids: string[] | 'all'): Promise<void> {
 
 .choices {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr));
-  gap: 0.75rem;
+  /* Two by two: up to four sources, so none is left alone on a row of three. */
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.8rem;
   margin: 1rem 0 1.5rem;
 }
 
+/* A card like a playback preset: the icon above, the name and its lines under it, a check
+   on the current one. */
 .choice {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 0.35rem;
-  padding: 1rem;
+  gap: 0.8rem;
+  padding: 1.1rem;
   border: 1px solid var(--line);
-  border-radius: 12px;
+  border-radius: 14px;
   color: var(--text);
-  background: transparent;
+  background: var(--panel);
   text-align: left;
+  font: inherit;
 }
 
 .choice:hover {
@@ -297,37 +314,81 @@ async function remove(ids: string[] | 'all'): Promise<void> {
   outline-offset: 2px;
 }
 
-.choice.current {
+.choice[aria-checked='true'] {
   border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+  background: linear-gradient(160deg, rgba(255, 138, 42, 0.1), var(--panel));
 }
 
-.choice-name {
+.icon {
+  flex: none;
+  width: 4.2rem;
+}
+
+.text {
   display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-weight: 600;
+  flex-direction: column;
+  gap: 0.3rem;
+  padding-right: 1.4rem;
+}
+
+.text .muted {
+  font-size: 0.82rem;
 }
 
 .status {
-  margin-top: auto;
-  padding-top: 0.4rem;
-  font-size: 0.85rem;
+  font-size: 0.82rem;
+  font-weight: 600;
 }
 
-.tag {
-  padding: 0.1rem 0.5rem;
-  border-radius: 999px;
-  color: #160a02;
+.check {
+  position: absolute;
+  top: 0.9rem;
+  right: 0.9rem;
+  display: grid;
+  place-items: center;
+  width: 1.4rem;
+  height: 1.4rem;
+  border-radius: 50%;
+  color: #1a110b;
   background: var(--accent);
-  font-size: 0.75rem;
-  font-weight: 600;
+  font-size: 0.8rem;
+  font-weight: 800;
 }
 
 .chosen {
   display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 0.6rem;
+  align-items: center;
+  gap: 1rem;
+}
+
+.chosen h1 {
+  margin: 0;
+}
+
+.kicker {
+  margin: 0 0 0.2rem;
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+/* Phones: the cards as rows, the icon beside the text. */
+@media (max-width: 600px) {
+  .choices {
+    grid-template-columns: 1fr;
+  }
+
+  .choice {
+    flex-direction: row;
+    align-items: center;
+  }
+
+  .choice .icon {
+    width: 3.4rem;
+  }
 }
 
 .screen {

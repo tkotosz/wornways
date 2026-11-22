@@ -111,7 +111,7 @@ test('uses Ride with GPS trips as the source, fetching tracks only when needed',
   await page.getByRole('button', { name: 'Source' }).click();
   await page.getByRole('button', { name: 'Disconnect Ride with GPS' }).click();
   await expect(page.getByRole('link', { name: 'Connect Ride with GPS' })).toBeVisible();
-  await expect(page.getByTestId('chosen-source')).toContainText('Current source: Ride with GPS');
+  await expect(page.getByTestId('chosen-source')).toHaveText('Ride with GPS');
   await expect(page.getByText('Ride with GPS disconnected')).toBeVisible();
   expect(disconnects).toEqual([1]);
   // A string, as the tests are type-checked without the browser's types.
@@ -126,13 +126,13 @@ test('switches between Ride with GPS and files without disconnecting', async ({ 
   await expect(page.getByTestId('source')).toContainText('Ride with GPS');
 
   await page.getByRole('button', { name: 'Change source' }).click();
-  await expect(page.getByTestId('choose-rwgps')).toContainText('Current');
+  await expect(page.getByTestId('choose-rwgps')).toHaveAttribute('aria-checked', 'true');
   await pickSource(page, 'files');
-  await expect(page.getByTestId('chosen-source')).toContainText('Current source: Files');
+  await expect(page.getByTestId('chosen-source')).toHaveText('Files');
 
   // Files were chosen last, so a reload stays with them; Ride with GPS is still connected.
   await page.reload();
-  await expect(page.getByTestId('chosen-source')).toContainText('Current source: Files');
+  await expect(page.getByTestId('chosen-source')).toHaveText('Files');
   await page.getByRole('button', { name: 'Change source' }).click();
   await expect(page.getByTestId('choose-rwgps')).toContainText('Connected');
   await pickSource(page, 'rwgps');
@@ -154,7 +154,8 @@ test('goes back to the Source step when Ride with GPS no longer accepts the conn
   await expect(page.getByRole('alert')).toHaveText(
     'The Ride with GPS connection ended. Connect again.',
   );
-  await expect(page.getByRole('heading', { name: 'Choose an activity source' })).toBeVisible();
+  // Back on the Ride with GPS screen, ready to connect again.
+  await expect(page.getByRole('link', { name: 'Connect Ride with GPS' })).toBeVisible();
 });
 
 test('says so when the sign-in was canceled', async ({ page }) => {
