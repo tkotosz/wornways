@@ -361,7 +361,10 @@ export function createRenderer(
     const ox = view.offX - lv.offX / k;
     const oy = view.offY - lv.offY / k;
     const composed = createCanvas(lv.width, lv.height);
-    const composedCtx = composed.getContext('2d', readback) as Context2DLike;
+    // No readback hint: this canvas is read once, for the map's pixels, and only written
+    // and shown after that. With the hint a browser keeps it in memory, and uploads it
+    // whole to the GPU every time it changed and is drawn onto the frame.
+    const composedCtx = composed.getContext('2d') as Context2DLike;
     composedCtx.fillStyle = background;
     composedCtx.fillRect(0, 0, lv.width, lv.height);
 

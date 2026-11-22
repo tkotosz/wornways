@@ -45,3 +45,6 @@ runs on the user's device: in a browser Web Worker for the web app, in Node for 
   several front ends.
 - Workspace packages resolve from source in development (a `source` export condition):
   no watch build needed.
+- In the browser, only the canvases whose pixels are read back on every frame ask to be
+  kept in memory; the others are left on the GPU, so drawing one onto another needs no
+  upload. See [render-performance.md](render-performance.md).
