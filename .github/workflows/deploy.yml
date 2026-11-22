@@ -54,7 +54,7 @@ jobs:
       - run: npm ci
       - run: npm run build -w @wornways/web
         env:
-          # The header shows the release tag; a branch run by hand shows branch@commit.
+          # The header shows the release tag; a branch run by hand shows branch · commit.
           WORNWAYS_RELEASE: ${{ github.ref_type == 'tag' && github.ref_name || '' }}
       - uses: cloudflare/wrangler-action@953926a2e2182532811c01a25e53647d93bf07c0 # v4.1.3
         with:
@@ -91,7 +91,7 @@ jobs:
       - run: npm ci
       - run: npm run build -w @wornways/web
         env:
-          # The checkout is a bare commit; the header shows main@commit.
+          # The checkout is a bare commit; the header shows main · commit.
           WORNWAYS_BRANCH: main
       - uses: cloudflare/wrangler-action@953926a2e2182532811c01a25e53647d93bf07c0 # v4.1.3
         with:
