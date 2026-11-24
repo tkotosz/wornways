@@ -537,6 +537,39 @@ describe('the elevation profile', () => {
     expect(orangeAtTheBottom(hill(true), false)).toBe(0);
   });
 
+  /** Orange pixels in the profile's band of the last frame, for a video made by `prepareReplay`. */
+  async function profileOrange(tracks: Track[], input: Record<string, string | boolean>) {
+    const settings = parseSettings({ map: false, size: `${width}x${height}`, ...input });
+    const { renderer } = await prepareReplay(tracks, settings, {
+      createCanvas: (w, h) => createCanvas(w, h) as unknown as CanvasLike,
+      loadTiles: () => Promise.reject(new Error('The map is off')),
+    });
+    const last = renderer.replayFrames - 1;
+    renderer.skipTo(last);
+    renderer.renderFrame(last);
+    const { data } = (renderer.canvas.getContext('2d') as Context2DLike).getImageData(
+      0,
+      height * 0.88,
+      width,
+      height * 0.08,
+    );
+    let count = 0;
+    for (let i = 0; i < data.length; i += 4)
+      if (data[i]! > 60 && data[i]! > data[i + 2]! + 30) count++;
+    return count;
+  }
+  /** The hill a day later, so two activities make a trip. */
+  const nextDay = (): Track => ({ ...hill(true), id: 'next', startTime: Date.UTC(2026, 4, 3) });
+
+  it('is on by default for one activity, off for several unless switched on', async () => {
+    const quiet = { metrics: false, title: '', watermark: false };
+    expect(await profileOrange([hill(true)], quiet)).toBeGreaterThan(200);
+    expect(await profileOrange([hill(true)], { ...quiet, 'elevation-profile': false })).toBe(0);
+    const trip = [hill(true), nextDay()];
+    expect(await profileOrange(trip, quiet)).toBe(0);
+    expect(await profileOrange(trip, { ...quiet, 'elevation-profile': true })).toBeGreaterThan(200);
+  });
+
   it('is left out for an activity without elevation', () => {
     expect(orangeAtTheBottom(hill(false), true)).toBe(0);
   });

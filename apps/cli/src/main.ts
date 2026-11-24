@@ -90,8 +90,9 @@ function helpEntry(flag: string, description: string): string {
 
 function settingHelp(setting: SettingDefinition): string {
   const value = valueName(setting);
-  // A switch that is on by default is turned off with --no-<name>.
-  const name = setting.default === true ? `[no-]${setting.name}` : setting.name;
+  // A switch that is not off by default (on, or left to the video) is turned off with --no-<name>.
+  const offable = setting.kind.type === 'switch' && setting.default !== false;
+  const name = offable ? `[no-]${setting.name}` : setting.name;
   return helpEntry(
     `--${name}${value ? ` ${value}` : ''}`,
     `${setting.help} [${defaultText(setting)}]`,

@@ -57,3 +57,34 @@ test('leaves the elevation profile out where there is no elevation', async ({ pa
   await expect(page.getByTestId('group-metrics')).toBeVisible();
   await expect(page.getByTestId('group-elevation')).toHaveCount(0);
 });
+
+test('offers the elevation profile for several activities, off until switched on', async ({
+  page,
+  context,
+}) => {
+  page.setDefaultTimeout(15_000);
+  await offlineMap(context);
+  await page.goto('/');
+  await pickSource(page, 'files');
+  const fixture = (name: string) =>
+    new URL(`../../../packages/engine/tests/import/fixtures/${name}`, import.meta.url).pathname;
+  await page
+    .getByTestId('file-input')
+    .setInputFiles([fixture('morning-ride.gpx'), fixture('trail-run.tcx')]);
+  await expect(page.getByTestId('activity-count')).toHaveText('2 activities on this device');
+  await page.getByRole('button', { name: 'Continue' }).click(); // to Activities
+  await page.getByRole('button', { name: 'Continue' }).click(); // to Playback
+  await page.getByRole('button', { name: 'Continue' }).click(); // to Appearance
+
+  const profile = page
+    .getByTestId('group-elevation')
+    .getByRole('switch', { name: 'Elevation profile' });
+  await expect(profile).not.toBeChecked();
+  const picture = page.getByTestId('preview').getByRole('img');
+  await expect(picture).toBeVisible();
+  await expect(page.getByText('Drawing preview')).toHaveCount(0);
+  const before = await picture.getAttribute('src');
+  await profile.click();
+  await expect(profile).toBeChecked();
+  await expect(picture).not.toHaveAttribute('src', before!);
+});

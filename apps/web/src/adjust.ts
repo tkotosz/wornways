@@ -88,12 +88,21 @@ const presetStarting = (preset: PresetChoice): Adjustments =>
     Object.entries(presetValues(preset)).filter(([name]) => !PLAYBACK_SETTINGS.includes(name)),
   );
 
-/** Where a setting of the Appearance step starts under the current preset; undefined: its default. */
-export const startingValue = (
+/**
+ * Where a setting of the Appearance step starts until it is set: the current preset's value,
+ * or the elevation profile's, which the engine leaves to the video (on for one activity,
+ * off for several); undefined: its default.
+ */
+export function startingValue(
   adjustments: Adjustments,
   count: ActivityCount,
   name: string,
-): string | boolean | undefined => presetStarting(presetOf(adjustments, count))[name];
+): string | boolean | undefined {
+  const fromPreset = presetStarting(presetOf(adjustments, count))[name];
+  if (fromPreset !== undefined) return fromPreset;
+  if (name === 'elevation-profile') return count === 'one';
+  return undefined;
+}
 
 /** The settings shown under Fine-tune, with the current preset's values applied. */
 export const playbackAdjustments = (
@@ -241,7 +250,8 @@ const HINTS: Record<string, string> = {
   'trim-radius': 'Hide the route within this radius of each activity’s start and finish.',
   'metrics-fields': 'In the order picked; the first is shown large.',
   'elevation-profile':
-    'The climb profile along the bottom of the video, with a dot that follows the activity.',
+    'The climb profile along the bottom of the video, with a dot that follows the activity. ' +
+    'For several activities, they are laid end to end; off unless switched on.',
   'totals-card':
     'After the replay, a few seconds of totals: activities, kilometers, hours moving and ' +
     'meters climbed. On for Recap.',
@@ -286,12 +296,12 @@ const PANELS: Record<Panel, string[]> = {
 };
 
 /**
- * Whether a panel has something to set for this video: the elevation profile only for a
- * single activity with recorded elevation, the totals card only for several activities.
- * Until the plan is known, the totals card shows; the elevation profile waits for it.
+ * Whether a panel has something to set for this video: the elevation profile only when an
+ * activity recorded elevation, the totals card only for several activities. Until the plan
+ * is known, the totals card shows; the elevation profile waits for it.
  */
 export function panelOffered(panel: Panel, plan: PlanReport | null | undefined): boolean {
-  if (panel === 'elevation') return !!plan && plan.activities === 1 && plan.hasElevation;
+  if (panel === 'elevation') return !!plan && plan.hasElevation;
   if (panel === 'totals') return !plan || plan.activities > 1;
   return true;
 }
@@ -327,7 +337,7 @@ export function valueOf(
   return (
     presetPlayback(preset)[setting.name] ??
     adjustments[adjustmentKey(setting.name, count)] ??
-    presetStarting(preset)[setting.name] ??
+    startingValue(adjustments, count, setting.name) ??
     setting.default
   );
 }
