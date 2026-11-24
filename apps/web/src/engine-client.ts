@@ -241,10 +241,11 @@ export class EngineClient {
   makeVideo(
     settings: SettingsInput,
     onProgress: (progress: Progress) => void,
+    { draft = false } = {},
   ): { result: Promise<{ video: Blob; report: VideoReport }>; cancel: () => void } {
     const id = this.nextId++;
     const result = this.send(
-      { type: 'make-video', id, settings, source: this.source },
+      { type: 'make-video', id, settings, source: this.source, draft },
       onProgress,
     ).then((reply) => {
       if (reply.type === 'video-made')

@@ -1,10 +1,28 @@
+<script lang="ts">
+import { ref as moduleRef } from 'vue';
+
+/**
+ * The last draft made, for the settings it was made with. It outlives the component, so
+ * going from one step to the other keeps it while the settings stay the same.
+ */
+const draft = moduleRef<{ key: string; url: string } | null>(null);
+
+function dropDraft(): void {
+  if (draft.value) URL.revokeObjectURL(draft.value.url);
+  draft.value = null;
+}
+</script>
+
 <script setup lang="ts">
 // The live preview of the video: its finished last frame, small, redrawn shortly after the
-// settings change, with the frame's shape, size and length. It stays in view beside the
-// settings on wide screens and sits above them on phones.
+// settings change, with the frame's shape, size and length. Play makes a draft of the whole
+// video, small and at a low frame rate, and plays it in place of the picture, with a bar to
+// move to any moment. It stays in view beside the settings on wide screens and sits above
+// them on phones.
 import { parseSettings, type SettingsInput } from '@wornways/engine';
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { Canceled, type EngineClient } from '../engine-client.ts';
+import type { Progress } from '../messages.ts';
 
 const props = defineProps<{ engine: EngineClient; settings: SettingsInput; seconds?: number }>();
 
@@ -16,6 +34,55 @@ const busy = ref(false);
 const error = ref('');
 let cancel: (() => void) | null = null;
 let timer: ReturnType<typeof setTimeout> | undefined;
+
+const key = computed(() => JSON.stringify(props.settings));
+/** The draft of these settings, when one is made. */
+const draftUrl = computed(() => (draft.value?.key === key.value ? draft.value.url : ''));
+/** The draft being made: how far it is, and how to stop it. */
+const drafting = ref<{ progress: Progress; cancel: () => void } | null>(null);
+const draftError = ref('');
+
+const draftStatus = computed(() => {
+  const progress = drafting.value?.progress;
+  if (!progress || progress.stage === 'choosing') return 'Starting the preview…';
+  if (progress.stage === 'map') return 'Loading the map…';
+  if (progress.stage === 'finishing') return 'Finishing the preview…';
+  return 'Making the preview…';
+});
+/** How much of the draft is drawn, from 0 to 1. */
+const draftShare = computed(() => {
+  const { done, total } = drafting.value?.progress ?? {};
+  return done && total ? done / total : 0;
+});
+
+function stopDraft(): void {
+  drafting.value?.cancel();
+  drafting.value = null;
+}
+
+async function play(): Promise<void> {
+  stopDraft();
+  draftError.value = '';
+  const settingsKey = key.value;
+  const task = props.engine.makeVideo(
+    props.settings,
+    (progress) => {
+      if (drafting.value?.cancel === task.cancel) drafting.value.progress = progress;
+    },
+    { draft: true },
+  );
+  drafting.value = { progress: { stage: 'choosing' }, cancel: task.cancel };
+  try {
+    const { video } = await task.result;
+    if (drafting.value?.cancel !== task.cancel) return;
+    dropDraft();
+    draft.value = { key: settingsKey, url: URL.createObjectURL(video) };
+  } catch (caught) {
+    if (drafting.value?.cancel !== task.cancel || caught instanceof Canceled) return;
+    draftError.value = caught instanceof Error ? caught.message : String(caught);
+  }
+  drafting.value = null;
+}
 
 /** The video's frame and length, for the box's shape and the lines around the picture. */
 const frame = computed(() => {
@@ -70,6 +137,10 @@ watch(
       URL.revokeObjectURL(url.value);
       url.value = '';
     }
+    // A draft shows the settings it was made with; a change goes back to the picture.
+    if (draft.value && draft.value.key !== key.value) dropDraft();
+    stopDraft();
+    draftError.value = '';
     error.value = '';
     busy.value = true;
     timer = setTimeout(() => void draw(), PAUSE_MS);
@@ -81,6 +152,7 @@ onBeforeUnmount(() => {
   clearTimeout(timer);
   cancel?.();
   cancel = null;
+  stopDraft();
   if (url.value) URL.revokeObjectURL(url.value);
 });
 </script>
@@ -93,13 +165,48 @@ onBeforeUnmount(() => {
       <span class="shape">{{ shape }}</span>
     </div>
     <div class="frame" :style="{ aspectRatio: aspect }">
-      <img v-if="url" :src="url" alt="Preview: the last frame of the video" />
-      <span v-if="busy" class="status">Drawing preview…</span>
+      <video
+        v-if="draftUrl"
+        :src="draftUrl"
+        :poster="url || undefined"
+        data-testid="preview-video"
+        aria-label="Preview of the video"
+        controls
+        autoplay
+        loop
+        muted
+        playsinline
+      />
+      <img v-else-if="url" :src="url" alt="Preview: the last frame of the video" />
+      <button
+        v-if="url && !draftUrl && !drafting && !busy"
+        type="button"
+        class="play"
+        aria-label="Play preview"
+        @click="play"
+      >
+        <span aria-hidden="true">▶</span>
+      </button>
+      <div v-if="drafting" class="status making" role="status">
+        <span>{{ draftStatus }}</span>
+        <span class="bar" aria-hidden="true"
+          ><span :style="{ width: `${draftShare * 100}%` }"
+        /></span>
+        <button type="button" class="link" @click="stopDraft">Cancel</button>
+      </div>
+      <span v-else-if="busy" class="status">Drawing preview…</span>
       <span v-else-if="error" class="status error">{{ error }}</span>
+      <span v-else-if="draftError" class="status error">{{ draftError }}</span>
     </div>
     <p class="caption muted">
       {{ frame.width }} × {{ frame.height }} · {{ frame.fps }} fps ·
       {{ Number((seconds ?? frame.duration).toFixed(1)) }} s
+    </p>
+    <p v-if="draftUrl" class="caption muted" data-testid="draft-note">
+      A quick draft: small and less smooth. The video is made in full on Export.
+    </p>
+    <p v-else-if="url && !drafting" class="caption muted">
+      The finished picture. Press play to see it move.
     </p>
   </div>
 </template>
@@ -159,11 +266,54 @@ onBeforeUnmount(() => {
   background: #050608;
 }
 
-.frame img {
+.frame img,
+.frame video {
   display: block;
   width: 100%;
   height: 100%;
   object-fit: contain;
+}
+
+/* A round button in the middle of the picture. */
+.play {
+  position: absolute;
+  inset: 50% auto auto 50%;
+  display: grid;
+  place-items: center;
+  width: 3.4rem;
+  height: 3.4rem;
+  padding: 0 0 0 0.2rem;
+  border: 0;
+  border-radius: 50%;
+  color: #1a110b;
+  background: var(--accent);
+  box-shadow: 0 0 0 6px rgba(255, 138, 42, 0.25);
+  font-size: 1.2rem;
+  transform: translate(-50%, -50%);
+}
+
+/* What the draft is doing, with a bar of how far it is. No transition: nothing on the page
+   animates while the worker draws. */
+.making {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.bar {
+  display: block;
+  width: 100%;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.15);
+  overflow: hidden;
+}
+
+.bar > span {
+  display: block;
+  height: 100%;
+  background: var(--accent);
 }
 
 .status {
