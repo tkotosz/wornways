@@ -31,12 +31,12 @@ Single- and multi-activity replays remember their timing and camera settings ind
 Use **Reset playback to defaults** under Fine-tune playback for the same starting settings as
 `wornways render` without a preset.
 
-| Preset          | What it plays                                                                         | Settings                                                                      |
-| --------------- | ------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
-| `all-at-once`   | every activity starts at the same moment and moves at its real pace                   | `--group all --group-pace real --duration 30`                                 |
-| `recap`         | activities in turn, grouped as needed (a week by activity, a year by month)           | `--group auto --share even --group-pace fit --duration 30`                    |
-| `multiday-trip` | one day after another, a longer day getting more time, the camera following the route | `--group day --share distance --group-pace fit --duration 45 --camera follow` |
-| `highlight`     | for one activity: a 15-second clip with the camera following the route                | `--duration 15 --camera follow`                                               |
+| Preset          | What it plays                                                                                  | Settings                                                                      |
+| --------------- | ---------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| `all-at-once`   | every activity starts at the same moment and moves at its real pace                            | `--group all --group-pace real --duration 30`                                 |
+| `recap`         | activities in turn, grouped as needed (a week by activity, a year by month), then their totals | `--group auto --share even --group-pace fit --duration 30 --totals-card`      |
+| `multiday-trip` | one day after another, a longer day getting more time, the camera following the route          | `--group day --share distance --group-pace fit --duration 45 --camera follow` |
+| `highlight`     | for one activity: a 15-second clip with the camera following the route                         | `--duration 15 --camera follow`                                               |
 
 ## Settings
 
@@ -86,8 +86,8 @@ The fields beside numeric sliders accept exact values within the same ranges as 
 | Drawing pace | `--pace`       | `time` or `distance`                                                                                                                                                    | `time`  |
 
 0.4 s of map come before the first group and up to 2.5 s on the finished picture after
-the last (at most a tenth of the video; only 0.3 s when the end card follows, as it fades
-in from the finished picture); the groups share the time in between, each at
+the last (at most a tenth of the video; only 0.3 s when the totals card or the end card
+follows, as it fades in from the finished picture); the groups share the time in between, each at
 least 0.3 s. The headline shows the playing group: an activity's or a day's date, a week's
 dates, a month, or the dates all activities span; in a race, the race clock.
 
@@ -163,6 +163,24 @@ activity plays; a video of several activities shows running totals.
 | Values    | `--metrics-fields`           | comma-separated, in the order shown: `time`, `distance`, `pace`, `elevation`, `date`, `count` | what suits the video |
 | Position  | `--metrics-position`         | `top-`, `middle-` or `bottom-` with `left`, `center` or `right`, e.g. `middle-center`         | `bottom-left`        |
 | Card size | `--metrics-size`             | 50–200%                                                                                       | 100%                 |
+
+### Totals card
+
+For a video of several activities: after the replay, 3.4 s more, before the end card. The
+finished map dims, the video's title comes in with a short orange rule under it, and the
+totals count up: the activities (named after the one sport shown, such as rides), the
+kilometers, the hours moving and the meters climbed (left out when no activity recorded
+elevation). Two columns on a story or square frame, one row on a wide one. Distance and
+climb are the ones the metrics card shows at the end; hours moving add up the time between
+points covered at 0.5 m/s or faster, so stops do not count.
+
+The recap preset turns it on; any other video of several activities can. In the web app a
+Custom playback made from Recap keeps it on, and the switch on the Appearance step always
+decides over the preset.
+
+| Setting          | CLI flag                             | Values | Default              |
+| ---------------- | ------------------------------------ | ------ | -------------------- |
+| Show totals card | `--totals-card` / `--no-totals-card` | on/off | off; on with `recap` |
 
 ### Branding
 

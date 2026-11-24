@@ -42,6 +42,13 @@ describe('planReplay', () => {
     expect(plan.timeline.label?.(1)).toBe('1 Aug 2026');
   });
 
+  it('holds the finished picture briefly when the totals card follows it', () => {
+    const plan = planReplay(august, parseSettings({ 'end-card': false, 'totals-card': true }));
+
+    // 30 s, less 0.4 s before the first and 0.3 s on the finished picture.
+    expect(plan.note).toBe('3 activities at 9.77 s each');
+  });
+
   it('starts the next group early with overlap, still filling the duration exactly', () => {
     const plan = planReplay(august, parseSettings({ overlap: '40', 'end-card': false }));
     const [a, b, c] = plan.timeline.windows!;

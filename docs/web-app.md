@@ -103,11 +103,12 @@ phone.
    as the automatic one; switched off, a title written stays for switching it on
    again), its position and size, the metrics (on or off, which ones in the order
    picked, their position and size), the elevation profile (for a single activity with
-   recorded elevation only; the panel is not shown otherwise), the street map, and the
-   branding: the end card after the replay and the small watermark at the bottom left, on
-   the map credit's line (each on or off). A position is the top, middle or bottom row,
-   left, middle or right; text in the middle gets a soft dark band behind it. The settings
-   of steps 3 and 4 are remembered for the next visit.
+   recorded elevation only; the panel is not shown otherwise), the street map, the totals
+   card (for several activities only; on for Recap), and the branding: the end card after
+   the replay and the small watermark at the bottom left, on the map credit's line (each
+   on or off). A position is the top, middle or bottom row, left, middle or right; text in
+   the middle gets a soft dark band behind it. The settings of steps 3 and 4 are
+   remembered for the next visit.
 5. **Export.** A stage in the video's shape, which shows the finished picture with a "Make
    video" button in the middle; while the video is made, its progress and a way to
    cancel; then the video itself, playing. Download then appears in the bottom bar where
@@ -270,6 +271,8 @@ for exporting an account or a single activity from Strava or Garmin.
 - Text is drawn with a font shipped with the app (Inter, under the SIL Open Font License)
   and loaded in the worker, so a video looks the same on every device.
 - Every frame with a map carries the map credit the tile provider asks for.
+- When the totals card is on, 3.4 s of totals follow the replay: the map dims and the
+  activities, kilometers, hours moving and meters climbed count up under the title.
 - Unless switched off, the video ends with the Wornways card, 3.2 s added after the
   replay: the finished map fades to black and the mark draws itself, then the name
   fades in. While the replay plays, a small mark and name sit at the bottom left, on the

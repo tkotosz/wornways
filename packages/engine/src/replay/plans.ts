@@ -39,7 +39,7 @@ export function dateRange(a: number, b: number): string {
 const LEAD_S = 0.4;
 const HOLD_S = 2.5;
 /**
- * The finished picture holds this briefly when the end card follows: the card fades in
+ * The finished picture holds this briefly when a card follows (totals or end): it fades in
  * from it, so a longer hold looks like the video stopped.
  */
 const HOLD_BEFORE_END_CARD_S = 0.3;
@@ -108,11 +108,13 @@ export function groupsPlan(
     RenderSettings,
     'duration' | 'group' | 'share' | 'groupPace' | 'overlap' | 'endCard'
   > &
-    Partial<Pick<RenderSettings, 'camera'>>,
+    Partial<Pick<RenderSettings, 'camera' | 'totalsCard'>>,
 ): Plan {
   const { duration } = settings;
   const lead = Math.min(LEAD_S, duration * 0.02);
-  const hold = settings.endCard ? HOLD_BEFORE_END_CARD_S : Math.min(HOLD_S, duration * 0.1);
+  // A card fades in from the finished picture: the totals card, else the end card.
+  const cardFollows = settings.endCard || !!settings.totalsCard;
+  const hold = cardFollows ? HOLD_BEFORE_END_CARD_S : Math.min(HOLD_S, duration * 0.1);
   const build = duration - lead - hold;
 
   const realSeconds = tracks.map((t) => t.points[t.points.length - 1]);
@@ -126,7 +128,7 @@ export function groupsPlan(
 
   // One group at real pace: a race of every activity on one clock.
   if (groups.length === 1 && settings.groupPace === 'real') {
-    const race = allAtOncePlan(tracks, duration, settings.endCard ? hold : undefined);
+    const race = allAtOncePlan(tracks, duration, cardFollows ? hold : undefined);
     const length = race.timeline.duration;
     return {
       ...race,
