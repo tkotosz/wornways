@@ -383,7 +383,7 @@ export const SETTINGS: readonly SettingDefinition[] = [
     label: 'Title position',
     group: 'title',
     kind: { type: 'choice', choices: POSITIONS },
-    default: 'top-left',
+    default: 'top-center',
     help:
       'Where the title sits: a row (top, middle or bottom) and a side. Where it would meet the ' +
       'metrics card, the two stack, the title first.',

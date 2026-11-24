@@ -143,7 +143,7 @@ export type RenderOptions = {
   metrics?: Metric[];
   /** Where the metrics card sits; default bottom-left. */
   metricsPosition?: Position;
-  /** Where the title sits; default top-left. */
+  /** Where the title sits; default top-center. */
   titlePosition?: Position;
   /** Scales the title; default 1. */
   titleScale?: number;
@@ -312,7 +312,7 @@ export function createRenderer(
     options.overlay === 'single' ? 'single' : timeline.clock ? 'race' : 'groups';
   const metrics = options.metrics ?? defaultMetrics(kind);
   const corner = options.metricsPosition ?? 'bottom-left';
-  const titleCorner = options.titlePosition ?? 'top-left';
+  const titleCorner = options.titlePosition ?? 'top-center';
   const titleScale = options.titleScale ?? 1;
   const metricsScale = options.metricsScale ?? 1;
   const unit = Math.min(W, H) / 1080; // scales strokes and type with the output size

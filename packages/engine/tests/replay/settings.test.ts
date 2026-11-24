@@ -40,7 +40,7 @@ describe('parseSettings', () => {
       metrics: true,
       metricsFields: null,
       metricsPosition: 'bottom-left',
-      titlePosition: 'top-left',
+      titlePosition: 'top-center',
       titleSize: 100,
       metricsSize: 100,
       totalsCard: false,
