@@ -1,5 +1,6 @@
 import { drawBasemap, type Basemap, type MapLabel, type Tile } from '../map/basemap.ts';
 import { levelsFor, mapLevelViews, type CameraPath, type LevelWindow } from './camera.ts';
+import { drawElevationProfile, elevationProfile } from './elevation-profile.ts';
 import { drawEndCard, endCardFrames } from './end-card.ts';
 import { drawWatermark } from './mark.ts';
 import { composeHeat, createHeatRamp, decodeHeat, heatStyle, saturationFromHeat } from './heat.ts';
@@ -155,6 +156,11 @@ export type RenderOptions = {
   endCard?: boolean;
   /** Draw the small Wornways mark on the map credit's line. Default false. */
   watermark?: boolean;
+  /**
+   * A single activity with elevation: its climb profile along the bottom, with a dot that
+   * moves along it. Text at the bottom goes above it. Default false.
+   */
+  elevationProfile?: boolean;
   fontFamily?: string;
   /** BCP 47 locale for the date counter. */
   locale?: string;
@@ -543,6 +549,24 @@ export function createRenderer(
     (cardSide === titleSide || cardSide === 'center' || titleSide === 'center');
   const hasElevation = prepared.some((tr) => tr.hasElevation);
 
+  // The climb profile: across the frame between the margins, just above the map credit.
+  const profileHeight = 80 * unit;
+  const profileBox = {
+    x: margin,
+    y: H - H * 0.012 - 34 * unit - profileHeight,
+    width: W - 2 * margin,
+    height: profileHeight,
+  };
+  const profile =
+    options.elevationProfile && kind === 'single'
+      ? elevationProfile(
+          tracks[0],
+          Math.round(Math.min(600, Math.max(50, profileBox.width / (3 * unit)))),
+        )
+      : null;
+  /** The lowest baseline text in the bottom row may take: above the profile when it shows. */
+  const textFloor = profile ? profileBox.y - 30 * unit : H * 0.955;
+
   const headFade = 0.35; // seconds a head dot lingers after its track finishes
   const headRadius = 15 * unit;
   let nextFrame = 0;
@@ -756,8 +780,8 @@ export function createRenderer(
       // The large value and the lines under it, centred on the frame's middle.
       headlineY = H * 0.5 - below / 2 + 22 * unit * metricsScale;
     } else {
-      // Raised when it has more lines, to stay clear of the bottom edge.
-      headlineY = Math.min(H * 0.875, H * 0.955 - below);
+      // Raised when it has more lines, to stay clear of the bottom edge and the profile.
+      headlineY = Math.min(H * 0.875, textFloor - below);
     }
     return { headline, headlineY, lines, bottom: headlineY + below + 14 * unit * metricsScale };
   }
@@ -770,7 +794,7 @@ export function createRenderer(
     if (titleOnTop) return H * 0.075;
     if (card && stacked) return card.headlineY - (60 * metricsScale + 30 * titleScale) * unit;
     if (titleRow === 'middle') return H * 0.5 + 16 * unit * titleScale;
-    return H * 0.93;
+    return Math.min(H * 0.93, textFloor);
   }
 
   /**
@@ -799,9 +823,14 @@ export function createRenderer(
     const card = layoutCard(t);
     const title = options.title ? { y: titleY(card), top: 0 } : null;
     if (title) title.top = title.y - 44 * unit * titleScale;
-    /** Where the shade at the bottom starts: higher when the title sits down there. */
-    const bottomStart =
+    /**
+     * Where the shade at the bottom starts: higher when the title sits down there, or the
+     * card does above the profile.
+     */
+    let bottomStart =
       title && titleRow === 'bottom' ? Math.min(H * 0.76, title.top - H * 0.06) : H * 0.76;
+    if (profile && card && cardRow === 'bottom')
+      bottomStart = Math.min(bottomStart, card.headlineY - 60 * unit * metricsScale - H * 0.06);
     /** The rows text in the middle of the frame takes, with room around; null when none. */
     const middleBand = middleRows(card, title);
     if (attribution !== undefined) {
@@ -909,6 +938,8 @@ export function createRenderer(
       ctx.fill();
     }
     ctx.globalCompositeOperation = 'source-over';
+
+    if (profile) drawElevationProfile(ctx, profile, profileBox, prepared[0].metres, unit);
 
     ctx.textBaseline = 'alphabetic';
     if (options.title && title) {
