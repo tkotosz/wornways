@@ -6,21 +6,21 @@ import { STRIDE, type Track } from '../track/types.ts';
 import type { Context2DLike } from './render.ts';
 
 export type ElevationProfile = {
-  /** Elevation in metres at evenly spaced distances, from the start to the finish. */
+  /** Elevation in meters at evenly spaced distances, from the start to the finish. */
   elevation: Float32Array;
-  /** The activity's distance in metres, measured as the renderer measures it. */
+  /** The activity's distance in meters, measured as the renderer measures it. */
   totalM: number;
   /** The elevations the strip's bottom and top stand for. */
   low: number;
   high: number;
 };
 
-/** A profile rising less than this, in metres, is drawn as this much: flat looks flat. */
+/** A profile rising less than this, in meters, is drawn as this much: flat looks flat. */
 const MIN_RANGE_M = 60;
 
 /**
  * The profile of `track` in `samples` steps of distance: the mean elevation of the points in
- * each step, steps without one filled in from their neighbours, then lightly smoothed. Null
+ * each step, steps without one filled in from their neighbors, then lightly smoothed. Null
  * when the track has no elevation or no distance.
  */
 export function elevationProfile(
@@ -29,12 +29,12 @@ export function elevationProfile(
 ): ElevationProfile | null {
   const p = track.points;
   const n = p.length / STRIDE;
-  const metres = new Float64Array(n);
+  const meters = new Float64Array(n);
   for (let i = 1; i < n; i++) {
     const o = i * STRIDE;
-    metres[i] = metres[i - 1] + distanceM(p[o - STRIDE + 1], p[o - STRIDE], p[o + 1], p[o]);
+    meters[i] = meters[i - 1] + distanceM(p[o - STRIDE + 1], p[o - STRIDE], p[o + 1], p[o]);
   }
-  const totalM = n > 0 ? metres[n - 1] : 0;
+  const totalM = n > 0 ? meters[n - 1] : 0;
   if (!(totalM > 0) || samples < 2) return null;
 
   const sum = new Float64Array(samples);
@@ -42,7 +42,7 @@ export function elevationProfile(
   for (let i = 0; i < n; i++) {
     const ele = p[i * STRIDE + 2];
     if (!Number.isFinite(ele)) continue;
-    const step = Math.min(samples - 1, Math.floor((metres[i] / totalM) * samples));
+    const step = Math.min(samples - 1, Math.floor((meters[i] / totalM) * samples));
     sum[step] += ele;
     count[step]++;
   }
@@ -86,14 +86,14 @@ export function elevationProfile(
 export type Box = { x: number; y: number; width: number; height: number };
 
 /**
- * Draws the profile in `box`, `metres` into the activity: the part covered in orange, the
+ * Draws the profile in `box`, `meters` into the activity: the part covered in orange, the
  * rest faint, and a glowing dot on the line where the activity is.
  */
 export function drawElevationProfile(
   ctx: Context2DLike,
   profile: ElevationProfile,
   box: Box,
-  metres: number,
+  meters: number,
   unit: number,
 ): void {
   const { elevation, totalM, low, high } = profile;
@@ -103,7 +103,7 @@ export function drawElevationProfile(
   // The lowest point keeps a little fill under it, so the strip reads as ground.
   const yOf = (e: number) => bottom - (0.14 + (0.86 * (e - low)) / (high - low)) * box.height;
 
-  const at = Math.min(1, Math.max(0, metres / totalM)) * last;
+  const at = Math.min(1, Math.max(0, meters / totalM)) * last;
   const step = Math.min(last - 1, Math.floor(at));
   const f = at - step;
   const head = {
