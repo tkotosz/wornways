@@ -138,11 +138,11 @@ const ROUTE_BOUNDS = [44, 164, 424, 162] as const;
 
 /**
  * The small mark and name of the watermark: the route without its tile, then the name,
- * ending at `right` and sitting on `baseline`, a little faint.
+ * starting at `left` and sitting on `baseline`, a little faint.
  */
 export function drawWatermark(
   ctx: Context2DLike,
-  right: number,
+  left: number,
   baseline: number,
   unit: number,
   fontFamily: string,
@@ -156,12 +156,11 @@ export function drawWatermark(
   const wornWidth = ctx.measureText('worn').width;
   ctx.font = `300 ${Math.round(fontSize)}px ${fontFamily}`;
   const nameWidth = wornWidth + ctx.measureText('ways').width;
-  drawWordmark(ctx, right - nameWidth / 2, baseline, fontSize, fontFamily);
 
-  // The route, its middle level with the middle of the lowercase letters.
+  // The route first, its middle level with the middle of the lowercase letters, then the name.
   const [bx, by, bw, bh] = ROUTE_BOUNDS;
   const scale = routeHeight / bh;
-  const left = right - nameWidth - gap - bw * scale;
+  drawWordmark(ctx, left + bw * scale + gap + nameWidth / 2, baseline, fontSize, fontFamily);
   const middle = baseline - fontSize * 0.27;
   const at = ([px, py]: readonly [number, number]): [number, number] => [
     left + (px - bx) * scale,
