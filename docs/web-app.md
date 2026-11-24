@@ -103,7 +103,7 @@ phone.
    as the automatic one; switched off, a title written stays for switching it on
    again), its position and size, the metrics (on or off, which ones in the order
    picked, their position and size), the street map, and the branding: the end card
-   after the replay and the small watermark by the map credit (each on or off). A
+   after the replay and the small watermark at the bottom left, on the map credit's line (each on or off). A
    position is the top, middle or bottom row, left, middle or right; text in the middle
    gets a soft dark band behind it. The settings of steps 3 and 4 are remembered for
    the next visit.
@@ -271,7 +271,8 @@ for exporting an account or a single activity from Strava or Garmin.
 - Every frame with a map carries the map credit the tile provider asks for.
 - Unless switched off, the video ends with the Wornways card, 3.2 s added after the
   replay: the finished map fades to black and the mark draws itself, then the name
-  fades in. While the replay plays, a small mark and name sit by the map credit.
+  fades in. While the replay plays, a small mark and name sit at the bottom left, on the
+  map credit's line.
 
 ### Install
 
