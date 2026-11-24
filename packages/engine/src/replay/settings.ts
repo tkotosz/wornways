@@ -428,8 +428,10 @@ export const SETTINGS: readonly SettingDefinition[] = [
     automatic: 'what suits the video',
     help:
       `Values to show, the first one large: ${METRICS.join(', ')}. A value the video ` +
-      'cannot show is left out: count is for several activities, elevation only when ' +
-      'recorded. Pace is in minutes per kilometer when every activity is on foot, else km/h.',
+      'cannot show is left out: start is for a single activity; count, days and longest ' +
+      'for several activities; elevation, descent and highest need recorded elevation. ' +
+      'Pace and top speed are in minutes per kilometer when every activity is on foot, else ' +
+      'km/h; top speed is the fastest over 10 s.',
   },
   {
     name: 'metrics-position',
@@ -466,9 +468,11 @@ export const SETTINGS: readonly SettingDefinition[] = [
     default: null,
     automatic: AUTOMATIC_TOTALS.join(', '),
     help:
-      `Values the totals card shows, in this order: ${TOTALS_FIELDS.join(', ')} (activities, ` +
-      'kilometers, hours moving, meters climbed, average pace or speed while moving, the ' +
-      'days spanned). Elevation is left out when no activity recorded it.',
+      `Values the totals card shows, in this order: ${TOTALS_FIELDS.join(', ')}. The same ` +
+      'values as the metrics card, as totals: time is hours in total, moving hours moving, ' +
+      'pace the average while moving, top-speed the fastest of any activity, date the days ' +
+      'spanned, days the days with an activity. ' +
+      'Elevation, descent and highest are left out when no activity recorded elevation.',
   },
 
   {

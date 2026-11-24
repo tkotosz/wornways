@@ -1,37 +1,18 @@
 import { describe, expect, it } from 'vitest';
-import { movingSeconds, totalsEntries, type Totals } from '../../src/replay/totals-card.ts';
-import { STRIDE } from '../../src/track/types.ts';
-
-/** A track heading east: a point every 10 s, each `stepDeg` of longitude after the one before. */
-function track(steps: number[]) {
-  const points = new Float64Array((steps.length + 1) * STRIDE);
-  let lon = 19;
-  points.set([lon, 47.5, 0, 0], 0);
-  steps.forEach((step, i) => {
-    lon += step;
-    points.set([lon, 47.5, 0, (i + 1) * 10], (i + 1) * STRIDE);
-  });
-  return { points };
-}
-
-describe('movingSeconds', () => {
-  it('counts the time between points covered at walking speed or faster', () => {
-    // 0.0004° of longitude is about 30 m: 3 m/s. Standing still in between does not count.
-    expect(movingSeconds(track([0.0004, 0.0004, 0, 0, 0.0004]))).toBe(30);
-  });
-
-  it('leaves out creeping slower than half a meter a second', () => {
-    // About 2 m in 10 s.
-    expect(movingSeconds(track([0.00003, 0.00003]))).toBe(0);
-  });
-});
+import { totalsEntries, type Totals } from '../../src/replay/totals-card.ts';
 
 describe('totalsEntries', () => {
   const totals: Totals = {
     activities: 5,
     meters: 312_400,
     movingSeconds: 14.5 * 3600,
+    totalSeconds: 18 * 3600,
     climbed: 4210,
+    descended: 4105,
+    highest: 1445,
+    days: 4,
+    longest: 112_300,
+    topSpeed: 15,
     onFoot: false,
     dates: '18–22 Apr 2026',
   };
@@ -41,8 +22,33 @@ describe('totalsEntries', () => {
     expect(totalsEntries(totals, 1, rides)).toEqual([
       { field: 'count', value: '5', label: 'rides' },
       { field: 'distance', value: '312', label: 'km' },
-      { field: 'time', value: '15', label: 'hours moving' },
+      { field: 'moving', value: '15', label: 'hours moving' },
       { field: 'elevation', value: '4,210', label: 'm climbed' },
+    ]);
+  });
+
+  it('adds up the time in total, the descent, the highest point, the days and the longest', () => {
+    expect(
+      totalsEntries(totals, 1, rides, ['time', 'descent', 'highest', 'days', 'longest']),
+    ).toEqual([
+      { field: 'time', value: '18', label: 'hours in total' },
+      { field: 'descent', value: '4,105', label: 'm descended' },
+      { field: 'highest', value: '1,445', label: 'm highest point' },
+      { field: 'days', value: '4', label: 'days out' },
+      { field: 'longest', value: '112', label: 'km longest ride' },
+    ]);
+    const oneDay = { ...totals, days: 1 };
+    expect(totalsEntries(oneDay, 1, rides, ['days'])[0]!.label).toBe('day out');
+  });
+
+  it('tells the top speed, or the best pace when every activity is on foot', () => {
+    expect(totalsEntries(totals, 0.2, rides, ['top-speed'])).toEqual([
+      { field: 'top-speed', value: '54.0', label: 'km/h top speed' },
+    ]);
+    // 5 m/s is 3:20 per kilometer.
+    const runs = { ...totals, onFoot: true, topSpeed: 5 };
+    expect(totalsEntries(runs, 1, rides, ['top-speed'])).toEqual([
+      { field: 'top-speed', value: '3:20', label: 'min/km best pace' },
     ]);
   });
 
@@ -73,10 +79,12 @@ describe('totalsEntries', () => {
   });
 
   it('leaves out elevation when no activity recorded it, even when picked', () => {
-    const flat = { ...totals, climbed: null };
-    expect(totalsEntries(flat, 1, rides, ['elevation', 'distance']).map((e) => e.field)).toEqual([
-      'distance',
-    ]);
+    const flat = { ...totals, climbed: null, descended: null, highest: null };
+    expect(
+      totalsEntries(flat, 1, rides, ['elevation', 'descent', 'distance', 'highest']).map(
+        (e) => e.field,
+      ),
+    ).toEqual(['distance']);
     expect(totalsEntries(flat, 1, rides, ['elevation'])).toEqual([]);
   });
 });

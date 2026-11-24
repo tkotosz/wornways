@@ -93,6 +93,18 @@ test('picks the totals card values and their order', async ({ page, context }) =
   await chip('Activities').click();
   await expect.poll(picked).toEqual(['Activities']);
 
+  // Every other total is offered too (the demo activities have heights).
+  for (const name of [
+    'Hours in total',
+    'Meters descended',
+    'Highest point',
+    'Average pace',
+    'Top speed',
+    'Dates',
+    'Days out',
+    'Longest activity',
+  ])
+    await expect(chip(name)).toHaveAttribute('aria-pressed', 'false');
   // The pace and the dates are offered too, after the usual four.
   await chip('Dates').click();
   await chip('Average pace').click();

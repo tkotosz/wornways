@@ -1,11 +1,9 @@
 // The totals card after the replay of several activities: the finished map dims, the
-// video's title comes in, and the totals count up: activities, kilometers, hours moving
-// and meters climbed. It is added after the replay and before the end card, so the replay
-// keeps the length it was given.
+// video's title comes in, and the totals picked count up (unless picked otherwise:
+// activities, kilometers, hours moving and meters climbed). It is added after the replay
+// and before the end card, so the replay keeps the length it was given.
 
-import { distanceM } from '../track/geo.ts';
-import { STRIDE, type Track } from '../track/types.ts';
-import { averagePace } from './pace.ts';
+import { averagePace, topSpeed } from './pace.ts';
 import type { CanvasLike, Context2DLike } from './render.ts';
 
 /** How long the totals card plays, in seconds. */
@@ -25,55 +23,80 @@ const TIMING = {
 /** How dark the map gets behind the card. */
 const DIM = 0.82;
 /** Slower than this, in meters per second, a stretch of an activity counts as standing. */
-const MOVING_SPEED = 0.5;
 
 /** The number of frames the totals card adds at this frame rate. */
 export const totalsCardFrames = (fps: number) => Math.round(TOTALS_CARD_S * fps);
 
 /**
- * A value the totals card can show: the number of activities, kilometers, hours moving,
- * meters climbed, the average pace or speed while moving, or the days the activities span.
- * The names are the metrics card's for the same values.
+ * A value the totals card can show. The names are the metrics card's for the same values:
+ * - count: the number of activities
+ * - distance: kilometers
+ * - moving: hours moving; time: hours in total, stops included
+ * - elevation: meters climbed; descent: meters descended; highest: the highest point
+ * - pace: the average pace or speed while moving; top-speed: the top speed
+ * - date: the days the activities span; days: the days with an activity
+ * - longest: the longest activity's kilometers
  */
-export type TotalsField = 'count' | 'distance' | 'time' | 'elevation' | 'pace' | 'date';
+export type TotalsField =
+  | 'count'
+  | 'distance'
+  | 'moving'
+  | 'time'
+  | 'elevation'
+  | 'descent'
+  | 'highest'
+  | 'pace'
+  | 'top-speed'
+  | 'date'
+  | 'days'
+  | 'longest';
 /** Every value of the totals card, in the order the settings list them. */
 export const TOTALS_FIELDS: readonly TotalsField[] = [
   'count',
   'distance',
+  'moving',
   'time',
   'elevation',
+  'descent',
+  'highest',
   'pace',
+  'top-speed',
   'date',
+  'days',
+  'longest',
 ];
 /** The values the totals card shows unless told otherwise, in this order. */
-export const AUTOMATIC_TOTALS: readonly TotalsField[] = ['count', 'distance', 'time', 'elevation'];
+export const AUTOMATIC_TOTALS: readonly TotalsField[] = [
+  'count',
+  'distance',
+  'moving',
+  'elevation',
+];
 
 export type Totals = {
   activities: number;
   meters: number;
   /** Seconds moving: the stretches between points covered at walking speed or faster. */
   movingSeconds: number;
+  /** Seconds from each activity's first point to its last, added up. */
+  totalSeconds: number;
   /** Meters climbed; null when no activity recorded elevation. */
   climbed: number | null;
+  /** Meters descended; null when no activity recorded elevation. */
+  descended: number | null;
+  /** The highest elevation reached, in meters; null when no activity recorded elevation. */
+  highest: number | null;
+  /** How many calendar days have an activity starting on them. */
+  days: number;
+  /** The longest activity's meters. */
+  longest: number;
+  /** The top speed of any activity, in meters per second (see `TOP_SPEED_WINDOW_S`). */
+  topSpeed: number;
   /** Whether every activity is on foot, so pace is told in minutes per kilometer. */
   onFoot: boolean;
   /** The days the activities span, e.g. "18–22 Apr 2026". */
   dates: string;
 };
-
-/** The time an activity was moving: the time between points covered at `MOVING_SPEED` or faster. */
-export function movingSeconds(track: Pick<Track, 'points'>): number {
-  const p = track.points;
-  const n = p.length / STRIDE;
-  let seconds = 0;
-  for (let i = 1; i < n; i++) {
-    const o = i * STRIDE;
-    const dt = p[o + 3] - p[o - STRIDE + 3];
-    const meters = distanceM(p[o - STRIDE + 1], p[o - STRIDE], p[o + 1], p[o]);
-    if (dt > 0 && meters / dt >= MOVING_SPEED) seconds += dt;
-  }
-  return seconds;
-}
 
 export type TotalsCardOptions = {
   width: number;
@@ -98,8 +121,8 @@ export type TotalsEntry = { field: TotalsField; value: string; label: string };
 
 /**
  * The values of `fields` in their order, with their labels, the numbers shown at a share `f`
- * of their count-up; the pace and the dates do not count up. Elevation is left out when no
- * activity recorded it.
+ * of their count-up; the pace, the top speed and the dates do not count up. The climb, the descent and the
+ * highest point are left out when no activity recorded elevation.
  */
 export function totalsEntries(
   totals: Totals,
@@ -107,7 +130,10 @@ export function totalsEntries(
   countLabel: [string, string],
   fields: readonly TotalsField[] = AUTOMATIC_TOTALS,
 ): TotalsEntry[] {
-  const hours = totals.movingSeconds / 3600;
+  const hours = (seconds: number) => {
+    const h = seconds / 3600;
+    return h < 10 ? (h * f).toFixed(1) : wholeNumber(h * f);
+  };
   return fields.flatMap((field) => {
     switch (field) {
       case 'count':
@@ -118,19 +144,41 @@ export function totalsEntries(
         };
       case 'distance':
         return { field, value: wholeNumber((totals.meters / 1000) * f), label: 'km' };
+      case 'moving':
+        return { field, value: hours(totals.movingSeconds), label: 'hours moving' };
       case 'time':
-        return {
-          field,
-          value: hours < 10 ? (hours * f).toFixed(1) : wholeNumber(hours * f),
-          label: 'hours moving',
-        };
+        return { field, value: hours(totals.totalSeconds), label: 'hours in total' };
       case 'elevation':
         return totals.climbed === null
           ? []
           : { field, value: wholeNumber(totals.climbed * f), label: 'm climbed' };
+      case 'descent':
+        return totals.descended === null
+          ? []
+          : { field, value: wholeNumber(totals.descended * f), label: 'm descended' };
+      case 'highest':
+        return totals.highest === null
+          ? []
+          : { field, value: wholeNumber(totals.highest * f), label: 'm highest point' };
+      case 'days':
+        return {
+          field,
+          value: wholeNumber(totals.days * f),
+          label: totals.days === 1 ? 'day out' : 'days out',
+        };
+      case 'longest':
+        return {
+          field,
+          value: wholeNumber((totals.longest / 1000) * f),
+          label: `km longest ${countLabel[0]}`,
+        };
       case 'pace': {
         const { value, unit } = averagePace(totals.onFoot, totals.movingSeconds, totals.meters);
         return { field, value, label: unit === '/km' ? 'min/km average' : 'km/h average' };
+      }
+      case 'top-speed': {
+        const { value, unit } = topSpeed(totals.onFoot, totals.topSpeed);
+        return { field, value, label: unit === '/km' ? 'min/km best pace' : 'km/h top speed' };
       }
       case 'date':
         return { field, value: totals.dates, label: 'dates' };
@@ -164,11 +212,11 @@ export function drawTotalsCard(
     countLabel,
     fields,
   );
-  // Rows of values: every number in one row on a wide frame, two to a row otherwise, a last
-  // odd one centered. The dates are too long to share a row, so they get one of their own
-  // where they sit in the order, in smaller type.
+  // Rows of values: up to four to a row on a wide frame, two otherwise, a last short row
+  // centered. The dates are too long to share a row, so they get one of their own where they
+  // sit in the order, in smaller type.
   const numbers = values.filter((entry) => entry.field !== 'date').length;
-  const perRow = W > H * 1.3 ? Math.max(1, numbers) : 2;
+  const perRow = W > H * 1.3 ? Math.min(4, Math.max(1, numbers)) : 2;
   const rows: { entries: { entry: TotalsEntry; order: number }[]; dates: boolean }[] = [];
   values.forEach((entry, order) => {
     const last = rows.at(-1);

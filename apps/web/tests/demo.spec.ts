@@ -118,6 +118,14 @@ test('follows the guide to a highlight of the long ride', async ({ page }) => {
   await expect(
     page.getByTestId('group-metrics').getByRole('button', { name: 'Elevation' }),
   ).toBeVisible();
+  // One activity offers its start time and its descent, not picked at first, and no count.
+  for (const name of ['Start time', 'Descent', 'Highest point', 'Top speed'])
+    await expect(
+      page.getByTestId('group-metrics').getByRole('button', { name, exact: true }),
+    ).toHaveAttribute('aria-pressed', 'false');
+  await expect(
+    page.getByTestId('group-metrics').getByRole('button', { name: 'Count', exact: true }),
+  ).toHaveCount(0);
   await expect(
     page.getByTestId('group-elevation').getByRole('switch', { name: 'Elevation profile' }),
   ).toBeChecked();
