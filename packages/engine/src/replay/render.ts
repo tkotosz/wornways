@@ -154,6 +154,11 @@ export type RenderOptions = {
    * does not show are not set up, and drawing any other frame is an error.
    */
   onlyFrame?: number;
+  /**
+   * Seconds the replay's last frame stays on screen after the replay, before the totals
+   * card and the end card. Default 0.
+   */
+  endPause?: number;
   /** End the video with the Wornways card (see end-card.ts), after the replay. Default false. */
   endCard?: boolean;
   /**
@@ -177,9 +182,9 @@ export type RenderOptions = {
 export type Renderer = {
   /** Holds the most recently rendered frame. */
   readonly canvas: CanvasLike;
-  /** Every frame of the video: the replay's, then the totals card's and the end card's. */
+  /** Every frame of the video: the replay's, the end pause's, then the cards'. */
   readonly frameCount: number;
-  /** The replay's frames; the cards' follow them. */
+  /** The replay's frames; the end pause's and the cards' follow them. */
   readonly replayFrames: number;
   /** Pass count that shows as the hottest colour. */
   readonly heatSaturation: number;
@@ -322,9 +327,11 @@ export function createRenderer(
     year: 'numeric',
   });
   const replayFrames = Math.round(timeline.duration * fps);
+  const pauseFrames = Math.round((options.endPause ?? 0) * fps);
   // The totals card is for several activities only.
   const totalsFrames = options.totalsCard && kind !== 'single' ? totalsCardFrames(fps) : 0;
-  const frameCount = replayFrames + totalsFrames + (options.endCard ? endCardFrames(fps) : 0);
+  const frameCount =
+    replayFrames + pauseFrames + totalsFrames + (options.endCard ? endCardFrames(fps) : 0);
   if (camera && camera.zoom.length < replayFrames)
     throw new Error('Camera path is shorter than the video');
   const { onlyFrame } = options;
@@ -1032,7 +1039,9 @@ export function createRenderer(
         throw new Error(`This renderer draws frame ${onlyFrame} only, not frame ${index}`);
       nextFrame++;
       if (index >= replayFrames) {
-        const after = index - replayFrames;
+        // The end pause: the frame keeps the replay's last picture, drawn just before.
+        if (index < replayFrames + pauseFrames) return;
+        const after = index - replayFrames - pauseFrames;
         if (after < totalsFrames) {
           lastReplayFrame ??= copyFrame();
           totalsShown ??= totals();

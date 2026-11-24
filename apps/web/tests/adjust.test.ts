@@ -60,7 +60,14 @@ describe('the settings offered', () => {
   it('offers the settings of a panel in order', () => {
     const names = (panel: Parameters<typeof offered>[0]) => offered(panel).map((s) => s.name);
 
-    expect(names('timing')).toEqual(['group', 'share', 'group-pace', 'overlap', 'pace']);
+    expect(names('timing')).toEqual([
+      'group',
+      'share',
+      'group-pace',
+      'overlap',
+      'pace',
+      'end-pause',
+    ]);
     expect(names('camera')).toEqual(['camera']);
     expect(names('map')).toEqual(['map']);
   });

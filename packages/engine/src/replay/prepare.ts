@@ -170,6 +170,7 @@ export async function prepareReplay(
     titlePosition: settings.titlePosition,
     titleScale: settings.titleSize / 100,
     metricsScale: settings.metricsSize / 100,
+    endPause: settings.endPause,
     endCard: settings.endCard,
     totalsCard: settings.totalsCard,
     watermark: settings.watermark,
