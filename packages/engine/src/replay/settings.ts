@@ -48,6 +48,8 @@ export type RenderSettings = {
   /** How much of a group's time, in percent, the next group starts early; 0: none. */
   overlap: number;
   pace: 'time' | 'distance';
+  /** Seconds the finished picture stays after the replay, before any card; added to the length. */
+  endPause: number;
 
   /** Hide routes within this many metres of their start or finish. Zero shows the full route. */
   trimRadius: number;
@@ -309,6 +311,16 @@ export const SETTINGS: readonly SettingDefinition[] = [
     help:
       'time: each activity is drawn as it was recorded, pauses shortened. distance: at ' +
       'an even speed along the route.',
+  },
+  {
+    name: 'end-pause',
+    label: 'End pause',
+    group: 'timing',
+    kind: { type: 'number', min: 0, max: 10, unit: 's' },
+    default: '0',
+    help:
+      'Seconds the finished picture stays on screen after the replay, before the totals ' +
+      'card, the end card or the end of the video. Added to the video’s length.',
   },
 
   {
@@ -670,6 +682,7 @@ export function parseSettings(input: SettingsInput): RenderSettings {
     groupPace: choice<'fit' | 'real'>('group-pace'),
     overlap: number('overlap'),
     pace: choice<'time' | 'distance'>('pace'),
+    endPause: number('end-pause'),
     trimRadius: number('trim-radius'),
     camera: choice<RenderSettings['camera']>('camera'),
     map: flag('map'),

@@ -91,7 +91,7 @@ phone.
    then a summary of the replay ("30 seconds · Recap" and a line telling what it plays,
    e.g. "12 months (312 activities), 2.3 s each" or "a race of all 24 activities, each
    at its real pace"), then **Fine-tune playback**, folded at first: grouping, time
-   share, group pace, overlap, drawing pace and the camera, built from the settings
+   share, group pace, overlap, drawing pace, end pause and the camera, built from the settings
    table, starting from the preset's values. Changing the length or one of the preset's
    values makes it Custom ("Custom playback"), and no card is picked; picking a card
    goes back to that preset.

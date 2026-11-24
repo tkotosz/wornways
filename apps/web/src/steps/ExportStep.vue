@@ -30,13 +30,15 @@ const parsed = computed(() => {
 const settingsKey = computed(() => JSON.stringify(props.settings));
 const trimRadius = computed(() => parsed.value?.trimRadius ?? 0);
 
-/** The settings in words, e.g. "1080 × 1920 · 30 s + end card". */
+/** The settings in words, e.g. "1080 × 1920 · 30 s + 2 s pause + end card". */
 const summary = computed(() => {
   const s = parsed.value;
   if (!s) return '';
   const seconds = Number((props.plan?.seconds ?? s.duration).toFixed(1));
-  const length = s.endCard ? `${seconds} s + end card` : `${seconds} s`;
-  return `${s.width} × ${s.height} · ${length}`;
+  const parts = [`${seconds} s`];
+  if (s.endPause > 0) parts.push(`${s.endPause} s pause`);
+  if (s.endCard) parts.push('end card');
+  return `${s.width} × ${s.height} · ${parts.join(' + ')}`;
 });
 
 /**

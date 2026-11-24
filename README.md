@@ -27,8 +27,8 @@ Activity files you add stay there.
   - **Multiday trip:** one day after another, a longer day getting more time.
   - **Highlight:** a 15-second clip with the camera following a single activity.
 
-  Or fine-tune it: grouping, time share, how a group moves, overlap, drawing pace and the
-  camera.
+  Or fine-tune it: grouping, time share, how a group moves, overlap, drawing pace, the
+  camera and a pause on the finished picture at the end.
 
 - **Dresses it up:** story, square or landscape frame, a title, metrics (date, time,
   distance, pace, elevation, count) in any of nine positions, a climb profile (also of a

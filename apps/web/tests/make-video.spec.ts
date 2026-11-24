@@ -673,6 +673,10 @@ test('sets up the video and its text, and keeps both for the next visit', async 
   await slider('Video length').fill('10');
   await slider('Video length').dispatchEvent('change');
   await expect(summary).toHaveText('10 seconds · Custom playback');
+  // The end pause keeps the finished picture on screen longer; it is added to the video.
+  await slider('End pause').fill('2.5');
+  await slider('End pause').dispatchEvent('change');
+  await expect(summary).toHaveText('10 seconds · Custom playback');
 
   // The Appearance step: the title starts as the automatic one, with its position and size.
   await page.getByRole('button', { name: 'Continue' }).click();
@@ -719,11 +723,11 @@ test('sets up the video and its text, and keeps both for the next visit', async 
 
   // The Export step: only the video.
   await page.getByRole('button', { name: 'Continue' }).click();
-  await expect(page.getByTestId('video-summary')).toHaveText('1080 × 1080 · 10 s');
+  await expect(page.getByTestId('video-summary')).toHaveText('1080 × 1080 · 10 s + 2.5 s pause');
   await page.getByRole('button', { name: 'Make video' }).click();
   const result = page.getByTestId('result');
   await expect(result).toBeVisible({ timeout: 150_000 });
-  await expect(page.getByTestId('made')).toContainText('10.0 s');
+  await expect(page.getByTestId('made')).toContainText('12.5 s');
 
   await page.reload();
   await page.getByRole('button', { name: 'Playback', exact: true }).click();
