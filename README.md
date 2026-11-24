@@ -32,7 +32,8 @@ Activity files you add stay there.
 
 - **Dresses it up:** story, square or landscape frame, a title, metrics (date, time,
   distance, pace, elevation, count) in any of nine positions, a climb profile for a
-  single activity, a live preview, an end card with the Wornways mark.
+  single activity, a live preview that can play a quick draft, an end card with the
+  Wornways mark.
 - **Makes the video in the browser** as an MP4 (H.264), to download or share straight to
   another app on a phone. The web app can be installed and then starts without a network.
 

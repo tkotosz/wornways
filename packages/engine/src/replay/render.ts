@@ -961,10 +961,9 @@ export function createRenderer(
       );
     }
     if (options.watermark) {
-      // On the map credit's line, left of the credit; alone at the bottom right without a map.
-      ctx.font = creditFont;
-      const credit = basemap ? ctx.measureText(basemap.attribution).width + 18 * unit : 0;
-      drawWatermark(ctx, W - W * 0.03 - credit, H - H * 0.012, unit, fontFamily);
+      // At the bottom left, on the map credit's line, as far from the edge as the credit
+      // is on the right: the two never meet, whatever the credit's length.
+      drawWatermark(ctx, W * 0.03, H - H * 0.012, unit, fontFamily);
     }
   }
 

@@ -169,13 +169,13 @@ activity plays; a video of several activities shows running totals.
 The end card: after the replay, 3.2 s more. The finished map fades to black and the
 Wornways mark draws itself: the tile appears with the start dot, the route runs through
 the double W with a glowing head, the end dot lands and the name fades in. The replay
-keeps its duration; the card is added to it. The preview shows the replay's last frame,
-not the card.
+keeps its duration; the card is added to it. The preview's picture shows the replay's
+last frame, not the card; its playable draft has the card.
 
-The watermark: the small mark and name, a little faint, at the bottom right on the map
-credit's line, left of the credit (alone at the bottom right without a map), on every
-frame of the replay. Nothing else is drawn on that line, so it never meets the title or
-the metrics card.
+The watermark: the small mark and name, a little faint, at the bottom left on the map
+credit's line, as far from the edge as the credit is on the right, on every frame of the
+replay. Nothing else is drawn on that line, so it never meets the title, the metrics card
+or the credit.
 
 | Setting        | CLI flag                         | Values | Default |
 | -------------- | -------------------------------- | ------ | ------- |

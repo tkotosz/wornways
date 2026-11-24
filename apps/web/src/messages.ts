@@ -58,7 +58,8 @@ export type Request =
   | { type: 'match'; id: number; settings: SettingsInput; source: Source }
   /** The places most of the activities these settings choose start or end at, to suggest. */
   | { type: 'places'; id: number; settings: SettingsInput; end: TrackEnd; source: Source }
-  | { type: 'make-video'; id: number; settings: SettingsInput; source: Source }
+  /** The video; a draft is small and at a low frame rate, for the preview to play. */
+  | { type: 'make-video'; id: number; settings: SettingsInput; source: Source; draft?: boolean }
   /** The last frame of the video the settings describe, small, as a preview. */
   | { type: 'make-poster'; id: number; settings: SettingsInput; source: Source }
   /** How the video the settings describe will be paced, without drawing it. */
@@ -165,8 +166,10 @@ export type VideoReport = {
   fileName: string;
   activities: number;
   seconds: number;
+  /** The frame's size and rate as made: a draft's are smaller than the settings'. */
   width: number;
   height: number;
+  fps: number;
   /** Why the map could not be drawn; null when it was, or when the settings leave it out. */
   mapError: string | null;
 };

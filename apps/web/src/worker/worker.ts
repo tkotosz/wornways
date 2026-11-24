@@ -224,6 +224,7 @@ async function answer(request: Exclude<Request, { type: 'cancel' }>, signal: Abo
         renderSignal,
         progress,
         remote?.loadTiles,
+        request.draft,
       );
       renderSignal.throwIfAborted();
       return reply({ type: 'video-made', id, video, report }, [video]);

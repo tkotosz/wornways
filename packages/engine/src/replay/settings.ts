@@ -442,7 +442,7 @@ export const SETTINGS: readonly SettingDefinition[] = [
     group: 'brand',
     kind: { type: 'switch' },
     default: true,
-    help: 'Show the small Wornways mark at the bottom right, on the map credit line.',
+    help: 'Show the small Wornways mark at the bottom left, on the map credit line.',
   },
 ];
 

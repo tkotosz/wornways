@@ -471,7 +471,7 @@ describe('the watermark', () => {
   const width = 270;
   const height = 480;
 
-  /** Orange pixels along the bottom edge of the last frame, where the watermark sits. */
+  /** Orange pixels along the bottom left edge of the last frame, where the watermark sits. */
   function bottomOrange(watermark: boolean): number {
     const renderer = createRenderer(
       [route()],
@@ -481,7 +481,7 @@ describe('the watermark', () => {
     );
     for (let f = 0; f < renderer.frameCount; f++) renderer.renderFrame(f);
     const { data } = (renderer.canvas.getContext('2d') as Context2DLike).getImageData(
-      width / 2,
+      0,
       height * 0.94,
       width / 2,
       height * 0.06,
@@ -492,7 +492,7 @@ describe('the watermark', () => {
     return count;
   }
 
-  it('shows at the bottom right when asked', () => {
+  it('shows at the bottom left when asked', () => {
     expect(bottomOrange(true)).toBeGreaterThan(bottomOrange(false) + 30);
   });
 });
@@ -558,5 +558,44 @@ describe('the elevation profile', () => {
       return h;
     };
     expect(cardTop(true)).toBeLessThan(cardTop(false) - 15);
+  });
+});
+
+describe('the watermark and the map credit', () => {
+  /** The rightmost column of the watermark's orange, on the credit's line of the last frame. */
+  async function watermarkRight(camera: 'fixed' | 'follow'): Promise<number> {
+    const [width, height] = [540, 960];
+    const settings = parseSettings({ camera, duration: '5', size: `${width}x${height}` });
+    const replay = await prepareReplay([route()], settings, {
+      createCanvas: (w, h) => createCanvas(w, h) as unknown as CanvasLike,
+      // Empty tiles: a map, and so its credit, without drawing streets.
+      loadTiles: async (ids) => ({
+        tiles: ids.map((id) => ({ ...id, data: null })),
+        downloaded: 0,
+      }),
+    });
+    const { renderer } = replay;
+    const last = renderer.replayFrames - 1;
+    renderer.skipTo(last);
+    renderer.renderFrame(last);
+    const top = Math.round(height * 0.95);
+    const { data } = (renderer.canvas.getContext('2d') as Context2DLike).getImageData(
+      0,
+      top,
+      width,
+      height - top,
+    );
+    let right = -1;
+    for (let i = 0; i < data.length; i += 4)
+      if (data[i]! > 150 && data[i + 1]! > 50 && data[i + 1]! < 200 && data[i + 2]! < 90)
+        right = Math.max(right, (i / 4) % width);
+    return right;
+  }
+
+  it('keeps to the bottom left, away from the credit, with any camera', async () => {
+    const fixed = await watermarkRight('fixed');
+    expect(fixed).toBeGreaterThan(0);
+    expect(fixed).toBeLessThan(540 * 0.3);
+    expect(Math.abs((await watermarkRight('follow')) - fixed)).toBeLessThanOrEqual(2);
   });
 });

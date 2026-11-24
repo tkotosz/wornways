@@ -1,6 +1,7 @@
 // Making a video in the worker: choosing the activities, setting up the replay, drawing
 // every frame on an OffscreenCanvas and encoding it to an H.264 MP4 with the browser's
-// encoder (WebCodecs), through Mediabunny.
+// encoder (WebCodecs), through Mediabunny. A draft is the same video at the preview's size
+// and a lower frame rate, to play on the page before the real one is made.
 
 import {
   createTileLoader,
@@ -26,10 +27,16 @@ import {
 } from 'mediabunny';
 import type { Progress, VideoReport } from '../messages.ts';
 import { loadFont } from './font.ts';
+import { previewSize } from './poster.ts';
 import { cacheStorageTileCache } from './tile-cache.ts';
 
 /** Bits per second for a 1080x1920 video at 30 frames per second; other sizes scale with it. */
 const FULL_HD_BITRATE = 8_000_000;
+
+/** A draft's frame rate: enough to see how the routes move, at half the frames of 30 fps. */
+export const DRAFT_FPS = 15;
+/** A draft's bits per second: its frames are small, but the map's lines need some detail. */
+const DRAFT_BITRATE = 1_500_000;
 
 /** What went wrong in choosing the activities, in words for the person. */
 export function problemText(problem: SelectionProblem, settings: RenderSettings): string {
@@ -76,15 +83,21 @@ export async function makeVideo(
   signal: AbortSignal,
   onProgress: (progress: Progress) => void,
   loadTiles: TileLoader = createTileLoader({ cache: cacheStorageTileCache }),
+  draft = false,
 ): Promise<{ video: ArrayBuffer; report: VideoReport }> {
   onProgress({ stage: 'choosing' });
-  const settings = parseSettings(input);
+  const asked = parseSettings(input);
+  // A draft keeps everything but the frame rate, and is drawn at the preview's size.
+  const settings = draft ? { ...asked, fps: DRAFT_FPS } : asked;
   const selection = selectTracks(library, settings);
   if (selection.problem) throw new VideoProblem(problemText(selection.problem, settings));
   const tracks = selection.tracks;
 
-  const { width, height, fps } = settings;
-  const bitrate = Math.round(FULL_HD_BITRATE * ((width * height) / (1080 * 1920)) * (fps / 30));
+  const { width, height } = draft ? previewSize(settings) : settings;
+  const { fps } = settings;
+  const bitrate = draft
+    ? DRAFT_BITRATE
+    : Math.round(FULL_HD_BITRATE * ((width * height) / (1080 * 1920)) * (fps / 30));
   const quality = new Quality({ bitrate });
   if (!(await canEncodeVideo('avc', { width, height, quality, frameRate: fps })))
     throw new VideoProblem(`This browser cannot make an H.264 video of ${width}x${height}.`);
@@ -96,6 +109,7 @@ export async function makeVideo(
     createCanvas: canvases.createCanvas,
     loadTiles,
     signal,
+    size: draft ? { width, height } : undefined,
   });
   if (signal.aborted) throw new Canceled();
 
@@ -133,6 +147,7 @@ export async function makeVideo(
       seconds: renderer.frameCount / fps,
       width,
       height,
+      fps,
       mapError: replay.map?.error ?? null,
     },
   };
