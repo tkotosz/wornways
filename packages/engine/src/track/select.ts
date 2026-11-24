@@ -135,7 +135,9 @@ export function selectTracks(activities: Track[], settings: RenderSettings): Sel
     if (trim.start || trim.end)
       selection.trimmed.push({ track: t, start: trim.start, end: trim.end });
     const c = cleanTrack(trim.track, { edgeJumpM: 0 });
-    if (c) cleaned.push({ ...c, startTime: t.startTime });
+    // Cleaning shortens long pauses; the time in total keeps them.
+    const raw = trim.track.points;
+    if (c) cleaned.push({ ...c, startTime: t.startTime, elapsedSeconds: raw[raw.length - 1] });
   }
   cleaned.sort((a, b) => a.startTime - b.startTime);
   for (const t of cleaned.filter((c) => trackLengthM(c) < MIN_LENGTH_M)) {

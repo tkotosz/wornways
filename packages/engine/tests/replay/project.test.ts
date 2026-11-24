@@ -62,6 +62,22 @@ describe('projectTrack', () => {
     expect(spiky).toBeGreaterThan(3);
   });
 
+  it('counts moving time and top speed by the recorded clock when the points are re-timed', () => {
+    // Recorded: 30 m in 10 s, standing for 100 s, 30 m in 10 s. Re-timed evenly over 120 s.
+    const points = new Float64Array(4 * STRIDE);
+    [0, 10, 110, 120].forEach((t, i) =>
+      points.set([19 + Math.min(i, 2) * 0.0004 + (i === 3 ? 0.0004 : 0), 47.5, 0, t], i * STRIDE),
+    );
+    const recorded = Float64Array.from([0, 10, 110, 120]);
+    const even = points.slice();
+    [0, 40, 40, 80].forEach((t, i) => (even[i * STRIDE + 3] = t));
+    const asRecorded = projectTrack({ points }, view, 0);
+    const reTimed = projectTrack({ points: even, recorded }, view, 0);
+
+    expect(reTimed.moving.at(-1)).toBe(asRecorded.moving.at(-1));
+    expect(reTimed.fastest.at(-1)).toBe(asRecorded.fastest.at(-1));
+  });
+
   it('takes small ups and downs for noise', () => {
     const projected = projectTrack(withElevations([100, 101, 99, 102, 100, 101]), view, 0);
 

@@ -10,6 +10,16 @@ export type Track = {
   startTime: number;
   /** Packed [lon, lat, ele, tSeconds] per point; tSeconds counts from the first point. */
   points: Float64Array;
+  /**
+   * Set while a video is made, when the points' clock is no longer the recorded one (even
+   * pace): the recorded seconds of each point, for values that need real time.
+   */
+  recorded?: Float64Array;
+  /**
+   * Set while a video is made: the recorded duration in seconds, stops included, before
+   * cleaning shortened long pauses.
+   */
+  elapsedSeconds?: number;
 };
 
 /** What a file parser returns: a track without the identity the caller assigns. */

@@ -37,7 +37,7 @@ export const TOP_SPEED_WINDOW_S = 10;
 
 /** Projects a track into `view`, dropping points closer than `minGapPx` to the one before. */
 export function projectTrack(
-  track: Pick<Track, 'points'>,
+  track: Pick<Track, 'points' | 'recorded'>,
   view: View,
   minGapPx: number,
 ): Projected {
@@ -66,13 +66,15 @@ export function projectTrack(
   let level = NaN;
   for (let i = 0; i < n; i++) {
     const o = i * STRIDE;
+    // Moving time and top speed go by the recorded clock, also under even pace.
+    const clock = track.recorded ? track.recorded[i] : p[o + 3];
     if (i > 0) {
       const step = distanceM(p[o - STRIDE + 1], p[o - STRIDE], p[o + 1], p[o]);
-      const dt = p[o + 3] - p[o - STRIDE + 3];
+      const dt = clock - seconds[i - 1];
       metres += step;
       if (dt > 0 && step / dt >= MOVING_SPEED) movingSeconds += dt;
     }
-    seconds[i] = p[o + 3];
+    seconds[i] = clock;
     reached[i] = metres;
     // The latest window of at least TOP_SPEED_WINDOW_S seconds that ends at this point.
     while (windowStart + 1 < i && seconds[i] - seconds[windowStart + 1] >= TOP_SPEED_WINDOW_S)

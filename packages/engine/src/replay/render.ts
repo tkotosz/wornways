@@ -1117,7 +1117,10 @@ export function createRenderer(
       activities: tracks.length,
       meters,
       movingSeconds: moving,
-      totalSeconds: tracks.reduce((sum, track) => sum + track.points[track.points.length - 1], 0),
+      totalSeconds: tracks.reduce(
+        (sum, track) => sum + (track.elapsedSeconds ?? track.points[track.points.length - 1]),
+        0,
+      ),
       climbed: hasElevation ? climbed : null,
       descended: hasElevation ? descended : null,
       highest: hasElevation ? highest : null,

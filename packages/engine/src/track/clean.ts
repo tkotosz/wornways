@@ -162,6 +162,7 @@ export function trackLengthM(track: Pick<Track, 'points'>): number {
 /**
  * Rewrites a track's clock so it moves at a constant speed along the route, keeping its
  * total duration: replays then draw the line evenly instead of following the real pace.
+ * The recorded clock stays in `recorded`, for the values that need real time.
  */
 export function paceByDistance(track: Track): Track {
   const p = track.points;
@@ -175,8 +176,11 @@ export function paceByDistance(track: Track): Track {
       distanceM(p[(i - 1) * STRIDE + 1], p[(i - 1) * STRIDE], p[i * STRIDE + 1], p[i * STRIDE]);
   }
   const length = cumulative[n - 1];
-  for (let i = 0; i < n; i++)
+  const recorded = track.recorded ?? new Float64Array(n);
+  for (let i = 0; i < n; i++) {
+    if (!track.recorded) recorded[i] = p[i * STRIDE + 3];
     points[i * STRIDE + 3] =
       length > 0 ? (cumulative[i] / length) * total : (i / Math.max(1, n - 1)) * total;
-  return { ...track, points };
+  }
+  return { ...track, points, recorded };
 }

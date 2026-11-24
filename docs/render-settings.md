@@ -183,7 +183,10 @@ activity plays; a video of several activities shows running totals.
 | `days`      | not offered                        | days with an activity        | days with an activity so far | days with an activity          |
 | `longest`   | not offered                        | longest so far               | longest activity so far      | longest activity               |
 
-Moving time counts the stretches covered at 0.5 m/s or faster, so stops do not count. Top
+The time over the video follows the replay, where long pauses are shortened; the totals
+card's time in total keeps every stop as recorded. Moving time counts the stretches covered at
+0.5 m/s or faster, so stops do not count; it and the top speed go by the recorded clock, also
+with even drawing pace. Top
 speed is the fastest average over 10 seconds, so a single point the GPS put too far away
 hardly counts. The start time is in the time zone of the device making the video. Pace and
 top speed are minutes per kilometer when every activity is on foot (run, walk, hike), otherwise
