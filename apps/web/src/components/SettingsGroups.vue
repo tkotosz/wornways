@@ -7,6 +7,8 @@ import {
   SHOW_TITLE,
   choiceLabel,
   offered,
+  panelOffered,
+  startingValue,
   type ActivityCount,
   type Panel,
   settingHint,
@@ -32,14 +34,23 @@ const GROUP_TITLES: Record<Panel, string> = {
   map: 'Map',
   title: 'Title',
   metrics: 'Metrics',
+  elevation: 'Elevation',
+  totals: 'Totals card',
   brand: 'Branding',
 };
 
 const groups = computed(() =>
-  props.groups.map((group) => ({ group, main: offered(group) })).filter((g) => g.main.length > 0),
+  props.groups
+    .filter((group) => panelOffered(group, props.plan))
+    .map((group) => ({ group, main: offered(group) }))
+    .filter((g) => g.main.length > 0),
 );
 
-const value = (setting: SettingDefinition) => adjustments.value[setting.name] ?? setting.default;
+/** The value set, else where the preset starts it (the totals card under Recap), else the default. */
+const value = (setting: SettingDefinition) =>
+  adjustments.value[setting.name] ??
+  startingValue(adjustments.value, props.count, setting.name) ??
+  setting.default;
 
 /** Sets a setting; undefined puts it back to its default. */
 function set(name: string, newValue: string | boolean | undefined): void {

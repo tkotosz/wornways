@@ -497,6 +497,124 @@ describe('the watermark', () => {
   });
 });
 
+describe('the elevation profile', () => {
+  const width = 270;
+  const height = 480;
+
+  /** A route like `route()`, over a hill in the middle, or without elevation. */
+  function hill(withElevation: boolean): Track {
+    const track = route();
+    const count = track.points.length / STRIDE;
+    for (let i = 0; i < count; i++)
+      track.points[i * STRIDE + 2] = withElevation ? 300 - Math.abs(i - count / 2) * 4 : NaN;
+    return track;
+  }
+
+  /** Orange pixels in the band above the map credit, halfway through the activity. */
+  function orangeAtTheBottom(track: Track, elevationProfile: boolean): number {
+    const fps = 10;
+    const renderer = createRenderer(
+      [track],
+      chronologicalTimeline([5_000], { duration: 2 }),
+      (w, h) => createCanvas(w, h) as unknown as CanvasLike,
+      { width, height, fps, overlay: 'single', metrics: [], elevationProfile },
+    );
+    for (let f = 0; f < fps; f++) renderer.renderFrame(f);
+    const { data } = (renderer.canvas.getContext('2d') as Context2DLike).getImageData(
+      0,
+      height * 0.88,
+      width,
+      height * 0.08,
+    );
+    let count = 0;
+    for (let i = 0; i < data.length; i += 4)
+      if (data[i]! > 60 && data[i]! > data[i + 2]! + 30) count++;
+    return count;
+  }
+
+  it('shows under a single activity with elevation, when asked', () => {
+    expect(orangeAtTheBottom(hill(true), true)).toBeGreaterThan(200);
+    expect(orangeAtTheBottom(hill(true), false)).toBe(0);
+  });
+
+  it('is left out for an activity without elevation', () => {
+    expect(orangeAtTheBottom(hill(false), true)).toBe(0);
+  });
+
+  it('lifts the metrics card above it', () => {
+    // Landscape, where the card would otherwise reach down to the profile.
+    const [w, h] = [480, 270];
+    /** The highest row of white text in the lower half of the last frame: the large value. */
+    const cardTop = (elevationProfile: boolean) => {
+      const renderer = createRenderer(
+        [hill(true)],
+        chronologicalTimeline([5_000], { duration: 1 }),
+        (cw, ch) => createCanvas(cw, ch) as unknown as CanvasLike,
+        { width: w, height: h, fps: 10, overlay: 'single', elevationProfile },
+      );
+      for (let f = 0; f < renderer.replayFrames; f++) renderer.renderFrame(f);
+      for (let y = h / 2; y < h; y++)
+        if (textPixels(renderer.canvas, 0, y, w / 2, y + 1) > 0) return y;
+      return h;
+    };
+    expect(cardTop(true)).toBeLessThan(cardTop(false) - 15);
+  });
+});
+
+describe('the totals card', () => {
+  const width = 270;
+  const height = 480;
+  const fps = 10;
+  /** A second route like `route()`, a day later. */
+  const nextDay = (): Track => ({ ...route(), id: 'next', startTime: Date.UTC(2026, 4, 3) });
+  const make = (tracks: Track[], options: Partial<RenderOptions>) =>
+    createRenderer(
+      tracks,
+      chronologicalTimeline(
+        tracks.map(() => 5_000),
+        { duration: 2 },
+      ),
+      (w, h) => createCanvas(w, h) as unknown as CanvasLike,
+      { width, height, fps, metrics: [], ...options },
+    );
+
+  it('adds its seconds after the replay, before the end card', () => {
+    const plain = make([route(), nextDay()], { endCard: true });
+    const withTotals = make([route(), nextDay()], { endCard: true, totalsCard: true });
+
+    expect(withTotals.replayFrames).toBe(plain.replayFrames);
+    expect(withTotals.frameCount).toBe(plain.frameCount + Math.round(3.4 * fps));
+  });
+
+  it('is left out for a single activity', () => {
+    const single = make([route()], { overlay: 'single', totalsCard: true });
+
+    expect(single.frameCount).toBe(single.replayFrames);
+  });
+
+  it('shows the totals over the dimmed map, then the end card fades from it', () => {
+    const renderer = make([route(), nextDay()], {
+      totalsCard: true,
+      endCard: true,
+      title: 'May 2026',
+    });
+    const totalsEnd = renderer.replayFrames + Math.round(3.4 * fps) - 1;
+    for (let f = 0; f < renderer.replayFrames; f++) renderer.renderFrame(f);
+    // The route, in the top fifth of the frame: away from the card's text.
+    const routeAtEnd = heatPixels(renderer.canvas, width, height * 0.2);
+    expect(routeAtEnd).toBeGreaterThan(20);
+    for (let f = renderer.replayFrames; f <= totalsEnd; f++) renderer.renderFrame(f);
+
+    // The values and the title in the middle; the route dimmed behind them.
+    expect(textPixels(renderer.canvas, 0, height * 0.3, width, height * 0.7)).toBeGreaterThan(300);
+    expect(heatPixels(renderer.canvas, width, height * 0.2)).toBeLessThan(routeAtEnd / 4);
+
+    // The end card's first frame still shows the totals, fading out.
+    renderer.renderFrame(totalsEnd + 1);
+    expect(textPixels(renderer.canvas, 0, height * 0.3, width, height * 0.7)).toBeGreaterThan(100);
+  });
+});
+
 describe('the watermark and the map credit', () => {
   /** The rightmost column of the watermark's orange, on the credit's line of the last frame. */
   async function watermarkRight(camera: 'fixed' | 'follow'): Promise<number> {

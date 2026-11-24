@@ -589,6 +589,8 @@ onMounted(() => {
       <PlaybackStep
         v-else-if="step === 'playback'"
         v-model="adjustments"
+        :engine="engine"
+        :settings="settings"
         :activities="chosenIds.length"
         :plan="plan"
         @back="step = 'activities'"

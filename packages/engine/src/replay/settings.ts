@@ -7,6 +7,7 @@
 import { sportSlug } from '../import/index-csv.ts';
 import type { LatLon } from '../track/places.ts';
 import { END_CARD_S } from './end-card.ts';
+import { TOTALS_CARD_S } from './totals-card.ts';
 import { PRESETS, PRESET_NAMES, type Preset } from './presets.ts';
 import type { Grouping } from './plans.ts';
 import { METRICS, POSITIONS, type Metric, type Position } from './render.ts';
@@ -54,6 +55,8 @@ export type RenderSettings = {
   // Look
   camera: 'zoom' | 'fixed' | 'follow';
   map: boolean;
+  /** Whether a single activity's video shows its climb profile along the bottom. */
+  elevationProfile: boolean;
   width: number;
   height: number;
   fps: number;
@@ -73,6 +76,9 @@ export type RenderSettings = {
   metricsPosition: Position;
   /** Size of the metrics card in percent of the normal size. */
   metricsSize: number;
+
+  /** Whether a video of several activities shows their totals after the replay. */
+  totalsCard: boolean;
 
   // Branding
   /** Whether the video ends with the Wornways card, after the replay. */
@@ -333,6 +339,16 @@ export const SETTINGS: readonly SettingDefinition[] = [
     help: 'Draw the street map under the routes.',
   },
   {
+    name: 'elevation-profile',
+    label: 'Elevation profile',
+    group: 'look',
+    kind: { type: 'switch' },
+    default: true,
+    help:
+      "A single activity's climb profile along the bottom, with a dot that moves along it. " +
+      'Only for an activity with recorded elevation.',
+  },
+  {
     name: 'size',
     label: 'Frame size',
     group: 'look',
@@ -412,6 +428,17 @@ export const SETTINGS: readonly SettingDefinition[] = [
     kind: { type: 'number', min: 50, max: 200, unit: '%' },
     default: '100',
     help: 'Size of the metrics card, in percent of the normal size.',
+  },
+
+  {
+    name: 'totals-card',
+    label: 'Totals card',
+    group: 'look',
+    kind: { type: 'switch' },
+    default: false,
+    help:
+      `For several activities: their totals after the replay (${TOTALS_CARD_S} s more): ` +
+      'activities, kilometers, hours moving and meters climbed. On with the recap preset.',
   },
 
   {
@@ -635,6 +662,7 @@ export function parseSettings(input: SettingsInput): RenderSettings {
     trimRadius: number('trim-radius'),
     camera: choice<RenderSettings['camera']>('camera'),
     map: flag('map'),
+    elevationProfile: flag('elevation-profile'),
     title: text('title'),
     titlePosition: choice<Position>('title-position'),
     titleSize: number('title-size'),
@@ -645,6 +673,7 @@ export function parseSettings(input: SettingsInput): RenderSettings {
     metricsFields: metricsFields === null ? null : ([...new Set(metricsFields)] as Metric[]),
     metricsPosition: choice<Position>('metrics-position'),
     metricsSize: number('metrics-size'),
+    totalsCard: flag('totals-card'),
     endCard: flag('end-card'),
     watermark: flag('watermark'),
   };

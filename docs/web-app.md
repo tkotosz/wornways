@@ -85,7 +85,8 @@ phone.
    when the filters change. Nothing can be deleted here.
 3. **Playback.** How the routes play, as a preset: All at once (picked at first), Recap or
    Multiday trip for several activities; Highlight (a 15-second clip of the activity)
-   for a single one. Each remembers its own choice. Each preset is a card with a small
+   for a single one. Beside them on wide screens, above them on phones, the same preview
+   as on Appearance, which can play the video. Each remembers its own choice. Each preset is a card with a small
    looping drawing of how activities move in it. Under the cards, the video's length,
    then a summary of the replay ("30 seconds · Recap" and a line telling what it plays,
    e.g. "12 months (312 activities), 2.3 s each" or "a race of all 24 activities, each
@@ -96,16 +97,18 @@ phone.
    goes back to that preset.
 4. **Appearance.** A live preview of the video's last frame, the finished picture, small,
    with the frame's shape, size, frame rate and length, redrawn shortly after each
-   change; the motion is seen once the video is made. Beside it on wide screens, under
+   change; its Play button makes a quick draft of the video and plays it (see Preview). Beside it on wide screens, under
    it on phones: the frame (aspect ratio: Story, Square or Landscape, for where the
    video will be posted; frame rate: 24, 30 or 60 fps), the title (on or off, starting
    as the automatic one; switched off, a title written stays for switching it on
    again), its position and size, the metrics (on or off, which ones in the order
-   picked, their position and size), the street map, and the branding: the end card
-   after the replay and the small watermark at the bottom left, on the map credit's line (each on or off). A
-   position is the top, middle or bottom row, left, middle or right; text in the middle
-   gets a soft dark band behind it. The settings of steps 3 and 4 are remembered for
-   the next visit.
+   picked, their position and size), the elevation profile (for a single activity with
+   recorded elevation only; the panel is not shown otherwise), the street map, the totals
+   card (for several activities only; on for Recap), and the branding: the end card after
+   the replay and the small watermark at the bottom left, on the map credit's line (each
+   on or off). A position is the top, middle or bottom row, left, middle or right; text in
+   the middle gets a soft dark band behind it. The settings of steps 3 and 4 are
+   remembered for the next visit.
 5. **Export.** A stage in the video's shape, which shows the finished picture with a "Make
    video" button in the middle; while the video is made, its progress and a way to
    cancel; then the video itself, playing. Download then appears in the bottom bar where
@@ -257,8 +260,15 @@ for exporting an account or a single activity from Strava or Garmin.
   still being drawn. Measured on a desktop: about 0.3 s for one activity, 0.5–1.1 s for a
   month or a year, 4.5 s for about 770 activities at once; the earlier picture stays
   until the new one is ready.
-- A playable preview (play, and a bar to move to any moment) is not built; the motion is
-  seen in the finished video.
+- Play, in the middle of the picture, makes a draft of the whole video, end card
+  included, and plays it in its place, with the player's bar to move to any moment. The
+  draft is the real video made small: at the preview's size, 15 frames a second and a
+  low bitrate, by the same code as Export. While it is made, the picture shows how far it
+  is, with Cancel. Any change of settings goes back to the picture until Play is pressed
+  again; the draft stays while the settings stay the same, also from one step to the
+  other. The engine draws frames forward only, so a video is what lets a person move back
+  and forth. Measured in headless Chromium without a GPU: under 3 s for the 25 demo
+  activities at once.
 
 ### Video
 
@@ -267,6 +277,8 @@ for exporting an account or a single activity from Strava or Garmin.
 - Text is drawn with a font shipped with the app (Inter, under the SIL Open Font License)
   and loaded in the worker, so a video looks the same on every device.
 - Every frame with a map carries the map credit the tile provider asks for.
+- When the totals card is on, 3.4 s of totals follow the replay: the map dims and the
+  activities, kilometers, hours moving and meters climbed count up under the title.
 - Unless switched off, the video ends with the Wornways card, 3.2 s added after the
   replay: the finished map fades to black and the mark draws itself, then the name
   fades in. While the replay plays, a small mark and name sit at the bottom left, on the

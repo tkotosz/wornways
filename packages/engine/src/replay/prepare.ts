@@ -171,7 +171,9 @@ export async function prepareReplay(
     titleScale: settings.titleSize / 100,
     metricsScale: settings.metricsSize / 100,
     endCard: settings.endCard,
+    totalsCard: settings.totalsCard,
     watermark: settings.watermark,
+    elevationProfile: settings.elevationProfile,
     onlyFrame,
   });
   return { renderer, plan, title, width, height, fps, camera, cameraMode, map };

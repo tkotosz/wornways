@@ -31,12 +31,12 @@ Single- and multi-activity replays remember their timing and camera settings ind
 Use **Reset playback to defaults** under Fine-tune playback for the same starting settings as
 `wornways render` without a preset.
 
-| Preset          | What it plays                                                                         | Settings                                                                      |
-| --------------- | ------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
-| `all-at-once`   | every activity starts at the same moment and moves at its real pace                   | `--group all --group-pace real --duration 30`                                 |
-| `recap`         | activities in turn, grouped as needed (a week by activity, a year by month)           | `--group auto --share even --group-pace fit --duration 30`                    |
-| `multiday-trip` | one day after another, a longer day getting more time, the camera following the route | `--group day --share distance --group-pace fit --duration 45 --camera follow` |
-| `highlight`     | for one activity: a 15-second clip with the camera following the route                | `--duration 15 --camera follow`                                               |
+| Preset          | What it plays                                                                                  | Settings                                                                      |
+| --------------- | ---------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| `all-at-once`   | every activity starts at the same moment and moves at its real pace                            | `--group all --group-pace real --duration 30`                                 |
+| `recap`         | activities in turn, grouped as needed (a week by activity, a year by month), then their totals | `--group auto --share even --group-pace fit --duration 30 --totals-card`      |
+| `multiday-trip` | one day after another, a longer day getting more time, the camera following the route          | `--group day --share distance --group-pace fit --duration 45 --camera follow` |
+| `highlight`     | for one activity: a 15-second clip with the camera following the route                         | `--duration 15 --camera follow`                                               |
 
 ## Settings
 
@@ -86,8 +86,8 @@ The fields beside numeric sliders accept exact values within the same ranges as 
 | Drawing pace | `--pace`       | `time` or `distance`                                                                                                                                                    | `time`  |
 
 0.4 s of map come before the first group and up to 2.5 s on the finished picture after
-the last (at most a tenth of the video; only 0.3 s when the end card follows, as it fades
-in from the finished picture); the groups share the time in between, each at
+the last (at most a tenth of the video; only 0.3 s when the totals card or the end card
+follows, as it fades in from the finished picture); the groups share the time in between, each at
 least 0.3 s. The headline shows the playing group: an activity's or a day's date, a week's
 dates, a month, or the dates all activities span; in a race, the race clock.
 
@@ -114,15 +114,23 @@ Trimmed exports default to the filename `replay.mp4`.
 
 ### Look
 
-| Setting           | CLI flag             | Values                                                                 | Default |
-| ----------------- | -------------------- | ---------------------------------------------------------------------- | ------- |
-| Camera            | `--camera`           | `zoom`, `fixed` or `follow`                                            | `zoom`  |
-| Street map        | `--map` / `--no-map` | on/off                                                                 | on      |
-| Frame size        | `--size`             | `WxH`, presets: story 1080x1920, square 1080x1080, landscape 1920x1080 | story   |
-| Frames per second | `--fps`              | 24, 30, 60                                                             | 30      |
+| Setting           | CLI flag                                         | Values                                                                 | Default |
+| ----------------- | ------------------------------------------------ | ---------------------------------------------------------------------- | ------- |
+| Camera            | `--camera`                                       | `zoom`, `fixed` or `follow`                                            | `zoom`  |
+| Street map        | `--map` / `--no-map`                             | on/off                                                                 | on      |
+| Elevation profile | `--elevation-profile` / `--no-elevation-profile` | on/off                                                                 | on      |
+| Frame size        | `--size`                                         | `WxH`, presets: story 1080x1920, square 1080x1080, landscape 1920x1080 | story   |
+| Frames per second | `--fps`                                          | 24, 30, 60                                                             | 30      |
 
 In Appearance, choose a frame preset or enter a custom size such as `640x480`. Both
 dimensions must be positive even numbers. Available encoder sizes depend on the device.
+
+The elevation profile shows in a single activity's video only, when the activity recorded
+elevation: its climb along the bottom of the frame, between the side margins and just
+above the map credit, over the distance from start to finish. The part already covered is
+orange, the rest faint, and a glowing dot moves along the line with the activity. A route
+that rises less than 60 m is drawn against a 60 m range, so a flat route looks flat. The
+metrics card and the title, when they sit at the bottom, go above it.
 
 The follow camera tracks the moving end of the route and pulls back to show the whole
 replay at the end. Each activity gets a zoom suited to its pace, and the camera widens
@@ -156,13 +164,31 @@ activity plays; a video of several activities shows running totals.
 | Position  | `--metrics-position`         | `top-`, `middle-` or `bottom-` with `left`, `center` or `right`, e.g. `middle-center`         | `bottom-left`        |
 | Card size | `--metrics-size`             | 50–200%                                                                                       | 100%                 |
 
+### Totals card
+
+For a video of several activities: after the replay, 3.4 s more, before the end card. The
+finished map dims, the video's title comes in with a short orange rule under it, and the
+totals count up: the activities (named after the one sport shown, such as rides), the
+kilometers, the hours moving and the meters climbed (left out when no activity recorded
+elevation). Two columns on a story or square frame, one row on a wide one. Distance and
+climb are the ones the metrics card shows at the end; hours moving add up the time between
+points covered at 0.5 m/s or faster, so stops do not count.
+
+The recap preset turns it on; any other video of several activities can. In the web app a
+Custom playback made from Recap keeps it on, and the switch on the Appearance step always
+decides over the preset.
+
+| Setting          | CLI flag                             | Values | Default              |
+| ---------------- | ------------------------------------ | ------ | -------------------- |
+| Show totals card | `--totals-card` / `--no-totals-card` | on/off | off; on with `recap` |
+
 ### Branding
 
 The end card: after the replay, 3.2 s more. The finished map fades to black and the
 Wornways mark draws itself: the tile appears with the start dot, the route runs through
 the double W with a glowing head, the end dot lands and the name fades in. The replay
-keeps its duration; the card is added to it. The preview shows the replay's last frame,
-not the card.
+keeps its duration; the card is added to it. The preview's picture shows the replay's
+last frame, not the card; its playable draft has the card.
 
 The watermark: the small mark and name, a little faint, at the bottom left on the map
 credit's line, as far from the edge as the credit is on the right, on every frame of the
