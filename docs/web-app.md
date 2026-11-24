@@ -234,10 +234,16 @@ for exporting an account or a single activity from Strava or Garmin.
   them go.
 - The file is built by `npm run demo-routes` (`apps/cli/src/demo`): a road network from the
   road lines of zoom-13 map tiles, shortest paths between named places (quieter roads
-  preferred; paths only for runs), and recorded times at a sport's speed with a little
-  variation. The tiles have no elevation, so the demo has none. The same map data always
-  gives the same file. The download stays within OpenFreeMap's terms for offline use:
-  under 3,000 tiles, 4 requests at a time, a User-Agent naming the app.
+  preferred; paths only for runs), heights, and recorded times at a sport's speed with a
+  little variation. The heights come from Terrain Tiles (open data on AWS; for Mallorca,
+  SRTM on land and ETOPO1 at sea, about 30 m per pixel at zoom 12): read every 20 m along
+  a route and averaged over 200 m of it, since 30 m pixels next to a winding mountain road
+  also catch the slope beside it. The speed follows the gradient: a ride at about half its
+  speed up a 7% climb and at most 1.8 times it downhill; a run at about 60% up a 10% climb
+  and at most 1.15 times downhill. The same map and terrain data always give the same
+  file. The map download stays within OpenFreeMap's terms for offline use: under 3,000
+  tiles, 4 requests at a time, a User-Agent naming the app; the terrain tiles the routes
+  need (about 50) are fetched 4 at a time and kept beside the map tiles.
 - The routes are drawn from OpenStreetMap data, so the ZIP is published under the Open
   Database License with "© OpenStreetMap contributors" (in the ZIP's `README.txt` and in
   `THIRD_PARTY_NOTICES.md`).

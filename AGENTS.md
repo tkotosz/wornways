@@ -14,7 +14,8 @@
   a phone (see the README).
 - `npm run lint` / `npm run format`: ESLint and Prettier.
 - `npm run demo-routes`: rebuilds the web app's demo activities
-  (`apps/web/public/demo/mallorca.zip`) from map tiles; the same map data gives the same file.
+  (`apps/web/public/demo/mallorca.zip`) from map and terrain tiles; the same data gives the
+  same file.
 - `npm run icons`: draws the web app's PNG icons from the SVG marks in
   `apps/web/public/icons/`.
 - `npm run build`: TypeScript project build.

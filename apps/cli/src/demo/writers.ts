@@ -7,13 +7,15 @@ import type { Recorded } from './timing.ts';
 const escapeXml = (text: string) =>
   text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
-/** A GPX file of one activity. The points have no elevation: the map tiles give none. */
+/** A GPX file of one activity, with each point's height when it has one. */
 export function gpxFile(name: string, type: string, start: Date, points: Recorded[]): string {
   const time = (seconds: number) =>
     new Date(start.getTime() + seconds * 1000).toISOString().replace('.000Z', 'Z');
   const rows = points.map(
     (p) =>
-      `      <trkpt lat="${p.lat.toFixed(6)}" lon="${p.lon.toFixed(6)}"><time>${time(p.seconds)}</time></trkpt>`,
+      `      <trkpt lat="${p.lat.toFixed(6)}" lon="${p.lon.toFixed(6)}">` +
+      (p.ele === undefined ? '' : `<ele>${p.ele.toFixed(1)}</ele>`) +
+      `<time>${time(p.seconds)}</time></trkpt>`,
   );
   return [
     '<?xml version="1.0" encoding="UTF-8"?>',

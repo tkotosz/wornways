@@ -15,8 +15,9 @@ import {
   type LatLon,
   type RoadGraph,
 } from './road-graph.ts';
+import { alongRoute, loadTerrain, routeHeights, TERRAIN_ZOOM } from './terrain.ts';
 import { tileRoads } from './tile-roads.ts';
-import { recordRoute, seededRandom, type Recorded } from './timing.ts';
+import { recordRoute, RIDE_HILLS, RUN_HILLS, seededRandom, type Recorded } from './timing.ts';
 import { activitiesCsv, gpxFile, type ListedActivity, zipFile } from './writers.ts';
 
 const OUT = path.join(import.meta.dirname, '../../../web/public/demo/mallorca.zip');
@@ -34,6 +35,10 @@ activities. The routes were drawn along roads from OpenStreetMap data, (c) OpenS
 contributors, available under the Open Database License (ODbL) 1.0:
 https://opendatacommons.org/licenses/odbl/1-0/
 The road data came from OpenMapTiles vector tiles served by OpenFreeMap.
+
+The heights come from Terrain Tiles (https://registry.opendata.aws/terrain-tiles/):
+SRTM terrain data courtesy of the U.S. Geological Survey, and ETOPO1 terrain data from
+the U.S. National Oceanic and Atmospheric Administration.
 `;
 
 /** The map tiles covering the island. */
@@ -130,6 +135,15 @@ async function main(): Promise<void> {
     })),
   ].sort((a, b) => a.start.localeCompare(b.start));
 
+  // Heights: read every 20 m along each route, from the terrain tiles those places are on.
+  const places = planned.map((activity) => alongRoute(activity.route));
+  // Beside the map tiles' folder, not in it: that one is emptied when the map changes.
+  const terrainDir = path.join(path.dirname(tileCacheDir()), 'terrain');
+  const terrain = await loadTerrain(places.flat(), fileTileCache(terrainDir), USER_AGENT);
+  console.log(
+    `Terrain    ${terrain.tiles} tiles at zoom ${TERRAIN_ZOOM} (${terrain.downloaded} downloaded)`,
+  );
+
   const files: { path: string; data: Uint8Array }[] = [];
   const listed: ListedActivity[] = [];
   const encoder = new TextEncoder();
@@ -142,6 +156,10 @@ async function main(): Promise<void> {
         // Rides between 23 and 27 km/h, runs between 10.5 and 11.5 km/h.
         speed: ride ? (23 + 4 * random()) / 3.6 : (10.5 + random()) / 3.6,
         interval: 10,
+        hills: {
+          heights: routeHeights(places[i], terrain.heightAt),
+          pace: ride ? RIDE_HILLS : RUN_HILLS,
+        },
         stop: ride && km > 60 ? { at: 0.55, seconds: 900 + Math.round(600 * random()) } : undefined,
       },
       random,
@@ -163,8 +181,11 @@ async function main(): Promise<void> {
       file,
     });
     const hours = points[points.length - 1].seconds / 3600;
+    const climbed = points
+      .slice(1)
+      .reduce((sum, p, k) => sum + Math.max(0, p.ele! - points[k].ele!), 0);
     console.log(
-      `  ${id}  ${activity.start.slice(0, 10)}  ${type.padEnd(4)}  ${km.toFixed(1).padStart(5)} km  ${hours.toFixed(1)} h  ${activity.name}`,
+      `  ${id}  ${activity.start.slice(0, 10)}  ${type.padEnd(4)}  ${km.toFixed(1).padStart(5)} km  ${hours.toFixed(1)} h  ↑${climbed.toFixed(0).padStart(4)} m  ${activity.name}`,
     );
   }
   files.unshift(
