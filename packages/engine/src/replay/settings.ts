@@ -55,8 +55,11 @@ export type RenderSettings = {
   // Look
   camera: 'zoom' | 'fixed' | 'follow';
   map: boolean;
-  /** Whether a single activity's video shows its climb profile along the bottom. */
-  elevationProfile: boolean;
+  /**
+   * Whether the video shows the activities' climb profile along the bottom; null: on for a
+   * single activity, off for several.
+   */
+  elevationProfile: boolean | null;
   width: number;
   height: number;
   fps: number;
@@ -343,10 +346,11 @@ export const SETTINGS: readonly SettingDefinition[] = [
     label: 'Elevation profile',
     group: 'look',
     kind: { type: 'switch' },
-    default: true,
+    default: null,
+    automatic: 'on for a single activity, off for several',
     help:
-      "A single activity's climb profile along the bottom, with a dot that moves along it. " +
-      'Only for an activity with recorded elevation.',
+      'The climb profile along the bottom: the activities end to end, with a dot moving ' +
+      'along each one being drawn. Only with recorded elevation.',
   },
   {
     name: 'size',
@@ -565,6 +569,13 @@ export function parseSettings(input: SettingsInput): RenderSettings {
     if (typeof value !== 'boolean') throw new SettingsError(name, 'is a switch and takes no value');
     return value;
   };
+  /** A switch with no fixed default: on, off, or null to leave it to the video. */
+  const optionalFlag = (name: string): boolean | null => {
+    const value = valueOf(name);
+    if (value === null) return null;
+    if (typeof value !== 'boolean') throw new SettingsError(name, 'is a switch and takes no value');
+    return value;
+  };
   const number = (name: string): number => {
     const kind = definition(name).kind;
     if (kind.type !== 'number') throw new Error(`"${name}" is not a number setting`);
@@ -662,7 +673,7 @@ export function parseSettings(input: SettingsInput): RenderSettings {
     trimRadius: number('trim-radius'),
     camera: choice<RenderSettings['camera']>('camera'),
     map: flag('map'),
-    elevationProfile: flag('elevation-profile'),
+    elevationProfile: optionalFlag('elevation-profile'),
     title: text('title'),
     titlePosition: choice<Position>('title-position'),
     titleSize: number('title-size'),

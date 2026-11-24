@@ -164,8 +164,9 @@ export type RenderOptions = {
   /** Draw the small Wornways mark on the map credit's line. Default false. */
   watermark?: boolean;
   /**
-   * A single activity with elevation: its climb profile along the bottom, with a dot that
-   * moves along it. Text at the bottom goes above it. Default false.
+   * The activities' climb profile along the bottom, end to end, with a dot moving along
+   * each one being drawn; left out when none has elevation. Text at the bottom goes above
+   * it. Default false.
    */
   elevationProfile?: boolean;
   fontFamily?: string;
@@ -566,18 +567,24 @@ export function createRenderer(
     width: W - 2 * margin,
     height: profileHeight,
   };
-  const profile =
-    options.elevationProfile && kind === 'single'
-      ? elevationProfile(
-          tracks[0],
-          Math.round(Math.min(600, Math.max(50, profileBox.width / (3 * unit)))),
-        )
-      : null;
+  const profile = options.elevationProfile
+    ? elevationProfile(
+        tracks,
+        Math.round(Math.min(600, Math.max(50, profileBox.width / (3 * unit)))),
+      )
+    : null;
   /** The lowest baseline text in the bottom row may take: above the profile when it shows. */
   const textFloor = profile ? profileBox.y - 30 * unit : H * 0.955;
 
   const headFade = 0.35; // seconds a head dot lingers after its track finishes
   const headRadius = 15 * unit;
+  /** How strongly a track's head dot shows at time `t`: 1 while it moves, fading after. */
+  const headAlpha = (tr: Prepared, t: number) => {
+    if (!tr.started) return 0;
+    const sinceEnd = t - tr.doneAt;
+    if (sinceEnd >= headFade) return 0;
+    return sinceEnd <= 0 ? 1 : 1 - sinceEnd / headFade;
+  };
   let nextFrame = 0;
 
   function markDirty(level: Level, r: Rect): void {
@@ -931,10 +938,8 @@ export function createRenderer(
     // Head dots
     ctx.globalCompositeOperation = 'lighter';
     for (const tr of prepared) {
-      if (!tr.started) continue;
-      const sinceEnd = t - tr.doneAt;
-      if (sinceEnd >= headFade) continue;
-      const a = sinceEnd <= 0 ? 1 : 1 - sinceEnd / headFade;
+      const a = headAlpha(tr, t);
+      if (a === 0) continue;
       const x = tr.headX * zoom + tx;
       const y = tr.headY * zoom + ty;
       const glow = ctx.createRadialGradient(x, y, 0, x, y, headRadius);
@@ -948,7 +953,18 @@ export function createRenderer(
     }
     ctx.globalCompositeOperation = 'source-over';
 
-    if (profile) drawElevationProfile(ctx, profile, profileBox, prepared[0].metres, unit);
+    if (profile)
+      drawElevationProfile(
+        ctx,
+        profile,
+        profileBox,
+        prepared.map((tr) => ({
+          meters: tr.started ? tr.metres : 0,
+          // One activity keeps its dot, also at the finish; several show theirs while moving.
+          dot: kind === 'single' ? 1 : headAlpha(tr, t),
+        })),
+        unit,
+      );
 
     ctx.textBaseline = 'alphabetic';
     if (options.title && title) {

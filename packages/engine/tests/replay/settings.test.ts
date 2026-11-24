@@ -32,7 +32,7 @@ describe('parseSettings', () => {
       trimRadius: 0,
       camera: 'zoom',
       map: true,
-      elevationProfile: true,
+      elevationProfile: null,
       title: null,
       width: 1080,
       height: 1920,

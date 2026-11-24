@@ -102,8 +102,8 @@ phone.
    video will be posted; frame rate: 24, 30 or 60 fps), the title (on or off, starting
    as the automatic one; switched off, a title written stays for switching it on
    again), its position and size, the metrics (on or off, which ones in the order
-   picked, their position and size), the elevation profile (for a single activity with
-   recorded elevation only; the panel is not shown otherwise), the street map, the totals
+   picked, their position and size), the elevation profile (when an activity recorded
+   elevation; on for a single activity, off for several), the street map, the totals
    card (for several activities only; on for Recap), and the branding: the end card after
    the replay and the small watermark at the bottom left, on the map credit's line (each
    on or off). A position is the top, middle or bottom row, left, middle or right; text in

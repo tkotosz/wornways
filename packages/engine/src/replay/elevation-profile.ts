@@ -1,15 +1,19 @@
-// The climb profile along the bottom of a single activity's video: its elevation over the
-// distance, the part covered so far in the route's orange, with a dot where the activity is.
+// The climb profile along the bottom of a video: the activities' elevation over their
+// distance, laid end to end in date order, with a thin tick where one ends and the next
+// begins. Each activity's part turns orange as it is drawn, with a dot where it is.
 
 import { distanceM } from '../track/geo.ts';
 import { STRIDE, type Track } from '../track/types.ts';
 import type { Context2DLike } from './render.ts';
 
 export type ElevationProfile = {
-  /** Elevation in meters at evenly spaced distances, from the start to the finish. */
+  /** Elevation in meters at evenly spaced distances, from the first start to the last finish. */
   elevation: Float32Array;
-  /** The activity's distance in meters, measured as the renderer measures it. */
-  totalM: number;
+  /**
+   * Where each activity starts, in meters along the strip; one more entry at the end, the
+   * total. Distances are measured as the renderer measures them.
+   */
+  starts: Float64Array;
   /** The elevations the strip's bottom and top stand for. */
   low: number;
   high: number;
@@ -19,33 +23,44 @@ export type ElevationProfile = {
 const MIN_RANGE_M = 60;
 
 /**
- * The profile of `track` in `samples` steps of distance: the mean elevation of the points in
- * each step, steps without one filled in from their neighbors, then lightly smoothed. Null
- * when the track has no elevation or no distance.
+ * The profile of `tracks`, end to end, in `samples` steps of distance: the mean elevation of
+ * the points in each step, steps without one (also an activity without elevation) on a
+ * straight line between the heights around them, then lightly smoothed. Null when no
+ * activity has elevation, or there is no distance.
  */
 export function elevationProfile(
-  track: Pick<Track, 'points'>,
+  tracks: Pick<Track, 'points'>[],
   samples: number,
 ): ElevationProfile | null {
-  const p = track.points;
-  const n = p.length / STRIDE;
-  const meters = new Float64Array(n);
-  for (let i = 1; i < n; i++) {
-    const o = i * STRIDE;
-    meters[i] = meters[i - 1] + distanceM(p[o - STRIDE + 1], p[o - STRIDE], p[o + 1], p[o]);
-  }
-  const totalM = n > 0 ? meters[n - 1] : 0;
+  // Each point's meters from the first activity's start.
+  const starts = new Float64Array(tracks.length + 1);
+  const along = tracks.map((track, k) => {
+    const p = track.points;
+    const n = p.length / STRIDE;
+    const meters = new Float64Array(n);
+    meters[0] = starts[k];
+    for (let i = 1; i < n; i++) {
+      const o = i * STRIDE;
+      meters[i] = meters[i - 1] + distanceM(p[o - STRIDE + 1], p[o - STRIDE], p[o + 1], p[o]);
+    }
+    starts[k + 1] = n > 0 ? meters[n - 1] : starts[k];
+    return meters;
+  });
+  const totalM = starts[tracks.length];
   if (!(totalM > 0) || samples < 2) return null;
 
   const sum = new Float64Array(samples);
   const count = new Uint32Array(samples);
-  for (let i = 0; i < n; i++) {
-    const ele = p[i * STRIDE + 2];
-    if (!Number.isFinite(ele)) continue;
-    const step = Math.min(samples - 1, Math.floor((meters[i] / totalM) * samples));
-    sum[step] += ele;
-    count[step]++;
-  }
+  tracks.forEach((track, k) => {
+    const p = track.points;
+    for (let i = 0; i < along[k].length; i++) {
+      const ele = p[i * STRIDE + 2];
+      if (!Number.isFinite(ele)) continue;
+      const step = Math.min(samples - 1, Math.floor((along[k][i] / totalM) * samples));
+      sum[step] += ele;
+      count[step]++;
+    }
+  });
   const known: number[] = [];
   for (let s = 0; s < samples; s++) if (count[s] > 0) known.push(s);
   if (known.length === 0) return null;
@@ -80,92 +95,110 @@ export function elevationProfile(
     low = middle - MIN_RANGE_M / 2;
     high = middle + MIN_RANGE_M / 2;
   }
-  return { elevation, totalM, low, high };
+  return { elevation, starts, low, high };
 }
 
 export type Box = { x: number; y: number; width: number; height: number };
 
+/** Where an activity is: meters covered so far, and how strongly its dot shows (0: none). */
+export type ProfileProgress = { meters: number; dot: number };
+
 /**
- * Draws the profile in `box`, `meters` into the activity: the part covered in orange, the
- * rest faint, and a glowing dot on the line where the activity is.
+ * Draws the profile in `box`, with one entry of `progress` per activity: the part each has
+ * covered in orange, the rest faint, a thin tick between activities, and a glowing dot on
+ * the line where each one is.
  */
 export function drawElevationProfile(
   ctx: Context2DLike,
   profile: ElevationProfile,
   box: Box,
-  meters: number,
+  progress: ProfileProgress[],
   unit: number,
 ): void {
-  const { elevation, totalM, low, high } = profile;
+  const { elevation, starts, low, high } = profile;
   const last = elevation.length - 1;
+  const totalM = starts[starts.length - 1];
   const bottom = box.y + box.height;
-  const xOf = (s: number) => box.x + (s / last) * box.width;
+  /** The sample position of a distance along the strip. */
+  const stepOf = (meters: number) => Math.min(1, Math.max(0, meters / totalM)) * last;
+  const xOf = (meters: number) => box.x + (stepOf(meters) / last) * box.width;
   // The lowest point keeps a little fill under it, so the strip reads as ground.
-  const yOf = (e: number) => bottom - (0.14 + (0.86 * (e - low)) / (high - low)) * box.height;
-
-  const at = Math.min(1, Math.max(0, meters / totalM)) * last;
-  const step = Math.min(last - 1, Math.floor(at));
-  const f = at - step;
-  const head = {
-    x: xOf(at),
-    y: yOf(elevation[step] + f * (elevation[step + 1] - elevation[step])),
+  const yOf = (meters: number) => {
+    const at = stepOf(meters);
+    const s = Math.min(last - 1, Math.floor(at));
+    const e = elevation[s] + (at - s) * (elevation[s + 1] - elevation[s]);
+    return bottom - (0.14 + (0.86 * (e - low)) / (high - low)) * box.height;
   };
+  const xOfStep = (s: number) => box.x + (s / last) * box.width;
+  const yOfStep = (s: number) =>
+    bottom - (0.14 + (0.86 * (elevation[s] - low)) / (high - low)) * box.height;
 
-  /** Traces the line from sample `from` to `to`, starting or ending at the head when given. */
-  const trace = (from: number, to: number, start?: typeof head, end?: typeof head) => {
-    if (start) ctx.lineTo(start.x, start.y);
-    for (let s = from; s <= to; s++) ctx.lineTo(xOf(s), yOf(elevation[s]));
-    if (end) ctx.lineTo(end.x, end.y);
+  /** Traces the line from `from` to `to` meters along the strip. */
+  const trace = (from: number, to: number) => {
+    ctx.lineTo(xOf(from), yOf(from));
+    for (let s = Math.floor(stepOf(from)) + 1; s < stepOf(to); s++)
+      ctx.lineTo(xOfStep(s), yOfStep(s));
+    ctx.lineTo(xOf(to), yOf(to));
+  };
+  /** Fills under the line from `from` to `to`, then draws the line. */
+  const part = (from: number, to: number, fill: unknown, line: string, width: number) => {
+    if (!(to > from)) return;
+    ctx.beginPath();
+    ctx.moveTo(xOf(from), bottom);
+    trace(from, to);
+    ctx.lineTo(xOf(to), bottom);
+    ctx.closePath();
+    ctx.fillStyle = fill;
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(xOf(from), yOf(from));
+    trace(from, to);
+    ctx.lineWidth = width;
+    ctx.strokeStyle = line;
+    ctx.stroke();
   };
 
   ctx.globalCompositeOperation = 'source-over';
   ctx.globalAlpha = 1;
   ctx.lineJoin = 'round';
-  ctx.lineCap = 'round';
+  // Flat ends, so the parts meet without overlapping.
+  ctx.lineCap = 'butt';
+  const covered = ctx.createLinearGradient(0, box.y, 0, bottom);
+  covered.addColorStop(0, 'rgba(255, 138, 42, 0.55)');
+  covered.addColorStop(1, 'rgba(255, 138, 42, 0.12)');
+  const heads: number[] = [];
+  progress.forEach(({ meters, dot }, k) => {
+    const start = starts[k];
+    const end = starts[k + 1];
+    const head = start + Math.min(end - start, Math.max(0, meters));
+    // What is still ahead: faint. What is covered: orange, fading to the bottom.
+    part(head, end, 'rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.35)', 2 * unit);
+    part(start, head, covered, 'rgba(255, 176, 102, 0.95)', 2.5 * unit);
+    if (dot > 0) heads.push(head, dot);
+  });
 
-  // What is still ahead: faint.
-  ctx.beginPath();
-  ctx.moveTo(head.x, bottom);
-  trace(step + 1, last, head);
-  ctx.lineTo(xOf(last), bottom);
-  ctx.closePath();
-  ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
-  ctx.fill();
-  ctx.beginPath();
-  ctx.moveTo(head.x, head.y);
-  trace(step + 1, last);
-  ctx.lineWidth = 2 * unit;
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.35)';
-  ctx.stroke();
-
-  // What is covered: orange, fading to the bottom.
-  if (at > 0) {
+  // A thin tick where one activity ends and the next begins.
+  ctx.lineWidth = 1.5 * unit;
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.28)';
+  for (let k = 1; k < starts.length - 1; k++) {
     ctx.beginPath();
-    ctx.moveTo(box.x, bottom);
-    trace(0, step, undefined, head);
-    ctx.lineTo(head.x, bottom);
-    ctx.closePath();
-    const fill = ctx.createLinearGradient(0, box.y, 0, bottom);
-    fill.addColorStop(0, 'rgba(255, 138, 42, 0.55)');
-    fill.addColorStop(1, 'rgba(255, 138, 42, 0.12)');
-    ctx.fillStyle = fill;
-    ctx.fill();
-    ctx.beginPath();
-    ctx.moveTo(xOf(0), yOf(elevation[0]));
-    trace(1, step, undefined, head);
-    ctx.lineWidth = 2.5 * unit;
-    ctx.strokeStyle = 'rgba(255, 176, 102, 0.95)';
+    ctx.moveTo(xOf(starts[k]), bottom);
+    ctx.lineTo(xOf(starts[k]), box.y + box.height * 0.08);
     ctx.stroke();
   }
 
-  // The dot, like the route's head.
+  // The dots, like the routes' heads.
   const radius = 12 * unit;
-  const glow = ctx.createRadialGradient(head.x, head.y, 0, head.x, head.y, radius);
-  glow.addColorStop(0, 'rgba(255, 244, 230, 0.95)');
-  glow.addColorStop(0.3, 'rgba(255, 190, 130, 0.55)');
-  glow.addColorStop(1, 'rgba(255, 120, 40, 0)');
-  ctx.fillStyle = glow;
-  ctx.beginPath();
-  ctx.arc(head.x, head.y, radius, 0, Math.PI * 2);
-  ctx.fill();
+  for (let i = 0; i < heads.length; i += 2) {
+    const [x, y] = [xOf(heads[i]), yOf(heads[i])];
+    const a = heads[i + 1];
+    const glow = ctx.createRadialGradient(x, y, 0, x, y, radius);
+    glow.addColorStop(0, `rgba(255, 244, 230, ${(0.95 * a).toFixed(3)})`);
+    glow.addColorStop(0.3, `rgba(255, 190, 130, ${(0.55 * a).toFixed(3)})`);
+    glow.addColorStop(1, 'rgba(255, 120, 40, 0)');
+    ctx.fillStyle = glow;
+    ctx.beginPath();
+    ctx.arc(x, y, radius, 0, Math.PI * 2);
+    ctx.fill();
+  }
 }
