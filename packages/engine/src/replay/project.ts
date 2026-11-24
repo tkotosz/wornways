@@ -1,5 +1,5 @@
 import { distanceM, mercatorY } from '../track/geo.ts';
-import { STRIDE, type Track } from '../track/types.ts';
+import { SENSOR_CHANNELS, STRIDE, type SensorChannel, type Track } from '../track/types.ts';
 import { viewX, type View } from './view.ts';
 
 /** A track in the pixel coordinates of a view. */
@@ -20,10 +20,20 @@ export type Projected = {
   moving: Float64Array;
   /** The top speed reached up to each point, in meters per second (see `TOP_SPEED_WINDOW_S`). */
   fastest: Float64Array;
+  /** Running sums of each sensor channel the track recorded (see `SensorSums`). */
+  sensors: Partial<Record<SensorChannel, SensorSums>>;
   /** Whether the track recorded elevation. */
   hasElevation: boolean;
   count: number;
 };
+
+/**
+ * A sensor channel up to each point: the values weighed by the seconds they lasted, added up
+ * (`total`), those seconds (`time`), so `total / time` is the average over time, and the
+ * highest value (`max`). A stretch counts when either end has a value; cadence leaves out
+ * stretches at zero, such as coasting.
+ */
+export type SensorSums = { total: Float64Array; time: Float64Array; max: Float64Array };
 
 /** A rise or fall smaller than this, in metres, is taken for noise in the elevation. */
 const CLIMB_STEP_M = 3;
@@ -37,7 +47,7 @@ export const TOP_SPEED_WINDOW_S = 10;
 
 /** Projects a track into `view`, dropping points closer than `minGapPx` to the one before. */
 export function projectTrack(
-  track: Pick<Track, 'points' | 'recorded'>,
+  track: Pick<Track, 'points' | 'recorded' | 'sensors'>,
   view: View,
   minGapPx: number,
 ): Projected {
@@ -52,6 +62,13 @@ export function projectTrack(
   const top: number[] = [];
   const moving: number[] = [];
   const fastest: number[] = [];
+  const channels = SENSOR_CHANNELS.filter((channel) => track.sensors?.[channel]);
+  const sums = channels.map(() => ({
+    total: [] as number[],
+    time: [] as number[],
+    max: [] as number[],
+  }));
+  const running = channels.map(() => ({ total: 0, time: 0, max: -Infinity }));
   /** Every point's seconds and cumulative meters, for the top speed's window. */
   const seconds = new Float64Array(n);
   const reached = new Float64Array(n);
@@ -76,6 +93,19 @@ export function projectTrack(
     }
     seconds[i] = clock;
     reached[i] = metres;
+    channels.forEach((channel, c) => {
+      const values = track.sensors![channel]!;
+      const now = values[i];
+      const sum = running[c];
+      if (!Number.isNaN(now)) sum.max = Math.max(sum.max, now);
+      if (i === 0) return;
+      const before = values[i - 1];
+      const value = Number.isNaN(before) ? now : Number.isNaN(now) ? before : (before + now) / 2;
+      const dt = clock - seconds[i - 1];
+      if (Number.isNaN(value) || dt <= 0 || (channel === 'cadence' && value === 0)) return;
+      sum.total += value * dt;
+      sum.time += dt;
+    });
     // The latest window of at least TOP_SPEED_WINDOW_S seconds that ends at this point.
     while (windowStart + 1 < i && seconds[i] - seconds[windowStart + 1] >= TOP_SPEED_WINDOW_S)
       windowStart++;
@@ -106,6 +136,11 @@ export function projectTrack(
     top.push(Number.isFinite(highest) ? highest : 0);
     moving.push(movingSeconds);
     fastest.push(topSpeed);
+    running.forEach((sum, c) => {
+      sums[c].total.push(sum.total);
+      sums[c].time.push(sum.time);
+      sums[c].max.push(Number.isFinite(sum.max) ? sum.max : 0);
+    });
   }
   return {
     xy: new Float32Array(xy),
@@ -116,6 +151,16 @@ export function projectTrack(
     top: new Float64Array(top),
     moving: new Float64Array(moving),
     fastest: new Float64Array(fastest),
+    sensors: Object.fromEntries(
+      channels.map((channel, c) => [
+        channel,
+        {
+          total: new Float64Array(sums[c].total),
+          time: new Float64Array(sums[c].time),
+          max: new Float64Array(sums[c].max),
+        },
+      ]),
+    ),
     hasElevation: !Number.isNaN(level),
     count: u.length,
   };

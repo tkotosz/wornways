@@ -5,8 +5,9 @@
 // Each track also carries what the list says of its trip (name, date, sport, distance), so
 // the Source step can show what is kept without asking Ride with GPS.
 
-import { STRIDE, type Track } from '@wornways/engine';
+import type { Track } from '@wornways/engine';
 import type { ActivitySummary } from '../messages.ts';
+import { decodeTrack, encodeTrack, type TrackRecord } from './track-record.ts';
 
 const NAME = 'wornways-rwgps-tracks';
 const VERSION = 'X-Wornways-Version';
@@ -22,11 +23,8 @@ async function use<T>(operation: (cache: Cache) => Promise<T>): Promise<T | unde
   }
 }
 
-/** The stored track of this version of a trip: its start time and points. */
-export function cachedTrack(
-  id: string,
-  version: string,
-): Promise<Pick<Track, 'startTime' | 'points'> | undefined> {
+/** The stored track of this version of a trip: its start time, points and sensor values. */
+export function cachedTrack(id: string, version: string): Promise<TrackRecord | undefined> {
   return use(async (cache) => {
     const entry = await cache.match(address(id));
     if (!entry) return;
@@ -34,14 +32,9 @@ export function cachedTrack(
       await cache.delete(address(id));
       return;
     }
-    // Stored as [start time, ...points].
-    const record = new Float64Array(await entry.arrayBuffer());
-    const points = record.subarray(1);
-    if (!Number.isFinite(record[0]) || points.length < 2 * STRIDE || points.length % STRIDE) {
-      await cache.delete(address(id));
-      return;
-    }
-    return { startTime: record[0]!, points };
+    const track = decodeTrack(new Float64Array(await entry.arrayBuffer()));
+    if (!track) await cache.delete(address(id));
+    return track;
   });
 }
 
@@ -51,9 +44,7 @@ export async function cacheTrack(
   summary: ActivitySummary,
 ): Promise<void> {
   await use(async (cache) => {
-    const record = new Float64Array(track.points.length + 1);
-    record[0] = track.startTime;
-    record.set(track.points, 1);
+    const record = encodeTrack(track);
     const headers = { [VERSION]: version, [SUMMARY]: encodeURIComponent(JSON.stringify(summary)) };
     await cache.put(address(track.id), new Response(record, { headers }));
   });

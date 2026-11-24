@@ -512,6 +512,23 @@ test('previews and exports trimmed routes and leaves out routes too short to sho
   await expect(page.getByRole('link', { name: 'Download' })).toHaveCount(0);
 });
 
+test('offers heart rate and cadence for an activity that recorded them', async ({ page }) => {
+  page.setDefaultTimeout(15_000);
+  await page.goto('/');
+  await addFiles(page, 'heart-rate-ride.gpx');
+  for (let i = 0; i < 3; i++) await page.getByRole('button', { name: 'Continue' }).click();
+  await expect(page.getByRole('heading', { name: 'Make it yours' })).toBeVisible();
+  const metrics = page.getByTestId('group-metrics');
+  for (const name of ['Heart rate', 'Max heart rate', 'Cadence'])
+    await expect(metrics.getByRole('button', { name, exact: true })).toHaveAttribute(
+      'aria-pressed',
+      'false',
+    );
+  // It recorded no power, temperature or calories.
+  for (const name of ['Power', 'Temperature', 'Calories'])
+    await expect(metrics.getByRole('button', { name, exact: true })).toHaveCount(0);
+});
+
 test('shares the video where the browser can share files', async ({ page, context }) => {
   await offlineMap(context);
   // Chromium on Linux cannot share files; this stands in for a phone's share sheet.

@@ -74,4 +74,22 @@ describe('Ride with GPS trips', () => {
     ]);
     expect(trackFromTrip(summary, [{ x: 1, y: 2, t: 3 }])).toBeNull();
   });
+
+  it('keep heart rate, cadence, power and temperature with their points', () => {
+    const summary = listedTrip(row)!.summary;
+    const track = trackFromTrip(summary, [
+      { x: -122.6, y: 45.5, t: 1_777_734_000, h: 120, c: 85, p: 200, T: 18 },
+      { x: -122.61, y: 45.51, t: 1_777_733_999, h: 999 }, // back in time, left out
+      { x: -122.62, y: 45.52, t: 1_777_734_005, h: 125, p: 210 },
+    ])!;
+    expect(Array.from(track.sensors!.heartRate!)).toEqual([120, 125]);
+    expect(Array.from(track.sensors!.cadence!)).toEqual([85, NaN]);
+    expect(Array.from(track.sensors!.power!)).toEqual([200, 210]);
+    expect(Array.from(track.sensors!.temperature!)).toEqual([18, NaN]);
+    const plain = trackFromTrip(summary, [
+      { x: -122.6, y: 45.5, t: 1_777_734_000 },
+      { x: -122.62, y: 45.52, t: 1_777_734_005 },
+    ])!;
+    expect(plain.sensors).toBeUndefined();
+  });
 });

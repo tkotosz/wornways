@@ -1,4 +1,5 @@
-import type { ParsedActivity } from '../track/types.ts';
+import { sensorsFrom } from '../track/sensors.ts';
+import type { ParsedActivity, SensorChannel } from '../track/types.ts';
 
 // A minimal FIT reader for what activity files need: definition and data messages,
 // compressed timestamp headers, developer fields (skipped) and chained files.
@@ -172,6 +173,9 @@ export function fitFileType(data: Uint8Array): number | null {
 export function parseFit(data: Uint8Array): ParsedActivity | null {
   const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
   const out: number[] = []; // lon, lat, ele, absolute FIT seconds
+  /** Per record in `out`: heart rate, cadence, power and temperature, NaN where missing. */
+  const readings: Record<SensorChannel, number>[] = [];
+  let calories = NaN;
   let sport = -1;
   let subSport = -1;
   let start = 0;
@@ -227,6 +231,12 @@ export function parseFit(data: Uint8Array): ParsedActivity | null {
         let lat = INVALID_SINT32;
         let lon = INVALID_SINT32;
         let ele = NaN;
+        const reading: Record<SensorChannel, number> = {
+          heartRate: NaN,
+          cadence: NaN,
+          power: NaN,
+          temperature: NaN,
+        };
         let fieldSport = 0xff;
         let fieldSubSport = 0xff;
 
@@ -246,10 +256,24 @@ export function parseFit(data: Uint8Array): ParsedActivity | null {
             } else if (num === 78 && size === 4) {
               const v = view.getUint32(pos, little);
               if (v !== 0xffffffff) ele = v / 5 - 500;
+            } else if (num === 3 && size === 1) {
+              if (data[pos] !== 0xff) reading.heartRate = data[pos];
+            } else if (num === 4 && size === 1) {
+              if (data[pos] !== 0xff) reading.cadence = data[pos];
+            } else if (num === 7 && size === 2) {
+              const v = view.getUint16(pos, little);
+              if (v !== 0xffff) reading.power = v;
+            } else if (num === 13 && size === 1) {
+              const v = view.getInt8(pos);
+              if (v !== 0x7f) reading.temperature = v;
             }
           } else if (globalNum === MSG_SESSION && size === 1) {
             if (num === 5) fieldSport = data[pos];
             else if (num === 6) fieldSubSport = data[pos];
+          } else if (globalNum === MSG_SESSION && num === 11 && size === 2) {
+            // total_calories, in kcal; a file of several sessions adds them up.
+            const v = view.getUint16(pos, little);
+            if (v !== 0xffff) calories = (Number.isNaN(calories) ? 0 : calories) + v;
           } else if (globalNum === MSG_SPORT && size === 1) {
             if (num === 0) fieldSport = data[pos];
             else if (num === 1) fieldSubSport = data[pos];
@@ -265,6 +289,7 @@ export function parseFit(data: Uint8Array): ParsedActivity | null {
           if (ts >= 0 && positioned) {
             // Positions are stored in semicircles: degrees = semicircles * 180 / 2^31.
             out.push((lon * 180) / 2147483648, (lat * 180) / 2147483648, ele, ts);
+            readings.push(reading);
           }
         } else if (sport < 0 && fieldSport !== 0xff) {
           sport = fieldSport;
@@ -301,5 +326,12 @@ export function parseFit(data: Uint8Array): ParsedActivity | null {
     points[i * 4 + 2] = out[src + 2];
     points[i * 4 + 3] = out[src + 3] - t0;
   }
-  return { sport: sportSlug(sport, subSport), startTime: (t0 + FIT_EPOCH_S) * 1000, points };
+  const sensors = sensorsFrom(order ? order.map((k) => readings[k]) : readings);
+  return {
+    sport: sportSlug(sport, subSport),
+    startTime: (t0 + FIT_EPOCH_S) * 1000,
+    points,
+    ...(sensors ? { sensors } : {}),
+    ...(Number.isNaN(calories) ? {} : { calories }),
+  };
 }

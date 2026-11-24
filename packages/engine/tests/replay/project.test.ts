@@ -78,6 +78,32 @@ describe('projectTrack', () => {
     expect(reTimed.fastest.at(-1)).toBe(asRecorded.fastest.at(-1));
   });
 
+  it('averages sensor values over time, leaves out cadence at zero and keeps the highest', () => {
+    // Points at 0, 10 and 40 s: 120 bpm for 10 s, then 150 bpm for 30 s.
+    const points = new Float64Array(3 * STRIDE);
+    [0, 10, 40].forEach((t, i) => points.set([19 + i * 0.001, 47.5, 0, t], i * STRIDE));
+    const projected = projectTrack(
+      {
+        points,
+        sensors: {
+          heartRate: Float32Array.from([120, 120, 180]),
+          cadence: Float32Array.from([80, 0, 0]),
+        },
+      },
+      view,
+      0,
+    );
+    const heart = projected.sensors.heartRate!;
+    // 120 over the first 10 s, then the 150 between 120 and 180 over 30 s.
+    expect(heart.total.at(-1)! / heart.time.at(-1)!).toBeCloseTo((120 * 10 + 150 * 30) / 40);
+    expect(Array.from(heart.max)).toEqual([120, 120, 180]);
+    // Cadence: 40 over the first 10 s; nothing while at zero.
+    const cadence = projected.sensors.cadence!;
+    expect(cadence.time.at(-1)).toBe(10);
+    expect(cadence.total.at(-1)).toBe(400);
+    expect(projected.sensors.power).toBeUndefined();
+  });
+
   it('takes small ups and downs for noise', () => {
     const projected = projectTrack(withElevations([100, 101, 99, 102, 100, 101]), view, 0);
 

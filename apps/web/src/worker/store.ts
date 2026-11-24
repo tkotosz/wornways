@@ -1,5 +1,6 @@
 // The activity library, kept in the browser's IndexedDB so it is there on the next visit.
-// One record per activity: its id, name, sport, start time and points.
+// One record per activity: its id, name, sport, start time and points, and its sensor
+// values and calories when it has them (records from before those were kept lack them).
 
 import type { Track } from '@wornways/engine';
 

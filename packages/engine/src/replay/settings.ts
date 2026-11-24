@@ -431,7 +431,8 @@ export const SETTINGS: readonly SettingDefinition[] = [
       'cannot show is left out: start is for a single activity; count, days and longest ' +
       'for several activities; elevation, descent and highest need recorded elevation. ' +
       'Pace and top speed are in minutes per kilometer when every activity is on foot, else ' +
-      'km/h; top speed is the fastest over 10 s.',
+      'km/h; top speed is the fastest over 10 s. Heart rate, power, cadence, temperature and ' +
+      'calories need an activity that recorded them; cadence is steps per minute on foot.',
   },
   {
     name: 'metrics-position',
@@ -472,7 +473,8 @@ export const SETTINGS: readonly SettingDefinition[] = [
       'values as the metrics card, as totals: time is hours in total, moving hours moving, ' +
       'pace the average while moving, top-speed the fastest of any activity, date the days ' +
       'spanned, days the days with an activity. ' +
-      'Elevation, descent and highest are left out when no activity recorded elevation.',
+      'Elevation, descent and highest are left out when no activity recorded elevation, the ' +
+      'heart rate, power, cadence, temperature and calories when none recorded them.',
   },
 
   {

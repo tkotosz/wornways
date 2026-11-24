@@ -1,4 +1,5 @@
-import type { ParsedActivity } from '../track/types.ts';
+import { sensorsFrom } from '../track/sensors.ts';
+import type { ParsedActivity, SensorChannel } from '../track/types.ts';
 import { sportSlug } from './index-csv.ts';
 
 // GPX and TCX are read with tolerant pattern scans rather than a full XML parser: the
@@ -36,6 +37,17 @@ function inner(block: string, tag: string): string | null {
   return m ? m[1].trim() : null;
 }
 
+/**
+ * The number in the first element called `local` in any namespace (`hr`, `gpxtpx:hr`,
+ * `ns3:hr`), or NaN.
+ */
+function anyNamespace(block: string, local: string): number {
+  const m = new RegExp(
+    `<(?:[\\w.-]+:)?${local}(?:\\s[^>]*)?>\\s*([^<]*?)\\s*</(?:[\\w.-]+:)?${local}>`,
+  ).exec(block);
+  return m && m[1] !== '' ? Number(m[1]) : NaN;
+}
+
 /** Text with XML's character references turned back into characters. */
 function unescape(text: string): string {
   return text.replace(/&(#x[\da-f]+|#\d+|amp|lt|gt|quot|apos);/gi, (_, code: string) => {
@@ -55,13 +67,18 @@ function gpxName(text: string): string | undefined {
   return name ? unescape(name) : undefined;
 }
 
-function build(sport: string, rows: number[]): ParsedActivity | null {
+function build(
+  sport: string,
+  rows: number[],
+  readings: Record<SensorChannel, number>[],
+): ParsedActivity | null {
   const n = rows.length / 4;
   if (n < 2) return null;
   const t0 = rows[3];
   const points = new Float64Array(rows);
   for (let i = 0; i < n; i++) points[i * 4 + 3] = (points[i * 4 + 3] - t0) / 1000;
-  return { sport, startTime: t0, points };
+  const sensors = sensorsFrom(readings);
+  return { sport, startTime: t0, points, ...(sensors ? { sensors } : {}) };
 }
 
 export function parseGpx(data: Uint8Array): ParsedActivity | null {
@@ -71,6 +88,7 @@ export function parseGpx(data: Uint8Array): ParsedActivity | null {
   const sport = sportOf(type);
 
   const rows: number[] = [];
+  const readings: Record<SensorChannel, number>[] = [];
   const re = /<trkpt\b([^>]*)>([\s\S]*?)<\/trkpt>/g;
   for (let m = re.exec(text); m; m = re.exec(text)) {
     const lat = /\blat\s*=\s*["']([^"']+)["']/.exec(m[1]);
@@ -84,8 +102,15 @@ export function parseGpx(data: Uint8Array): ParsedActivity | null {
       continue;
     const ele = inner(m[2], 'ele');
     rows.push(lo, la, ele === null ? NaN : Number(ele), ms);
+    // Garmin's TrackPointExtension (hr, cad, atemp), and the power some apps add.
+    readings.push({
+      heartRate: anyNamespace(m[2], 'hr'),
+      cadence: anyNamespace(m[2], 'cad'),
+      power: anyNamespace(m[2], 'power'),
+      temperature: anyNamespace(m[2], 'atemp'),
+    });
   }
-  const parsed = build(sport, rows);
+  const parsed = build(sport, rows, readings);
   const name = gpxName(text);
   return parsed && name ? { ...parsed, name } : parsed;
 }
@@ -97,6 +122,7 @@ export function parseTcx(data: Uint8Array): ParsedActivity | null {
   const sport = sportOf(tcxSport);
 
   const rows: number[] = [];
+  const readings: Record<SensorChannel, number>[] = [];
   const re = /<Trackpoint\b[^>]*>([\s\S]*?)<\/Trackpoint>/g;
   for (let m = re.exec(text); m; m = re.exec(text)) {
     const time = inner(m[1], 'Time');
@@ -109,6 +135,23 @@ export function parseTcx(data: Uint8Array): ParsedActivity | null {
     if (!Number.isFinite(ms) || !validPosition(la, lo)) continue;
     const ele = inner(m[1], 'AltitudeMeters');
     rows.push(lo, la, ele === null ? NaN : Number(ele), ms);
+    // Cadence for rides, RunCadence (in the TPX extension) on foot; power as Watts.
+    const cadence = anyNamespace(m[1], 'Cadence');
+    readings.push({
+      heartRate: anyNamespace(
+        /<HeartRateBpm\b[\s\S]*?<\/HeartRateBpm>/.exec(m[1])?.[0] ?? '',
+        'Value',
+      ),
+      cadence: Number.isNaN(cadence) ? anyNamespace(m[1], 'RunCadence') : cadence,
+      power: anyNamespace(m[1], 'Watts'),
+      temperature: NaN,
+    });
   }
-  return build(sport, rows);
+  const parsed = build(sport, rows, readings);
+  // Calories are given per lap, outside the lap's track.
+  const laps = [...text.matchAll(/<Lap\b[\s\S]*?<\/Lap>/g)]
+    .map((lap) => anyNamespace(lap[0].replace(/<Track\b[\s\S]*?<\/Track>/g, ''), 'Calories'))
+    .filter(Number.isFinite);
+  if (!parsed || laps.length === 0) return parsed;
+  return { ...parsed, calories: laps.reduce((sum, value) => sum + value, 0) };
 }

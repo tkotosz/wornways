@@ -1,5 +1,6 @@
-import { STRIDE, type Track } from '@wornways/engine';
+import type { Track } from '@wornways/engine';
 import type { ActivitySummary } from '../messages.ts';
+import { decodeTrack, encodeTrack, type TrackRecord } from './track-record.ts';
 
 const PREFIX = 'wornways-strava-';
 const encoder = new TextEncoder();
@@ -175,27 +176,20 @@ export class StravaCache<T> {
     return this.indexing;
   }
 
-  track(id: string, version: string): Promise<Pick<Track, 'points' | 'startTime'> | undefined> {
+  track(id: string, version: string): Promise<TrackRecord | undefined> {
     return this.use(async (cache) => {
       const path = await this.trackPath(id);
       const data = await this.read(cache, path, version);
       if (!data) return;
-      const record = new Float64Array(data);
-      const startTime = record[0]!;
-      const points = record.subarray(1);
-      if (!Number.isFinite(startTime) || points.length < 2 * STRIDE || points.length % STRIDE) {
-        await cache.delete('/wornways-strava-cache/' + path);
-        return;
-      }
-      return { points, startTime };
+      const track = decodeTrack(new Float64Array(data));
+      if (!track) await cache.delete('/wornways-strava-cache/' + path);
+      return track;
     });
   }
 
   async saveTrack(track: Track, version: string, summary: ActivitySummary): Promise<void> {
     await this.use(async (cache) => {
-      const record = new Float64Array(track.points.length + 1);
-      record[0] = track.startTime;
-      record.set(track.points, 1);
+      const record = encodeTrack(track);
       await this.write(cache, await this.trackPath(track.id), version, record.buffer);
     });
     await this.index((list) => [...list.filter((row) => row.id !== summary.id), summary]);

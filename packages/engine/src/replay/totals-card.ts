@@ -36,6 +36,8 @@ export const totalsCardFrames = (fps: number) => Math.round(TOTALS_CARD_S * fps)
  * - pace: the average pace or speed while moving; top-speed: the top speed
  * - date: the days the activities span; days: the days with an activity
  * - longest: the longest activity's kilometers
+ * - heart-rate, power, cadence, temperature: their averages over time; max-heart-rate: the
+ *   highest heart rate; calories: the kilocalories, for the activities that recorded them
  */
 export type TotalsField =
   | 'count'
@@ -49,7 +51,13 @@ export type TotalsField =
   | 'top-speed'
   | 'date'
   | 'days'
-  | 'longest';
+  | 'longest'
+  | 'heart-rate'
+  | 'max-heart-rate'
+  | 'power'
+  | 'cadence'
+  | 'temperature'
+  | 'calories';
 /** Every value of the totals card, in the order the settings list them. */
 export const TOTALS_FIELDS: readonly TotalsField[] = [
   'count',
@@ -64,6 +72,12 @@ export const TOTALS_FIELDS: readonly TotalsField[] = [
   'date',
   'days',
   'longest',
+  'heart-rate',
+  'max-heart-rate',
+  'power',
+  'cadence',
+  'temperature',
+  'calories',
 ];
 /** The values the totals card shows unless told otherwise, in this order. */
 export const AUTOMATIC_TOTALS: readonly TotalsField[] = [
@@ -92,6 +106,17 @@ export type Totals = {
   longest: number;
   /** The top speed of any activity, in meters per second (see `TOP_SPEED_WINDOW_S`). */
   topSpeed: number;
+  /**
+   * Averages over time of the activities that recorded them, and the highest heart rate;
+   * null when none did. Cadence is in rotations per minute (one leg's strides on foot).
+   */
+  heartRate: number | null;
+  maxHeartRate: number | null;
+  power: number | null;
+  cadence: number | null;
+  temperature: number | null;
+  /** Kilocalories of the activities that gave them; null when none did. */
+  calories: number | null;
   /** Whether every activity is on foot, so pace is told in minutes per kilometer. */
   onFoot: boolean;
   /** The days the activities span, e.g. "18–22 Apr 2026". */
@@ -121,8 +146,9 @@ export type TotalsEntry = { field: TotalsField; value: string; label: string };
 
 /**
  * The values of `fields` in their order, with their labels, the numbers shown at a share `f`
- * of their count-up; the pace, the top speed and the dates do not count up. The climb, the descent and the
- * highest point are left out when no activity recorded elevation.
+ * of their count-up; the pace, the top speed and the dates do not count up. The climb, the
+ * descent and the highest point are left out when no activity recorded elevation, the sensor
+ * values and calories when none recorded them.
  */
 export function totalsEntries(
   totals: Totals,
@@ -182,6 +208,31 @@ export function totalsEntries(
       }
       case 'date':
         return { field, value: totals.dates, label: 'dates' };
+      case 'heart-rate':
+        return totals.heartRate === null
+          ? []
+          : { field, value: wholeNumber(totals.heartRate * f), label: 'bpm average' };
+      case 'max-heart-rate':
+        return totals.maxHeartRate === null
+          ? []
+          : { field, value: wholeNumber(totals.maxHeartRate * f), label: 'bpm max' };
+      case 'power':
+        return totals.power === null
+          ? []
+          : { field, value: wholeNumber(totals.power * f), label: 'W average' };
+      case 'cadence':
+        if (totals.cadence === null) return [];
+        return totals.onFoot
+          ? { field, value: wholeNumber(totals.cadence * 2 * f), label: 'spm average' }
+          : { field, value: wholeNumber(totals.cadence * f), label: 'rpm average' };
+      case 'temperature':
+        return totals.temperature === null
+          ? []
+          : { field, value: wholeNumber(totals.temperature * f), label: '°C average' };
+      case 'calories':
+        return totals.calories === null
+          ? []
+          : { field, value: wholeNumber(totals.calories * f), label: 'kcal' };
     }
   });
 }

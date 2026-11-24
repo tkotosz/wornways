@@ -178,6 +178,22 @@ describe('selectTracks', () => {
     expect(trimmed!.elapsedSeconds).toBeCloseTo(3800 - hiddenSeconds, -1);
   });
 
+  it('keeps each sensor value with its point through cleaning and the privacy trim', () => {
+    // Heart rate 100 + the point's index, so a value shows which point it belongs to.
+    const ride = activity({ id: 'hr', day: 6 });
+    const n = pointCount(ride);
+    ride.sensors = { heartRate: Float32Array.from({ length: n }, (_, i) => 100 + i) };
+    const indexOf = (track: Track, k: number) => ((at(track, k).lon - HOME.lon) * perLon) / 30;
+
+    for (const settings of [{}, { 'trim-radius': '500' }]) {
+      const [track] = selectTracks([ride], parseSettings(settings)).tracks;
+      const values = track!.sensors!.heartRate!;
+      expect(values).toHaveLength(pointCount(track!));
+      for (let k = 0; k < values.length; k++)
+        expect(values[k]).toBeCloseTo(100 + indexOf(track!, k), 3);
+    }
+  });
+
   it('keeps the recorded clock when even pace rewrites it', () => {
     const [timed] = selectTracks(library, parseSettings({ activity: 'early' })).tracks;
     const [even] = selectTracks(

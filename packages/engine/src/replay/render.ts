@@ -7,9 +7,9 @@ import { drawWatermark } from './mark.ts';
 import { averagePace, isOnFoot, topSpeed } from './pace.ts';
 import { dateRange } from './plans.ts';
 import { composeHeat, createHeatRamp, decodeHeat, heatStyle, saturationFromHeat } from './heat.ts';
-import { projectTrack, type Projected } from './project.ts';
+import { projectTrack, type Projected, type SensorSums } from './project.ts';
 import type { Timeline } from './timeline.ts';
-import type { Track } from '../track/types.ts';
+import type { SensorChannel, Track } from '../track/types.ts';
 import { fitView, type View } from './view.ts';
 
 // The engine draws through this minimal subset of the Canvas 2D API so the same code runs
@@ -89,7 +89,13 @@ export type Metric =
   | 'start'
   | 'count'
   | 'days'
-  | 'longest';
+  | 'longest'
+  | 'heart-rate'
+  | 'max-heart-rate'
+  | 'power'
+  | 'cadence'
+  | 'temperature'
+  | 'calories';
 export const METRICS: readonly Metric[] = [
   'time',
   'moving',
@@ -104,6 +110,12 @@ export const METRICS: readonly Metric[] = [
   'count',
   'days',
   'longest',
+  'heart-rate',
+  'max-heart-rate',
+  'power',
+  'cadence',
+  'temperature',
+  'calories',
 ];
 
 /** Where on the frame a block of text sits: an edge, then the side or the middle. */
@@ -246,11 +258,30 @@ type Prepared = Projected & {
   moved: number;
   /** The top speed so far, in meters per second. */
   topSpeed: number;
+  /** Each recorded sensor channel's running sums so far (see `SensorSums`). */
+  sensorsNow: Partial<Record<SensorChannel, { total: number; time: number; max: number }>>;
   started: boolean;
   done: boolean;
   /** Video time at which the track finished drawing. */
   doneAt: number;
 };
+
+/** A track's recorded sensor channels with their running sums. */
+const sensorEntries = (projected: Projected) =>
+  Object.entries(projected.sensors) as [SensorChannel, SensorSums][];
+
+/**
+ * A sensor channel's text: heart rate, power, cadence (doubled into steps on foot) or
+ * temperature, from its average over time or its highest value.
+ */
+function sensorText(metric: Metric, value: number, onFoot: boolean): string {
+  const whole = Math.round(value);
+  if (metric === 'heart-rate') return `${whole} bpm avg`;
+  if (metric === 'max-heart-rate') return `${whole} bpm max`;
+  if (metric === 'power') return `${whole} W avg`;
+  if (metric === 'cadence') return onFoot ? `${Math.round(value * 2)} spm avg` : `${whole} rpm avg`;
+  return `${whole} °C avg`;
+}
 
 type Rect = { x0: number; y0: number; x1: number; y1: number };
 type RoutePiece = Rect & { xy: number[] };
@@ -352,6 +383,7 @@ export function createRenderer(
   const titleScale = options.titleScale ?? 1;
   const metricsScale = options.metricsScale ?? 1;
   const unit = Math.min(W, H) / 1080; // scales strokes and type with the output size
+  const withCalories = tracks.some((track) => track.calories !== undefined);
   // Pace is in minutes per kilometer only when every activity is on foot.
   const onFoot = tracks.every((track) => isOnFoot(track.sport));
   const starts = tracks.map((track) => track.startTime);
@@ -404,6 +436,7 @@ export function createRenderer(
     highest: 0,
     moved: 0,
     topSpeed: 0,
+    sensorsNow: {},
     started: false,
     done: false,
     doneAt: Infinity,
@@ -706,6 +739,12 @@ export function createRenderer(
         tr.highest = between(tr.top);
         tr.moved = between(tr.moving);
         tr.topSpeed = between(tr.fastest);
+        for (const [channel, sums] of sensorEntries(tr))
+          tr.sensorsNow[channel] = {
+            total: between(sums.total),
+            time: between(sums.time),
+            max: between(sums.max),
+          };
         piece.push(tr.headX, tr.headY);
       } else {
         tr.headX = tr.xy[i * 2];
@@ -716,6 +755,8 @@ export function createRenderer(
         tr.highest = tr.top[i];
         tr.moved = tr.moving[i];
         tr.topSpeed = tr.fastest[i];
+        for (const [channel, sums] of sensorEntries(tr))
+          tr.sensorsNow[channel] = { total: sums.total[i], time: sums.time[i], max: sums.max[i] };
         tr.done = true;
         tr.doneAt = t;
       }
@@ -837,6 +878,40 @@ export function createRenderer(
       texts.set('distance', `${wholeNumber(metres / 1000)} km`);
     }
     texts.set('moving', `${clockText(Math.floor(moved))} moving`);
+    // Sensor channels: averages over time, the highest heart rate, and calories so far.
+    const sensorSums = new Map<SensorChannel, { total: number; time: number; max: number }>();
+    for (const tr of prepared) {
+      if (!tr.started) continue;
+      for (const [channel, now] of Object.entries(tr.sensorsNow) as [
+        SensorChannel,
+        { total: number; time: number; max: number },
+      ][]) {
+        const sum = sensorSums.get(channel) ?? { total: 0, time: 0, max: 0 };
+        sensorSums.set(channel, {
+          total: sum.total + now.total,
+          time: sum.time + now.time,
+          max: Math.max(sum.max, now.max),
+        });
+      }
+    }
+    const averages: [Metric, SensorChannel][] = [
+      ['heart-rate', 'heartRate'],
+      ['power', 'power'],
+      ['cadence', 'cadence'],
+      ['temperature', 'temperature'],
+    ];
+    for (const [metric, channel] of averages) {
+      const sum = sensorSums.get(channel);
+      if (sum && sum.time > 0) texts.set(metric, sensorText(metric, sum.total / sum.time, onFoot));
+    }
+    const heart = sensorSums.get('heartRate');
+    if (heart && heart.max > 0)
+      texts.set('max-heart-rate', sensorText('max-heart-rate', heart.max, onFoot));
+    if (withCalories)
+      texts.set(
+        'calories',
+        `${wholeNumber(tracks.reduce((sum, track, k) => sum + (track.calories ?? 0) * timeline.progress(k, t), 0))} kcal`,
+      );
     const top = topSpeed(onFoot, fastest);
     texts.set('top-speed', top.unit === '/km' ? `best ${top.value} /km` : `max ${top.value} km/h`);
     if (kind !== 'single') {
@@ -1129,6 +1204,33 @@ export function createRenderer(
       days: new Set(prepared.map((tr) => tr.date)).size,
       longest,
       topSpeed: fastest,
+      ...sensorTotals(),
+      calories: withCalories ? tracks.reduce((sum, track) => sum + (track.calories ?? 0), 0) : null,
+    };
+  };
+  /** Each sensor channel over every activity that recorded it: averages, highest heart rate. */
+  const sensorTotals = () => {
+    const average = (channel: SensorChannel) => {
+      let total = 0;
+      let time = 0;
+      for (const tr of prepared) {
+        const sums = tr.sensors[channel];
+        if (!sums) continue;
+        total += sums.total[tr.count - 1];
+        time += sums.time[tr.count - 1];
+      }
+      return time > 0 ? total / time : null;
+    };
+    const maxes = prepared.flatMap((tr) => {
+      const sums = tr.sensors.heartRate;
+      return sums ? [sums.max[tr.count - 1]] : [];
+    });
+    return {
+      heartRate: average('heartRate'),
+      maxHeartRate: maxes.length ? Math.max(...maxes) : null,
+      power: average('power'),
+      cadence: average('cadence'),
+      temperature: average('temperature'),
     };
   };
   let totalsShown: Totals | null = null;

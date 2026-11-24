@@ -167,21 +167,27 @@ The values shown over the map: the first one large, the others on a line under i
 wraps when the frame is too narrow. A single-activity video shows live values as the
 activity plays; a video of several activities shows running totals.
 
-| Value       | One activity                       | Race (all at once)           | In turn (groups)             | Totals card                    |
-| ----------- | ---------------------------------- | ---------------------------- | ---------------------------- | ------------------------------ |
-| `time`      | its time so far                    | the race clock               | the activities' time so far  | hours in total, stops included |
-| `moving`    | its moving time so far             | moving time so far           | moving time so far           | hours moving                   |
-| `distance`  | kilometers so far                  | kilometers so far            | kilometers so far            | kilometers                     |
-| `pace`      | average so far                     | average so far               | average so far               | average while moving           |
-| `top-speed` | top speed so far                   | top speed so far             | top speed so far             | top speed of any activity      |
-| `elevation` | meters climbed so far              | meters climbed so far        | meters climbed so far        | meters climbed                 |
-| `descent`   | meters descended so far            | meters descended so far      | meters descended so far      | meters descended               |
-| `highest`   | highest point so far               | highest point so far         | highest point so far         | highest point                  |
-| `date`      | its day                            | the days the activities span | the playing group's dates    | the days the activities span   |
-| `start`     | its start time, e.g. "06:42 start" | not offered                  | not offered                  | not offered                    |
-| `count`     | not offered                        | how many are still moving    | activities so far            | activities                     |
-| `days`      | not offered                        | days with an activity        | days with an activity so far | days with an activity          |
-| `longest`   | not offered                        | longest so far               | longest activity so far      | longest activity               |
+| Value            | One activity                       | Race (all at once)           | In turn (groups)             | Totals card                    |
+| ---------------- | ---------------------------------- | ---------------------------- | ---------------------------- | ------------------------------ |
+| `time`           | its time so far                    | the race clock               | the activities' time so far  | hours in total, stops included |
+| `moving`         | its moving time so far             | moving time so far           | moving time so far           | hours moving                   |
+| `distance`       | kilometers so far                  | kilometers so far            | kilometers so far            | kilometers                     |
+| `pace`           | average so far                     | average so far               | average so far               | average while moving           |
+| `top-speed`      | top speed so far                   | top speed so far             | top speed so far             | top speed of any activity      |
+| `elevation`      | meters climbed so far              | meters climbed so far        | meters climbed so far        | meters climbed                 |
+| `descent`        | meters descended so far            | meters descended so far      | meters descended so far      | meters descended               |
+| `highest`        | highest point so far               | highest point so far         | highest point so far         | highest point                  |
+| `date`           | its day                            | the days the activities span | the playing group's dates    | the days the activities span   |
+| `start`          | its start time, e.g. "06:42 start" | not offered                  | not offered                  | not offered                    |
+| `count`          | not offered                        | how many are still moving    | activities so far            | activities                     |
+| `days`           | not offered                        | days with an activity        | days with an activity so far | days with an activity          |
+| `longest`        | not offered                        | longest so far               | longest activity so far      | longest activity               |
+| `heart-rate`     | average so far                     | average so far               | average so far               | average                        |
+| `max-heart-rate` | highest so far                     | highest so far               | highest so far               | highest                        |
+| `power`          | average so far                     | average so far               | average so far               | average                        |
+| `cadence`        | average so far                     | average so far               | average so far               | average                        |
+| `temperature`    | average so far                     | average so far               | average so far               | average                        |
+| `calories`       | so far                             | so far                       | so far                       | in total                       |
 
 The time over the video follows the replay, where long pauses are shortened; the totals
 card's time in total keeps every stop as recorded. Moving time counts the stretches covered at
@@ -190,7 +196,18 @@ with even drawing pace. Top
 speed is the fastest average over 10 seconds, so a single point the GPS put too far away
 hardly counts. The start time is in the time zone of the device making the video. Pace and
 top speed are minutes per kilometer when every activity is on foot (run, walk, hike), otherwise
-kilometers per hour. Elevation shows only when an activity recorded it. Unless picked, the
+kilometers per hour. Elevation shows only when an activity recorded it.
+
+Heart rate, power, cadence, temperature and calories show only when an activity recorded
+them. Averages are over time, so a stretch with many points weighs no more than one with few;
+cadence leaves out stretches at zero, such as coasting, and is steps per minute on foot
+(rotations per minute otherwise). Calories so far count each activity's share as it plays.
+The values come from FIT files (all five), TCX files (heart rate, cadence, power, calories),
+GPX files (heart rate, cadence and temperature from Garmin's track point extension, and power
+where an app adds it), Strava (heart rate, cadence, power, temperature; no calories, which
+would need one more request per activity) and Ride with GPS (heart rate, cadence, power,
+temperature). Strava and Ride with GPS tracks downloaded before these values were kept show
+none until they are downloaded again. Unless picked, the
 video shows what suits it (one activity: time, distance, date; a race: time, count,
 distance; in turn: date, count, distance) and the totals card its first four values.
 

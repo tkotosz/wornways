@@ -35,6 +35,32 @@ describe('Library', () => {
     expect([...reopened.get('1')!.points]).toEqual([19, 47.5, NaN, 0, 19.01, 47.51, 120.5, 60]);
   });
 
+  it('keeps sensor values and calories, and reads activities stored without them', async () => {
+    const library = await Library.open(home);
+    const withSensors: Track = {
+      ...track('hr', 3000),
+      sensors: {
+        heartRate: Float32Array.of(120, NaN),
+        power: Float32Array.of(210, 230),
+      },
+      calories: 512,
+    };
+    await library.put([withSensors, track('plain', 1000)]);
+
+    const reopened = await Library.open(home);
+    const read = reopened.get('hr')!;
+    expect(Object.keys(read.sensors!).sort()).toEqual(['heartRate', 'power']);
+    expect(Array.from(read.sensors!.heartRate!)).toEqual([120, NaN]);
+    expect(Array.from(read.sensors!.power!)).toEqual([210, 230]);
+    expect(read.calories).toBe(512);
+    expect(reopened.get('plain')!.sensors).toBeUndefined();
+    expect(reopened.get('plain')!.calories).toBeUndefined();
+
+    // Storing it again without sensor values removes them.
+    await reopened.put([track('hr', 3000)]);
+    expect((await Library.open(home)).get('hr')!.sensors).toBeUndefined();
+  });
+
   it('deletes some activities, or all of them', async () => {
     const library = await Library.open(home);
     await library.put([track('1', 1000), track('2', 2000), track('3', 3000)]);

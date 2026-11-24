@@ -2,8 +2,10 @@
 // which tells what the chosen settings will actually play.
 
 import {
+  SENSOR_CHANNELS,
   STRIDE,
   automaticTitle,
+  recorded,
   parseSettings,
   planReplay,
   selectTracks,
@@ -27,6 +29,10 @@ export function planVideo(library: Track[], input: SettingsInput): PlanReport {
     hasElevation: selection.tracks.some((track) =>
       track.points.some((value, index) => index % STRIDE === 2 && Number.isFinite(value)),
     ),
+    sensors: SENSOR_CHANNELS.filter((channel) =>
+      selection.tracks.some((track) => recorded(track.sensors, channel)),
+    ),
+    hasCalories: selection.tracks.some((track) => track.calories !== undefined),
     seconds: plan.timeline.duration,
     groups: plan.groups ?? null,
     realPace: settings.groupPace === 'real',

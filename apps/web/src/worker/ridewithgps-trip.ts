@@ -1,7 +1,14 @@
 // Ride with GPS trips turned into what the app works with: sport names, list entries and
 // tracks. Kept apart from the requests (ridewithgps.ts) so it can be tested on its own.
 
-import { defaultActivityName, STRIDE, type LatLon, type Track } from '@wornways/engine';
+import {
+  defaultActivityName,
+  sensorsFrom,
+  STRIDE,
+  type LatLon,
+  type SensorChannel,
+  type Track,
+} from '@wornways/engine';
 import type { TripRow } from '../../../../functions/api/ridewithgps/trips.ts';
 import type { ActivitySummary } from '../messages.ts';
 import type { RemoteActivity } from './remote-activities.ts';
@@ -81,11 +88,25 @@ export function listedTrip(row: TripRow): RemoteActivity | null {
   };
 }
 
-export type TripPoint = { x?: unknown; y?: unknown; e?: unknown; t?: unknown };
+/** A trip's point: position, elevation, time, and heart rate, cadence, power, temperature. */
+export type TripPoint = {
+  x?: unknown;
+  y?: unknown;
+  e?: unknown;
+  t?: unknown;
+  h?: unknown;
+  c?: unknown;
+  p?: unknown;
+  T?: unknown;
+};
+
+const reading = (value: unknown) =>
+  typeof value === 'number' && Number.isFinite(value) ? value : NaN;
 
 /** A trip's track from its points; null when it has fewer than two timed positions. */
 export function trackFromTrip(summary: ActivitySummary, points: TripPoint[]): Track | null {
   const packed = new Float64Array(points.length * STRIDE);
+  const readings: Record<SensorChannel, number>[] = [];
   let size = 0;
   let first = NaN;
   for (const point of points) {
@@ -99,14 +120,22 @@ export function trackFromTrip(summary: ActivitySummary, points: TripPoint[]): Tr
     packed[size++] = at.lat;
     packed[size++] = typeof point.e === 'number' && Number.isFinite(point.e) ? point.e : NaN;
     packed[size++] = time;
+    readings.push({
+      heartRate: reading(point.h),
+      cadence: reading(point.c),
+      power: reading(point.p),
+      temperature: reading(point.T),
+    });
   }
   if (size < 2 * STRIDE) return null;
   for (let i = 3; i < size; i += STRIDE) packed[i] = packed[i]! - first;
+  const sensors = sensorsFrom(readings);
   return {
     id: summary.id,
     name: summary.name,
     sport: summary.sport,
     startTime: first * 1000,
     points: packed.slice(0, size),
+    ...(sensors ? { sensors } : {}),
   };
 }

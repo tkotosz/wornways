@@ -2,7 +2,13 @@
 // the worker answers each request with exactly one final reply carrying the same id, and
 // may send progress for it before that.
 
-import type { FrequentPlace, Grouping, SettingsInput, TrackEnd } from '@wornways/engine';
+import type {
+  FrequentPlace,
+  Grouping,
+  SensorChannel,
+  SettingsInput,
+  TrackEnd,
+} from '@wornways/engine';
 
 export type PickedFile = { path: string; file: File };
 
@@ -139,6 +145,10 @@ export type PlanReport = {
   privacyOmitted: number;
   title: string;
   hasElevation: boolean;
+  /** The sensor channels some selected activity recorded, such as heart rate. */
+  sensors: SensorChannel[];
+  /** Whether some selected activity gives its calories. */
+  hasCalories: boolean;
   /** The replay's length in seconds, without the end card. */
   seconds: number;
   /**

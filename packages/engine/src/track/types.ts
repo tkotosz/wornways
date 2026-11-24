@@ -1,6 +1,22 @@
 /** Values per point in `Track.points`: lon, lat, ele, tSeconds. */
 export const STRIDE = 4;
 
+/** A value some devices record at every point, besides position, elevation and time. */
+export type SensorChannel = 'heartRate' | 'power' | 'cadence' | 'temperature';
+export const SENSOR_CHANNELS: readonly SensorChannel[] = [
+  'heartRate',
+  'power',
+  'cadence',
+  'temperature',
+];
+/**
+ * The channels an activity recorded, each with one value per point (NaN where a point has
+ * none): heart rate in beats per minute, power in watts, cadence in rotations per minute
+ * (one leg's strides on foot, as FIT, TCX and Strava give it) and temperature in degrees
+ * Celsius.
+ */
+export type Sensors = Partial<Record<SensorChannel, Float32Array>>;
+
 export type Track = {
   id: string;
   name?: string;
@@ -10,6 +26,10 @@ export type Track = {
   startTime: number;
   /** Packed [lon, lat, ele, tSeconds] per point; tSeconds counts from the first point. */
   points: Float64Array;
+  /** Values recorded at each point besides the position, when the activity has any. */
+  sensors?: Sensors;
+  /** Kilocalories the activity burned, when its file or service gives them. */
+  calories?: number;
   /**
    * Set while a video is made, when the points' clock is no longer the recorded one (even
    * pace): the recorded seconds of each point, for values that need real time.
@@ -23,7 +43,10 @@ export type Track = {
 };
 
 /** What a file parser returns: a track without the identity the caller assigns. */
-export type ParsedActivity = Pick<Track, 'sport' | 'startTime' | 'points'> & {
+export type ParsedActivity = Pick<
+  Track,
+  'sport' | 'startTime' | 'points' | 'sensors' | 'calories'
+> & {
   /** The name the file gives the activity, if it has one. */
   name?: string;
 };
