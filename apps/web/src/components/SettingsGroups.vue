@@ -7,6 +7,7 @@ import {
   SHOW_TITLE,
   choiceLabel,
   offered,
+  panelOffered,
   type ActivityCount,
   type Panel,
   settingHint,
@@ -32,11 +33,15 @@ const GROUP_TITLES: Record<Panel, string> = {
   map: 'Map',
   title: 'Title',
   metrics: 'Metrics',
+  elevation: 'Elevation',
   brand: 'Branding',
 };
 
 const groups = computed(() =>
-  props.groups.map((group) => ({ group, main: offered(group) })).filter((g) => g.main.length > 0),
+  props.groups
+    .filter((group) => panelOffered(group, props.plan))
+    .map((group) => ({ group, main: offered(group) }))
+    .filter((g) => g.main.length > 0),
 );
 
 const value = (setting: SettingDefinition) => adjustments.value[setting.name] ?? setting.default;

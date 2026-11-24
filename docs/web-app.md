@@ -102,11 +102,12 @@ phone.
    video will be posted; frame rate: 24, 30 or 60 fps), the title (on or off, starting
    as the automatic one; switched off, a title written stays for switching it on
    again), its position and size, the metrics (on or off, which ones in the order
-   picked, their position and size), the street map, and the branding: the end card
-   after the replay and the small watermark at the bottom left, on the map credit's line (each on or off). A
-   position is the top, middle or bottom row, left, middle or right; text in the middle
-   gets a soft dark band behind it. The settings of steps 3 and 4 are remembered for
-   the next visit.
+   picked, their position and size), the elevation profile (for a single activity with
+   recorded elevation only; the panel is not shown otherwise), the street map, and the
+   branding: the end card after the replay and the small watermark at the bottom left, on
+   the map credit's line (each on or off). A position is the top, middle or bottom row,
+   left, middle or right; text in the middle gets a soft dark band behind it. The settings
+   of steps 3 and 4 are remembered for the next visit.
 5. **Export.** A stage in the video's shape, which shows the finished picture with a "Make
    video" button in the middle; while the video is made, its progress and a way to
    cancel; then the video itself, playing. Download then appears in the bottom bar where
