@@ -155,7 +155,7 @@ activity to the next every few frames.
 | Setting        | CLI flag           | Values                                                                                | Default                 |
 | -------------- | ------------------ | ------------------------------------------------------------------------------------- | ----------------------- |
 | Title          | `--title`          | text, empty for none                                                                  | made from the selection |
-| Title position | `--title-position` | `top-`, `middle-` or `bottom-` with `left`, `center` or `right`, e.g. `middle-center` | `top-left`              |
+| Title position | `--title-position` | `top-`, `middle-` or `bottom-` with `left`, `center` or `right`, e.g. `middle-center` | `top-center`            |
 | Title size     | `--title-size`     | 50–200%                                                                               | 100%                    |
 
 Where the title would meet the metrics card (the same edge, and the same side or either in the

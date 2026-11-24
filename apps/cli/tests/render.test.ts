@@ -351,8 +351,20 @@ describe('the title', () => {
     };
   }
 
-  it('sits at the top left unless told otherwise', () => {
+  it('sits at the top in the middle unless told otherwise', () => {
     const frame = lastFrame({});
+
+    // Centered: about as much of the text on either side of the middle.
+    expect(frame.topLeft).toBeGreaterThan(10);
+    expect(frame.topRight).toBeGreaterThan(10);
+    expect(Math.abs(frame.topLeft - frame.topRight)).toBeLessThan(
+      (frame.topLeft + frame.topRight) * 0.2,
+    );
+    expect(frame.bottomLeft + frame.bottomRight).toBe(0);
+  });
+
+  it('sits at the top left when told', () => {
+    const frame = lastFrame({ titlePosition: 'top-left' });
 
     expect(frame.topLeft).toBeGreaterThan(20);
     expect(frame.topRight + frame.bottomLeft + frame.bottomRight).toBe(0);
