@@ -36,13 +36,22 @@ test('offers the elevation profile for a single activity with elevation', async 
 test('leaves the elevation profile out where there is no elevation', async ({ page, context }) => {
   page.setDefaultTimeout(15_000);
   await offlineMap(context);
+  // A short ride recorded without heights.
+  const points = Array.from(
+    { length: 60 },
+    (_, i) =>
+      `<trkpt lat="47.5" lon="${(19 + i * 0.0005).toFixed(4)}"><time>2026-05-02T08:${String(i).padStart(2, '0')}:00Z</time></trkpt>`,
+  ).join('');
+  const gpx = `<?xml version="1.0"?><gpx version="1.1" creator="test" xmlns="http://www.topografix.com/GPX/1/1"><trk><name>Flat ride</name><trkseg>${points}</trkseg></trk></gpx>`;
   await page.goto('/');
-  await pickSource(page, 'demo');
-  await expect(page.getByTestId('demo-count')).toHaveText('25 made-up activities');
-  await page.getByRole('button', { name: 'Continue' }).click();
-  // The demo has no elevation; one activity of it still gets no profile to set.
-  await page.getByRole('checkbox', { name: 'Select all shown' }).click();
-  await page.getByTestId('chosen').getByText('Easy run').click();
+  await pickSource(page, 'files');
+  await page.getByTestId('file-input').setInputFiles({
+    name: 'flat-ride.gpx',
+    mimeType: 'application/gpx+xml',
+    buffer: Buffer.from(gpx),
+  });
+  await expect(page.getByTestId('activity-count')).toHaveText('1 activity on this device');
+  await page.getByRole('button', { name: 'Continue' }).click(); // to Activities
   await page.getByRole('button', { name: 'Continue' }).click(); // to Playback
   await page.getByRole('button', { name: 'Continue' }).click(); // to Appearance
   await expect(page.getByTestId('group-metrics')).toBeVisible();

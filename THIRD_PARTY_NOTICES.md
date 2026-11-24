@@ -1,7 +1,7 @@
 # Third-party notices
 
 Wornways reuses code from one project, ships one font made by others, and ships demo
-activities drawn from OpenStreetMap data. This file says exactly what, and carries the
+activities drawn from OpenStreetMap data, with heights from public elevation data. This file says exactly what, and carries the
 licenses that ask to be passed on.
 
 ## strava-home-runs
@@ -59,3 +59,16 @@ SOFTWARE.
 - License: © OpenStreetMap contributors, available under the Open Database License (ODbL)
   1.0, https://opendatacommons.org/licenses/odbl/1-0/. The demo activities are published
   under the same license; the ZIP's `README.txt` says so too.
+
+## Terrain Tiles
+
+- Source: Terrain Tiles, open data on AWS (https://registry.opendata.aws/terrain-tiles/),
+  in the "terrarium" PNG encoding. For Mallorca at zoom 12 they hold SRTM heights on land
+  and ETOPO1 at sea.
+- Used in: the heights of the web app's demo activities
+  (`apps/web/public/demo/mallorca.zip`), read along their routes by `npm run demo-routes`.
+- Attribution, as the data's attribution page asks
+  (https://github.com/tilezen/joerd/blob/master/docs/attribution.md): SRTM terrain data
+  courtesy of the U.S. Geological Survey; ETOPO1 terrain data from the U.S. National
+  Oceanic and Atmospheric Administration. Both are U.S. government data in the public
+  domain. The ZIP's `README.txt` gives the same credit.

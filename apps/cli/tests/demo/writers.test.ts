@@ -1,6 +1,7 @@
 import { importFiles } from '@wornways/engine';
 import { describe, expect, it } from 'vitest';
-import { recordRoute, seededRandom } from '../../src/demo/timing.ts';
+import { RIDE_HILLS, RUN_HILLS, recordRoute, seededRandom } from '../../src/demo/timing.ts';
+import type { RouteHeights } from '../../src/demo/terrain.ts';
 import { activitiesCsv, gpxFile, zipFile } from '../../src/demo/writers.ts';
 
 // A straight 2 km road heading east, as three points.
@@ -30,10 +31,50 @@ describe('recordRoute', () => {
   });
 });
 
+describe('recordRoute on hills', () => {
+  /** A road climbing at `grade` for its first kilometer, then flat. */
+  const hill = (grade: number): RouteHeights => ({
+    at: (done) => 100 + grade * Math.min(done, 1000),
+    grade: (done) => (done < 1000 ? grade : 0),
+  });
+  /** Seconds to the point nearest the end of the first kilometer. */
+  const firstKm = (grade: number) => {
+    const points = recordRoute(
+      route,
+      { speed: 7, interval: 10, hills: { heights: hill(grade), pace: RIDE_HILLS } },
+      seededRandom(5),
+    );
+    return { points, seconds: points.find((p) => p.lon >= 3.0058)!.seconds };
+  };
+
+  it('goes slower up a climb and faster down, and records the heights', () => {
+    const flat = firstKm(0).seconds;
+    const up = firstKm(0.07);
+    const down = firstKm(-0.07).seconds;
+
+    expect(up.seconds).toBeGreaterThan(flat * 1.8);
+    expect(down).toBeLessThan(flat * 0.65);
+    expect(up.points[0]!.ele).toBe(100);
+    expect(up.points.at(-1)!.ele).toBe(170);
+  });
+
+  it('slows a ride down more than a run on the same climb, within limits downhill', () => {
+    expect(RIDE_HILLS(0)).toBe(1);
+    expect(RIDE_HILLS(0.07)).toBeLessThan(RUN_HILLS(0.07));
+    expect(RIDE_HILLS(-0.2)).toBe(1.8);
+    expect(RUN_HILLS(-0.2)).toBe(1.15);
+  });
+});
+
 describe('the demo export', () => {
   it('is read by the importer with its names, sports and times', async () => {
     const start = new Date('2026-04-02T07:40:00Z');
-    const points = recordRoute(route, { speed: 7, interval: 10 }, seededRandom(3));
+    const flatRoad: RouteHeights = { at: () => 42, grade: () => 0 };
+    const points = recordRoute(
+      route,
+      { speed: 7, interval: 10, hills: { heights: flatRoad, pace: RIDE_HILLS } },
+      seededRandom(3),
+    );
     const encoder = new TextEncoder();
     const zip = zipFile([
       {
@@ -72,6 +113,8 @@ describe('the demo export', () => {
       sport: 'ride',
       startTime: start.getTime(),
     });
+    // The heights come through the GPX file.
+    expect(result.activities[0]!.points[2]).toBe(42);
     expect(zipFile([{ path: 'a.txt', data: encoder.encode('a') }])).toEqual(
       zipFile([{ path: 'a.txt', data: encoder.encode('a') }]),
     );
