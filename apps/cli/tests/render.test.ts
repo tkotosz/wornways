@@ -287,6 +287,45 @@ describe('rendering a replay', () => {
     expect(atEnd).toBeGreaterThan(50);
     expect(atEnd).toBeGreaterThan(atStart);
   });
+
+  it('holds the finished picture for the end pause, then plays the end card', () => {
+    const width = 270;
+    const height = 480;
+    const timeline = chronologicalTimeline([5_000], { duration: 2 });
+    const renderer = createRenderer(
+      [route()],
+      timeline,
+      (w, h) => createCanvas(w, h) as unknown as CanvasLike,
+      { width, height, fps: 10, endPause: 1.5, endCard: true },
+    );
+    const pixels = () =>
+      Buffer.from(
+        (renderer.canvas.getContext('2d') as Context2DLike).getImageData(0, 0, width, height).data,
+      );
+
+    // 2 s of replay, 1.5 s of pause, then the end card's 3.2 s.
+    expect(renderer.replayFrames).toBe(20);
+    expect(renderer.frameCount).toBe(20 + 15 + 32);
+    for (let f = 0; f < renderer.replayFrames; f++) renderer.renderFrame(f);
+    const finished = pixels();
+    for (let f = 20; f < 35; f++) {
+      renderer.renderFrame(f);
+      expect(pixels().equals(finished)).toBe(true);
+    }
+    // Halfway into the end card the map has faded to black.
+    for (let f = 35; f < 35 + 16; f++) renderer.renderFrame(f);
+    expect(pixels().equals(finished)).toBe(false);
+  });
+
+  it('adds no frames without an end pause', () => {
+    const timeline = chronologicalTimeline([5_000], { duration: 2 });
+    const create = (w: number, h: number) => createCanvas(w, h) as unknown as CanvasLike;
+    const options = { width: 90, height: 160, fps: 10 };
+    expect(createRenderer([route()], timeline, create, options).frameCount).toBe(20);
+    expect(
+      createRenderer([route()], timeline, create, { ...options, endPause: 0 }).frameCount,
+    ).toBe(20);
+  });
 });
 
 describe('the totals card', () => {

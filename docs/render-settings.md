@@ -84,12 +84,17 @@ The fields beside numeric sliders accept exact values within the same ranges as 
 | Group pace   | `--group-pace` | `fit`: a group's activities all finish together; `real`: they move at their real pace on one clock that starts slow and speeds up, the longest filling the group's time | `fit`   |
 | Overlap      | `--overlap`    | 0–80%: lets the next group start before the current one has finished; at 40% it starts when the current one is 60% drawn                                                | 0%      |
 | Drawing pace | `--pace`       | `time` or `distance`                                                                                                                                                    | `time`  |
+| End pause    | `--end-pause`  | 0–10 s: the finished picture stays on screen this long after the replay, before the totals card and the end card; added to the video's length                           | 0 s     |
 
 0.4 s of map come before the first group and up to 2.5 s on the finished picture after
 the last (at most a tenth of the video; only 0.3 s when the totals card or the end card
 follows, as it fades in from the finished picture); the groups share the time in between, each at
 least 0.3 s. The headline shows the playing group: an activity's or a day's date, a week's
 dates, a month, or the dates all activities span; in a race, the race clock.
+
+End pause adds time on the finished picture, after the replay and before any card, so the
+replay keeps its length and draws at the same speed. A 15 s video with a 3 s end pause and
+the end card plays 15 s of replay, 3 s on the finished picture, then the end card.
 
 ### Replay privacy
 

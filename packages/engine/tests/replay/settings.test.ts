@@ -29,6 +29,7 @@ describe('parseSettings', () => {
       groupPace: 'fit',
       overlap: 0,
       pace: 'time',
+      endPause: 0,
       trimRadius: 0,
       camera: 'zoom',
       map: true,
@@ -64,6 +65,14 @@ describe('parseSettings', () => {
       'expects values from count, distance, time, elevation, got "pace"',
     );
     expect(() => parseSettings({ 'totals-fields': '' })).toThrow('expects values from');
+  });
+
+  it('reads an end pause of 0 to 10 seconds, halves included', () => {
+    expect(parseSettings({ 'end-pause': '2.5' }).endPause).toBe(2.5);
+    expect(parseSettings({ 'end-pause': '10' }).endPause).toBe(10);
+    expect(() => parseSettings({ 'end-pause': '11' })).toThrow('from 0 to 10');
+    expect(() => parseSettings({ 'end-pause': '-1' })).toThrow('from 0 to 10');
+    expect(() => parseSettings({ 'end-pause': 'long' })).toThrow('from 0 to 10');
   });
 
   it('reads a period as whole days, months or years in local time', () => {

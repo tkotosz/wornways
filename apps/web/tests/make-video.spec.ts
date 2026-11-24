@@ -527,8 +527,36 @@ test('shares the video where the browser can share files', async ({ page, contex
   await page.getByRole('button', { name: 'Make video' }).click();
   await expect(page.getByTestId('result')).toBeVisible({ timeout: 150_000 });
 
-  await expect(page.getByRole('link', { name: 'Download', exact: true })).toBeVisible();
-  await page.getByRole('button', { name: 'Share', exact: true }).click();
+  const back = page.getByRole('button', { name: '← Back' });
+  const download = page.getByRole('link', { name: 'Download', exact: true });
+  const share = page.getByRole('button', { name: 'Share', exact: true });
+  await expect(download).toBeVisible();
+
+  // On a phone, Back sits at the left, Share at the right and Download in the middle of the
+  // bar, all on one row. A 320 px phone has too little room to center it exactly.
+  for (const [width, offCenter] of [
+    [390, 1],
+    [360, 1],
+    [320, 3],
+  ]) {
+    await page.setViewportSize({ width, height: 844 });
+    const [bar, left, middle, right] = await Promise.all(
+      [page.locator('.footer'), back, download, share].map(
+        async (item) => (await item.boundingBox())!,
+      ),
+    );
+    const center = (box: { x: number; width: number }) => box.x + box.width / 2;
+    expect(Math.abs(center(middle) - center(bar))).toBeLessThan(offCenter);
+    expect(left.y).toBeCloseTo(middle.y, 0);
+    expect(left.x).toBeCloseTo(bar.x, 0);
+    expect(right.x + right.width).toBeCloseTo(bar.x + bar.width, 0);
+    expect(left.x + left.width).toBeLessThan(middle.x);
+    expect(middle.x + middle.width).toBeLessThan(right.x);
+    expect(left.y).toBeCloseTo(right.y, 0);
+  }
+  await page.screenshot({ path: 'test-results/export-footer-phone.png' });
+
+  await share.click();
   await expect
     .poll(() => page.evaluate('window.shared'))
     .toEqual([['activity-morning-ride.mp4', 'video/mp4', expect.any(Number)]]);
@@ -673,6 +701,10 @@ test('sets up the video and its text, and keeps both for the next visit', async 
   await slider('Video length').fill('10');
   await slider('Video length').dispatchEvent('change');
   await expect(summary).toHaveText('10 seconds · Custom playback');
+  // The end pause keeps the finished picture on screen longer; it is added to the video.
+  await slider('End pause').fill('2.5');
+  await slider('End pause').dispatchEvent('change');
+  await expect(summary).toHaveText('10 seconds · Custom playback');
 
   // The Appearance step: the title starts as the automatic one, with its position and size.
   await page.getByRole('button', { name: 'Continue' }).click();
@@ -719,11 +751,11 @@ test('sets up the video and its text, and keeps both for the next visit', async 
 
   // The Export step: only the video.
   await page.getByRole('button', { name: 'Continue' }).click();
-  await expect(page.getByTestId('video-summary')).toHaveText('1080 × 1080 · 10 s');
+  await expect(page.getByTestId('video-summary')).toHaveText('1080 × 1080 · 10 s + 2.5 s pause');
   await page.getByRole('button', { name: 'Make video' }).click();
   const result = page.getByTestId('result');
   await expect(result).toBeVisible({ timeout: 150_000 });
-  await expect(page.getByTestId('made')).toContainText('10.0 s');
+  await expect(page.getByTestId('made')).toContainText('12.5 s');
 
   await page.reload();
   await page.getByRole('button', { name: 'Playback', exact: true }).click();

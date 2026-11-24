@@ -248,6 +248,9 @@ const HINTS: Record<string, string> = {
   camera:
     'Follows the moving route and pulls back at the end. Activities within each group ' +
     'play in turn with this camera. Races, and activities too short to follow, use Zooms out.',
+  'end-pause':
+    'How long the finished picture stays on screen at the end, before the totals and the ' +
+    'end card. Added to the video’s length.',
   'trim-radius': 'Hide the route within this radius of each activity’s start and finish.',
   'metrics-fields': 'In the order picked; the first is shown large.',
   'totals-fields': 'In the order picked.',
@@ -263,6 +266,7 @@ const HINTS: Record<string, string> = {
 const STEPS: Record<string, number> = {
   duration: 1,
   overlap: 10,
+  'end-pause': 0.5,
   'trim-radius': 50,
   'title-size': 10,
   'metrics-size': 10,
@@ -286,7 +290,7 @@ export type Panel =
 /** The settings of each panel on the screens, in order: mostly the settings table's groups. */
 const PANELS: Record<Panel, string[]> = {
   // The video's length has a control of its own above Fine-tune playback.
-  timing: ['group', 'share', 'group-pace', 'overlap', 'pace'],
+  timing: ['group', 'share', 'group-pace', 'overlap', 'pace', 'end-pause'],
   camera: ['camera'],
   privacy: ['trim-radius'],
   map: ['map'],
