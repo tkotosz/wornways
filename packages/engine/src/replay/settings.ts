@@ -7,7 +7,7 @@
 import { sportSlug } from '../import/index-csv.ts';
 import type { LatLon } from '../track/places.ts';
 import { END_CARD_S } from './end-card.ts';
-import { TOTALS_CARD_S } from './totals-card.ts';
+import { TOTALS_CARD_S, TOTALS_FIELDS, type TotalsField } from './totals-card.ts';
 import { PRESETS, PRESET_NAMES, type Preset } from './presets.ts';
 import type { Grouping } from './plans.ts';
 import { METRICS, POSITIONS, type Metric, type Position } from './render.ts';
@@ -82,6 +82,8 @@ export type RenderSettings = {
 
   /** Whether a video of several activities shows their totals after the replay. */
   totalsCard: boolean;
+  /** The totals card's values in order; null: every one, in the usual order. */
+  totalsFields: TotalsField[] | null;
 
   // Branding
   /** Whether the video ends with the Wornways card, after the replay. */
@@ -444,6 +446,18 @@ export const SETTINGS: readonly SettingDefinition[] = [
       `For several activities: their totals after the replay (${TOTALS_CARD_S} s more): ` +
       'activities, kilometers, hours moving and meters climbed. On with the recap preset.',
   },
+  {
+    name: 'totals-fields',
+    label: 'Totals',
+    group: 'look',
+    kind: { type: 'list', choices: TOTALS_FIELDS },
+    default: null,
+    automatic: TOTALS_FIELDS.join(', '),
+    help:
+      `Values the totals card shows, in this order: ${TOTALS_FIELDS.join(', ')} (activities, ` +
+      'kilometers, hours moving, meters climbed). Elevation is left out when no activity ' +
+      'recorded it.',
+  },
 
   {
     name: 'end-card',
@@ -635,15 +649,22 @@ export function parseSettings(input: SettingsInput): RenderSettings {
   if (minDistanceKm !== null && maxDistanceKm !== null && minDistanceKm > maxDistanceKm)
     throw new SettingsError('max-distance', 'is below the minimum distance');
 
-  const fieldsText = text('metrics-fields');
-  const metricsFields =
-    fieldsText === null ? null : fieldsText.split(',').map((field) => field.trim().toLowerCase());
-  const unknownField = metricsFields?.find((field) => !METRICS.includes(field as Metric));
-  if (metricsFields !== null && (fieldsText?.trim() === '' || unknownField !== undefined))
-    throw new SettingsError(
-      'metrics-fields',
-      `expects values from ${METRICS.join(', ')}, got "${unknownField ?? fieldsText}"`,
-    );
+  /** A list of fixed values in the order given, each once; null when the list is not given. */
+  const choiceList = <T extends string>(name: string): T[] | null => {
+    const kind = definition(name).kind;
+    if (kind.type !== 'list' || !kind.choices)
+      throw new Error(`"${name}" is not a list of choices`);
+    const listText = text(name);
+    if (listText === null) return null;
+    const values = listText.split(',').map((value) => value.trim().toLowerCase());
+    const unknown = values.find((value) => !kind.choices!.includes(value));
+    if (listText.trim() === '' || unknown !== undefined)
+      throw new SettingsError(
+        name,
+        `expects values from ${kind.choices.join(', ')}, got "${unknown ?? listText}"`,
+      );
+    return [...new Set(values)] as T[];
+  };
 
   /** A place filter: its place and radius, or null when no place is given. */
   const near = (place: string, radius: string): NearPlace | null => {
@@ -681,10 +702,11 @@ export function parseSettings(input: SettingsInput): RenderSettings {
     height,
     fps: Number(choice('fps')),
     metrics: flag('metrics'),
-    metricsFields: metricsFields === null ? null : ([...new Set(metricsFields)] as Metric[]),
+    metricsFields: choiceList<Metric>('metrics-fields'),
     metricsPosition: choice<Position>('metrics-position'),
     metricsSize: number('metrics-size'),
     totalsCard: flag('totals-card'),
+    totalsFields: choiceList<TotalsField>('totals-fields'),
     endCard: flag('end-card'),
     watermark: flag('watermark'),
   };

@@ -63,6 +63,7 @@ describe('the settings offered', () => {
     expect(names('timing')).toEqual(['group', 'share', 'group-pace', 'overlap', 'pace']);
     expect(names('camera')).toEqual(['camera']);
     expect(names('map')).toEqual(['map']);
+    expect(names('totals')).toEqual(['totals-card', 'totals-fields']);
   });
 
   it('keeps the metrics panel to the metrics', () => {

@@ -189,6 +189,7 @@ const LABELS: Record<string, string> = {
   'title-size': 'Size',
   metrics: 'Show metrics',
   'metrics-fields': 'Metrics',
+  'totals-fields': 'Values',
   'metrics-position': 'Position',
   'metrics-size': 'Size',
 };
@@ -249,6 +250,7 @@ const HINTS: Record<string, string> = {
     'play in turn with this camera. Races, and activities too short to follow, use Zooms out.',
   'trim-radius': 'Hide the route within this radius of each activity’s start and finish.',
   'metrics-fields': 'In the order picked; the first is shown large.',
+  'totals-fields': 'In the order picked.',
   'elevation-profile':
     'The climb profile along the bottom of the video, with a dot that follows the activity. ' +
     'For several activities, they are laid end to end; off unless switched on.',
@@ -291,7 +293,7 @@ const PANELS: Record<Panel, string[]> = {
   title: ['title', 'title-position', 'title-size'],
   metrics: ['metrics', 'metrics-fields', 'metrics-position', 'metrics-size'],
   elevation: ['elevation-profile'],
-  totals: ['totals-card'],
+  totals: ['totals-card', 'totals-fields'],
   brand: ['end-card', 'watermark'],
 };
 

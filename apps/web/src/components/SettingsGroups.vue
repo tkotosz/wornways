@@ -1,7 +1,14 @@
 <script setup lang="ts">
 // The controls of a few setting groups, built from the engine's settings table: buttons
 // for a choice, a slider for a number, a switch for on/off, and a few made to measure.
-import { METRICS, defaultMetrics, type Metric, type SettingDefinition } from '@wornways/engine';
+import {
+  METRICS,
+  TOTALS_FIELDS,
+  defaultMetrics,
+  type Metric,
+  type SettingDefinition,
+  type TotalsField,
+} from '@wornways/engine';
 import { computed } from 'vue';
 import {
   SHOW_TITLE,
@@ -75,11 +82,18 @@ const titleSet = computed(() => typeof adjustments.value['title'] === 'string');
 // Metrics: the values this video can show, and the ones picked, in order.
 const showsMetrics = computed(() => adjustments.value['metrics'] !== false);
 const showsTitle = computed(() => adjustments.value[SHOW_TITLE] !== false);
+/** Whether the totals card is on: set, or started by the preset (Recap). */
+const showsTotals = computed(
+  () =>
+    (adjustments.value['totals-card'] ??
+      startingValue(adjustments.value, props.count, 'totals-card')) === true,
+);
 
 /** Whether a setting's row shows: a group switched off shows only its switch. */
 const shown = (group: Panel, name: string) =>
   (group !== 'title' || showsTitle.value) &&
-  (group !== 'metrics' || name === 'metrics' || showsMetrics.value);
+  (group !== 'metrics' || name === 'metrics' || showsMetrics.value) &&
+  (group !== 'totals' || name === 'totals-card' || showsTotals.value);
 /** What the metrics have to describe: one activity, all at once, or activities in turn. */
 const kind = computed(() => {
   if (!props.plan) return null;
@@ -108,6 +122,28 @@ function toggleMetric(metric: Metric): void {
   const picked = pickedMetrics.value;
   const next = picked.includes(metric) ? picked.filter((m) => m !== metric) : [...picked, metric];
   if (next.length > 0) set('metrics-fields', next.join(','));
+}
+
+// Totals card: the values it can show (elevation only when recorded), and the ones picked, in order.
+const TOTALS_LABELS: Record<TotalsField, string> = {
+  count: 'Activities',
+  distance: 'Kilometers',
+  time: 'Hours moving',
+  elevation: 'Meters climbed',
+};
+const offeredTotals = computed(() =>
+  TOTALS_FIELDS.filter((field) => field !== 'elevation' || props.plan?.hasElevation),
+);
+const pickedTotals = computed<TotalsField[]>(() => {
+  const set = adjustments.value['totals-fields'];
+  const picked = typeof set === 'string' ? (set.split(',') as TotalsField[]) : TOTALS_FIELDS;
+  return picked.filter((field) => offeredTotals.value.includes(field));
+});
+
+function toggleTotal(field: TotalsField): void {
+  const picked = pickedTotals.value;
+  const next = picked.includes(field) ? picked.filter((f) => f !== field) : [...picked, field];
+  if (next.length > 0) set('totals-fields', next.join(','));
 }
 </script>
 
@@ -240,6 +276,31 @@ function toggleMetric(metric: Metric): void {
                   @click="set('metrics-fields', undefined)"
                 >
                   Use automatic metrics
+                </button>
+              </div>
+
+              <!-- The totals card's values, in the order picked. -->
+              <div v-else-if="setting.name === 'totals-fields'" class="chips">
+                <button
+                  v-for="field in offeredTotals"
+                  :key="field"
+                  type="button"
+                  class="chip"
+                  :aria-pressed="pickedTotals.includes(field)"
+                  @click="toggleTotal(field)"
+                >
+                  <span v-if="pickedTotals.includes(field)" class="order">{{
+                    pickedTotals.indexOf(field) + 1
+                  }}</span>
+                  {{ TOTALS_LABELS[field] }}
+                </button>
+                <button
+                  v-if="adjustments['totals-fields'] !== undefined"
+                  type="button"
+                  class="link"
+                  @click="set('totals-fields', undefined)"
+                >
+                  Use automatic totals
                 </button>
               </div>
 

@@ -29,6 +29,14 @@ const MOVING_SPEED = 0.5;
 /** The number of frames the totals card adds at this frame rate. */
 export const totalsCardFrames = (fps: number) => Math.round(TOTALS_CARD_S * fps);
 
+/**
+ * A value the totals card can show: the number of activities, kilometers, hours moving or
+ * meters climbed. The names are the metrics card's for the same values.
+ */
+export type TotalsField = 'count' | 'distance' | 'time' | 'elevation';
+/** Every value of the totals card, in the order it shows them unless told otherwise. */
+export const TOTALS_FIELDS: readonly TotalsField[] = ['count', 'distance', 'time', 'elevation'];
+
 export type Totals = {
   activities: number;
   meters: number;
@@ -60,6 +68,8 @@ export type TotalsCardOptions = {
   title: string;
   /** Singular and plural noun for the count, e.g. ["ride", "rides"]. */
   countLabel: [string, string];
+  /** The values to show, in order; default every one. Elevation shows only when recorded. */
+  fields?: readonly TotalsField[];
 };
 
 const smoothstep = (f: number) => f * f * (3 - 2 * f);
@@ -68,23 +78,39 @@ const progress = (t: number, at: number, length: number) =>
   Math.min(1, Math.max(0, (t - at) / length));
 const wholeNumber = (n: number) => Math.round(n).toLocaleString('en-US');
 
-/** The values and their labels, with the value shown at a share `f` of its count-up. */
-function entries(totals: Totals, f: number, countLabel: [string, string]) {
+/**
+ * The values of `fields` in their order, with their labels, each shown at a share `f` of
+ * its count-up. Elevation is left out when no activity recorded it.
+ */
+export function totalsEntries(
+  totals: Totals,
+  f: number,
+  countLabel: [string, string],
+  fields: readonly TotalsField[] = TOTALS_FIELDS,
+): { field: TotalsField; value: string; label: string }[] {
   const hours = totals.movingSeconds / 3600;
-  const list = [
-    {
-      value: wholeNumber(totals.activities * f),
-      label: totals.activities === 1 ? countLabel[0] : countLabel[1],
-    },
-    { value: wholeNumber((totals.meters / 1000) * f), label: 'km' },
-    {
-      value: hours < 10 ? (hours * f).toFixed(1) : wholeNumber(hours * f),
-      label: 'hours moving',
-    },
-  ];
-  if (totals.climbed !== null)
-    list.push({ value: wholeNumber(totals.climbed * f), label: 'm climbed' });
-  return list;
+  return fields.flatMap((field) => {
+    switch (field) {
+      case 'count':
+        return {
+          field,
+          value: wholeNumber(totals.activities * f),
+          label: totals.activities === 1 ? countLabel[0] : countLabel[1],
+        };
+      case 'distance':
+        return { field, value: wholeNumber((totals.meters / 1000) * f), label: 'km' };
+      case 'time':
+        return {
+          field,
+          value: hours < 10 ? (hours * f).toFixed(1) : wholeNumber(hours * f),
+          label: 'hours moving',
+        };
+      case 'elevation':
+        return totals.climbed === null
+          ? []
+          : { field, value: wholeNumber(totals.climbed * f), label: 'm climbed' };
+    }
+  });
 }
 
 /**
@@ -96,7 +122,7 @@ export function drawTotalsCard(
   last: CanvasLike,
   t: number,
   totals: Totals,
-  { width: W, height: H, fontFamily, title, countLabel }: TotalsCardOptions,
+  { width: W, height: H, fontFamily, title, countLabel, fields }: TotalsCardOptions,
 ): void {
   const unit = Math.min(W, H) / 1080;
   ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -107,13 +133,14 @@ export function drawTotalsCard(
   ctx.fillStyle = '#050608';
   ctx.fillRect(0, 0, W, H);
 
-  const values = entries(
+  const values = totalsEntries(
     totals,
     easeOut(progress(t, TIMING.count.at, TIMING.count.length)),
     countLabel,
+    fields,
   );
   // A row of all values on a wide frame; two columns otherwise, a last odd one centered.
-  const columns = W > H * 1.3 ? values.length : 2;
+  const columns = W > H * 1.3 ? Math.max(1, values.length) : 2;
   const rows = Math.ceil(values.length / columns);
   const valueSize = 96 * unit;
   const labelSize = 30 * unit;

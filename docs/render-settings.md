@@ -175,17 +175,25 @@ For a video of several activities: after the replay, 3.4 s more, before the end 
 finished map dims, the video's title comes in with a short orange rule under it, and the
 totals count up: the activities (named after the one sport shown, such as rides), the
 kilometers, the hours moving and the meters climbed (left out when no activity recorded
-elevation). Two columns on a story or square frame, one row on a wide one. Distance and
+elevation), unless other values are picked. Two columns on a story or square frame, one row on a wide one. Distance and
 climb are the ones the metrics card shows at the end; hours moving add up the time between
 points covered at 0.5 m/s or faster, so stops do not count.
+
+Its values can be picked and ordered: any of the activities (`count`), kilometers
+(`distance`), hours moving (`time`) and meters climbed (`elevation`), the names the metrics
+card uses for the same values. Unless picked, it shows all four in that order. Elevation is
+left out when no activity recorded it, whatever is picked. In the web app the values are
+chips under the switch, numbered in the order picked, with a link back to the automatic
+choice.
 
 The recap preset turns it on; any other video of several activities can. In the web app a
 Custom playback made from Recap keeps it on, and the switch on the Appearance step always
 decides over the preset.
 
-| Setting          | CLI flag                             | Values | Default              |
-| ---------------- | ------------------------------------ | ------ | -------------------- |
-| Show totals card | `--totals-card` / `--no-totals-card` | on/off | off; on with `recap` |
+| Setting          | CLI flag                             | Values                                                                        | Default                 |
+| ---------------- | ------------------------------------ | ----------------------------------------------------------------------------- | ----------------------- |
+| Show totals card | `--totals-card` / `--no-totals-card` | on/off                                                                        | off; on with `recap`    |
+| Values           | `--totals-fields`                    | comma-separated, in the order shown: `count`, `distance`, `time`, `elevation` | all four, in that order |
 
 ### Branding
 
