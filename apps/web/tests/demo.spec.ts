@@ -118,6 +118,9 @@ test('follows the guide to a highlight of the long ride', async ({ page }) => {
   await expect(
     page.getByTestId('group-metrics').getByRole('button', { name: 'Elevation' }),
   ).toBeVisible();
+  await expect(
+    page.getByTestId('group-elevation').getByRole('switch', { name: 'Elevation profile' }),
+  ).toBeChecked();
 });
 
 test('loads the demo only when it is picked, not with the app', async ({ page }) => {
