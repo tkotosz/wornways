@@ -79,6 +79,7 @@ export {
   type ReplayPlan,
 } from './replay/plans.ts';
 export { PRESETS, PRESET_NAMES, type Preset, type PresetDefinition } from './replay/presets.ts';
+export { TOTALS_FIELDS, type TotalsField } from './replay/totals-card.ts';
 export {
   GROUP_LABELS,
   SETTINGS,

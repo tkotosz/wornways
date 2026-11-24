@@ -70,6 +70,7 @@ describe('the settings offered', () => {
     ]);
     expect(names('camera')).toEqual(['camera']);
     expect(names('map')).toEqual(['map']);
+    expect(names('totals')).toEqual(['totals-card', 'totals-fields']);
   });
 
   it('keeps the metrics panel to the metrics', () => {

@@ -173,6 +173,7 @@ export async function prepareReplay(
     endPause: settings.endPause,
     endCard: settings.endCard,
     totalsCard: settings.totalsCard,
+    totalsFields: settings.totalsFields ?? undefined,
     watermark: settings.watermark,
     // Left to the video: on for a single activity, off for several.
     elevationProfile: settings.elevationProfile ?? tracks.length === 1,

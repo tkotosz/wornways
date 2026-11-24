@@ -45,6 +45,7 @@ describe('parseSettings', () => {
       titleSize: 100,
       metricsSize: 100,
       totalsCard: false,
+      totalsFields: null,
       endCard: true,
       watermark: true,
     });
@@ -53,6 +54,17 @@ describe('parseSettings', () => {
   it('makes a 30 s video unless told otherwise', () => {
     expect(parseSettings({}).duration).toBe(30);
     expect(parseSettings({ duration: '45' }).duration).toBe(45);
+  });
+
+  it('reads the totals card values in the order given', () => {
+    expect(parseSettings({ 'totals-fields': 'time, Count,time' }).totalsFields).toEqual([
+      'time',
+      'count',
+    ]);
+    expect(() => parseSettings({ 'totals-fields': 'pace' })).toThrow(
+      'expects values from count, distance, time, elevation, got "pace"',
+    );
+    expect(() => parseSettings({ 'totals-fields': '' })).toThrow('expects values from');
   });
 
   it('reads an end pause of 0 to 10 seconds, halves included', () => {

@@ -328,6 +328,35 @@ describe('rendering a replay', () => {
   });
 });
 
+describe('the totals card', () => {
+  /** The last frame of a video of two activities with the totals card, as raw pixels. */
+  function lastTotalsFrame(totalsFields?: RenderOptions['totalsFields']) {
+    const second = route();
+    second.id = 'second';
+    second.startTime += 86_400_000;
+    const renderer = createRenderer(
+      [route(), second],
+      chronologicalTimeline([5_000, 5_000], { duration: 1 }),
+      (w, h) => createCanvas(w, h) as unknown as CanvasLike,
+      { width: 270, height: 480, fps: 10, totalsCard: true, totalsFields },
+    );
+    for (let f = 0; f < renderer.frameCount; f++) renderer.renderFrame(f);
+    const ctx = renderer.canvas.getContext('2d') as Context2DLike;
+    return Buffer.from(ctx.getImageData(0, 0, 270, 480).data);
+  }
+
+  it('shows every value unless told otherwise, and only the values picked when told', () => {
+    const automatic = lastTotalsFrame();
+    expect(lastTotalsFrame(['count', 'distance', 'time', 'elevation']).equals(automatic)).toBe(
+      true,
+    );
+    expect(lastTotalsFrame(['distance']).equals(automatic)).toBe(false);
+    expect(lastTotalsFrame(['time', 'count']).equals(lastTotalsFrame(['count', 'time']))).toBe(
+      false,
+    );
+  });
+});
+
 describe('the title', () => {
   const width = 270;
   const height = 480;

@@ -2,7 +2,13 @@ import { drawBasemap, type Basemap, type MapLabel, type Tile } from '../map/base
 import { levelsFor, mapLevelViews, type CameraPath, type LevelWindow } from './camera.ts';
 import { drawElevationProfile, elevationProfile } from './elevation-profile.ts';
 import { drawEndCard, endCardFrames } from './end-card.ts';
-import { drawTotalsCard, movingSeconds, totalsCardFrames, type Totals } from './totals-card.ts';
+import {
+  drawTotalsCard,
+  movingSeconds,
+  totalsCardFrames,
+  type Totals,
+  type TotalsField,
+} from './totals-card.ts';
 import { drawWatermark } from './mark.ts';
 import { composeHeat, createHeatRamp, decodeHeat, heatStyle, saturationFromHeat } from './heat.ts';
 import { projectTrack, type Projected } from './project.ts';
@@ -166,6 +172,8 @@ export type RenderOptions = {
    * before the end card. Default false.
    */
   totalsCard?: boolean;
+  /** The totals card's values in order; default every one (see totals-card.ts). */
+  totalsFields?: readonly TotalsField[];
   /** Draw the small Wornways mark on the map credit's line. Default false. */
   watermark?: boolean;
   /**
@@ -1051,6 +1059,7 @@ export function createRenderer(
             fontFamily,
             title: options.title ?? '',
             countLabel: [singular, plural],
+            fields: options.totalsFields,
           });
           return;
         }

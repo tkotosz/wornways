@@ -49,6 +49,59 @@ test('turns the totals card on for Recap, and leaves the switch to the person', 
   await expect(totals).not.toBeChecked();
 });
 
+test('picks the totals card values and their order', async ({ page, context }) => {
+  page.setDefaultTimeout(15_000);
+  await offlineMap(context);
+  await page.goto('/');
+  await pickSource(page, 'demo');
+  await page.getByRole('button', { name: 'Continue' }).click(); // to Activities
+  await page.getByRole('button', { name: 'Continue' }).click(); // to Playback
+  await page
+    .getByRole('radiogroup', { name: 'Preset' })
+    .getByRole('radio', { name: /Recap/ })
+    .click();
+  await page.getByRole('button', { name: 'Appearance', exact: true }).click();
+
+  const group = page.getByTestId('group-totals');
+  const chip = (name: string) => group.getByRole('button', { name: new RegExp(`${name}$`) });
+  const picked = () =>
+    group.locator('.chip[aria-pressed="true"]').evaluateAll((chips) =>
+      chips
+        .map(
+          (c) =>
+            [
+              Number(c.querySelector('.order')?.textContent),
+              c.textContent!.replace(/^\s*\d+\s*/, '').trim(),
+            ] as const,
+        )
+        .sort((a, b) => a[0] - b[0])
+        .map(([, name]) => name),
+    );
+
+  // Automatic: all four, in the usual order.
+  await expect.poll(picked).toEqual(['Activities', 'Kilometers', 'Hours moving', 'Meters climbed']);
+  await expect(group.getByRole('button', { name: 'Use automatic totals' })).toHaveCount(0);
+
+  // Unpicking renumbers the rest; picking again puts it last.
+  await chip('Activities').click();
+  await expect.poll(picked).toEqual(['Kilometers', 'Hours moving', 'Meters climbed']);
+  await chip('Activities').click();
+  await expect.poll(picked).toEqual(['Kilometers', 'Hours moving', 'Meters climbed', 'Activities']);
+  // The last one picked cannot be unpicked.
+  for (const name of ['Kilometers', 'Hours moving', 'Meters climbed']) await chip(name).click();
+  await expect.poll(picked).toEqual(['Activities']);
+  await chip('Activities').click();
+  await expect.poll(picked).toEqual(['Activities']);
+
+  // Back to automatic.
+  await group.getByRole('button', { name: 'Use automatic totals' }).click();
+  await expect.poll(picked).toEqual(['Activities', 'Kilometers', 'Hours moving', 'Meters climbed']);
+
+  // Switched off, the card's values hide.
+  await group.getByRole('switch', { name: 'Totals card' }).click();
+  await expect(chip('Activities')).toHaveCount(0);
+});
+
 test('offers the totals card for several activities only', async ({ page, context }) => {
   page.setDefaultTimeout(15_000);
   await offlineMap(context);
