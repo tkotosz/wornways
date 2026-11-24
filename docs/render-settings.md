@@ -114,15 +114,23 @@ Trimmed exports default to the filename `replay.mp4`.
 
 ### Look
 
-| Setting           | CLI flag             | Values                                                                 | Default |
-| ----------------- | -------------------- | ---------------------------------------------------------------------- | ------- |
-| Camera            | `--camera`           | `zoom`, `fixed` or `follow`                                            | `zoom`  |
-| Street map        | `--map` / `--no-map` | on/off                                                                 | on      |
-| Frame size        | `--size`             | `WxH`, presets: story 1080x1920, square 1080x1080, landscape 1920x1080 | story   |
-| Frames per second | `--fps`              | 24, 30, 60                                                             | 30      |
+| Setting           | CLI flag                                         | Values                                                                 | Default |
+| ----------------- | ------------------------------------------------ | ---------------------------------------------------------------------- | ------- |
+| Camera            | `--camera`                                       | `zoom`, `fixed` or `follow`                                            | `zoom`  |
+| Street map        | `--map` / `--no-map`                             | on/off                                                                 | on      |
+| Elevation profile | `--elevation-profile` / `--no-elevation-profile` | on/off                                                                 | on      |
+| Frame size        | `--size`                                         | `WxH`, presets: story 1080x1920, square 1080x1080, landscape 1920x1080 | story   |
+| Frames per second | `--fps`                                          | 24, 30, 60                                                             | 30      |
 
 In Appearance, choose a frame preset or enter a custom size such as `640x480`. Both
 dimensions must be positive even numbers. Available encoder sizes depend on the device.
+
+The elevation profile shows in a single activity's video only, when the activity recorded
+elevation: its climb along the bottom of the frame, between the side margins and just
+above the map credit, over the distance from start to finish. The part already covered is
+orange, the rest faint, and a glowing dot moves along the line with the activity. A route
+that rises less than 60 m is drawn against a 60 m range, so a flat route looks flat. The
+metrics card and the title, when they sit at the bottom, go above it.
 
 The follow camera tracks the moving end of the route and pulls back to show the whole
 replay at the end. Each activity gets a zoom suited to its pace, and the camera widens
@@ -179,13 +187,13 @@ decides over the preset.
 The end card: after the replay, 3.2 s more. The finished map fades to black and the
 Wornways mark draws itself: the tile appears with the start dot, the route runs through
 the double W with a glowing head, the end dot lands and the name fades in. The replay
-keeps its duration; the card is added to it. The preview shows the replay's last frame,
-not the card.
+keeps its duration; the card is added to it. The preview's picture shows the replay's
+last frame, not the card; its playable draft has the card.
 
-The watermark: the small mark and name, a little faint, at the bottom right on the map
-credit's line, left of the credit (alone at the bottom right without a map), on every
-frame of the replay. Nothing else is drawn on that line, so it never meets the title or
-the metrics card.
+The watermark: the small mark and name, a little faint, at the bottom left on the map
+credit's line, as far from the edge as the credit is on the right, on every frame of the
+replay. Nothing else is drawn on that line, so it never meets the title, the metrics card
+or the credit.
 
 | Setting        | CLI flag                         | Values | Default |
 | -------------- | -------------------------------- | ------ | ------- |

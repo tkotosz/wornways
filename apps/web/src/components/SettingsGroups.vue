@@ -34,6 +34,7 @@ const GROUP_TITLES: Record<Panel, string> = {
   map: 'Map',
   title: 'Title',
   metrics: 'Metrics',
+  elevation: 'Elevation',
   totals: 'Totals card',
   brand: 'Branding',
 };

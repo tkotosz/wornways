@@ -471,7 +471,7 @@ describe('the watermark', () => {
   const width = 270;
   const height = 480;
 
-  /** Orange pixels along the bottom edge of the last frame, where the watermark sits. */
+  /** Orange pixels along the bottom left edge of the last frame, where the watermark sits. */
   function bottomOrange(watermark: boolean): number {
     const renderer = createRenderer(
       [route()],
@@ -481,7 +481,7 @@ describe('the watermark', () => {
     );
     for (let f = 0; f < renderer.frameCount; f++) renderer.renderFrame(f);
     const { data } = (renderer.canvas.getContext('2d') as Context2DLike).getImageData(
-      width / 2,
+      0,
       height * 0.94,
       width / 2,
       height * 0.06,
@@ -492,8 +492,72 @@ describe('the watermark', () => {
     return count;
   }
 
-  it('shows at the bottom right when asked', () => {
+  it('shows at the bottom left when asked', () => {
     expect(bottomOrange(true)).toBeGreaterThan(bottomOrange(false) + 30);
+  });
+});
+
+describe('the elevation profile', () => {
+  const width = 270;
+  const height = 480;
+
+  /** A route like `route()`, over a hill in the middle, or without elevation. */
+  function hill(withElevation: boolean): Track {
+    const track = route();
+    const count = track.points.length / STRIDE;
+    for (let i = 0; i < count; i++)
+      track.points[i * STRIDE + 2] = withElevation ? 300 - Math.abs(i - count / 2) * 4 : NaN;
+    return track;
+  }
+
+  /** Orange pixels in the band above the map credit, halfway through the activity. */
+  function orangeAtTheBottom(track: Track, elevationProfile: boolean): number {
+    const fps = 10;
+    const renderer = createRenderer(
+      [track],
+      chronologicalTimeline([5_000], { duration: 2 }),
+      (w, h) => createCanvas(w, h) as unknown as CanvasLike,
+      { width, height, fps, overlay: 'single', metrics: [], elevationProfile },
+    );
+    for (let f = 0; f < fps; f++) renderer.renderFrame(f);
+    const { data } = (renderer.canvas.getContext('2d') as Context2DLike).getImageData(
+      0,
+      height * 0.88,
+      width,
+      height * 0.08,
+    );
+    let count = 0;
+    for (let i = 0; i < data.length; i += 4)
+      if (data[i]! > 60 && data[i]! > data[i + 2]! + 30) count++;
+    return count;
+  }
+
+  it('shows under a single activity with elevation, when asked', () => {
+    expect(orangeAtTheBottom(hill(true), true)).toBeGreaterThan(200);
+    expect(orangeAtTheBottom(hill(true), false)).toBe(0);
+  });
+
+  it('is left out for an activity without elevation', () => {
+    expect(orangeAtTheBottom(hill(false), true)).toBe(0);
+  });
+
+  it('lifts the metrics card above it', () => {
+    // Landscape, where the card would otherwise reach down to the profile.
+    const [w, h] = [480, 270];
+    /** The highest row of white text in the lower half of the last frame: the large value. */
+    const cardTop = (elevationProfile: boolean) => {
+      const renderer = createRenderer(
+        [hill(true)],
+        chronologicalTimeline([5_000], { duration: 1 }),
+        (cw, ch) => createCanvas(cw, ch) as unknown as CanvasLike,
+        { width: w, height: h, fps: 10, overlay: 'single', elevationProfile },
+      );
+      for (let f = 0; f < renderer.replayFrames; f++) renderer.renderFrame(f);
+      for (let y = h / 2; y < h; y++)
+        if (textPixels(renderer.canvas, 0, y, w / 2, y + 1) > 0) return y;
+      return h;
+    };
+    expect(cardTop(true)).toBeLessThan(cardTop(false) - 15);
   });
 });
 
@@ -548,5 +612,44 @@ describe('the totals card', () => {
     // The end card's first frame still shows the totals, fading out.
     renderer.renderFrame(totalsEnd + 1);
     expect(textPixels(renderer.canvas, 0, height * 0.3, width, height * 0.7)).toBeGreaterThan(100);
+  });
+});
+
+describe('the watermark and the map credit', () => {
+  /** The rightmost column of the watermark's orange, on the credit's line of the last frame. */
+  async function watermarkRight(camera: 'fixed' | 'follow'): Promise<number> {
+    const [width, height] = [540, 960];
+    const settings = parseSettings({ camera, duration: '5', size: `${width}x${height}` });
+    const replay = await prepareReplay([route()], settings, {
+      createCanvas: (w, h) => createCanvas(w, h) as unknown as CanvasLike,
+      // Empty tiles: a map, and so its credit, without drawing streets.
+      loadTiles: async (ids) => ({
+        tiles: ids.map((id) => ({ ...id, data: null })),
+        downloaded: 0,
+      }),
+    });
+    const { renderer } = replay;
+    const last = renderer.replayFrames - 1;
+    renderer.skipTo(last);
+    renderer.renderFrame(last);
+    const top = Math.round(height * 0.95);
+    const { data } = (renderer.canvas.getContext('2d') as Context2DLike).getImageData(
+      0,
+      top,
+      width,
+      height - top,
+    );
+    let right = -1;
+    for (let i = 0; i < data.length; i += 4)
+      if (data[i]! > 150 && data[i + 1]! > 50 && data[i + 1]! < 200 && data[i + 2]! < 90)
+        right = Math.max(right, (i / 4) % width);
+    return right;
+  }
+
+  it('keeps to the bottom left, away from the credit, with any camera', async () => {
+    const fixed = await watermarkRight('fixed');
+    expect(fixed).toBeGreaterThan(0);
+    expect(fixed).toBeLessThan(540 * 0.3);
+    expect(Math.abs((await watermarkRight('follow')) - fixed)).toBeLessThanOrEqual(2);
   });
 });

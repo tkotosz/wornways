@@ -1,7 +1,8 @@
 <script setup lang="ts">
 // Step 3: how the routes play. A preset is enough; the video's length and Fine-tune
-// playback change its values, which makes it Custom. A summary tells what will play.
-import { SETTINGS } from '@wornways/engine';
+// playback change its values, which makes it Custom. A summary tells what will play, and
+// the preview shows it, also moving.
+import { SETTINGS, type SettingsInput } from '@wornways/engine';
 import { computed, ref } from 'vue';
 import {
   PLAYBACK_PANELS,
@@ -21,11 +22,16 @@ import {
 } from '../adjust.ts';
 import ExactNumber from '../components/ExactNumber.vue';
 import PacingLine from '../components/PacingLine.vue';
+import PosterPreview from '../components/PosterPreview.vue';
 import PresetDrawing from '../components/PresetDrawing.vue';
 import SettingsGroups from '../components/SettingsGroups.vue';
+import type { EngineClient } from '../engine-client.ts';
 import type { PlanReport } from '../messages.ts';
 
 const props = defineProps<{
+  engine: EngineClient;
+  /** The settings of the whole video, for the preview. */
+  settings: SettingsInput;
   activities: number;
   plan: PlanReport | null;
 }>();
@@ -69,105 +75,117 @@ const fineTuneOpen = ref(false);
       Choose a playback style and you're ready to go. Adjust the details only if you want to.
     </p>
 
-    <h2 class="kicker">Playback style</h2>
-    <div class="presets" role="radiogroup" aria-label="Preset">
-      <button
-        v-for="name in presetChoices(count)"
-        :key="name"
-        type="button"
-        role="radio"
-        class="preset"
-        :aria-checked="preset === name"
-        @click="pick(name)"
-      >
-        <PresetDrawing class="drawing" :preset="name" />
-        <span class="text">
-          <strong>{{ PRESET_LABELS[name] }}</strong>
-          <span class="muted">{{ PRESET_LINES[name] }}</span>
-        </span>
-        <span v-if="preset === name" class="check" aria-hidden="true">✓</span>
-      </button>
-    </div>
-
-    <div class="length">
-      <div class="length-head">
-        <div>
-          <strong>Video length</strong>
-          <p class="muted small">
-            {{
-              count === 'one'
-                ? settingHint('duration', 'one')
-                : 'How long the routes play, not counting the end card.'
-            }}
-          </p>
+    <div class="layout">
+      <PosterPreview
+        class="preview"
+        :engine="engine"
+        :settings="settings"
+        :seconds="plan?.seconds"
+      />
+      <div class="settings">
+        <h2 class="kicker">Playback style</h2>
+        <div class="presets" role="radiogroup" aria-label="Preset">
+          <button
+            v-for="name in presetChoices(count)"
+            :key="name"
+            type="button"
+            role="radio"
+            class="preset"
+            :aria-checked="preset === name"
+            @click="pick(name)"
+          >
+            <PresetDrawing class="drawing" :preset="name" />
+            <span class="text">
+              <strong>{{ PRESET_LABELS[name] }}</strong>
+              <span class="muted">{{ PRESET_LINES[name] }}</span>
+            </span>
+            <span v-if="preset === name" class="check" aria-hidden="true">✓</span>
+          </button>
         </div>
-        <ExactNumber
-          label="Exact video length in seconds"
-          :min="durationRange.min"
-          :max="durationRange.max"
-          :value="durationShown ?? duration"
-          unit="s"
-          @change="setDuration"
-        />
-      </div>
-      <input
-        type="range"
-        :min="durationRange.min"
-        :max="durationRange.max"
-        step="1"
-        :value="durationShown ?? duration"
-        aria-label="Video length"
-        @input="durationShown = Number(($event.target as HTMLInputElement).value)"
-        @change="setDuration(Number(($event.target as HTMLInputElement).value))"
-      />
-    </div>
 
-    <div class="summary" role="status">
-      <span class="icon" aria-hidden="true">▶</span>
-      <div>
-        <span class="caption">Your replay</span>
-        <strong data-testid="replay-summary">
-          {{ Number((plan?.seconds ?? duration).toFixed(1)) }} seconds ·
-          {{ preset === 'custom' ? 'Custom playback' : PRESET_LABELS[preset] }}
-        </strong>
-        <PacingLine v-if="plan" class="muted small" :plan="plan" />
-      </div>
-    </div>
+        <div class="length">
+          <div class="length-head">
+            <div>
+              <strong>Video length</strong>
+              <p class="muted small">
+                {{
+                  count === 'one'
+                    ? settingHint('duration', 'one')
+                    : 'How long the routes play, not counting the end card.'
+                }}
+              </p>
+            </div>
+            <ExactNumber
+              label="Exact video length in seconds"
+              :min="durationRange.min"
+              :max="durationRange.max"
+              :value="durationShown ?? duration"
+              unit="s"
+              @change="setDuration"
+            />
+          </div>
+          <input
+            type="range"
+            :min="durationRange.min"
+            :max="durationRange.max"
+            step="1"
+            :value="durationShown ?? duration"
+            aria-label="Video length"
+            @input="durationShown = Number(($event.target as HTMLInputElement).value)"
+            @change="setDuration(Number(($event.target as HTMLInputElement).value))"
+          />
+        </div>
 
-    <div class="fine-tune">
-      <button
-        type="button"
-        class="fine-tune-toggle"
-        :aria-expanded="fineTuneOpen"
-        aria-controls="fine-tune-playback"
-        @click="fineTuneOpen = !fineTuneOpen"
-      >
-        <span>
-          <strong>Fine-tune playback</strong>
-          <span class="muted small">
-            {{
-              fineTuneOpen ? 'Hide the detailed settings' : 'Optional: grouping, pace and camera'
-            }}
-          </span>
-        </span>
-        <span class="chevron" aria-hidden="true">{{ fineTuneOpen ? '⌃' : '⌄' }}</span>
-      </button>
-      <SettingsGroups
-        v-if="fineTuneOpen"
-        id="fine-tune-playback"
-        v-model="tuned"
-        class="fine-tune-panels"
-        :groups="PLAYBACK_PANELS"
-        :count="count"
-      />
-      <button
-        v-if="fineTuneOpen"
-        type="button"
-        class="link"
-        @click="adjustments = resetPlayback(adjustments, count)"
-      >
-        Reset playback to defaults
-      </button>
+        <div class="summary" role="status">
+          <span class="icon" aria-hidden="true">▶</span>
+          <div>
+            <span class="caption">Your replay</span>
+            <strong data-testid="replay-summary">
+              {{ Number((plan?.seconds ?? duration).toFixed(1)) }} seconds ·
+              {{ preset === 'custom' ? 'Custom playback' : PRESET_LABELS[preset] }}
+            </strong>
+            <PacingLine v-if="plan" class="muted small" :plan="plan" />
+          </div>
+        </div>
+
+        <div class="fine-tune">
+          <button
+            type="button"
+            class="fine-tune-toggle"
+            :aria-expanded="fineTuneOpen"
+            aria-controls="fine-tune-playback"
+            @click="fineTuneOpen = !fineTuneOpen"
+          >
+            <span>
+              <strong>Fine-tune playback</strong>
+              <span class="muted small">
+                {{
+                  fineTuneOpen
+                    ? 'Hide the detailed settings'
+                    : 'Optional: grouping, pace and camera'
+                }}
+              </span>
+            </span>
+            <span class="chevron" aria-hidden="true">{{ fineTuneOpen ? '⌃' : '⌄' }}</span>
+          </button>
+          <SettingsGroups
+            v-if="fineTuneOpen"
+            id="fine-tune-playback"
+            v-model="tuned"
+            class="fine-tune-panels"
+            :groups="PLAYBACK_PANELS"
+            :count="count"
+          />
+          <button
+            v-if="fineTuneOpen"
+            type="button"
+            class="link"
+            @click="adjustments = resetPlayback(adjustments, count)"
+          >
+            Reset playback to defaults
+          </button>
+        </div>
+      </div>
     </div>
 
     <div class="footer">
@@ -180,6 +198,18 @@ const fineTuneOpen = ref(false);
 <style scoped>
 .lead {
   margin-bottom: 1.6rem;
+}
+
+/* The preview beside the settings, as on the Appearance step. */
+.layout {
+  display: grid;
+  grid-template-columns: 17rem 1fr;
+  gap: 1.5rem;
+  align-items: start;
+}
+
+.settings {
+  min-width: 0;
 }
 
 .kicker {
@@ -345,6 +375,13 @@ const fineTuneOpen = ref(false);
 
 .fine-tune .link {
   margin: 0 0.8rem 0.8rem;
+}
+
+/* Phones: one column, the preview first. */
+@media (max-width: 760px) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* Phones: the cards as rows, the drawing beside the text. */

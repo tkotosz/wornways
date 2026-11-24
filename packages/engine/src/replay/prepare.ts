@@ -173,6 +173,7 @@ export async function prepareReplay(
     endCard: settings.endCard,
     totalsCard: settings.totalsCard,
     watermark: settings.watermark,
+    elevationProfile: settings.elevationProfile,
     onlyFrame,
   });
   return { renderer, plan, title, width, height, fps, camera, cameraMode, map };

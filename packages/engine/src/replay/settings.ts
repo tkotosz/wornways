@@ -55,6 +55,8 @@ export type RenderSettings = {
   // Look
   camera: 'zoom' | 'fixed' | 'follow';
   map: boolean;
+  /** Whether a single activity's video shows its climb profile along the bottom. */
+  elevationProfile: boolean;
   width: number;
   height: number;
   fps: number;
@@ -337,6 +339,16 @@ export const SETTINGS: readonly SettingDefinition[] = [
     help: 'Draw the street map under the routes.',
   },
   {
+    name: 'elevation-profile',
+    label: 'Elevation profile',
+    group: 'look',
+    kind: { type: 'switch' },
+    default: true,
+    help:
+      "A single activity's climb profile along the bottom, with a dot that moves along it. " +
+      'Only for an activity with recorded elevation.',
+  },
+  {
     name: 'size',
     label: 'Frame size',
     group: 'look',
@@ -445,7 +457,7 @@ export const SETTINGS: readonly SettingDefinition[] = [
     group: 'brand',
     kind: { type: 'switch' },
     default: true,
-    help: 'Show the small Wornways mark at the bottom right, on the map credit line.',
+    help: 'Show the small Wornways mark at the bottom left, on the map credit line.',
   },
 ];
 
@@ -650,6 +662,7 @@ export function parseSettings(input: SettingsInput): RenderSettings {
     trimRadius: number('trim-radius'),
     camera: choice<RenderSettings['camera']>('camera'),
     map: flag('map'),
+    elevationProfile: flag('elevation-profile'),
     title: text('title'),
     titlePosition: choice<Position>('title-position'),
     titleSize: number('title-size'),

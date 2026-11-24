@@ -158,7 +158,15 @@ export function fineTuned(
 }
 
 /** The panels of the Appearance step, after its Frame panel. */
-export const APPEARANCE_PANELS: Panel[] = ['privacy', 'title', 'metrics', 'map', 'totals', 'brand'];
+export const APPEARANCE_PANELS: Panel[] = [
+  'privacy',
+  'title',
+  'metrics',
+  'elevation',
+  'map',
+  'totals',
+  'brand',
+];
 /** Every group the two steps offer. Which activities are chosen in the step before them. */
 const ADJUST_GROUPS: SettingGroup[] = ['timing', 'privacy', 'look', 'title', 'metrics', 'brand'];
 
@@ -232,6 +240,8 @@ const HINTS: Record<string, string> = {
     'play in turn with this camera. Races, and activities too short to follow, use Zooms out.',
   'trim-radius': 'Hide the route within this radius of each activity’s start and finish.',
   'metrics-fields': 'In the order picked; the first is shown large.',
+  'elevation-profile':
+    'The climb profile along the bottom of the video, with a dot that follows the activity.',
   'totals-card':
     'After the replay, a few seconds of totals: activities, kilometers, hours moving and ' +
     'meters climbed. On for Recap.',
@@ -259,7 +269,7 @@ export const sliderStep = (setting: string) => STEPS[setting] ?? 1;
 
 /** A panel of settings on the Video and Text steps. */
 export type Panel =
-  'timing' | 'camera' | 'privacy' | 'map' | 'title' | 'metrics' | 'totals' | 'brand';
+  'timing' | 'camera' | 'privacy' | 'map' | 'title' | 'metrics' | 'elevation' | 'totals' | 'brand';
 
 /** The settings of each panel on the screens, in order: mostly the settings table's groups. */
 const PANELS: Record<Panel, string[]> = {
@@ -270,15 +280,18 @@ const PANELS: Record<Panel, string[]> = {
   map: ['map'],
   title: ['title', 'title-position', 'title-size'],
   metrics: ['metrics', 'metrics-fields', 'metrics-position', 'metrics-size'],
+  elevation: ['elevation-profile'],
   totals: ['totals-card'],
   brand: ['end-card', 'watermark'],
 };
 
 /**
- * Whether a panel has something to set for this video: the totals card only for several
- * activities. Until the plan is known, every panel shows.
+ * Whether a panel has something to set for this video: the elevation profile only for a
+ * single activity with recorded elevation, the totals card only for several activities.
+ * Until the plan is known, the totals card shows; the elevation profile waits for it.
  */
 export function panelOffered(panel: Panel, plan: PlanReport | null | undefined): boolean {
+  if (panel === 'elevation') return !!plan && plan.activities === 1 && plan.hasElevation;
   if (panel === 'totals') return !plan || plan.activities > 1;
   return true;
 }
