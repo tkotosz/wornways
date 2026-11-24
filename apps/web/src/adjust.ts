@@ -11,6 +11,7 @@ import {
   type SettingGroup,
   type SettingsInput,
 } from '@wornways/engine';
+import type { PlanReport } from './messages.ts';
 
 /** What the person changed in the Video and Overlay steps, by setting name; the rest keeps its default. */
 export type Adjustments = Record<string, string | boolean>;
@@ -69,8 +70,30 @@ export const PRESET_LINES: Record<PresetChoice, string> = {
 };
 
 /** The values the preset gives its settings, by setting name; none for Custom. */
-const presetValues = (preset: PresetChoice): Record<string, string> =>
+const presetValues = (preset: PresetChoice): Adjustments =>
   preset === 'custom' ? {} : PRESETS[preset].settings;
+
+/** The preset's values of the playback settings: the preset decides these. */
+const presetPlayback = (preset: PresetChoice): Adjustments =>
+  Object.fromEntries(
+    Object.entries(presetValues(preset)).filter(([name]) => PLAYBACK_SETTINGS.includes(name)),
+  );
+
+/**
+ * The preset's values of other settings, such as the totals card: where they start, until
+ * the person sets them on the Appearance step.
+ */
+const presetStarting = (preset: PresetChoice): Adjustments =>
+  Object.fromEntries(
+    Object.entries(presetValues(preset)).filter(([name]) => !PLAYBACK_SETTINGS.includes(name)),
+  );
+
+/** Where a setting of the Appearance step starts under the current preset; undefined: its default. */
+export const startingValue = (
+  adjustments: Adjustments,
+  count: ActivityCount,
+  name: string,
+): string | boolean | undefined => presetStarting(presetOf(adjustments, count))[name];
 
 /** The settings shown under Fine-tune, with the current preset's values applied. */
 export const playbackAdjustments = (
@@ -82,7 +105,7 @@ export const playbackAdjustments = (
     const value = adjustments[adjustmentKey(name, count)];
     if (value !== undefined) values[name] = value;
   }
-  return { ...values, ...presetValues(presetOf(adjustments, count)) };
+  return { ...values, ...presetPlayback(presetOf(adjustments, count)) };
 };
 
 /** Picks a preset for this selection size. */
@@ -109,18 +132,23 @@ export function resetPlayback(adjustments: Adjustments, count: ActivityCount): A
 
 /**
  * The adjustments after editing the effective values under Fine-tune. Changing a setting the preset sets turns
- * the preset into Custom, starting from its values; any other change keeps the preset.
+ * the preset into Custom, starting from its values (also those of other steps, such as the
+ * totals card, where the person has not set them); any other change keeps the preset.
  */
 export function fineTuned(
   before: Adjustments,
   after: Adjustments,
   count: ActivityCount,
 ): Adjustments {
-  const values = presetValues(presetOf(before, count));
+  const preset = presetOf(before, count);
+  const values = presetPlayback(preset);
   const effective = playbackAdjustments(before, count);
   const changed = PLAYBACK_SETTINGS.filter((name) => after[name] !== effective[name]);
   const custom = changed.some((name) => Object.hasOwn(values, name));
   const tuned = new Map(Object.entries(custom ? withPreset(before, 'custom', count) : before));
+  if (custom)
+    for (const [name, value] of Object.entries(presetStarting(preset)))
+      if (!tuned.has(name)) tuned.set(name, value);
   for (const name of custom ? PLAYBACK_SETTINGS : changed) {
     const key = adjustmentKey(name, count);
     if (after[name] === undefined) tuned.delete(key);
@@ -130,7 +158,7 @@ export function fineTuned(
 }
 
 /** The panels of the Appearance step, after its Frame panel. */
-export const APPEARANCE_PANELS: Panel[] = ['privacy', 'title', 'metrics', 'map', 'brand'];
+export const APPEARANCE_PANELS: Panel[] = ['privacy', 'title', 'metrics', 'map', 'totals', 'brand'];
 /** Every group the two steps offer. Which activities are chosen in the step before them. */
 const ADJUST_GROUPS: SettingGroup[] = ['timing', 'privacy', 'look', 'title', 'metrics', 'brand'];
 
@@ -204,6 +232,9 @@ const HINTS: Record<string, string> = {
     'play in turn with this camera. Races, and activities too short to follow, use Zooms out.',
   'trim-radius': 'Hide the route within this radius of each activity’s start and finish.',
   'metrics-fields': 'In the order picked; the first is shown large.',
+  'totals-card':
+    'After the replay, a few seconds of totals: activities, kilometers, hours moving and ' +
+    'meters climbed. On for Recap.',
 };
 
 /** Steps of the number sliders. */
@@ -227,7 +258,8 @@ export const settingHint = (setting: string, count: ActivityCount) =>
 export const sliderStep = (setting: string) => STEPS[setting] ?? 1;
 
 /** A panel of settings on the Video and Text steps. */
-export type Panel = 'timing' | 'camera' | 'privacy' | 'map' | 'title' | 'metrics' | 'brand';
+export type Panel =
+  'timing' | 'camera' | 'privacy' | 'map' | 'title' | 'metrics' | 'totals' | 'brand';
 
 /** The settings of each panel on the screens, in order: mostly the settings table's groups. */
 const PANELS: Record<Panel, string[]> = {
@@ -238,8 +270,18 @@ const PANELS: Record<Panel, string[]> = {
   map: ['map'],
   title: ['title', 'title-position', 'title-size'],
   metrics: ['metrics', 'metrics-fields', 'metrics-position', 'metrics-size'],
+  totals: ['totals-card'],
   brand: ['end-card', 'watermark'],
 };
+
+/**
+ * Whether a panel has something to set for this video: the totals card only for several
+ * activities. Until the plan is known, every panel shows.
+ */
+export function panelOffered(panel: Panel, plan: PlanReport | null | undefined): boolean {
+  if (panel === 'totals') return !plan || plan.activities > 1;
+  return true;
+}
 
 /** The frame rates offered on the Appearance step, from the settings table. */
 export const FRAME_RATES: readonly string[] = (() => {
@@ -268,8 +310,13 @@ export function valueOf(
   setting: SettingDefinition,
   count: ActivityCount,
 ): string | boolean | null {
-  const fromPreset: string | undefined = presetValues(presetOf(adjustments, count))[setting.name];
-  return fromPreset ?? adjustments[adjustmentKey(setting.name, count)] ?? setting.default;
+  const preset = presetOf(adjustments, count);
+  return (
+    presetPlayback(preset)[setting.name] ??
+    adjustments[adjustmentKey(setting.name, count)] ??
+    presetStarting(preset)[setting.name] ??
+    setting.default
+  );
 }
 
 /**
@@ -279,7 +326,7 @@ export function valueOf(
 export function adjustSettings(adjustments: Adjustments, count: ActivityCount): SettingsInput {
   const preset = presetOf(adjustments, count);
   // Under a preset, the settings it sets come from it, not from values set under Custom.
-  const fromPreset = presetValues(preset);
+  const fromPreset = presetPlayback(preset);
   const settings: SettingsInput = {};
   for (const setting of SETTINGS) {
     const value = adjustments[adjustmentKey(setting.name, count)];

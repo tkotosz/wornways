@@ -1,6 +1,7 @@
 import { drawBasemap, type Basemap, type MapLabel, type Tile } from '../map/basemap.ts';
 import { levelsFor, mapLevelViews, type CameraPath, type LevelWindow } from './camera.ts';
 import { drawEndCard, endCardFrames } from './end-card.ts';
+import { drawTotalsCard, movingSeconds, totalsCardFrames, type Totals } from './totals-card.ts';
 import { drawWatermark } from './mark.ts';
 import { composeHeat, createHeatRamp, decodeHeat, heatStyle, saturationFromHeat } from './heat.ts';
 import { projectTrack, type Projected } from './project.ts';
@@ -34,7 +35,8 @@ export interface Context2DLike {
   stroke(): void;
   fill(): void;
   fillRect(x: number, y: number, w: number, h: number): void;
-  fillText(text: string, x: number, y: number): void;
+  /** With `maxWidth`, text wider than that is drawn narrower to fit. */
+  fillText(text: string, x: number, y: number, maxWidth?: number): void;
   strokeText(text: string, x: number, y: number): void;
   measureText(text: string): { width: number };
   drawImage(image: unknown, dx: number, dy: number): void;
@@ -153,6 +155,11 @@ export type RenderOptions = {
   onlyFrame?: number;
   /** End the video with the Wornways card (see end-card.ts), after the replay. Default false. */
   endCard?: boolean;
+  /**
+   * Several activities: the card of their totals (see totals-card.ts) after the replay,
+   * before the end card. Default false.
+   */
+  totalsCard?: boolean;
   /** Draw the small Wornways mark on the map credit's line. Default false. */
   watermark?: boolean;
   fontFamily?: string;
@@ -163,9 +170,9 @@ export type RenderOptions = {
 export type Renderer = {
   /** Holds the most recently rendered frame. */
   readonly canvas: CanvasLike;
-  /** Every frame of the video: the replay's, then the end card's. */
+  /** Every frame of the video: the replay's, then the totals card's and the end card's. */
   readonly frameCount: number;
-  /** The replay's frames; the end card's follow them. */
+  /** The replay's frames; the cards' follow them. */
   readonly replayFrames: number;
   /** Pass count that shows as the hottest colour. */
   readonly heatSaturation: number;
@@ -308,7 +315,9 @@ export function createRenderer(
     year: 'numeric',
   });
   const replayFrames = Math.round(timeline.duration * fps);
-  const frameCount = replayFrames + (options.endCard ? endCardFrames(fps) : 0);
+  // The totals card is for several activities only.
+  const totalsFrames = options.totalsCard && kind !== 'single' ? totalsCardFrames(fps) : 0;
+  const frameCount = replayFrames + totalsFrames + (options.endCard ? endCardFrames(fps) : 0);
   if (camera && camera.zoom.length < replayFrames)
     throw new Error('Camera path is shorter than the video');
   const { onlyFrame } = options;
@@ -937,8 +946,33 @@ export function createRenderer(
     }
   }
 
-  /** A copy of the replay's last frame, which the end card is drawn over. */
+  /** A copy of the replay's last frame, which the totals card is drawn over. */
   let lastReplayFrame: CanvasLike | null = null;
+  /** A copy of the frame before the end card: the replay's last, or the totals card's. */
+  let beforeEndCard: CanvasLike | null = null;
+  /** A copy of what the frame canvas holds now. */
+  const copyFrame = () => {
+    const copy = createCanvas(W, H);
+    (copy.getContext('2d') as Context2DLike).drawImage(frame, 0, 0);
+    return copy;
+  };
+
+  /** The totals of every activity, for the totals card. */
+  const totals = (): Totals => {
+    let meters = 0;
+    let climbed = 0;
+    for (const tr of prepared) {
+      meters += tr.dist[tr.count - 1];
+      climbed += tr.climb[tr.count - 1];
+    }
+    return {
+      activities: tracks.length,
+      meters,
+      movingSeconds: tracks.reduce((sum, track) => sum + movingSeconds(track), 0),
+      climbed: hasElevation ? climbed : null,
+    };
+  };
+  let totalsShown: Totals | null = null;
 
   return {
     canvas: frame,
@@ -952,11 +986,21 @@ export function createRenderer(
         throw new Error(`This renderer draws frame ${onlyFrame} only, not frame ${index}`);
       nextFrame++;
       if (index >= replayFrames) {
-        if (!lastReplayFrame) {
-          lastReplayFrame = createCanvas(W, H);
-          (lastReplayFrame.getContext('2d') as Context2DLike).drawImage(frame, 0, 0);
+        const after = index - replayFrames;
+        if (after < totalsFrames) {
+          lastReplayFrame ??= copyFrame();
+          totalsShown ??= totals();
+          drawTotalsCard(ctx, lastReplayFrame, after / fps, totalsShown, {
+            width: W,
+            height: H,
+            fontFamily,
+            title: options.title ?? '',
+            countLabel: [singular, plural],
+          });
+          return;
         }
-        drawEndCard(ctx, lastReplayFrame, (index - replayFrames) / fps, {
+        beforeEndCard ??= copyFrame();
+        drawEndCard(ctx, beforeEndCard, (after - totalsFrames) / fps, {
           width: W,
           height: H,
           fontFamily,

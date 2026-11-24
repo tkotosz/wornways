@@ -9,7 +9,8 @@ export type PresetDefinition = {
   help: string;
   /** Whether the preset is meant for one activity or for several. */
   activities: 'one' | 'several';
-  settings: Record<string, string>;
+  /** Setting values: text as entered, or on/off for a switch. */
+  settings: Record<string, string | boolean>;
 };
 
 export const PRESETS: Record<Preset, PresetDefinition> = {
@@ -19,9 +20,17 @@ export const PRESETS: Record<Preset, PresetDefinition> = {
     settings: { group: 'all', 'group-pace': 'real', duration: '30' },
   },
   recap: {
-    help: 'activities in turn, grouped as needed (a week by activity, a year by month)',
+    help:
+      'activities in turn, grouped as needed (a week by activity, a year by month), then ' +
+      'their totals',
     activities: 'several',
-    settings: { group: 'auto', share: 'even', 'group-pace': 'fit', duration: '30' },
+    settings: {
+      group: 'auto',
+      share: 'even',
+      'group-pace': 'fit',
+      duration: '30',
+      'totals-card': true,
+    },
   },
   'multiday-trip': {
     help: 'one day after another, a longer day getting more time, the camera following the route',

@@ -496,3 +496,57 @@ describe('the watermark', () => {
     expect(bottomOrange(true)).toBeGreaterThan(bottomOrange(false) + 30);
   });
 });
+
+describe('the totals card', () => {
+  const width = 270;
+  const height = 480;
+  const fps = 10;
+  /** A second route like `route()`, a day later. */
+  const nextDay = (): Track => ({ ...route(), id: 'next', startTime: Date.UTC(2026, 4, 3) });
+  const make = (tracks: Track[], options: Partial<RenderOptions>) =>
+    createRenderer(
+      tracks,
+      chronologicalTimeline(
+        tracks.map(() => 5_000),
+        { duration: 2 },
+      ),
+      (w, h) => createCanvas(w, h) as unknown as CanvasLike,
+      { width, height, fps, metrics: [], ...options },
+    );
+
+  it('adds its seconds after the replay, before the end card', () => {
+    const plain = make([route(), nextDay()], { endCard: true });
+    const withTotals = make([route(), nextDay()], { endCard: true, totalsCard: true });
+
+    expect(withTotals.replayFrames).toBe(plain.replayFrames);
+    expect(withTotals.frameCount).toBe(plain.frameCount + Math.round(3.4 * fps));
+  });
+
+  it('is left out for a single activity', () => {
+    const single = make([route()], { overlay: 'single', totalsCard: true });
+
+    expect(single.frameCount).toBe(single.replayFrames);
+  });
+
+  it('shows the totals over the dimmed map, then the end card fades from it', () => {
+    const renderer = make([route(), nextDay()], {
+      totalsCard: true,
+      endCard: true,
+      title: 'May 2026',
+    });
+    const totalsEnd = renderer.replayFrames + Math.round(3.4 * fps) - 1;
+    for (let f = 0; f < renderer.replayFrames; f++) renderer.renderFrame(f);
+    // The route, in the top fifth of the frame: away from the card's text.
+    const routeAtEnd = heatPixels(renderer.canvas, width, height * 0.2);
+    expect(routeAtEnd).toBeGreaterThan(20);
+    for (let f = renderer.replayFrames; f <= totalsEnd; f++) renderer.renderFrame(f);
+
+    // The values and the title in the middle; the route dimmed behind them.
+    expect(textPixels(renderer.canvas, 0, height * 0.3, width, height * 0.7)).toBeGreaterThan(300);
+    expect(heatPixels(renderer.canvas, width, height * 0.2)).toBeLessThan(routeAtEnd / 4);
+
+    // The end card's first frame still shows the totals, fading out.
+    renderer.renderFrame(totalsEnd + 1);
+    expect(textPixels(renderer.canvas, 0, height * 0.3, width, height * 0.7)).toBeGreaterThan(100);
+  });
+});

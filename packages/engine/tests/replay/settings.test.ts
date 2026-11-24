@@ -42,6 +42,7 @@ describe('parseSettings', () => {
       titlePosition: 'top-left',
       titleSize: 100,
       metricsSize: 100,
+      totalsCard: false,
       endCard: true,
       watermark: true,
     });
@@ -179,6 +180,10 @@ describe('parseSettings', () => {
       camera: 'follow',
     });
     expect(parseSettings({ preset: 'highlight', camera: 'fixed' }).camera).toBe('fixed');
+    // Recap also turns the totals card on; a switch given with it wins.
+    expect(parseSettings({ preset: 'recap' }).totalsCard).toBe(true);
+    expect(parseSettings({ preset: 'recap', 'totals-card': false }).totalsCard).toBe(false);
+    expect(parseSettings({ preset: 'all-at-once' }).totalsCard).toBe(false);
     expect(errorOf({ preset: 'race' })).toBe(
       'preset: expects all-at-once or recap or multiday-trip or highlight, got "race"',
     );

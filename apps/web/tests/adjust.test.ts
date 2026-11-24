@@ -9,6 +9,7 @@ import {
   presetOf,
   resetPlayback,
   settingLabel,
+  startingValue,
   valueOf,
   withPreset,
   fromEarlierVersions,
@@ -168,6 +169,8 @@ describe('presets', () => {
       share: 'even',
       'group-pace': 'fit',
       duration: '30',
+      // Custom starts from all of Recap's values, its totals card too.
+      'totals-card': true,
     });
     expect(fineTuned(recap, { ...effective, camera: 'fixed' }, 'several')).toEqual({
       ...recap,
@@ -177,6 +180,28 @@ describe('presets', () => {
     expect(fineTuned(recap, { ...effective, duration: '20' }, 'several')).toMatchObject({
       preset: 'custom',
       duration: '20',
+    });
+  });
+
+  it('starts the totals card on under Recap, and lets the switch decide', () => {
+    const totals = definition('totals-card');
+    const recap = { preset: 'recap' };
+    expect(valueOf(recap, totals, 'several')).toBe(true);
+    expect(startingValue(recap, 'several', 'totals-card')).toBe(true);
+    expect(valueOf({ preset: 'all-at-once' }, totals, 'several')).toBe(false);
+    // Switched off under Recap, it stays off, also when Recap turns Custom.
+    const off = { ...recap, 'totals-card': false };
+    expect(valueOf(off, totals, 'several')).toBe(false);
+    expect(adjustSettings(off, 'several')).toEqual({ preset: 'recap', 'totals-card': false });
+    const effective = playbackAdjustments(off, 'several');
+    expect(fineTuned(off, { ...effective, duration: '20' }, 'several')).toMatchObject({
+      preset: 'custom',
+      'totals-card': false,
+    });
+    // Switched on for another preset.
+    expect(adjustSettings({ 'totals-card': true }, 'several')).toEqual({
+      preset: 'all-at-once',
+      'totals-card': true,
     });
   });
 
