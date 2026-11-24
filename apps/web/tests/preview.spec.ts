@@ -23,16 +23,26 @@ test('plays a draft of the video in the preview, on Playback and Appearance', as
   const video = preview.getByTestId('preview-video');
   await expect(video).toBeVisible({ timeout: 120_000 });
   // The whole video: the replay, then the end card.
-  const seconds = await video.evaluate(
-    (element: HTMLVideoElement) =>
-      new Promise<number>((resolve) => {
-        if (element.readyState >= 1) resolve(element.duration);
-        else element.addEventListener('loadedmetadata', () => resolve(element.duration));
-      }),
-  );
+  /** The parts of the video element the length is read from. */
+  type Player = {
+    readyState: number;
+    duration: number;
+    addEventListener(type: 'loadedmetadata', listener: () => void): void;
+  };
+  const seconds = await video.evaluate((element) => {
+    const player = element as unknown as Player;
+    return new Promise<number>((resolve) => {
+      if (player.readyState >= 1) resolve(player.duration);
+      else player.addEventListener('loadedmetadata', () => resolve(player.duration));
+    });
+  });
   expect(seconds).toBeGreaterThan(30);
   expect(seconds).toBeLessThan(35);
-  await expect(preview.getByTestId('draft-note')).toBeVisible();
+  // The caption tells the video's frame from the draft's, which is smaller and slower.
+  await expect(preview.getByTestId('video-frame')).toContainText('Video: 1080 × 1920 · 30 fps');
+  await expect(preview.getByTestId('draft-note')).toContainText(
+    'Playing a quick draft at 270 × 480 and 15 fps',
+  );
 
   // The draft stays on the next step while the settings are the same.
   await page.getByRole('button', { name: 'Continue' }).click(); // to Appearance

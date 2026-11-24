@@ -5,7 +5,14 @@ import { ref as moduleRef } from 'vue';
  * The last draft made, for the settings it was made with. It outlives the component, so
  * going from one step to the other keeps it while the settings stay the same.
  */
-const draft = moduleRef<{ key: string; url: string } | null>(null);
+const draft = moduleRef<{
+  key: string;
+  url: string;
+  /** The draft's own frame, smaller and slower than the video's. */
+  width: number;
+  height: number;
+  fps: number;
+} | null>(null);
 
 function dropDraft(): void {
   if (draft.value) URL.revokeObjectURL(draft.value.url);
@@ -37,7 +44,8 @@ let timer: ReturnType<typeof setTimeout> | undefined;
 
 const key = computed(() => JSON.stringify(props.settings));
 /** The draft of these settings, when one is made. */
-const draftUrl = computed(() => (draft.value?.key === key.value ? draft.value.url : ''));
+const shownDraft = computed(() => (draft.value?.key === key.value ? draft.value : null));
+const draftUrl = computed(() => shownDraft.value?.url ?? '');
 /** The draft being made: how far it is, and how to stop it. */
 const drafting = ref<{ progress: Progress; cancel: () => void } | null>(null);
 const draftError = ref('');
@@ -73,10 +81,11 @@ async function play(): Promise<void> {
   );
   drafting.value = { progress: { stage: 'choosing' }, cancel: task.cancel };
   try {
-    const { video } = await task.result;
+    const { video, report } = await task.result;
     if (drafting.value?.cancel !== task.cancel) return;
     dropDraft();
-    draft.value = { key: settingsKey, url: URL.createObjectURL(video) };
+    const { width, height, fps } = report;
+    draft.value = { key: settingsKey, url: URL.createObjectURL(video), width, height, fps };
   } catch (caught) {
     if (drafting.value?.cancel !== task.cancel || caught instanceof Canceled) return;
     draftError.value = caught instanceof Error ? caught.message : String(caught);
@@ -198,12 +207,14 @@ onBeforeUnmount(() => {
       <span v-else-if="error" class="status error">{{ error }}</span>
       <span v-else-if="draftError" class="status error">{{ draftError }}</span>
     </div>
-    <p class="caption muted">
-      {{ frame.width }} × {{ frame.height }} · {{ frame.fps }} fps ·
+    <!-- The finished video's frame, not the preview's, which is drawn smaller. -->
+    <p class="caption muted" data-testid="video-frame">
+      Video: {{ frame.width }} × {{ frame.height }} · {{ frame.fps }} fps ·
       {{ Number((seconds ?? frame.duration).toFixed(1)) }} s
     </p>
-    <p v-if="draftUrl" class="caption muted" data-testid="draft-note">
-      A quick draft: small and less smooth. The video is made in full on Export.
+    <p v-if="shownDraft" class="caption muted" data-testid="draft-note">
+      Playing a quick draft at {{ shownDraft.width }} × {{ shownDraft.height }} and
+      {{ shownDraft.fps }} fps. The video is made in full on Export.
     </p>
     <p v-else-if="url && !drafting" class="caption muted">
       The finished picture. Press play to see it move.

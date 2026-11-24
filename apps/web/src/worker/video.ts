@@ -147,6 +147,7 @@ export async function makeVideo(
       seconds: renderer.frameCount / fps,
       width,
       height,
+      fps,
       mapError: replay.map?.error ?? null,
     },
   };

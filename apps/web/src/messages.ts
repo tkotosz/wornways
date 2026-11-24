@@ -166,8 +166,10 @@ export type VideoReport = {
   fileName: string;
   activities: number;
   seconds: number;
+  /** The frame's size and rate as made: a draft's are smaller than the settings'. */
   width: number;
   height: number;
+  fps: number;
   /** Why the map could not be drawn; null when it was, or when the settings leave it out. */
   mapError: string | null;
 };
