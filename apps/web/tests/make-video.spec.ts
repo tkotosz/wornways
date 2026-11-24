@@ -723,9 +723,11 @@ test('sets up the video and its text, and keeps both for the next visit', async 
   ).toBeVisible();
   await page.getByTestId('group-title').getByRole('button', { name: 'Bottom middle' }).click();
   await expect(page.getByTestId('group-metrics')).toContainText('Show metrics');
-  await expect(page.getByTestId('group-metrics').getByRole('button', { name: 'Date' })).toHaveCount(
-    0,
-  );
+  // A race offers every metric, the dates and the pace too, though not picked at first.
+  for (const name of ['Date', 'Pace'])
+    await expect(
+      page.getByTestId('group-metrics').getByRole('button', { name, exact: true }),
+    ).toHaveAttribute('aria-pressed', 'false');
   await slider('Size').first().fill('150');
   await slider('Size').first().dispatchEvent('change');
   // The end card is on unless switched off; off, the video is the replay alone.

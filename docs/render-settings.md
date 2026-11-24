@@ -167,6 +167,20 @@ The values shown over the map: the first one large, the others on a line under i
 wraps when the frame is too narrow. A single-activity video shows live values as the
 activity plays; a video of several activities shows running totals.
 
+| Value       | One activity          | Race (all at once)           | In turn (groups)            | Totals card                  |
+| ----------- | --------------------- | ---------------------------- | --------------------------- | ---------------------------- |
+| `time`      | its time so far       | the race clock               | the activities' time so far | hours moving                 |
+| `distance`  | kilometers so far     | kilometers so far            | kilometers so far           | kilometers                   |
+| `pace`      | average so far        | average so far               | average so far              | average while moving         |
+| `elevation` | meters climbed so far | meters climbed so far        | meters climbed so far       | meters climbed               |
+| `date`      | its day               | the days the activities span | the playing group's dates   | the days the activities span |
+| `count`     | not offered           | how many are still moving    | activities so far           | activities                   |
+
+Pace is minutes per kilometer when every activity is on foot (run, walk, hike), otherwise
+kilometers per hour. Elevation shows only when an activity recorded it. Unless picked, the
+video shows what suits it (one activity: time, distance, date; a race: time, count,
+distance; in turn: date, count, distance) and the totals card its first four values.
+
 | Setting   | CLI flag                     | Values                                                                                        | Default              |
 | --------- | ---------------------------- | --------------------------------------------------------------------------------------------- | -------------------- |
 | Show card | `--metrics` / `--no-metrics` | on/off                                                                                        | on                   |
@@ -185,20 +199,22 @@ climb are the ones the metrics card shows at the end; hours moving add up the ti
 points covered at 0.5 m/s or faster, so stops do not count.
 
 Its values can be picked and ordered: any of the activities (`count`), kilometers
-(`distance`), hours moving (`time`) and meters climbed (`elevation`), the names the metrics
-card uses for the same values. Unless picked, it shows all four in that order. Elevation is
-left out when no activity recorded it, whatever is picked. In the web app the values are
-chips under the switch, numbered in the order picked, with a link back to the automatic
-choice.
+(`distance`), hours moving (`time`), meters climbed (`elevation`), the average pace or speed
+while moving (`pace`) and the days the activities span (`date`), the names the metrics card
+uses for the same values (see the table above). Unless picked, it shows the first four in
+that order. The pace and the dates appear without counting up, and the dates take a row of
+their own. Elevation is left out when no activity recorded it, whatever is picked. In the
+web app the values are chips under the switch, numbered in the order picked, with a link
+back to the automatic choice.
 
 The recap preset turns it on; any other video of several activities can. In the web app a
 Custom playback made from Recap keeps it on, and the switch on the Appearance step always
 decides over the preset.
 
-| Setting          | CLI flag                             | Values                                                                        | Default                 |
-| ---------------- | ------------------------------------ | ----------------------------------------------------------------------------- | ----------------------- |
-| Show totals card | `--totals-card` / `--no-totals-card` | on/off                                                                        | off; on with `recap`    |
-| Values           | `--totals-fields`                    | comma-separated, in the order shown: `count`, `distance`, `time`, `elevation` | all four, in that order |
+| Setting          | CLI flag                             | Values                                                                                        | Default                                  |
+| ---------------- | ------------------------------------ | --------------------------------------------------------------------------------------------- | ---------------------------------------- |
+| Show totals card | `--totals-card` / `--no-totals-card` | on/off                                                                                        | off; on with `recap`                     |
+| Values           | `--totals-fields`                    | comma-separated, in the order shown: `count`, `distance`, `time`, `elevation`, `pace`, `date` | `count`, `distance`, `time`, `elevation` |
 
 ### Branding
 

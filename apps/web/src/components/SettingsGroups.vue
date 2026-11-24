@@ -2,6 +2,7 @@
 // The controls of a few setting groups, built from the engine's settings table: buttons
 // for a choice, a slider for a number, a switch for on/off, and a few made to measure.
 import {
+  AUTOMATIC_TOTALS,
   METRICS,
   TOTALS_FIELDS,
   defaultMetrics,
@@ -103,9 +104,7 @@ const kind = computed(() => {
 const offeredMetrics = computed(() =>
   METRICS.filter((m) => {
     if (!kind.value) return false;
-    if (m === 'pace') return kind.value === 'single';
     if (m === 'count') return kind.value !== 'single';
-    if (m === 'date') return kind.value !== 'race';
     if (m === 'elevation') return props.plan?.hasElevation;
     return true;
   }),
@@ -130,13 +129,15 @@ const TOTALS_LABELS: Record<TotalsField, string> = {
   distance: 'Kilometers',
   time: 'Hours moving',
   elevation: 'Meters climbed',
+  pace: 'Average pace',
+  date: 'Dates',
 };
 const offeredTotals = computed(() =>
   TOTALS_FIELDS.filter((field) => field !== 'elevation' || props.plan?.hasElevation),
 );
 const pickedTotals = computed<TotalsField[]>(() => {
   const set = adjustments.value['totals-fields'];
-  const picked = typeof set === 'string' ? (set.split(',') as TotalsField[]) : TOTALS_FIELDS;
+  const picked = typeof set === 'string' ? (set.split(',') as TotalsField[]) : AUTOMATIC_TOTALS;
   return picked.filter((field) => offeredTotals.value.includes(field));
 });
 

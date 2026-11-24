@@ -32,6 +32,8 @@ describe('totalsEntries', () => {
     meters: 312_400,
     movingSeconds: 14.5 * 3600,
     climbed: 4210,
+    onFoot: false,
+    dates: '18–22 Apr 2026',
   };
   const rides: [string, string] = ['ride', 'rides'];
 
@@ -48,6 +50,25 @@ describe('totalsEntries', () => {
     expect(totalsEntries(totals, 1, rides, ['elevation', 'count']).map((e) => e.field)).toEqual([
       'elevation',
       'count',
+    ]);
+  });
+
+  it('tells the average speed while moving, or the pace when every activity is on foot', () => {
+    expect(totalsEntries(totals, 1, rides, ['pace'])).toEqual([
+      { field: 'pace', value: '21.5', label: 'km/h average' },
+    ]);
+    // 42.2 km in 3:30 moving: 4:59 per kilometer.
+    const runs = { ...totals, onFoot: true, meters: 42_200, movingSeconds: 3.5 * 3600 };
+    expect(totalsEntries(runs, 1, rides, ['pace'])).toEqual([
+      { field: 'pace', value: '4:59', label: 'min/km average' },
+    ]);
+  });
+
+  it('shows the days spanned, and neither the dates nor the pace count up', () => {
+    expect(totalsEntries(totals, 0.2, rides, ['date', 'pace', 'distance'])).toEqual([
+      { field: 'date', value: '18–22 Apr 2026', label: 'dates' },
+      { field: 'pace', value: '21.5', label: 'km/h average' },
+      { field: 'distance', value: '62', label: 'km' },
     ]);
   });
 
