@@ -229,22 +229,23 @@ onBeforeUnmount(() => {
       <button type="button" class="link" @click="make">Try again</button>
     </p>
 
-    <div class="footer">
+    <div class="footer export-footer">
       <button type="button" class="secondary" :disabled="!!progress" @click="emit('back')">
         ← Back
       </button>
-      <span v-if="result && !progress" class="actions">
-        <!-- Where sharing works, it is the main thing to do; elsewhere downloading is. -->
+      <template v-if="result && !progress">
+        <!-- Where sharing works, it is the main thing to do and sits at the right, with
+             Download in the middle; elsewhere Download is the main thing and takes the right. -->
         <a
-          :class="canShare ? 'secondary' : 'primary'"
+          :class="canShare ? 'secondary middle' : 'primary end'"
           class="download"
           :href="result.url"
           :download="result.file.name"
         >
           Download
         </a>
-        <button v-if="canShare" type="button" class="primary" @click="share">Share</button>
-      </span>
+        <button v-if="canShare" type="button" class="primary end" @click="share">Share</button>
+      </template>
     </div>
   </section>
 </template>
@@ -344,10 +345,53 @@ onBeforeUnmount(() => {
   font-size: 0.9rem;
 }
 
-.actions {
-  display: flex;
-  flex-wrap: wrap;
+/*
+ * Back at the left, the main action at the right, and Download in the middle of the bar
+ * when Share takes the right. The two outer columns share what is left equally, so the
+ * middle column sits at the bar's center whatever the buttons' widths.
+ */
+.export-footer {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
   gap: 0.8rem;
+}
+
+.export-footer > :first-child {
+  justify-self: start;
+}
+
+.middle {
+  grid-column: 2;
+}
+
+.end {
+  grid-column: 3;
+  justify-self: end;
+}
+
+.export-footer > * {
+  white-space: nowrap;
+}
+
+/*
+ * Three buttons with their usual padding need about 330 px, more than a 360 px phone leaves
+ * for the bar. Tighter padding keeps them on one row with Download centered down to 360 px,
+ * and on one row, nearly centered, at 320 px.
+ */
+@media (max-width: 400px) {
+  .export-footer {
+    gap: 0.5rem;
+  }
+
+  .export-footer > * {
+    padding-inline: 0.9rem;
+  }
+}
+
+@media (max-width: 340px) {
+  .export-footer > * {
+    padding-inline: 0.7rem;
+  }
 }
 
 .download {
