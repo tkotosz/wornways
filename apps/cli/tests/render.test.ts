@@ -3,11 +3,13 @@ import { describe, expect, it } from 'vitest';
 import {
   chronologicalTimeline,
   createRenderer,
+  raceTimeline,
   parseSettings,
   planReplay,
   prepareReplay,
   STRIDE,
   type CanvasLike,
+  type Metric,
   type Context2DLike,
   type RenderOptions,
   type Track,
@@ -252,6 +254,29 @@ describe('the metrics card', () => {
 
     expect(frame.topRight).toBeGreaterThan(20);
     expect(frame.bottomLeft).toBe(0);
+  });
+
+  /** Text pixels in the bottom left of the last frame of a video of two activities. */
+  function severalLastFrame(timeline: ReturnType<typeof raceTimeline>, metrics: Metric[]) {
+    const second = route();
+    second.id = 'second';
+    second.startTime += 2 * 86_400_000;
+    const renderer = createRenderer(
+      [route(), second],
+      timeline,
+      (w, h) => createCanvas(w, h) as unknown as CanvasLike,
+      { width, height, fps: 10, metrics },
+    );
+    for (let f = 0; f < renderer.frameCount; f++) renderer.renderFrame(f);
+    return textPixels(renderer.canvas, 0, height * 0.8, width / 2, height);
+  }
+
+  it('shows the pace for several activities, in turn or in a race, and the dates in a race', () => {
+    const inTurn = chronologicalTimeline([1_190, 1_190], { duration: 1 });
+    const race = raceTimeline([1_190, 1_190], { duration: 1 });
+    expect(severalLastFrame(inTurn, ['pace'])).toBeGreaterThan(20);
+    expect(severalLastFrame(race, ['pace'])).toBeGreaterThan(20);
+    expect(severalLastFrame(race, ['date'])).toBeGreaterThan(20);
   });
 
   it('is left out when it has no values', () => {

@@ -5,6 +5,7 @@
 
 import { distanceM } from '../track/geo.ts';
 import { STRIDE, type Track } from '../track/types.ts';
+import { averagePace } from './pace.ts';
 import type { CanvasLike, Context2DLike } from './render.ts';
 
 /** How long the totals card plays, in seconds. */
@@ -30,12 +31,22 @@ const MOVING_SPEED = 0.5;
 export const totalsCardFrames = (fps: number) => Math.round(TOTALS_CARD_S * fps);
 
 /**
- * A value the totals card can show: the number of activities, kilometers, hours moving or
- * meters climbed. The names are the metrics card's for the same values.
+ * A value the totals card can show: the number of activities, kilometers, hours moving,
+ * meters climbed, the average pace or speed while moving, or the days the activities span.
+ * The names are the metrics card's for the same values.
  */
-export type TotalsField = 'count' | 'distance' | 'time' | 'elevation';
-/** Every value of the totals card, in the order it shows them unless told otherwise. */
-export const TOTALS_FIELDS: readonly TotalsField[] = ['count', 'distance', 'time', 'elevation'];
+export type TotalsField = 'count' | 'distance' | 'time' | 'elevation' | 'pace' | 'date';
+/** Every value of the totals card, in the order the settings list them. */
+export const TOTALS_FIELDS: readonly TotalsField[] = [
+  'count',
+  'distance',
+  'time',
+  'elevation',
+  'pace',
+  'date',
+];
+/** The values the totals card shows unless told otherwise, in this order. */
+export const AUTOMATIC_TOTALS: readonly TotalsField[] = ['count', 'distance', 'time', 'elevation'];
 
 export type Totals = {
   activities: number;
@@ -44,6 +55,10 @@ export type Totals = {
   movingSeconds: number;
   /** Meters climbed; null when no activity recorded elevation. */
   climbed: number | null;
+  /** Whether every activity is on foot, so pace is told in minutes per kilometer. */
+  onFoot: boolean;
+  /** The days the activities span, e.g. "18–22 Apr 2026". */
+  dates: string;
 };
 
 /** The time an activity was moving: the time between points covered at `MOVING_SPEED` or faster. */
@@ -68,7 +83,7 @@ export type TotalsCardOptions = {
   title: string;
   /** Singular and plural noun for the count, e.g. ["ride", "rides"]. */
   countLabel: [string, string];
-  /** The values to show, in order; default every one. Elevation shows only when recorded. */
+  /** The values to show, in order; default `AUTOMATIC_TOTALS`. Elevation shows only when recorded. */
   fields?: readonly TotalsField[];
 };
 
@@ -78,16 +93,20 @@ const progress = (t: number, at: number, length: number) =>
   Math.min(1, Math.max(0, (t - at) / length));
 const wholeNumber = (n: number) => Math.round(n).toLocaleString('en-US');
 
+/** A value of the totals card as shown: its text and the label under it. */
+export type TotalsEntry = { field: TotalsField; value: string; label: string };
+
 /**
- * The values of `fields` in their order, with their labels, each shown at a share `f` of
- * its count-up. Elevation is left out when no activity recorded it.
+ * The values of `fields` in their order, with their labels, the numbers shown at a share `f`
+ * of their count-up; the pace and the dates do not count up. Elevation is left out when no
+ * activity recorded it.
  */
 export function totalsEntries(
   totals: Totals,
   f: number,
   countLabel: [string, string],
-  fields: readonly TotalsField[] = TOTALS_FIELDS,
-): { field: TotalsField; value: string; label: string }[] {
+  fields: readonly TotalsField[] = AUTOMATIC_TOTALS,
+): TotalsEntry[] {
   const hours = totals.movingSeconds / 3600;
   return fields.flatMap((field) => {
     switch (field) {
@@ -109,6 +128,12 @@ export function totalsEntries(
         return totals.climbed === null
           ? []
           : { field, value: wholeNumber(totals.climbed * f), label: 'm climbed' };
+      case 'pace': {
+        const { value, unit } = averagePace(totals.onFoot, totals.movingSeconds, totals.meters);
+        return { field, value, label: unit === '/km' ? 'min/km average' : 'km/h average' };
+      }
+      case 'date':
+        return { field, value: totals.dates, label: 'dates' };
     }
   });
 }
@@ -139,15 +164,27 @@ export function drawTotalsCard(
     countLabel,
     fields,
   );
-  // A row of all values on a wide frame; two columns otherwise, a last odd one centered.
-  const columns = W > H * 1.3 ? Math.max(1, values.length) : 2;
-  const rows = Math.ceil(values.length / columns);
+  // Rows of values: every number in one row on a wide frame, two to a row otherwise, a last
+  // odd one centered. The dates are too long to share a row, so they get one of their own
+  // where they sit in the order, in smaller type.
+  const numbers = values.filter((entry) => entry.field !== 'date').length;
+  const perRow = W > H * 1.3 ? Math.max(1, numbers) : 2;
+  const rows: { entries: { entry: TotalsEntry; order: number }[]; dates: boolean }[] = [];
+  values.forEach((entry, order) => {
+    const last = rows.at(-1);
+    if (entry.field === 'date') rows.push({ entries: [{ entry, order }], dates: true });
+    else if (last && !last.dates && last.entries.length < perRow)
+      last.entries.push({ entry, order });
+    else rows.push({ entries: [{ entry, order }], dates: false });
+  });
   const valueSize = 96 * unit;
+  const datesSize = 60 * unit;
   const labelSize = 30 * unit;
-  const rowStep = valueSize + labelSize + 70 * unit;
+  const gap = 70 * unit;
+  const rowHeight = (dates: boolean) => (dates ? datesSize : valueSize) + labelSize + gap;
   const titleSize = 52 * unit;
   const titleRoom = title ? titleSize + 90 * unit : 0;
-  const blockHeight = titleRoom + rows * rowStep - 70 * unit;
+  const blockHeight = titleRoom + rows.reduce((sum, row) => sum + rowHeight(row.dates), 0) - gap;
   const top = (H - blockHeight) / 2;
 
   // Darker still behind the title and the values, fading out above and below them, so
@@ -176,24 +213,34 @@ export function drawTotalsCard(
     ctx.fillRect(W / 2 - rule / 2, top + titleSize + 34 * unit, rule, 5 * unit);
   }
 
-  const columnWidth = Math.min(W * 0.4, (W * 0.86) / columns);
-  values.forEach((entry, i) => {
-    const row = Math.floor(i / columns);
-    const inRow = Math.min(columns, values.length - row * columns);
-    const column = i % columns;
-    const x = W / 2 + (column - (inRow - 1) / 2) * columnWidth;
-    const shown = smoothstep(
-      progress(t, TIMING.values.at + i * TIMING.values.stagger, TIMING.values.length),
-    );
-    const rise = (1 - shown) * 24 * unit;
-    const y = top + titleRoom + row * rowStep + valueSize + rise;
-    ctx.globalAlpha = shown;
-    ctx.font = `700 ${Math.round(valueSize)}px ${fontFamily}`;
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.96)';
-    ctx.fillText(entry.value, x, y, columnWidth * 0.92);
-    ctx.font = `500 ${Math.round(labelSize)}px ${fontFamily}`;
-    ctx.fillStyle = 'rgba(255, 176, 102, 0.9)';
-    ctx.fillText(entry.label, x, y + labelSize + 22 * unit, columnWidth * 0.92);
-  });
+  /** Sets the font at `size`, or smaller when `text` would be wider than `width`. */
+  const fitFont = (text: string, weight: number, size: number, width: number) => {
+    ctx.font = `${weight} ${Math.round(size)}px ${fontFamily}`;
+    const measured = ctx.measureText(text).width;
+    if (measured > width)
+      ctx.font = `${weight} ${Math.floor((size * width) / measured)}px ${fontFamily}`;
+  };
+
+  const columnWidth = Math.min(W * 0.4, (W * 0.86) / perRow);
+  let rowTop = top + titleRoom;
+  for (const row of rows) {
+    const size = row.dates ? datesSize : valueSize;
+    const width = row.dates ? W * 0.86 : columnWidth * 0.92;
+    row.entries.forEach(({ entry, order }, column) => {
+      const x = W / 2 + (column - (row.entries.length - 1) / 2) * columnWidth;
+      const shown = smoothstep(
+        progress(t, TIMING.values.at + order * TIMING.values.stagger, TIMING.values.length),
+      );
+      const y = rowTop + size + (1 - shown) * 24 * unit;
+      ctx.globalAlpha = shown;
+      fitFont(entry.value, 700, size, width);
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.96)';
+      ctx.fillText(entry.value, x, y);
+      fitFont(entry.label, 500, labelSize, width);
+      ctx.fillStyle = 'rgba(255, 176, 102, 0.9)';
+      ctx.fillText(entry.label, x, y + labelSize + 22 * unit);
+    });
+    rowTop += rowHeight(row.dates);
+  }
   ctx.globalAlpha = 1;
 }

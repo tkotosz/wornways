@@ -10,6 +10,8 @@ import {
   type TotalsField,
 } from './totals-card.ts';
 import { drawWatermark } from './mark.ts';
+import { averagePace, isOnFoot } from './pace.ts';
+import { dateRange } from './plans.ts';
 import { composeHeat, createHeatRamp, decodeHeat, heatStyle, saturationFromHeat } from './heat.ts';
 import { projectTrack, type Projected } from './project.ts';
 import type { Timeline } from './timeline.ts';
@@ -281,17 +283,10 @@ function tracePoints(c: Context2DLike, xy: ArrayLike<number>, count: number, gap
   if (end > 0) c.lineTo(xy[end * 2], xy[end * 2 + 1]);
 }
 
-/** Sports whose speed is told as minutes per kilometre. */
-const isOnFoot = (sport: string) => /run|walk|hike/.test(sport);
-
 /** Average pace ("5:32 /km") or, off foot, speed ("24.3 km/h") over the distance so far. */
-function paceText(sport: string, seconds: number, metres: number): string {
-  const moving = seconds > 0 && metres >= 20;
-  if (!isOnFoot(sport))
-    return `${moving ? (metres / 1000 / (seconds / 3600)).toFixed(1) : '0.0'} km/h`;
-  if (!moving) return '–:–– /km';
-  const perKm = Math.round(seconds / (metres / 1000));
-  return `${Math.floor(perKm / 60)}:${String(perKm % 60).padStart(2, '0')} /km`;
+function paceText(onFoot: boolean, seconds: number, metres: number): string {
+  const { value, unit } = averagePace(onFoot, seconds, metres);
+  return `${value} ${unit}`;
 }
 
 /**
@@ -329,6 +324,11 @@ export function createRenderer(
   const titleScale = options.titleScale ?? 1;
   const metricsScale = options.metricsScale ?? 1;
   const unit = Math.min(W, H) / 1080; // scales strokes and type with the output size
+  // Pace is in minutes per kilometer only when every activity is on foot.
+  const onFoot = tracks.every((track) => isOnFoot(track.sport));
+  const starts = tracks.map((track) => track.startTime);
+  /** The days the activities span: "18–22 Apr 2026", or one day. */
+  const datesSpanned = dateRange(Math.min(...starts), Math.max(...starts));
   const dateFormat = new Intl.DateTimeFormat(options.locale ?? 'en-GB', {
     day: 'numeric',
     month: 'short',
@@ -748,24 +748,29 @@ export function createRenderer(
       date = tr.date;
     }
     const lastSecond = (track: Track) => track.points[track.points.length - 1];
+    /** The activities' recorded time so far, added up. */
+    const secondsSoFar = () =>
+      tracks.reduce((sum, track, k) => sum + lastSecond(track) * timeline.progress(k, t), 0);
     const texts = new Map<Metric, string>();
     if (kind === 'single') {
       // One activity: its own elapsed time and distance so far.
       const elapsed = Math.floor(lastSecond(tracks[0]) * timeline.progress(0, t));
       texts.set('time', clockText(elapsed));
       texts.set('distance', `${(metres / 1000).toFixed(1)} km`);
-      texts.set('pace', paceText(tracks[0].sport, elapsed, metres));
+      texts.set('pace', paceText(onFoot, elapsed, metres));
       texts.set('date', prepared[0].date);
     } else if (timeline.clock) {
       // All at once: one shared clock, and how many are still out.
       texts.set('time', clockText(Math.floor(timeline.clock(t))));
       texts.set('count', moving > 0 ? `${moving} still ${movingLabel}` : 'all finished');
       texts.set('distance', `${wholeNumber(metres / 1000)} km`);
+      texts.set('date', datesSpanned);
+      if (metrics.includes('pace')) texts.set('pace', paceText(onFoot, secondsSoFar(), metres));
     } else {
-      if (metrics.includes('time')) {
-        let seconds = 0;
-        tracks.forEach((track, k) => (seconds += lastSecond(track) * timeline.progress(k, t)));
+      if (metrics.includes('time') || metrics.includes('pace')) {
+        const seconds = secondsSoFar();
         texts.set('time', clockText(Math.floor(seconds)));
+        texts.set('pace', paceText(onFoot, seconds, metres));
       }
       texts.set('date', timeline.label?.(t) ?? date);
       texts.set('count', `${started} ${started === 1 ? singular : plural}`);
@@ -1031,6 +1036,8 @@ export function createRenderer(
       meters,
       movingSeconds: tracks.reduce((sum, track) => sum + movingSeconds(track), 0),
       climbed: hasElevation ? climbed : null,
+      onFoot,
+      dates: datesSpanned,
     };
   };
   let totalsShown: Totals | null = null;

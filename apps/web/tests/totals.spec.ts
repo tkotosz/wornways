@@ -93,6 +93,11 @@ test('picks the totals card values and their order', async ({ page, context }) =
   await chip('Activities').click();
   await expect.poll(picked).toEqual(['Activities']);
 
+  // The pace and the dates are offered too, after the usual four.
+  await chip('Dates').click();
+  await chip('Average pace').click();
+  await expect.poll(picked).toEqual(['Activities', 'Dates', 'Average pace']);
+
   // Back to automatic.
   await group.getByRole('button', { name: 'Use automatic totals' }).click();
   await expect.poll(picked).toEqual(['Activities', 'Kilometers', 'Hours moving', 'Meters climbed']);

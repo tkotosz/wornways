@@ -7,7 +7,7 @@
 import { sportSlug } from '../import/index-csv.ts';
 import type { LatLon } from '../track/places.ts';
 import { END_CARD_S } from './end-card.ts';
-import { TOTALS_CARD_S, TOTALS_FIELDS, type TotalsField } from './totals-card.ts';
+import { AUTOMATIC_TOTALS, TOTALS_CARD_S, TOTALS_FIELDS, type TotalsField } from './totals-card.ts';
 import { PRESETS, PRESET_NAMES, type Preset } from './presets.ts';
 import type { Grouping } from './plans.ts';
 import { METRICS, POSITIONS, type Metric, type Position } from './render.ts';
@@ -428,8 +428,8 @@ export const SETTINGS: readonly SettingDefinition[] = [
     automatic: 'what suits the video',
     help:
       `Values to show, the first one large: ${METRICS.join(', ')}. A value the video ` +
-      'cannot show is left out: pace is for a single activity, count for several ' +
-      'activities, date not in a race (one group at real pace), elevation only when recorded.',
+      'cannot show is left out: count is for several activities, elevation only when ' +
+      'recorded. Pace is in minutes per kilometer when every activity is on foot, else km/h.',
   },
   {
     name: 'metrics-position',
@@ -464,11 +464,11 @@ export const SETTINGS: readonly SettingDefinition[] = [
     group: 'look',
     kind: { type: 'list', choices: TOTALS_FIELDS },
     default: null,
-    automatic: TOTALS_FIELDS.join(', '),
+    automatic: AUTOMATIC_TOTALS.join(', '),
     help:
       `Values the totals card shows, in this order: ${TOTALS_FIELDS.join(', ')} (activities, ` +
-      'kilometers, hours moving, meters climbed). Elevation is left out when no activity ' +
-      'recorded it.',
+      'kilometers, hours moving, meters climbed, average pace or speed while moving, the ' +
+      'days spanned). Elevation is left out when no activity recorded it.',
   },
 
   {

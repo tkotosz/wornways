@@ -61,8 +61,9 @@ describe('parseSettings', () => {
       'time',
       'count',
     ]);
-    expect(() => parseSettings({ 'totals-fields': 'pace' })).toThrow(
-      'expects values from count, distance, time, elevation, got "pace"',
+    expect(parseSettings({ 'totals-fields': 'date,pace' }).totalsFields).toEqual(['date', 'pace']);
+    expect(() => parseSettings({ 'totals-fields': 'speed' })).toThrow(
+      'expects values from count, distance, time, elevation, pace, date, got "speed"',
     );
     expect(() => parseSettings({ 'totals-fields': '' })).toThrow('expects values from');
   });
