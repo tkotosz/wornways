@@ -10,8 +10,8 @@
 // asks for its text (`edit`). The picture is redrawn as soon as a widget is let go
 // (`placed`); its outline stays where it was let go until the new picture arrives. The
 // keyboard moves a picked widget with the arrow keys, resizes it with + and -, and removes
-// it with Delete. On a story-shaped frame, while a widget is picked or moved, guides show
-// the parts the platforms' own controls cover.
+// it with Delete. On a story-shaped frame, while a widget moves, guides show the parts the
+// platforms' own controls cover.
 import { WIDGET_SIZE, type FrameBox, type Widget } from '@wornways/engine';
 import { computed, ref, watch } from 'vue';
 import { widgetLabel } from '../adjust.ts';
@@ -275,11 +275,11 @@ const story = computed(() => props.ratio < 0.8);
   <!-- Pressing the picture outside the widgets lets the picked one go. -->
   <!-- The browser's own long-press menu would take a held widget away. -->
   <div ref="layer" class="layer" @pointerdown.self="secondFinger" @contextmenu.prevent>
-    <!-- What Instagram's own controls cover on a Reel or Story, as Meta's ads guide gives it:
-         14% at the top, 35% at the bottom, 6% at each side. -->
-    <div v-if="story && (selected !== null || moving)" class="guides" aria-hidden="true">
+    <!-- While a widget moves: what Instagram's own controls cover on a Reel or Story, as
+         Meta's ads guide gives it: 14% at the top, 35% at the bottom, 6% at each side. -->
+    <div v-if="story && moving" class="guides" aria-hidden="true">
       <span class="zone top" />
-      <span class="zone bottom" />
+      <span class="zone bottom"><span class="covered">Covered on Instagram</span></span>
       <span class="zone left" />
       <span class="zone right" />
     </div>
@@ -531,6 +531,20 @@ const story = computed(() => props.ratio < 0.8);
     rgba(255, 255, 255, 0.07) 0 6px,
     transparent 6px 12px
   );
+}
+
+/* The label at the top of the covered part at the bottom. */
+.covered {
+  position: absolute;
+  top: 0.3rem;
+  left: 50%;
+  padding: 0.05rem 0.4rem;
+  border-radius: 4px;
+  color: rgba(255, 255, 255, 0.8);
+  background: rgba(0, 0, 0, 0.55);
+  font-size: 0.6rem;
+  white-space: nowrap;
+  transform: translateX(-50%);
 }
 
 .zone.top {
