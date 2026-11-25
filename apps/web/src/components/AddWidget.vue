@@ -14,6 +14,8 @@ const props = defineProps<{
   hasElevation: boolean;
   /** Whether calories can be shown, also before they are fetched. */
   hasCalories: boolean;
+  /** Only the values: text and the chart have tools of their own. */
+  valuesOnly?: boolean;
 }>();
 const emit = defineEmits<{ add: [widget: Widget] }>();
 
@@ -31,29 +33,31 @@ const offered = computed(() =>
 
 <template>
   <div class="add-widget">
-    <h3 class="setting-rows-title">Text and chart</h3>
-    <div class="tiles">
-      <button
-        type="button"
-        class="tile"
-        @click="emit('add', { kind: 'text', text: 'Your text', x: 50, y: 50, size: 100 })"
-      >
-        <b aria-hidden="true">Aa</b>
-        <span>Text</span>
-      </button>
-      <button
-        v-if="hasElevation"
-        type="button"
-        class="tile"
-        @click="emit('add', { kind: 'elevation-chart', x: 50, y: 88, size: 100 })"
-      >
-        <svg viewBox="0 0 32 16" aria-hidden="true">
-          <path d="M1 15 6 9l4 3 6-8 5 6 4-3 6 8z" />
-        </svg>
-        <span>Elevation chart</span>
-      </button>
-    </div>
-    <h3 class="setting-rows-title">Values</h3>
+    <template v-if="!valuesOnly">
+      <h3 class="setting-rows-title">Text and chart</h3>
+      <div class="tiles">
+        <button
+          type="button"
+          class="tile"
+          @click="emit('add', { kind: 'text', text: 'Your text', x: 50, y: 50, size: 100 })"
+        >
+          <b aria-hidden="true">Aa</b>
+          <span>Text</span>
+        </button>
+        <button
+          v-if="hasElevation"
+          type="button"
+          class="tile"
+          @click="emit('add', { kind: 'elevation-chart', x: 50, y: 88, size: 100 })"
+        >
+          <svg viewBox="0 0 32 16" aria-hidden="true">
+            <path d="M1 15 6 9l4 3 6-8 5 6 4-3 6 8z" />
+          </svg>
+          <span>Elevation chart</span>
+        </button>
+      </div>
+    </template>
+    <h3 v-if="!valuesOnly" class="setting-rows-title">Values</h3>
     <div class="tiles">
       <button
         v-for="metric in offered"

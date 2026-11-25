@@ -104,19 +104,21 @@ test('resizes a widget from its corner, and edits a text widget from a tap', asy
   await offlineMap(context);
   await openOverlay(page);
   await outline(page, 0).click({ position: { x: 10, y: 6 } });
+  const width = (await outline(page, 0).boundingBox())!.width;
   const handle = (await page.getByTestId('resize-0').boundingBox())!;
   await drag(page, { x: handle.x + 5, y: handle.y + 5 }, 40, 20);
   await page.mouse.up();
-
-  // A tap on the picked text widget opens it: its text and its size.
-  await expect(page.getByText('Drawing preview')).toHaveCount(0);
-  await outline(page, 0).click({ position: { x: 10, y: 6 } });
-  const sheet = page.getByRole('dialog', { name: 'Text' });
   await expect
-    .poll(async () => Number(await sheet.getByRole('slider').inputValue()))
-    .toBeGreaterThan(100);
-  await sheet.getByRole('textbox', { name: 'Text' }).fill('Mallorca');
-  await sheet.getByRole('button', { name: 'Done' }).click();
+    .poll(async () => (await outline(page, 0).boundingBox())!.width)
+    .toBeGreaterThan(width);
+
+  // A tap on the picked text widget writes its text over the whole screen; Enter finishes.
+  await outline(page, 0).click({ position: { x: 10, y: 6 } });
+  const writing = page.getByRole('dialog', { name: 'Text' });
+  await writing.getByRole('textbox', { name: 'Text' }).fill('Mallorca');
+  await page.keyboard.press('Enter');
+  await expect(writing).toBeHidden();
+  await expect(outline(page, 0)).toContainText('Mallorca');
   await expect(page.getByRole('button', { name: /^Text: / })).toHaveAccessibleName(
     'Text: Mallorca',
   );

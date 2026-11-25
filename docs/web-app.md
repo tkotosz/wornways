@@ -161,17 +161,24 @@ list.
      widget's left edge, middle or right edge across and top or bottom down, with a line
      shown, and while it is dragged a bin shows at the bottom, where letting it go removes
      it. Two fingers, or the corner handle, resize it (50 to 250%). A tap on a picked text
-     widget opens its text. The arrow keys move a picked widget by 1% of the frame (5% with
+     widget opens its text over the whole screen, large as on the video, with the keyboard
+     up; a tap outside the text or Enter finishes it, and a text left empty is removed. The
+     arrow keys move a picked widget by 1% of the frame (5% with
      Shift), + and - resize it and Delete removes it. On a story-shaped frame, while a
      widget moves, hatched guides marked "Covered on Instagram" show what Instagram's own
      controls cover (Meta's ads guide: 14% at the top, 35% at the bottom, 6% at each side).
-     Under the picture, "+ Add a widget" opens the palette: Text, the elevation chart, and
-     each value this video can show as a tile with its own number (calories a service gives
-     on request are offered before they are known); a value already on the picture is
-     dimmed, and a new widget comes in a free spot clear of the middle. Then a row per
-     widget with what it shows, which opens its settings: its text (or back to the title),
-     its size and "Remove from the picture". The small watermark at the bottom left, on the
-     map credit's line, stays a switch.
+     A column of round tools at the top right of the picture adds widgets, as story
+     editors have them: Aa writes a new text, the value tool opens a sheet of the values
+     this video can show, each a tile with its own number (calories a service gives on
+     request are offered before they are known; a value already on the picture is
+     dimmed), the chart tool turns the elevation chart on and off (offered only when an
+     activity recorded elevation), and the mark turns the watermark on and off, a fixed
+     small mark at the bottom left on the map credit's line. The column hides while a
+     widget moves, and a new widget comes in a free spot clear of the middle. On a phone
+     Overlay has no settings under the picture, which gets the space. On a wide screen a
+     list stays beside it: "+ Add a widget" with the same palette, then a row per widget
+     that opens its settings (its text, its size and "Remove from the picture"), and the
+     watermark switch.
    - **Ending:** what comes after the replay: the end pause on the finished picture, the
      totals card (for several activities only; on for Recap) and the end card.
 4. **Export.** A stage in the video's shape, which shows the finished picture with a "Make

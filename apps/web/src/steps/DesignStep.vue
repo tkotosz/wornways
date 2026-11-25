@@ -29,6 +29,7 @@ import PosterPreview from '../components/PosterPreview.vue';
 import SettingSheet from '../components/SettingSheet.vue';
 import StyleChooser from '../components/StyleChooser.vue';
 import SettingsGroups from '../components/SettingsGroups.vue';
+import TextEditor from '../components/TextEditor.vue';
 import StepBar from '../components/StepBar.vue';
 import StepNav from '../components/StepNav.vue';
 import WidgetEditor from '../components/WidgetEditor.vue';
@@ -81,7 +82,8 @@ function openSetting(name: string, label: string): void {
   sheet.value = { name, label };
 }
 
-// Overlay: the widgets, arranged on the still (WidgetEditor) and listed under it.
+// Overlay: the widgets, arranged on the still (WidgetEditor) with the tools on it; on wide
+// screens also listed beside it.
 /**
  * What the last still of the replay told: its widgets, the values the video can show and the
  * climb profile's shape, for drawing the widgets over the bare still.
@@ -147,10 +149,14 @@ function freeSpot(widget: Widget): Widget {
   return { ...widget, ...best };
 }
 
-function addWidget(widget: Widget): void {
+/** Adds a widget, picked, and gives its place in the list. */
+function addWidget(widget: Widget): number {
+  // Its place now: the list read back would still be the one before, until the change is in.
+  const index = widgets.value.length;
   setWidgets([...widgets.value, freeSpot(widget)]);
-  selectedWidget.value = widgets.value.length - 1;
+  selectedWidget.value = index;
   sheet.value = null;
+  return index;
 }
 
 function changeWidget(index: number, widget: Widget): void {
@@ -161,6 +167,42 @@ function removeWidget(index: number): void {
   setWidgets(widgets.value.filter((_, k) => k !== index));
   selectedWidget.value = null;
   sheet.value = null;
+}
+
+/** The text widget whose text is being written over the whole screen; null when none is. */
+const editingText = ref<number | null>(null);
+
+/** The text written: the widget takes it, or goes when it is left empty. */
+function writeText(text: string): void {
+  const index = editingText.value;
+  editingText.value = null;
+  if (index === null) return;
+  const widget = widgets.value[index];
+  if (!text) removeWidget(index);
+  else if (widget?.kind === 'text') changeWidget(index, { ...widget, text });
+}
+
+/** The tools on the picture: what they show (see WidgetEditor), and what they do. */
+const watermark = computed(() => adjustments.value['watermark'] !== false);
+const toolState = computed(() => ({
+  chartOffered: !!props.plan?.hasElevation,
+  chart: widgets.value.some((widget) => widget.kind === 'elevation-chart'),
+  mark: watermark.value,
+}));
+
+function useTool(tool: 'text' | 'values' | 'chart' | 'mark'): void {
+  if (tool === 'text') {
+    // A new text, written straight away; left empty, it goes again.
+    editingText.value = addWidget({ kind: 'text', text: '', x: 50, y: 50, size: 100 });
+  } else if (tool === 'values') {
+    sheet.value = { name: 'values', label: 'Values' };
+  } else if (tool === 'chart') {
+    const chart = widgets.value.findIndex((widget) => widget.kind === 'elevation-chart');
+    if (chart >= 0) removeWidget(chart);
+    else addWidget({ kind: 'elevation-chart', x: 50, y: 88, size: 100 });
+  } else {
+    adjustments.value = { ...adjustments.value, watermark: !watermark.value };
+  }
 }
 </script>
 
@@ -197,14 +239,23 @@ function removeWidget(index: number): void {
               :title="title"
               :profile="drawn?.profile ?? null"
               :size="size"
+              :tools="toolState"
               @change="setWidgets"
-              @edit="openWidget"
+              @edit="editingText = $event"
+              @tool="useTool"
             />
           </template>
         </PosterPreview>
       </div>
 
-      <div ref="controls" class="tools" :aria-label="`${current.label} settings`" role="region">
+      <!-- The section's settings; Overlay has none here, its tools are on the picture. -->
+      <div
+        v-if="section !== 'overlay'"
+        ref="controls"
+        class="tools"
+        :aria-label="`${current.label} settings`"
+        role="region"
+      >
         <FramePanel
           v-if="section === 'frame'"
           v-model="adjustments"
@@ -219,17 +270,8 @@ function removeWidget(index: number): void {
           view="rows"
           @open="openSetting"
         />
-        <WidgetList
-          v-if="section === 'overlay'"
-          :widgets="widgets"
-          :values="values"
-          :title="title"
-          :selected="selectedWidget"
-          @add="sheet = { name: 'add-widget', label: 'Add a widget' }"
-          @open="openWidget"
-        />
         <SettingsGroups
-          v-if="section !== 'frame' && section !== 'playback'"
+          v-else
           v-model="adjustments"
           :groups="current.panels"
           :count="countOf(activities)"
@@ -320,8 +362,10 @@ function removeWidget(index: number): void {
                 :title="title"
                 :profile="drawn?.profile ?? null"
                 :size="size"
+                :tools="toolState"
                 @change="setWidgets"
-                @edit="openWidget"
+                @edit="editingText = $event"
+                @tool="useTool"
               />
             </template>
           </PosterPreview>
@@ -359,10 +403,18 @@ function removeWidget(index: number): void {
     <StepNav step="design" :next-disabled="choosing" @back="emit('back')" @next="emit('next')" />
   </section>
 
+  <!-- A text widget's text, written over the whole screen. -->
+  <TextEditor
+    v-if="editingText !== null && widgets[editingText]?.kind === 'text'"
+    :text="(widgets[editingText] as { text: string | null }).text ?? title"
+    @done="writeText"
+  />
+
   <!-- The setting being changed, on its own: from the phone's list, or a widget's. -->
   <SettingSheet v-if="sheet" :title="sheet.label" @close="sheet = null">
     <AddWidget
-      v-if="sheet.name === 'add-widget'"
+      v-if="sheet.name === 'add-widget' || sheet.name === 'values'"
+      :values-only="sheet.name === 'values'"
       :widgets="widgets"
       :values="values"
       :has-elevation="!!plan?.hasElevation"

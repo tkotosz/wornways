@@ -10,10 +10,11 @@
 // center lines and in line with the other widgets (their edges, and across their middles),
 // with a line shown, and
 // while it is dragged a bin shows at the bottom, where letting go removes it. Two fingers, or
-// the corner handle, resize it. A tap on a picked text widget asks for its text
-// (`edit`). The keyboard moves a picked widget with the arrow keys, resizes it with + and -,
-// and removes it with Delete. On a story-shaped frame, while a widget moves, guides show the
-// parts the platforms' own controls cover.
+// the corner handle, resize it. A tap on a picked text widget asks for its text (`edit`).
+// Round tools down the side add a text or a value and turn the chart and the watermark on
+// or off (`tool`). The keyboard moves a picked widget with the arrow keys, resizes it with +
+// and -, and removes it with Delete. On a story-shaped frame, while a widget moves, guides
+// show the parts the platforms' own controls cover.
 import { WIDGET_SIZE, type Metric, type MetricValue, type Widget } from '@wornways/engine';
 import { computed, ref } from 'vue';
 import { widgetLabel } from '../adjust.ts';
@@ -28,6 +29,11 @@ const props = defineProps<{
   profile: number[] | null;
   /** The video's frame, in pixels: the widgets are sized as the engine sizes them in it. */
   size: { width: number; height: number };
+  /**
+   * The tools down the side of the picture: whether the chart is offered (an activity
+   * recorded elevation) and on the picture, and whether the watermark is on.
+   */
+  tools: { chartOffered: boolean; chart: boolean; mark: boolean };
 }>();
 /** The picked widget's index; null when none is. */
 const selected = defineModel<number | null>('selected', { required: true });
@@ -36,6 +42,8 @@ const emit = defineEmits<{
   change: [widgets: Widget[]];
   /** A picked text widget was tapped: its text is asked for. */
   edit: [index: number];
+  /** A tool was tapped: add a text, add a value, the chart on or off, the watermark on or off. */
+  tool: [tool: 'text' | 'values' | 'chart' | 'mark'];
 }>();
 
 /** The widget being moved or resized, where it is now: its point and size. */
@@ -349,6 +357,36 @@ const story = computed(() => props.size.width / props.size.height < 0.8);
       :style="{ top: `${snap.y}%` }"
       aria-hidden="true"
     />
+    <!-- The tools, down the right side at the top, out of the way while a widget moves. -->
+    <div v-if="!moving" class="tool-column">
+      <button type="button" class="tool" aria-label="Add a text" @click="emit('tool', 'text')">
+        Aa
+      </button>
+      <button type="button" class="tool" aria-label="Add a value" @click="emit('tool', 'values')">
+        12
+      </button>
+      <button
+        v-if="tools.chartOffered"
+        type="button"
+        class="tool"
+        aria-label="Show the elevation chart"
+        :aria-pressed="tools.chart"
+        @click="emit('tool', 'chart')"
+      >
+        <svg viewBox="0 0 32 16" aria-hidden="true">
+          <path d="M1 15 6 9l4 3 6-8 5 6 4-3 6 8z" />
+        </svg>
+      </button>
+      <button
+        type="button"
+        class="tool"
+        aria-label="Show the watermark"
+        :aria-pressed="tools.mark"
+        @click="emit('tool', 'mark')"
+      >
+        <img src="/icons/route.svg" alt="" />
+      </button>
+    </div>
     <span
       v-if="moving && moving.size === widgets[moving.index]?.size"
       class="bin"
@@ -422,6 +460,48 @@ const story = computed(() => props.size.width / props.size.height < 0.8);
   touch-action: none;
   user-select: none;
   -webkit-touch-callout: none;
+}
+
+/* The tools: round buttons down the right side of the picture, at the top. */
+.tool-column {
+  position: absolute;
+  top: 2.5cqw;
+  right: 2.5cqw;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  gap: 2.4cqw;
+}
+
+.tool {
+  display: grid;
+  place-items: center;
+  width: 2.6rem;
+  height: 2.6rem;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  color: #fff;
+  background: rgba(20, 24, 32, 0.72);
+  backdrop-filter: blur(6px);
+  font: inherit;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.tool[aria-pressed='true'] {
+  color: #1a110b;
+  background: rgba(255, 138, 42, 0.92);
+}
+
+.tool svg {
+  width: 1.3rem;
+  height: 0.7rem;
+  fill: currentColor;
+}
+
+.tool img {
+  width: 1.5rem;
 }
 
 /* A widget centered on its point, with a faint outline until it is picked. */
