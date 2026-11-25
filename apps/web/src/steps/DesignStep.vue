@@ -19,6 +19,7 @@ import OverlayEditor from '../components/OverlayEditor.vue';
 import PlaybackPanel from '../components/PlaybackPanel.vue';
 import PosterPreview from '../components/PosterPreview.vue';
 import SettingSheet from '../components/SettingSheet.vue';
+import StyleChooser from '../components/StyleChooser.vue';
 import SettingsGroups from '../components/SettingsGroups.vue';
 import StepBar from '../components/StepBar.vue';
 import StepNav from '../components/StepNav.vue';
@@ -34,6 +35,8 @@ defineProps<{
 }>();
 const adjustments = defineModel<Adjustments>({ required: true });
 const section = defineModel<Section>('section', { required: true });
+/** Whether the style is asked first, as it is each time the step is opened from Activities. */
+const choosing = defineModel<boolean>('choosing', { required: true });
 const emit = defineEmits<{ back: []; next: [] }>();
 
 const current = computed(() => SECTIONS.find((s) => s.id === section.value)!);
@@ -44,6 +47,11 @@ const phone = ref(phoneQuery.matches);
 const onWidth = (event: MediaQueryListEvent) => (phone.value = event.matches);
 phoneQuery.addEventListener('change', onWidth);
 onBeforeUnmount(() => phoneQuery.removeEventListener('change', onWidth));
+
+/** A style picked: the editor opens, on the section open last (Frame at first). */
+function chosen(): void {
+  choosing.value = false;
+}
 
 /** The phone's list of settings, which scrolls by itself. */
 const controls = ref<HTMLElement | null>(null);
@@ -77,128 +85,14 @@ function showGroup(group: string): void {
   <section v-if="phone" class="editor">
     <h1 class="visually-hidden">Design your video</h1>
     <header class="top">
-      <StepBar step="design" @back="emit('back')" @next="emit('next')" />
+      <StepBar step="design" :next-disabled="choosing" @back="emit('back')" @next="emit('next')" />
     </header>
 
-    <div class="stage">
-      <PosterPreview
-        :engine="engine"
-        :settings="settings"
-        :seconds="plan?.seconds"
-        :scene="section === 'ending' ? 'ending' : 'replay'"
-        :editing="section === 'overlay' || section === 'ending'"
-      >
-        <template #layer="{ boxes, ratio, placed }">
-          <OverlayEditor
-            v-if="section === 'overlay'"
-            v-model="adjustments"
-            :boxes="boxes"
-            :ratio="ratio"
-            @placed="placed"
-            @select="showGroup"
-          />
-        </template>
-      </PosterPreview>
+    <!-- Coming from Activities: how it plays, before the editor. -->
+    <div v-if="choosing" class="choosing">
+      <StyleChooser v-model="adjustments" :activities="activities" :plan="plan" @chosen="chosen" />
     </div>
-
-    <div ref="controls" class="tools" :aria-label="`${current.label} settings`" role="region">
-      <FramePanel
-        v-if="section === 'frame'"
-        v-model="adjustments"
-        view="rows"
-        @open="openSetting"
-      />
-      <PlaybackPanel
-        v-else-if="section === 'playback'"
-        v-model="adjustments"
-        :activities="activities"
-        :plan="plan"
-        view="rows"
-        @open="openSetting"
-      />
-      <SettingsGroups
-        v-else
-        v-model="adjustments"
-        :groups="current.panels"
-        :count="countOf(activities)"
-        :plan="plan"
-        view="rows"
-        @open="openSetting"
-      />
-    </div>
-
-    <!-- The setting being changed, on its own. -->
-    <SettingSheet v-if="sheet" :title="sheet.label" @close="sheet = null">
-      <FramePanel v-if="section === 'frame'" v-model="adjustments" :only="sheet.name" />
-      <PlaybackPanel
-        v-else-if="section === 'playback'"
-        v-model="adjustments"
-        :activities="activities"
-        :plan="plan"
-        :only="sheet.name"
-      />
-      <SettingsGroups
-        v-else
-        v-model="adjustments"
-        :groups="current.panels"
-        :count="countOf(activities)"
-        :plan="plan"
-        :only="sheet.name"
-      />
-    </SettingSheet>
-
-    <nav class="sections" aria-label="Sections">
-      <button
-        v-for="s in SECTIONS"
-        :key="s.id"
-        type="button"
-        :aria-current="s.id === section ? 'step' : undefined"
-        @click="open(s.id)"
-      >
-        <!-- A line drawing for each: a phone's frame, play, a folded map, text on a
-             picture, a finish flag. -->
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          <template v-if="s.id === 'frame'">
-            <rect x="7" y="3" width="10" height="18" rx="2" />
-            <path d="M3 8v8M21 8v8" />
-          </template>
-          <template v-else-if="s.id === 'playback'">
-            <circle cx="12" cy="12" r="9" />
-            <path d="M10 8.5v7l6-3.5z" />
-          </template>
-          <template v-else-if="s.id === 'map'">
-            <path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2z" />
-            <path d="M9 4v14M15 6v14" />
-          </template>
-          <template v-else-if="s.id === 'overlay'">
-            <rect x="3" y="4" width="18" height="16" rx="2" />
-            <path d="M7 8h7M7 16h4" />
-          </template>
-          <path v-else d="M5 21V4h11l-2 4 2 4H5" />
-        </svg>
-        {{ s.label }}
-      </button>
-    </nav>
-  </section>
-
-  <!-- Wide screens. -->
-  <section v-else class="design">
-    <!-- The section bar says where the person is; the heading is for screen readers. -->
-    <h1 class="visually-hidden">Design your video</h1>
-    <nav class="sections-bar" aria-label="Sections">
-      <button
-        v-for="s in SECTIONS"
-        :key="s.id"
-        type="button"
-        class="chip"
-        :aria-current="s.id === section ? 'step' : undefined"
-        @click="open(s.id)"
-      >
-        {{ s.label }}
-      </button>
-    </nav>
-
-    <div class="layout">
+    <template v-else>
       <div class="stage">
         <PosterPreview
           :engine="engine"
@@ -214,17 +108,26 @@ function showGroup(group: string): void {
               :boxes="boxes"
               :ratio="ratio"
               @placed="placed"
+              @select="showGroup"
             />
           </template>
         </PosterPreview>
       </div>
-      <div class="settings">
-        <FramePanel v-if="section === 'frame'" v-model="adjustments" />
+
+      <div ref="controls" class="tools" :aria-label="`${current.label} settings`" role="region">
+        <FramePanel
+          v-if="section === 'frame'"
+          v-model="adjustments"
+          view="rows"
+          @open="openSetting"
+        />
         <PlaybackPanel
           v-else-if="section === 'playback'"
           v-model="adjustments"
           :activities="activities"
           :plan="plan"
+          view="rows"
+          @open="openSetting"
         />
         <SettingsGroups
           v-else
@@ -232,11 +135,131 @@ function showGroup(group: string): void {
           :groups="current.panels"
           :count="countOf(activities)"
           :plan="plan"
+          view="rows"
+          @open="openSetting"
         />
       </div>
-    </div>
 
-    <StepNav step="design" @back="emit('back')" @next="emit('next')" />
+      <!-- The setting being changed, on its own. -->
+      <SettingSheet v-if="sheet" :title="sheet.label" @close="sheet = null">
+        <FramePanel v-if="section === 'frame'" v-model="adjustments" :only="sheet.name" />
+        <PlaybackPanel
+          v-else-if="section === 'playback'"
+          v-model="adjustments"
+          :activities="activities"
+          :plan="plan"
+          :only="sheet.name"
+        />
+        <SettingsGroups
+          v-else
+          v-model="adjustments"
+          :groups="current.panels"
+          :count="countOf(activities)"
+          :plan="plan"
+          :only="sheet.name"
+        />
+      </SettingSheet>
+
+      <nav class="sections" aria-label="Sections">
+        <button
+          v-for="s in SECTIONS"
+          :key="s.id"
+          type="button"
+          :aria-current="s.id === section ? 'step' : undefined"
+          @click="open(s.id)"
+        >
+          <!-- A line drawing for each: a phone's frame, play, a folded map, text on a
+             picture, a finish flag. -->
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <template v-if="s.id === 'frame'">
+              <rect x="7" y="3" width="10" height="18" rx="2" />
+              <path d="M3 8v8M21 8v8" />
+            </template>
+            <template v-else-if="s.id === 'playback'">
+              <circle cx="12" cy="12" r="9" />
+              <path d="M10 8.5v7l6-3.5z" />
+            </template>
+            <template v-else-if="s.id === 'map'">
+              <path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2z" />
+              <path d="M9 4v14M15 6v14" />
+            </template>
+            <template v-else-if="s.id === 'overlay'">
+              <rect x="3" y="4" width="18" height="16" rx="2" />
+              <path d="M7 8h7M7 16h4" />
+            </template>
+            <path v-else d="M5 21V4h11l-2 4 2 4H5" />
+          </svg>
+          {{ s.label }}
+        </button>
+      </nav>
+    </template>
+  </section>
+
+  <!-- Wide screens. -->
+  <section v-else class="design">
+    <!-- The section bar says where the person is; the heading is for screen readers. -->
+    <h1 class="visually-hidden">Design your video</h1>
+    <StyleChooser
+      v-if="choosing"
+      v-model="adjustments"
+      :activities="activities"
+      :plan="plan"
+      @chosen="chosen"
+    />
+    <template v-else>
+      <nav class="sections-bar" aria-label="Sections">
+        <button
+          v-for="s in SECTIONS"
+          :key="s.id"
+          type="button"
+          class="chip"
+          :aria-current="s.id === section ? 'step' : undefined"
+          @click="open(s.id)"
+        >
+          {{ s.label }}
+        </button>
+      </nav>
+
+      <div class="layout">
+        <div class="stage">
+          <PosterPreview
+            :engine="engine"
+            :settings="settings"
+            :seconds="plan?.seconds"
+            :scene="section === 'ending' ? 'ending' : 'replay'"
+            :editing="section === 'overlay' || section === 'ending'"
+          >
+            <template #layer="{ boxes, ratio, placed }">
+              <OverlayEditor
+                v-if="section === 'overlay'"
+                v-model="adjustments"
+                :boxes="boxes"
+                :ratio="ratio"
+                @placed="placed"
+              />
+            </template>
+          </PosterPreview>
+        </div>
+        <div class="settings">
+          <FramePanel v-if="section === 'frame'" v-model="adjustments" />
+          <PlaybackPanel
+            v-else-if="section === 'playback'"
+            v-model="adjustments"
+            :activities="activities"
+            :plan="plan"
+          />
+          <SettingsGroups
+            v-else
+            v-model="adjustments"
+            :groups="current.panels"
+            :count="countOf(activities)"
+            :plan="plan"
+          />
+        </div>
+      </div>
+    </template>
+
+    <StepNav step="design" :next-disabled="choosing" @back="emit('back')" @next="emit('next')" />
   </section>
 </template>
 
@@ -289,6 +312,14 @@ function showGroup(group: string): void {
   flex: none;
   padding-top: env(safe-area-inset-top);
   border-bottom: 1px solid var(--line);
+}
+
+/* The style chooser takes the screen under the step bar, and scrolls. */
+.choosing {
+  flex: 1;
+  min-height: 0;
+  padding: 1.2rem 1rem;
+  overflow-y: auto;
 }
 
 /* The preview takes what the rest leaves. */

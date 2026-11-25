@@ -4,7 +4,7 @@ import path from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
 import { offlineMap } from './offline-map.ts';
 import { pickSource } from './sources.ts';
-import { expectSection, openSection, openStep, pickPeriod } from './steps.ts';
+import { chooseStyle, expectSection, openSection, openStep, pickPeriod } from './steps.ts';
 
 const fixtures = new URL('../../../packages/engine/tests/import/fixtures/', import.meta.url);
 const fixture = (name: string) => new URL(name, fixtures).pathname;
@@ -373,6 +373,7 @@ test('accepts month and year bounds and validates custom frame sizes', async ({
   await expect(page.getByTestId('chosen-count')).toContainText('1 of 1 activity');
 
   await openStep(page, 'Design'); // opens on Frame
+  await chooseStyle(page);
   await page.getByRole('button', { name: 'Custom size' }).click();
   const size = page.getByRole('textbox', { name: 'Frame size in pixels' });
   await size.fill('641x480');
@@ -410,6 +411,7 @@ test('makes a video of activities within the chosen distance range', async ({ pa
   await maximum.fill('40');
   await expect(count).toContainText('3 of 3 activities');
   await page.getByRole('button', { name: 'Continue' }).click(); // to Design
+  await chooseStyle(page);
   await openStep(page, 'Export');
 
   await expect(page.getByText('A replay of 3 activities')).toBeVisible();
@@ -438,6 +440,7 @@ test('keeps the video while the choice stays the same', async ({ page, context }
   await page.getByRole('button', { name: 'Continue' }).click(); // to Activities
   await pickPeriod(page);
   await page.getByRole('button', { name: 'Continue' }).click(); // to Design
+  await chooseStyle(page);
   await openStep(page, 'Export');
   await page.getByRole('button', { name: 'Make video' }).click();
   await expect(page.getByTestId('result')).toBeVisible({ timeout: 150_000 });
@@ -455,6 +458,8 @@ test('keeps the video while the choice stays the same', async ({ page, context }
 
   await page.getByRole('button', { name: 'Activities', exact: true }).click();
   await trailRun(page).click();
+  await page.getByRole('button', { name: 'Export', exact: true }).click();
+  await chooseStyle(page); // on from Activities, the style is asked first
   await page.getByRole('button', { name: 'Export', exact: true }).click();
   await expect(page.getByTestId('result')).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Make video' })).toBeVisible();
@@ -481,6 +486,7 @@ test('previews and exports trimmed routes and leaves out routes too short to sho
   await page.getByRole('button', { name: 'Continue' }).click(); // to Activities
   await pickPeriod(page);
   await page.getByRole('button', { name: 'Continue' }).click(); // to Design
+  await chooseStyle(page);
   await openSection(page, 'Playback');
   const length = page.getByRole('slider', { name: 'Video length' });
   await length.fill('5');
@@ -517,6 +523,8 @@ test('previews and exports trimmed routes and leaves out routes too short to sho
   await page.getByRole('button', { name: 'Activities', exact: true }).click();
   await trailRun(page).click();
   await page.getByRole('button', { name: 'Export', exact: true }).click();
+  await chooseStyle(page); // on from Activities, the style is asked first
+  await page.getByRole('button', { name: 'Export', exact: true }).click();
   await expect(page.getByRole('alert')).toContainText('No usable route remains');
   await expect(make).toBeDisabled();
   await expect(page.getByRole('link', { name: 'Download' })).toHaveCount(0);
@@ -529,6 +537,7 @@ test('offers heart rate and cadence for an activity that recorded them', async (
   await page.getByRole('button', { name: 'Continue' }).click(); // to Activities
   await pickPeriod(page);
   await page.getByRole('button', { name: 'Continue' }).click(); // to Design
+  await chooseStyle(page);
   await openSection(page, 'Overlay');
   await expectSection(page, 'Overlay');
   const metrics = page.getByTestId('group-metrics');
@@ -556,6 +565,7 @@ test('shares the video where the browser can share files', async ({ page, contex
   await page.getByRole('button', { name: 'Continue' }).click(); // to Activities
   await pickPeriod(page);
   await page.getByRole('button', { name: 'Continue' }).click(); // to Design
+  await chooseStyle(page);
   await openStep(page, 'Export');
   await page.getByRole('button', { name: 'Make video' }).click();
   await expect(page.getByTestId('result')).toBeVisible({ timeout: 150_000 });
@@ -698,6 +708,7 @@ test('sets up the video and its text, and keeps both for the next visit', async 
   await page.getByRole('button', { name: 'Continue' }).click(); // to Activities
   await pickPeriod(page);
   await page.getByRole('button', { name: 'Continue' }).click(); // to Design, its Frame
+  await chooseStyle(page);
   await expectSection(page, 'Frame');
   await openSection(page, 'Playback');
   const chip = (name: string) => page.getByRole('button', { name, exact: true });
@@ -807,6 +818,7 @@ test('sets up the video and its text, and keeps both for the next visit', async 
   await page.reload();
   await pickPeriod(page); // the period is picked again on a new visit
   await openStep(page, 'Design');
+  await chooseStyle(page, 'Keep my own playback');
   await expect(chip('Square 1:1')).toHaveAttribute('aria-pressed', 'true');
   await openSection(page, 'Playback');
   await expect(summary).toHaveText('10 seconds · Custom playback');
@@ -833,6 +845,7 @@ test('offers Highlight for a single activity, and the other presets for several'
   await pickPeriod(page);
   await trailRun(page).click();
   await page.getByRole('button', { name: 'Continue' }).click(); // to Design
+  await chooseStyle(page);
   await openSection(page, 'Playback');
   const presets = page.getByRole('radio');
   const preset = (name: string) => page.getByRole('radio', { name: new RegExp(`^${name}`) });
@@ -857,6 +870,7 @@ test('offers Highlight for a single activity, and the other presets for several'
   await page.getByRole('button', { name: 'Activities', exact: true }).click();
   await trailRun(page).click();
   await openStep(page, 'Design');
+  await chooseStyle(page);
   await openSection(page, 'Playback');
   await expect(presets).toHaveCount(3);
   await expect(preset('All at once')).toHaveAttribute('aria-checked', 'true');

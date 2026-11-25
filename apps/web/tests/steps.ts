@@ -32,3 +32,15 @@ export function expectSection(page: Page, name: SectionName) {
 export function pickPeriod(page: Page, label = 'All time') {
   return page.getByRole('button', { name: label, exact: true }).click();
 }
+
+/**
+ * Picks how the video plays, which the Design step asks first each time it comes after
+ * Activities: the style named, else the first one offered (the one a video starts with).
+ */
+export async function chooseStyle(page: Page, name?: string) {
+  const chooser = page.getByRole('region', { name: 'How should it play?' });
+  const card = name
+    ? chooser.getByRole('button', { name: new RegExp(`^${name}`) })
+    : chooser.getByRole('button').first();
+  await card.click();
+}

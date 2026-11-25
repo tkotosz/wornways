@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { offlineMap } from './offline-map.ts';
 import { pickSource } from './sources.ts';
-import { openSection, pickPeriod } from './steps.ts';
+import { chooseStyle, openSection, pickPeriod } from './steps.ts';
 
 test('offers the elevation profile for a single activity with elevation', async ({
   page,
@@ -21,6 +21,7 @@ test('offers the elevation profile for a single activity with elevation', async 
   await page.getByRole('button', { name: 'Continue' }).click(); // to Activities
   await pickPeriod(page);
   await page.getByRole('button', { name: 'Continue' }).click(); // to Design
+  await chooseStyle(page);
   await openSection(page, 'Overlay');
 
   const panel = page.getByTestId('group-elevation');
@@ -56,6 +57,7 @@ test('leaves the elevation profile out where there is no elevation', async ({ pa
   await page.getByRole('button', { name: 'Continue' }).click(); // to Activities
   await pickPeriod(page);
   await page.getByRole('button', { name: 'Continue' }).click(); // to Design
+  await chooseStyle(page);
   await openSection(page, 'Overlay');
   await expect(page.getByTestId('group-metrics')).toBeVisible();
   await expect(page.getByTestId('group-elevation')).toHaveCount(0);
@@ -78,6 +80,7 @@ test('offers the elevation profile for several activities, off until switched on
   await page.getByRole('button', { name: 'Continue' }).click(); // to Activities
   await pickPeriod(page);
   await page.getByRole('button', { name: 'Continue' }).click(); // to Design
+  await chooseStyle(page);
   await openSection(page, 'Overlay');
 
   const profile = page

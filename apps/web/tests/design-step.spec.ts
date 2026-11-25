@@ -1,7 +1,48 @@
 import { expect, test } from '@playwright/test';
 import { offlineMap } from './offline-map.ts';
 import { pickSource } from './sources.ts';
-import { expectSection, openSection, openStep, pickPeriod } from './steps.ts';
+import { chooseStyle, expectSection, openSection, openStep, pickPeriod } from './steps.ts';
+
+test('asks how the video plays each time it comes after Activities', async ({ page, context }) => {
+  page.setDefaultTimeout(15_000);
+  await offlineMap(context);
+  await page.goto('/');
+  await pickSource(page, 'demo');
+  await page.getByRole('button', { name: 'Continue' }).click(); // to Activities
+  await pickPeriod(page);
+  await page.getByRole('button', { name: 'Continue' }).click(); // to Design
+
+  // The styles for several activities, none picked; the editor and Export wait for one.
+  const chooser = page.getByRole('region', { name: 'How should it play?' });
+  await expect(chooser.getByRole('button')).toHaveText([
+    /^All at once/,
+    /^Recap/,
+    /^Multiday trip/,
+  ]);
+  await expect(page.getByRole('navigation', { name: 'Sections' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Continue to Export' })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Export', exact: true })).toBeDisabled();
+  await chooseStyle(page, 'Recap');
+  await openSection(page, 'Playback');
+  await expect(page.getByRole('radio', { name: /^Recap/ })).toHaveAttribute('aria-checked', 'true');
+
+  // Back from Export it does not ask; on from Activities it asks again.
+  await page.getByRole('button', { name: 'Continue to Export' }).click();
+  await page.getByRole('button', { name: 'Back to Design' }).click();
+  await expectSection(page, 'Playback');
+  await page.getByRole('button', { name: 'Back to Activities' }).click();
+  await page.getByRole('button', { name: 'Continue to Design' }).click();
+  await expect(chooser).toBeVisible();
+
+  // Playback set by hand can be kept.
+  await chooseStyle(page, 'Recap');
+  await page.getByRole('button', { name: /Fine-tune playback/ }).click();
+  await page.getByTestId('group-timing').getByRole('button', { name: 'Day', exact: true }).click();
+  await page.getByRole('button', { name: 'Back to Activities' }).click();
+  await page.getByRole('button', { name: 'Continue to Design' }).click();
+  await chooseStyle(page, 'Keep my own playback');
+  await expect(page.getByTestId('replay-summary')).toContainText('Custom playback');
+});
 
 test('opens any section of the Design step from its bar, and leaves the step from any', async ({
   page,
@@ -14,6 +55,7 @@ test('opens any section of the Design step from its bar, and leaves the step fro
   await page.getByRole('button', { name: 'Continue' }).click(); // to Activities
   await pickPeriod(page);
   await page.getByRole('button', { name: 'Continue' }).click(); // to Design
+  await chooseStyle(page);
 
   const sections = page.getByRole('navigation', { name: 'Sections' }).getByRole('button');
   const order = ['Frame', 'Playback', 'Map', 'Overlay', 'Ending'] as const;
@@ -34,10 +76,12 @@ test('opens any section of the Design step from its bar, and leaves the step fro
 
   // The bar opens any section, and the section stays open after leaving the step.
   await openStep(page, 'Design');
+  await chooseStyle(page);
   await openSection(page, 'Map');
   await expectSection(page, 'Map');
   await openStep(page, 'Activities');
   await openStep(page, 'Design');
+  await chooseStyle(page);
   await expectSection(page, 'Map');
 });
 
@@ -55,6 +99,7 @@ test.describe('the Design step on a phone', () => {
     await page.getByRole('button', { name: 'Continue' }).click(); // to Activities
     await pickPeriod(page);
     await page.getByRole('button', { name: 'Continue' }).click(); // to Design
+    await chooseStyle(page);
 
     // The app's header and step bar make way for the editor's own top bar.
     await expect(page.getByRole('navigation', { name: 'Steps' })).toBeHidden();

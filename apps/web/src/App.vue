@@ -39,6 +39,8 @@ import { useStrava } from './use-strava.ts';
 const props = defineProps<{ engine: EngineClient }>();
 
 const steps = STEPS;
+/** Whether the Design step asks for the style first; it does each time it comes after Activities. */
+const choosingStyle = ref(false);
 /** The Design step's open section, kept while the app is open, like the step. */
 const section = ref<Section>('frame');
 const stepIndex = computed(() => steps.findIndex((s) => s.id === step.value));
@@ -308,6 +310,8 @@ watch([library, source], () => (video.value = null));
  */
 function reachable(id: Step): boolean {
   if (id === 'import') return true;
+  // Export waits while Design asks for the style.
+  if (id === 'export' && choosingStyle.value) return false;
   if (!usable.value) return false;
   return (
     id === 'activities' ||
@@ -327,6 +331,13 @@ async function navigate(id: Step): Promise<void> {
     const prepare = strava.value ? prepareStrava : rwgps.prepare;
     if (!(await prepare(chosenIds.value))) return;
     if (step.value !== 'activities' || ids !== chosenIds.value.join(',')) return;
+  }
+  // On from Activities: the style is asked first, in the Design step, also on the way to
+  // Export, so that how the video plays is always chosen.
+  if (step.value === 'activities' && (id === 'design' || id === 'export')) {
+    choosingStyle.value = true;
+    step.value = 'design';
+    return;
   }
   if (remote.value && step.value === 'import' && id !== 'activities' && id !== 'import') {
     // Returning from the source picker can use a selection edited in Activities.
@@ -578,6 +589,7 @@ onMounted(() => {
         v-else-if="step === 'design'"
         v-model="adjustments"
         v-model:section="section"
+        v-model:choosing="choosingStyle"
         :engine="engine"
         :settings="settings"
         :activities="chosenIds.length"

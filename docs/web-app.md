@@ -99,26 +99,30 @@ list.
    ticked at first, with their count and total distance; the ticked ones are what the video
    shows, and unticked ones stay unticked when the filters change. Nothing can be deleted
    here.
-3. **Design.** How the video plays and looks, in sections, with a section bar under the
-   step bar, in the order things are decided; the bar shows where the person is, so the
-   step has no title of its own. The bar opens any section, in any order, since every
+3. **Design.** Each time the step comes after Activities, it first asks how the video plays:
+   "How should it play?" with the presets these activities can take as cards (the drawing,
+   the name and its line), none picked, and "Keep my own playback" when the playback was set
+   by hand. The style decides what the video is, so it is always chosen; the editor and the
+   way on to Export wait for it, and Playback › Style changes it later. Coming back from
+   Export does not ask. Then: how the video plays and looks, in sections, with a section bar
+   under the step bar, in the order things are decided; the bar shows where the person is,
+   so the step has no title of its own. The bar opens any section, in any order, since every
    setting has a default; the buttons to Activities and Export leave the step from any
-   section. The section open last is kept while the app is open, also when coming back
-   from Export. One live preview stays while the sections change (see
-   Preview). On wide screens it sits beside the settings and the page scrolls. On phones
-   the step is a full editor screen that does not scroll, laid out like photo and video
-   editors: the slim step bar on top, in place of the app's header; the preview alone,
-   with no lines around it, as large as the room allows; under it the open section's
-   settings in a panel of fixed height, so the picture does not jump, as a list: a row
-   per setting with its value at the right ("Grouping · Day ›"), under a heading per group
-   where the section has several. A switch turns in place, and a group switched off keeps
-   only its switch. Any other row opens its setting alone in a sheet from the bottom, with
-   the top of the picture still in view and changes drawn on it as they are made: a
-   choice as an option per row, with its explanation; a number as a slider with the exact
-   value; a position as the nine squares with its name; the values to show as chips picked
-   in order; the presets as their cards. Done, Escape or a tap above the sheet closes it.
-   The five sections along the bottom, with a drawing each. The settings of this step are
-   remembered for the next visit.
+   section. The section open last is kept while the app is open, also when coming back from
+   Export. One live preview stays while the sections change (see Preview). On wide screens
+   it sits beside the settings and the page scrolls. On phones the step is a full editor
+   screen that does not scroll, laid out like photo and video editors: the slim step bar on
+   top, in place of the app's header; the preview alone, with no lines around it, as large
+   as the room allows; under it the open section's settings in a panel of fixed height, so
+   the picture does not jump, as a list: a row per setting with its value at the right
+   ("Grouping · Day ›"), under a heading per group where the section has several. A switch
+   turns in place, and a group switched off keeps only its switch. Any other row opens its
+   setting alone in a sheet from the bottom, with the top of the picture still in view and
+   changes drawn on it as they are made: a choice as an option per row, with its
+   explanation; a number as a slider with the exact value; a position as the nine squares
+   with its name; the values to show as chips picked in order; the presets as their cards.
+   Done, Escape or a tap above the sheet closes it. The five sections along the bottom, with
+   a drawing each. The settings of this step are remembered for the next visit.
    - **Frame:** the aspect ratio (Story, Square or Landscape, for where the video will be
      posted, or a custom size) and the frame rate (24, 30 or 60 fps). It comes first
      because the shape decides how everything else looks.

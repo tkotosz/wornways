@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { offlineMap } from './offline-map.ts';
 import { pickSource } from './sources.ts';
-import { openSection, pickPeriod } from './steps.ts';
+import { chooseStyle, openSection, pickPeriod } from './steps.ts';
 
 test('plays a draft of the video in the preview, and edits on a still', async ({
   page,
@@ -16,6 +16,7 @@ test('plays a draft of the video in the preview, and edits on a still', async ({
   await pickPeriod(page);
   await expect(page.getByTestId('chosen-count')).toContainText('25 of 25 activities selected');
   await page.getByRole('button', { name: 'Continue' }).click(); // to Design
+  await chooseStyle(page);
 
   // The still picture first; Play makes the draft and plays it in its place.
   const preview = page.getByTestId('preview');
@@ -90,6 +91,7 @@ test('a draft being made can be canceled', async ({ page, context }) => {
   await page.getByRole('button', { name: 'Continue' }).click();
   await pickPeriod(page);
   await page.getByRole('button', { name: 'Continue' }).click(); // to Design
+  await chooseStyle(page);
 
   const preview = page.getByTestId('preview');
   await preview.getByRole('button', { name: 'Play preview' }).click();
