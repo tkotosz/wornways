@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { totalsEntries, type Totals } from '../../src/replay/totals-card.ts';
+import type { Widget } from '../../src/replay/widgets.ts';
+import {
+  startingTotalsWidgets,
+  totalsEntries,
+  totalsWidgetHeight,
+  type Totals,
+} from '../../src/replay/totals-card.ts';
 
 describe('totalsEntries', () => {
   const totals: Totals = {
@@ -125,5 +131,44 @@ describe('totalsEntries', () => {
       ),
     ).toEqual(['distance']);
     expect(totalsEntries(flat, 1, rides, ['elevation'])).toEqual([]);
+  });
+});
+
+describe('startingTotalsWidgets', () => {
+  const story = { width: 1080, height: 1920 };
+  const landscape = { width: 1920, height: 1080 };
+
+  it('puts the title on top and the values two to a row, centered on the frame', () => {
+    const widgets = startingTotalsWidgets(['count', 'distance', 'moving'], true, story);
+    expect(widgets.map((w) => (w.kind === 'metric' ? w.metric : w.kind))).toEqual([
+      'text',
+      'count',
+      'distance',
+      'moving',
+    ]);
+    const [title, count, distance, moving] = widgets as [Widget, Widget, Widget, Widget];
+    expect(title).toMatchObject({ kind: 'text', text: null, x: 50, size: 100 });
+    expect(count.y).toBeCloseTo(distance.y);
+    expect(count.x).toBeCloseTo(50 - 20);
+    expect(distance.x).toBeCloseTo(50 + 20);
+    // The last short row is centered, under the first.
+    expect(moving.x).toBe(50);
+    expect(moving.y).toBeGreaterThan(count.y);
+    // The block is centered down the frame: as much room above the title as below the last row.
+    const top = (title.y / 100) * 1920 - totalsWidgetHeight(title, 1) / 2;
+    const bottom = (moving.y / 100) * 1920 - totalsWidgetHeight(moving, 1) / 2 + 96 + 30;
+    expect(top).toBeCloseTo(1920 - bottom);
+  });
+
+  it('puts up to four values in a row on a wide frame, and the dates in a row of their own', () => {
+    const widgets = startingTotalsWidgets(
+      ['count', 'distance', 'date', 'moving', 'elevation'],
+      false,
+      landscape,
+    );
+    const rows = new Set(widgets.map((w) => w.y.toFixed(3)));
+    expect(rows.size).toBe(3);
+    const date = widgets.find((w) => w.kind === 'metric' && w.metric === 'date')!;
+    expect(date.x).toBe(50);
   });
 });

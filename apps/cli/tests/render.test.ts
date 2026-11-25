@@ -418,7 +418,7 @@ describe('rendering a replay', () => {
 
 describe('the totals card', () => {
   /** The last frame of a video of two activities with the totals card, as raw pixels. */
-  function lastTotalsFrame(totalsFields?: RenderOptions['totalsFields']) {
+  function lastTotalsFrame(totalsWidgets?: RenderOptions['totalsWidgets']) {
     const second = route();
     second.id = 'second';
     second.startTime += 86_400_000;
@@ -426,7 +426,7 @@ describe('the totals card', () => {
       [route(), second],
       chronologicalTimeline([5_000, 5_000], { duration: 1 }),
       (w, h) => createCanvas(w, h) as unknown as CanvasLike,
-      { width: 270, height: 480, fps: 10, totalsCard: true, totalsFields },
+      { width: 270, height: 480, fps: 10, totalsCard: true, totalsWidgets },
     );
     for (let f = 0; f < renderer.frameCount; f++) renderer.renderFrame(f);
     const ctx = renderer.canvas.getContext('2d') as Context2DLike;
@@ -456,15 +456,41 @@ describe('the totals card', () => {
     expect(still('end').equals(last)).toBe(false);
   });
 
-  it('shows every value unless told otherwise, and only the values picked when told', () => {
+  it('shows the usual totals unless told otherwise, and the widgets given when told', () => {
     const automatic = lastTotalsFrame();
-    expect(lastTotalsFrame(['count', 'distance', 'moving', 'elevation']).equals(automatic)).toBe(
+    const distance = { kind: 'metric', metric: 'distance', x: 50, y: 50, size: 100 } as const;
+    const count = { kind: 'metric', metric: 'count', x: 50, y: 30, size: 100 } as const;
+    expect(lastTotalsFrame([distance]).equals(automatic)).toBe(false);
+    expect(lastTotalsFrame([distance, count]).equals(lastTotalsFrame([count, distance]))).toBe(
       true,
     );
-    expect(lastTotalsFrame(['distance']).equals(automatic)).toBe(false);
-    expect(lastTotalsFrame(['time', 'count']).equals(lastTotalsFrame(['count', 'time']))).toBe(
+    expect(lastTotalsFrame([distance]).equals(lastTotalsFrame([{ ...distance, y: 60 }]))).toBe(
       false,
     );
+    expect(lastTotalsFrame([distance]).equals(lastTotalsFrame([{ ...distance, size: 150 }]))).toBe(
+      false,
+    );
+  });
+
+  it('reports the widgets it starts with, which draw the same card when given', () => {
+    const second = route();
+    second.id = 'second';
+    second.startTime += 86_400_000;
+    const renderer = createRenderer(
+      [route(), second],
+      chronologicalTimeline([5_000, 5_000], { duration: 1 }),
+      (w, h) => createCanvas(w, h) as unknown as CanvasLike,
+      { width: 270, height: 480, fps: 10, totalsCard: true },
+    );
+    const { widgets, values } = renderer.totalsCard();
+    expect(widgets.map((w) => (w.kind === 'metric' ? w.metric : w.kind))).toEqual([
+      'count',
+      'distance',
+      'moving',
+      'elevation',
+    ]);
+    expect(values.get('count')).toEqual({ value: '2', label: 'activities' });
+    expect(lastTotalsFrame(widgets).equals(lastTotalsFrame())).toBe(true);
   });
 });
 

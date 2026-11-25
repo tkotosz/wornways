@@ -4,11 +4,14 @@ import { drawElevationProfile, elevationProfile } from './elevation-profile.ts';
 import { WIDGET_SIZE, startingWidgets, type Widget } from './widgets.ts';
 import { END_CARD_S, drawEndCard, endCardFrames } from './end-card.ts';
 import {
+  AUTOMATIC_TOTALS,
   TOTALS_CARD_S,
   drawTotalsCard,
+  startingTotalsWidgets,
   totalsCardFrames,
+  totalsEntries,
+  totalsValues,
   type Totals,
-  type TotalsField,
 } from './totals-card.ts';
 import { drawWatermark } from './mark.ts';
 import { averagePace, isOnFoot, topSpeed } from './pace.ts';
@@ -265,8 +268,10 @@ export type RenderOptions = {
    * before the end card. Default false.
    */
   totalsCard?: boolean;
-  /** The totals card's values in order; default every one (see totals-card.ts). */
-  totalsFields?: readonly TotalsField[];
+  /** What the totals card shows; default `startingTotalsWidgets` (see totals-card.ts). */
+  totalsWidgets?: Widget[];
+  /** Lay out the totals card's widgets but leave them off it, as `hideWidgets` does. */
+  hideTotalsWidgets?: boolean;
   /** Draw the small Wornways mark on the map credit's line. Default false. */
   watermark?: boolean;
   /**
@@ -307,6 +312,11 @@ export type Renderer = {
   overlayBoxes(): OverlayBoxes;
   /** The widgets drawn: the ones given, or the ones the other options describe. */
   readonly widgets: Widget[];
+  /**
+   * The totals card's widgets (the ones given, or the ones it starts with) and each value it
+   * can show, for arranging them.
+   */
+  totalsCard(): { widgets: Widget[]; values: Map<Metric, MetricValue> };
   /** Each value this video can show, as it stands at the end of the replay. */
   readonly finalValues: Map<Metric, MetricValue>;
   /**
@@ -1320,6 +1330,16 @@ export function createRenderer(
     };
   };
   let totalsShown: Totals | null = null;
+  /** The totals card's widgets: the ones given, else the title and the usual values. */
+  let totalsLayout: Widget[] | null = null;
+  const totalsWidgets = (): Widget[] =>
+    (totalsLayout ??=
+      options.totalsWidgets ??
+      startingTotalsWidgets(
+        totalsEntries(totals(), 1, [singular, plural], AUTOMATIC_TOTALS).map((e) => e.field),
+        !!options.title,
+        { width: W, height: H },
+      ));
 
   return {
     canvas: frame,
@@ -1345,7 +1365,8 @@ export function createRenderer(
             fontFamily,
             title: options.title ?? '',
             countLabel: [singular, plural],
-            fields: options.totalsFields,
+            widgets: totalsWidgets(),
+            hideWidgets: options.hideTotalsWidgets,
           });
           return;
         }
@@ -1375,12 +1396,17 @@ export function createRenderer(
           fontFamily,
           title: options.title ?? '',
           countLabel: [singular, plural],
-          fields: options.totalsFields,
+          widgets: totalsWidgets(),
+          hideWidgets: options.hideTotalsWidgets,
         });
       else drawEndCard(ctx, base, END_CARD_S, { width: W, height: H, fontFamily });
     },
     overlayBoxes: () => boxes,
     widgets,
+    totalsCard: () => ({
+      widgets: totalsWidgets(),
+      values: totalsValues(totals(), [singular, plural]) as Map<Metric, MetricValue>,
+    }),
     finalValues,
     profileShape(samples: number) {
       const shape = hasElevation ? elevationProfile(tracks, samples) : null;

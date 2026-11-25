@@ -26,9 +26,14 @@ export const widgetName = (widget: Widget) =>
 
 /**
  * Reads a list of widgets from its text form; an empty text is no widgets. `metrics` are
- * the metric names a value widget can take. Throws an Error that says what is wrong.
+ * the metric names a value widget can take; `chart` whether the elevation chart is one
+ * (not on the totals card). Throws an Error that says what is wrong.
  */
-export function parseWidgets(text: string, metrics: readonly string[]): Widget[] {
+export function parseWidgets(
+  text: string,
+  metrics: readonly string[],
+  { chart = true }: { chart?: boolean } = {},
+): Widget[] {
   const widgets: Widget[] = [];
   let i = 0;
   const fail = (why: string): never => {
@@ -74,10 +79,14 @@ export function parseWidgets(text: string, metrics: readonly string[]): Widget[]
     if (size < WIDGET_SIZE.min || size > WIDGET_SIZE.max)
       fail(`a size is from ${WIDGET_SIZE.min} to ${WIDGET_SIZE.max} percent, got ${size}`);
     if (name === 'text') widgets.push({ kind: 'text', text: own, x, y, size });
-    else if (name === 'elevation-chart') widgets.push({ kind: 'elevation-chart', x, y, size });
+    else if (name === 'elevation-chart' && chart)
+      widgets.push({ kind: 'elevation-chart', x, y, size });
     else if (metrics.includes(name))
       widgets.push({ kind: 'metric', metric: name as Metric, x, y, size });
-    else fail(`"${name}" is not a widget: text, elevation-chart or one of ${metrics.join(', ')}`);
+    else
+      fail(
+        `"${name}" is not a widget: text, ${chart ? 'elevation-chart or ' : ''}one of ${metrics.join(', ')}`,
+      );
     i++; // past the ";"
   }
   return widgets;

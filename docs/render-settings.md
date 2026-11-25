@@ -258,23 +258,30 @@ totals count up, by default the activities (named after the one sport shown, suc
 rides), the kilometers, the hours moving and the meters climbed. Each total is the value the
 metrics card shows at the end of the replay.
 
-Its values can be picked and ordered from the metrics card's values (see the table above),
-as totals for every activity. Unless picked, it shows activities, kilometers, hours moving and
-meters climbed (`count`, `distance`, `moving`, `elevation`). The pace and the dates appear
-without counting up, and the dates take a row of their own. The climb, the descent and the
-highest point are left out when no activity recorded elevation, whatever is picked. Up to two
-values sit in a row on a story or square frame, up to four on a wide one. In the web app the
-values are chips under the switch, numbered in the order picked, with a link back to the
-automatic choice.
+What it shows is a list of widgets, written as the widgets over the replay are (see
+Widgets): text, which without its own text shows the title, and totals for every activity,
+named as the values of the metrics table are (any of them but `start`; no elevation chart).
+Each is centered on its point, at a size from 50 to 250%. The text is drawn with the short
+orange rule under it; a total is its number large over its words in orange. The values fade
+in in their order, one after another, and count up; the pace and the dates appear without
+counting up, and the dates are drawn smaller. A total the activities did not record (the
+climb, the descent and the highest point without elevation, the sensor values, calories) is
+left out.
+
+Unless set, the card starts with the title at the top and activities, kilometers, hours
+moving and meters climbed (`count`, `distance`, `moving`, `elevation`) under it, up to two
+to a row on a story or square frame, up to four on a wide one, a last short row centered,
+the whole block centered on the frame. In the web app they are arranged on the card in the
+Ending section, as the widgets over the replay are in Overlay.
 
 The recap preset turns it on; any other video of several activities can. In the web app a
 Custom playback made from Recap keeps it on, and the switch in the Ending section always
 decides over the preset.
 
-| Setting          | CLI flag                             | Values                                                              | Default                                    |
-| ---------------- | ------------------------------------ | ------------------------------------------------------------------- | ------------------------------------------ |
-| Show totals card | `--totals-card` / `--no-totals-card` | on/off                                                              | off; on with `recap`                       |
-| Values           | `--totals-fields`                    | comma-separated, in the order shown: any value of the metrics table | `count`, `distance`, `moving`, `elevation` |
+| Setting          | CLI flag                             | Values                                                | Default                                                   |
+| ---------------- | ------------------------------------ | ----------------------------------------------------- | --------------------------------------------------------- |
+| Show totals card | `--totals-card` / `--no-totals-card` | on/off                                                | off; on with `recap`                                      |
+| Widgets          | `--totals-widgets`                   | as `--widgets`: `text:"…"@x,y,size`, `distance@x,y,…` | the title over `count`, `distance`, `moving`, `elevation` |
 
 ### Branding
 

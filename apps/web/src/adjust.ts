@@ -201,7 +201,6 @@ const LABELS: Record<string, string> = {
   duration: 'Video duration',
   size: 'Size',
   map: 'Street map',
-  'totals-fields': 'Values',
 };
 
 /** The words shown for a choice's values. */
@@ -249,7 +248,6 @@ const HINTS: Record<string, string> = {
     'end card. Added to the video’s length.',
   'trim-radius': 'Hide the route within this radius of each activity’s start and finish.',
   'metrics-fields': 'In the order picked; the first is shown large.',
-  'totals-fields': 'In the order picked.',
   'elevation-profile':
     'The climb profile along the bottom of the video, with a dot that follows the activity. ' +
     'For several activities, they are laid end to end; off unless switched on.',
@@ -290,7 +288,7 @@ const PANELS: Record<Panel, string[]> = {
   map: ['map'],
   watermark: ['watermark'],
   pause: ['end-pause'],
-  totals: ['totals-card', 'totals-fields'],
+  totals: ['totals-card'],
   'end-card': ['end-card'],
 };
 

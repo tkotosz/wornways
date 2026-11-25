@@ -7,7 +7,7 @@
 import { sportSlug } from '../import/index-csv.ts';
 import type { LatLon } from '../track/places.ts';
 import { END_CARD_S } from './end-card.ts';
-import { AUTOMATIC_TOTALS, TOTALS_CARD_S, TOTALS_FIELDS, type TotalsField } from './totals-card.ts';
+import { TOTALS_CARD_S, TOTALS_FIELDS } from './totals-card.ts';
 import { PRESETS, PRESET_NAMES, type Preset } from './presets.ts';
 import type { Grouping } from './plans.ts';
 import { METRICS, POSITIONS, parseFramePoint, type Metric, type Placement } from './render.ts';
@@ -91,8 +91,8 @@ export type RenderSettings = {
 
   /** Whether a video of several activities shows their totals after the replay. */
   totalsCard: boolean;
-  /** The totals card's values in order; null: every one, in the usual order. */
-  totalsFields: TotalsField[] | null;
+  /** What the totals card shows; null: the title and the usual totals. */
+  totalsWidgets: Widget[] | null;
 
   // Branding
   /** Whether the video ends with the Wornways card, after the replay. */
@@ -490,19 +490,19 @@ export const SETTINGS: readonly SettingDefinition[] = [
       'activities, kilometers, hours moving and meters climbed. On with the recap preset.',
   },
   {
-    name: 'totals-fields',
-    label: 'Totals',
+    name: 'totals-widgets',
+    label: 'Totals card widgets',
     group: 'look',
-    kind: { type: 'list', choices: TOTALS_FIELDS },
+    kind: { type: 'text', valueName: 'widgets' },
     default: null,
-    automatic: AUTOMATIC_TOTALS.join(', '),
+    automatic: 'the title over activities, kilometers, hours moving and meters climbed',
     help:
-      `Values the totals card shows, in this order: ${TOTALS_FIELDS.join(', ')}. The same ` +
-      'values as the metrics card, as totals: time is hours in total, moving hours moving, ' +
-      'pace the average while moving, top-speed the fastest of any activity, date the days ' +
-      'spanned, days the days with an activity. ' +
-      'Elevation, descent and highest are left out when no activity recorded elevation, the ' +
-      'heart rate, power, cadence, temperature and calories when none recorded them.',
+      'What the totals card shows, as --widgets is written: text:"Your text"@x,y,size ' +
+      `(text@x,y for the title) and totals such as distance@x,y,size: ${TOTALS_FIELDS.join(', ')}. ` +
+      'As totals: time is hours in total, moving hours moving, pace the average while moving, ' +
+      'top-speed the fastest of any activity, date the days spanned, days the days with an ' +
+      'activity. A total the activities did not record (elevation, the sensors, calories) is ' +
+      'left out. The values fade in in their order and count up.',
   },
 
   {
@@ -649,11 +649,15 @@ export function parseSettings(input: SettingsInput): RenderSettings {
     return n;
   };
   /** The widgets, or null when left to the other settings. */
-  const widgetList = (name: string): Widget[] | null => {
+  const widgetList = (
+    name: string,
+    metrics: readonly string[],
+    chart: boolean,
+  ): Widget[] | null => {
     const value = text(name);
     if (value === null) return null;
     try {
-      return parseWidgets(value, METRICS);
+      return parseWidgets(value, metrics, { chart });
     } catch (error) {
       throw new SettingsError(name, error instanceof Error ? error.message : String(error));
     }
@@ -776,9 +780,9 @@ export function parseSettings(input: SettingsInput): RenderSettings {
     metricsFields: choiceList<Metric>('metrics-fields'),
     metricsPosition: placement('metrics-position'),
     metricsSize: number('metrics-size'),
-    widgets: widgetList('widgets'),
+    widgets: widgetList('widgets', METRICS, true),
     totalsCard: flag('totals-card'),
-    totalsFields: choiceList<TotalsField>('totals-fields'),
+    totalsWidgets: widgetList('totals-widgets', TOTALS_FIELDS, false),
     endCard: flag('end-card'),
     watermark: flag('watermark'),
   };

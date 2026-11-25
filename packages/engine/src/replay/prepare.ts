@@ -59,6 +59,8 @@ export type PrepareOptions = {
   lastFrameOnly?: boolean;
   /** Leave the widgets off the picture (see `RenderOptions.hideWidgets`). */
   hideWidgets?: boolean;
+  /** Leave the totals card's widgets off it (see `RenderOptions.hideTotalsWidgets`). */
+  hideTotalsWidgets?: boolean;
 };
 
 /** Nouns for the counter and the verb for activities under way, by the one sport shown. */
@@ -177,7 +179,8 @@ export async function prepareReplay(
     endPause: settings.endPause,
     endCard: settings.endCard,
     totalsCard: settings.totalsCard,
-    totalsFields: settings.totalsFields ?? undefined,
+    totalsWidgets: settings.totalsWidgets ?? undefined,
+    hideTotalsWidgets: options.hideTotalsWidgets,
     watermark: settings.watermark,
     // Left to the video: on for a single activity, off for several.
     elevationProfile: settings.elevationProfile ?? tracks.length === 1,

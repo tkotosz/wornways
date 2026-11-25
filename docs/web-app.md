@@ -180,7 +180,15 @@ list.
      that opens its settings (its text, its size and "Remove from the picture"), and the
      watermark switch.
    - **Ending:** what comes after the replay: the end pause on the finished picture, the
-     totals card (for several activities only; on for Recap) and the end card.
+     totals card (for several activities only; on for Recap) and the end card. When the
+     video has the totals card, the picture is the finished card, drawn without its widgets,
+     and the page draws them over it, as in Overlay: at first the title over the usual
+     totals, at the card's sizes (a text over its short orange rule, a total's number over
+     its words in orange). They are picked, moved, resized and removed as over the replay,
+     and the same tools on the picture add a text or a total (a sheet of the totals these
+     activities have, each with its own number); there is no chart or watermark on the
+     card. The card's band behind them stays where the still drew it until it is drawn
+     again; the video has it behind the widgets as they are.
 4. **Export.** A stage in the video's shape, which shows the finished picture with a "Make
    video" button in the middle; while the video is made, its progress and a way to
    cancel; then the video itself, playing. Download then appears in the bottom bar, and

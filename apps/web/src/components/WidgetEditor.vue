@@ -15,6 +15,9 @@
 // or off (`tool`). The keyboard moves a picked widget with the arrow keys, resizes it with +
 // and -, and removes it with Delete. On a story-shaped frame, while a widget moves, guides
 // show the parts the platforms' own controls cover.
+//
+// With `card`, the widgets are the totals card's: drawn at the card's sizes, a text with the
+// orange rule under it, without the shadow; its tools add a text or a total.
 import { WIDGET_SIZE, type Metric, type MetricValue, type Widget } from '@wornways/engine';
 import { computed, ref } from 'vue';
 import { widgetLabel } from '../adjust.ts';
@@ -31,9 +34,12 @@ const props = defineProps<{
   size: { width: number; height: number };
   /**
    * The tools down the side of the picture: whether the chart is offered (an activity
-   * recorded elevation) and on the picture, and whether the watermark is on.
+   * recorded elevation) and on the picture, and whether the watermark is on (null: no
+   * watermark tool, as on the totals card).
    */
-  tools: { chartOffered: boolean; chart: boolean; mark: boolean };
+  tools: { chartOffered: boolean; chart: boolean; mark: boolean | null };
+  /** Whether the widgets are the totals card's, drawn as the card draws them. */
+  card?: boolean;
 }>();
 /** The picked widget's index; null when none is. */
 const selected = defineModel<number | null>('selected', { required: true });
@@ -333,6 +339,7 @@ const story = computed(() => props.size.width / props.size.height < 0.8);
   <div
     ref="layer"
     class="layer"
+    :class="{ card }"
     :style="{ '--unit': unit }"
     @pointerdown="touch"
     @contextmenu.prevent
@@ -378,6 +385,7 @@ const story = computed(() => props.size.width / props.size.height < 0.8);
         </svg>
       </button>
       <button
+        v-if="tools.mark !== null"
         type="button"
         class="tool"
         aria-label="Show the watermark"
@@ -417,7 +425,11 @@ const story = computed(() => props.size.width / props.size.height < 0.8);
     >
       <!-- What the engine draws for it, at its size. -->
       <span v-if="widget.kind === 'text'" class="text">{{ textOf(widget)!.value }}</span>
-      <span v-else-if="widget.kind === 'metric'" class="metric">
+      <span
+        v-else-if="widget.kind === 'metric'"
+        class="metric"
+        :class="{ dates: widget.metric === 'date' }"
+      >
         <span class="value">{{ textOf(widget)!.value }}</span>
         <span v-if="textOf(widget)!.label" class="words">{{ textOf(widget)!.label }}</span>
       </span>
@@ -579,6 +591,51 @@ const story = computed(() => props.size.width / props.size.height < 0.8);
   display: block;
   width: min(100cqw, calc(86cqw * var(--size)));
   height: calc(var(--unit) * 80 * var(--size) * 1cqw);
+}
+
+/* On the totals card, its sizes (a value's number smaller for the dates), with no shadow: a
+   text over a short orange rule, a value's number over its words in orange. The lines are
+   set so each sits where the card draws it, from the top of the widget's box. */
+.card .text,
+.card .metric {
+  text-shadow: none;
+}
+
+.card .text {
+  color: rgba(255, 255, 255, 0.94);
+  font-size: calc(var(--unit) * 52 * var(--size) * 1cqw);
+}
+
+.card .text::after {
+  content: '';
+  display: block;
+  width: calc(var(--unit) * 64 * var(--size) * 1cqw);
+  height: calc(var(--unit) * 5 * var(--size) * 1cqw);
+  margin: calc(var(--unit) * 20 * var(--size) * 1cqw) auto 0;
+  background: #ff8a2a;
+}
+
+.card .metric {
+  --number: 96;
+}
+
+.card .metric.dates {
+  --number: 60;
+}
+
+.card .metric .value {
+  color: rgba(255, 255, 255, 0.96);
+  font-size: calc(var(--unit) * var(--number) * var(--size) * 1cqw);
+  font-weight: 700;
+  line-height: 1.27;
+}
+
+.card .metric .words {
+  margin-top: calc(var(--unit) * (22 - 0.27 * var(--number)) * var(--size) * 1cqw);
+  color: rgba(255, 176, 102, 0.9);
+  font-size: calc(var(--unit) * 30 * var(--size) * 1cqw);
+  font-weight: 500;
+  line-height: 1.27;
 }
 
 /* The widget's name on a tab above its outline, when picked. */

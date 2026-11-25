@@ -1,10 +1,13 @@
 // The totals card after the replay of several activities: the finished map dims, the
-// video's title comes in, and the totals picked count up (unless picked otherwise:
-// activities, kilometers, hours moving and meters climbed). It is added after the replay
-// and before the end card, so the replay keeps the length it was given.
+// video's title comes in, and the totals count up. What it shows is a list of widgets, as
+// over the replay (see widgets.ts): text, and the totals as values, each centered on its
+// point; at first the title over activities, kilometers, hours moving and meters climbed.
+// It is added after the replay and before the end card, so the replay keeps the length it
+// was given.
 
 import { averagePace, topSpeed } from './pace.ts';
 import type { CanvasLike, Context2DLike } from './render.ts';
+import type { Widget } from './widgets.ts';
 
 /** How long the totals card plays, in seconds. */
 export const TOTALS_CARD_S = 3.4;
@@ -127,13 +130,103 @@ export type TotalsCardOptions = {
   width: number;
   height: number;
   fontFamily: string;
-  /** The title over the totals; empty for none. */
+  /** The video's title, which a text widget without its own text shows; empty for none. */
   title: string;
   /** Singular and plural noun for the count, e.g. ["ride", "rides"]. */
   countLabel: [string, string];
-  /** The values to show, in order; default `AUTOMATIC_TOTALS`. Elevation shows only when recorded. */
-  fields?: readonly TotalsField[];
+  /**
+   * What the card shows, as widgets (see widgets.ts): text, and values (a value widget's
+   * metric is one of `TOTALS_FIELDS`). See `startingTotalsWidgets` for the usual ones.
+   */
+  widgets: readonly Widget[];
+  /** Draw the card without its widgets, for an editor that draws them itself. */
+  hideWidgets?: boolean;
 };
+
+/**
+ * The card's type sizes at 100%, for a frame 1080 pixels on its shorter side: the title, a
+ * value's number (the dates' smaller, being long), the words under a value, and the gap from
+ * the number's baseline to theirs, less their own size.
+ */
+const SIZES = { title: 52, value: 96, dates: 60, label: 30, labelGap: 22 } as const;
+/** From the title's baseline down to the top of the orange rule under it, and its height. */
+const RULE = { below: 34, height: 5, width: 64 } as const;
+/** Below the last line of a text, room is kept for letters that reach under the baseline. */
+const DESCENT = 0.27;
+
+/**
+ * A widget's height on the card, in pixels at `unit` (pixels per 1080th of the shorter side):
+ * a text down to the bottom of its rule; a value from the top of its number's line down to
+ * below the words under it.
+ */
+export function totalsWidgetHeight(widget: Widget, unit: number): number {
+  const scale = widget.size / 100;
+  if (widget.kind === 'text') return (SIZES.title + RULE.below + RULE.height) * unit * scale;
+  const size = widget.kind === 'metric' && widget.metric === 'date' ? SIZES.dates : SIZES.value;
+  return (size + SIZES.labelGap + SIZES.label * (1 + DESCENT)) * unit * scale;
+}
+
+/**
+ * The widgets a totals card starts with: the title at the top, then the values in rows, up to
+ * four to a row on a wide frame and two otherwise, a last short row centered; the dates are
+ * too long to share a row, so they get one of their own where they sit in the order. The block
+ * is centered on the frame. `fields` are the values to show, in order; `title` whether the
+ * video has one.
+ */
+export function startingTotalsWidgets(
+  fields: readonly TotalsField[],
+  title: boolean,
+  { width: W, height: H }: { width: number; height: number },
+): Widget[] {
+  const unit = Math.min(W, H) / 1080;
+  const numbers = fields.filter((field) => field !== 'date').length;
+  const perRow = W > H * 1.3 ? Math.min(4, Math.max(1, numbers)) : 2;
+  const rows: { fields: TotalsField[]; dates: boolean }[] = [];
+  for (const field of fields) {
+    const last = rows.at(-1);
+    if (field === 'date') rows.push({ fields: [field], dates: true });
+    else if (last && !last.dates && last.fields.length < perRow) last.fields.push(field);
+    else rows.push({ fields: [field], dates: false });
+  }
+  const gap = 70 * unit;
+  const rowHeight = (dates: boolean) =>
+    (dates ? SIZES.dates : SIZES.value) * unit + SIZES.label * unit + gap;
+  const titleRoom = title ? (SIZES.title + 90) * unit : 0;
+  const blockHeight = titleRoom + rows.reduce((sum, row) => sum + rowHeight(row.dates), 0) - gap;
+  const top = (H - blockHeight) / 2;
+  const columnWidth = Math.min(W * 0.4, (W * 0.86) / perRow);
+
+  const widgets: Widget[] = [];
+  if (title) {
+    const widget: Widget = { kind: 'text', text: null, x: 50, y: 0, size: 100 };
+    widget.y = ((top + totalsWidgetHeight(widget, unit) / 2) / H) * 100;
+    widgets.push(widget);
+  }
+  let rowTop = top + titleRoom;
+  for (const row of rows) {
+    row.fields.forEach((field, column) => {
+      const widget: Widget = { kind: 'metric', metric: field, x: 0, y: 0, size: 100 };
+      widget.x = ((W / 2 + (column - (row.fields.length - 1) / 2) * columnWidth) / W) * 100;
+      widget.y = ((rowTop + totalsWidgetHeight(widget, unit) / 2) / H) * 100;
+      widgets.push(widget);
+    });
+    rowTop += rowHeight(row.dates);
+  }
+  return widgets;
+}
+
+/** The values a totals card can show, at their final numbers, by field. */
+export function totalsValues(
+  totals: Totals,
+  countLabel: [string, string],
+): Map<TotalsField, { value: string; label: string }> {
+  return new Map(
+    totalsEntries(totals, 1, countLabel, TOTALS_FIELDS).map((entry) => [
+      entry.field,
+      { value: entry.value, label: entry.label },
+    ]),
+  );
+}
 
 const smoothstep = (f: number) => f * f * (3 - 2 * f);
 const easeOut = (f: number) => 1 - (1 - f) ** 3;
@@ -239,14 +332,23 @@ export function totalsEntries(
 
 /**
  * Draws the totals card `t` seconds after the replay ended, over `last`, a copy of the
- * replay's last frame.
+ * replay's last frame: the map dims, the text widgets fade in, and the values fade in one
+ * after another, in their order, and count up. Each widget is centered on its point.
  */
 export function drawTotalsCard(
   ctx: Context2DLike,
   last: CanvasLike,
   t: number,
   totals: Totals,
-  { width: W, height: H, fontFamily, title, countLabel, fields }: TotalsCardOptions,
+  {
+    width: W,
+    height: H,
+    fontFamily,
+    title,
+    countLabel,
+    widgets,
+    hideWidgets = false,
+  }: TotalsCardOptions,
 ): void {
   const unit = Math.min(W, H) / 1080;
   ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -257,60 +359,53 @@ export function drawTotalsCard(
   ctx.fillStyle = '#050608';
   ctx.fillRect(0, 0, W, H);
 
-  const values = totalsEntries(
-    totals,
-    easeOut(progress(t, TIMING.count.at, TIMING.count.length)),
-    countLabel,
-    fields,
+  const fields = widgets.flatMap((widget) =>
+    widget.kind === 'metric' ? [widget.metric as TotalsField] : [],
   );
-  // Rows of values: up to four to a row on a wide frame, two otherwise, a last short row
-  // centered. The dates are too long to share a row, so they get one of their own where they
-  // sit in the order, in smaller type.
-  const numbers = values.filter((entry) => entry.field !== 'date').length;
-  const perRow = W > H * 1.3 ? Math.min(4, Math.max(1, numbers)) : 2;
-  const rows: { entries: { entry: TotalsEntry; order: number }[]; dates: boolean }[] = [];
-  values.forEach((entry, order) => {
-    const last = rows.at(-1);
-    if (entry.field === 'date') rows.push({ entries: [{ entry, order }], dates: true });
-    else if (last && !last.dates && last.entries.length < perRow)
-      last.entries.push({ entry, order });
-    else rows.push({ entries: [{ entry, order }], dates: false });
-  });
-  const valueSize = 96 * unit;
-  const datesSize = 60 * unit;
-  const labelSize = 30 * unit;
-  const gap = 70 * unit;
-  const rowHeight = (dates: boolean) => (dates ? datesSize : valueSize) + labelSize + gap;
-  const titleSize = 52 * unit;
-  const titleRoom = title ? titleSize + 90 * unit : 0;
-  const blockHeight = titleRoom + rows.reduce((sum, row) => sum + rowHeight(row.dates), 0) - gap;
-  const top = (H - blockHeight) / 2;
+  const entries = new Map(
+    totalsEntries(
+      totals,
+      easeOut(progress(t, TIMING.count.at, TIMING.count.length)),
+      countLabel,
+      fields,
+    ).map((entry) => [entry.field, entry]),
+  );
+  /** The widgets with something to show: a text, or a value the activities have. */
+  const shown = widgets.flatMap(
+    (widget): { widget: Widget; text: string; entry: TotalsEntry | null }[] => {
+      if (widget.kind === 'text') {
+        const text = widget.text ?? title;
+        return text ? [{ widget, text, entry: null }] : [];
+      }
+      const entry = widget.kind === 'metric' ? entries.get(widget.metric as TotalsField) : null;
+      return entry ? [{ widget, text: '', entry }] : [];
+    },
+  );
+  if (shown.length === 0) return;
+  const topOf = (widget: Widget) => (widget.y / 100) * H - totalsWidgetHeight(widget, unit) / 2;
 
-  // Darker still behind the title and the values, fading out above and below them, so
-  // place names on the map do not show through the numbers.
+  // Darker still behind the widgets, fading out above and below them, so place names on the
+  // map do not show through the numbers.
   const room = 120 * unit;
-  const band = ctx.createLinearGradient(0, top - room, 0, top + blockHeight + room);
+  const top = Math.min(...shown.map(({ widget }) => topOf(widget)));
+  const bottom = Math.max(
+    ...shown.map(({ widget, entry }) => {
+      const scale = widget.size / 100;
+      const size = entry ? (entry.field === 'date' ? SIZES.dates : SIZES.value) : SIZES.title;
+      // A text's rule and a value's words reach a little further than the band needs to.
+      return topOf(widget) + (entry ? size + SIZES.label : size + 20) * unit * scale;
+    }),
+  );
+  const band = ctx.createLinearGradient(0, top - room, 0, bottom + room);
   band.addColorStop(0, 'rgba(5, 6, 8, 0)');
   band.addColorStop(0.25, 'rgba(5, 6, 8, 0.75)');
   band.addColorStop(0.75, 'rgba(5, 6, 8, 0.75)');
   band.addColorStop(1, 'rgba(5, 6, 8, 0)');
   ctx.globalAlpha = smoothstep(progress(t, TIMING.dim.at, TIMING.dim.length));
   ctx.fillStyle = band;
-  ctx.fillRect(0, top - room, W, blockHeight + 2 * room);
-
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'alphabetic';
-  if (title) {
-    const shown = smoothstep(progress(t, TIMING.title.at, TIMING.title.length));
-    ctx.globalAlpha = shown;
-    ctx.font = `600 ${Math.round(titleSize)}px ${fontFamily}`;
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.94)';
-    ctx.fillText(title, W / 2, top + titleSize, W * 0.88);
-    // A short orange rule under the title.
-    ctx.fillStyle = '#ff8a2a';
-    const rule = 64 * unit * shown;
-    ctx.fillRect(W / 2 - rule / 2, top + titleSize + 34 * unit, rule, 5 * unit);
-  }
+  ctx.fillRect(0, top - room, W, bottom - top + 2 * room);
+  ctx.globalAlpha = 1;
+  if (hideWidgets) return;
 
   /** Sets the font at `size`, or smaller when `text` would be wider than `width`. */
   const fitFont = (text: string, weight: number, size: number, width: number) => {
@@ -319,27 +414,52 @@ export function drawTotalsCard(
     if (measured > width)
       ctx.font = `${weight} ${Math.floor((size * width) / measured)}px ${fontFamily}`;
   };
-
+  // As wide as a value may be: a column's, of as many columns as the values would fill.
+  const numbers = shown.filter(({ entry }) => entry && entry.field !== 'date').length;
+  const perRow = W > H * 1.3 ? Math.min(4, Math.max(1, numbers)) : 2;
   const columnWidth = Math.min(W * 0.4, (W * 0.86) / perRow);
-  let rowTop = top + titleRoom;
-  for (const row of rows) {
-    const size = row.dates ? datesSize : valueSize;
-    const width = row.dates ? W * 0.86 : columnWidth * 0.92;
-    row.entries.forEach(({ entry, order }, column) => {
-      const x = W / 2 + (column - (row.entries.length - 1) / 2) * columnWidth;
-      const shown = smoothstep(
-        progress(t, TIMING.values.at + order * TIMING.values.stagger, TIMING.values.length),
+
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'alphabetic';
+  let order = 0;
+  for (const { widget, text, entry } of shown) {
+    const scale = widget.size / 100;
+    const x = (widget.x / 100) * W;
+    const widgetTop = topOf(widget);
+    if (!entry) {
+      const size = SIZES.title * unit * scale;
+      const shownPart = smoothstep(progress(t, TIMING.title.at, TIMING.title.length));
+      ctx.globalAlpha = shownPart;
+      ctx.font = `600 ${Math.round(size)}px ${fontFamily}`;
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.94)';
+      ctx.fillText(text, x, widgetTop + size, W * 0.88);
+      // A short orange rule under it.
+      ctx.fillStyle = '#ff8a2a';
+      const rule = RULE.width * unit * scale * shownPart;
+      ctx.fillRect(
+        x - rule / 2,
+        widgetTop + size + RULE.below * unit * scale,
+        rule,
+        RULE.height * unit * scale,
       );
-      const y = rowTop + size + (1 - shown) * 24 * unit;
-      ctx.globalAlpha = shown;
-      fitFont(entry.value, 700, size, width);
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.96)';
-      ctx.fillText(entry.value, x, y);
-      fitFont(entry.label, 500, labelSize, width);
-      ctx.fillStyle = 'rgba(255, 176, 102, 0.9)';
-      ctx.fillText(entry.label, x, y + labelSize + 22 * unit);
-    });
-    rowTop += rowHeight(row.dates);
+      continue;
+    }
+    const dates = entry.field === 'date';
+    const size = (dates ? SIZES.dates : SIZES.value) * unit * scale;
+    const labelSize = SIZES.label * unit * scale;
+    const width = Math.min(W * 0.96, (dates ? W * 0.86 : columnWidth * 0.92) * scale);
+    const shownPart = smoothstep(
+      progress(t, TIMING.values.at + order * TIMING.values.stagger, TIMING.values.length),
+    );
+    order++;
+    const y = widgetTop + size + (1 - shownPart) * 24 * unit;
+    ctx.globalAlpha = shownPart;
+    fitFont(entry.value, 700, size, width);
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.96)';
+    ctx.fillText(entry.value, x, y);
+    fitFont(entry.label, 500, labelSize, width);
+    ctx.fillStyle = 'rgba(255, 176, 102, 0.9)';
+    ctx.fillText(entry.label, x, y + labelSize + SIZES.labelGap * unit * scale);
   }
   ctx.globalAlpha = 1;
 }

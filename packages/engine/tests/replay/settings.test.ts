@@ -46,7 +46,7 @@ describe('parseSettings', () => {
       titleSize: 100,
       metricsSize: 100,
       totalsCard: false,
-      totalsFields: null,
+      totalsWidgets: null,
       endCard: true,
       watermark: true,
     });
@@ -57,16 +57,18 @@ describe('parseSettings', () => {
     expect(parseSettings({ duration: '45' }).duration).toBe(45);
   });
 
-  it('reads the totals card values in the order given', () => {
-    expect(parseSettings({ 'totals-fields': 'time, Count,time' }).totalsFields).toEqual([
-      'time',
-      'count',
+  it('reads the totals card widgets: text and totals, without the elevation chart', () => {
+    expect(
+      parseSettings({ 'totals-widgets': 'text@50,40;distance@30,50,120' }).totalsWidgets,
+    ).toEqual([
+      { kind: 'text', text: null, x: 50, y: 40, size: 100 },
+      { kind: 'metric', metric: 'distance', x: 30, y: 50, size: 120 },
     ]);
-    expect(parseSettings({ 'totals-fields': 'date,pace' }).totalsFields).toEqual(['date', 'pace']);
-    expect(() => parseSettings({ 'totals-fields': 'speed' })).toThrow(
-      'expects values from count, distance, moving, time, elevation, descent, highest, pace, top-speed, date, days, longest, heart-rate, max-heart-rate, power, cadence, temperature, calories, got "speed"',
+    expect(() => parseSettings({ 'totals-widgets': 'elevation-chart@50,90' })).toThrow(
+      '"elevation-chart" is not a widget: text, one of count, distance',
     );
-    expect(() => parseSettings({ 'totals-fields': '' })).toThrow('expects values from');
+    // The start time is for a single activity, not a total.
+    expect(() => parseSettings({ 'totals-widgets': 'start@50,50' })).toThrow('is not a widget');
   });
 
   it('reads an end pause of 0 to 10 seconds, halves included', () => {

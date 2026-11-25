@@ -1,13 +1,7 @@
 <script setup lang="ts">
 // The controls of a few setting groups, built from the engine's settings table: buttons
 // for a choice, a slider for a number, a switch for on/off, and a few made to measure.
-import {
-  AUTOMATIC_TOTALS,
-  TOTALS_FIELDS,
-  type SettingDefinition,
-  type SensorChannel,
-  type TotalsField,
-} from '@wornways/engine';
+import { type SettingDefinition } from '@wornways/engine';
 import { computed } from 'vue';
 import {
   choiceLabel,
@@ -89,68 +83,8 @@ const showsTotals = computed(
 /** Whether a setting's row shows: the totals card switched off shows only its switch. */
 const shown = (group: Panel, name: string) =>
   group !== 'totals' || name === 'totals-card' || showsTotals.value;
-/** The values that need a sensor channel, or calories, that some selected activity recorded. */
-const SENSOR_VALUES: Record<string, SensorChannel | 'calories'> = {
-  'heart-rate': 'heartRate',
-  'max-heart-rate': 'heartRate',
-  power: 'power',
-  cadence: 'cadence',
-  temperature: 'temperature',
-  calories: 'calories',
-};
-const isSensorValue = (value: string) => Object.hasOwn(SENSOR_VALUES, value);
-const hasSensorValue = (value: string) => {
-  const needs = SENSOR_VALUES[value];
-  return needs === 'calories'
-    ? !!props.plan?.hasCalories
-    : !!props.plan?.sensors.includes(needs as SensorChannel);
-};
-
-// Totals card: the values it can show (elevation only when recorded), and the ones picked, in order.
-const TOTALS_LABELS: Record<TotalsField, string> = {
-  count: 'Activities',
-  distance: 'Kilometers',
-  moving: 'Hours moving',
-  time: 'Hours in total',
-  elevation: 'Meters climbed',
-  descent: 'Meters descended',
-  highest: 'Highest point',
-  pace: 'Average pace',
-  'top-speed': 'Top speed',
-  date: 'Dates',
-  days: 'Days out',
-  longest: 'Longest activity',
-  'heart-rate': 'Average heart rate',
-  'max-heart-rate': 'Max heart rate',
-  power: 'Average power',
-  cadence: 'Average cadence',
-  temperature: 'Average temperature',
-  calories: 'Calories',
-};
-const ELEVATION_TOTALS: TotalsField[] = ['elevation', 'descent', 'highest'];
-const offeredTotals = computed(() =>
-  TOTALS_FIELDS.filter((field) => {
-    if (ELEVATION_TOTALS.includes(field)) return props.plan?.hasElevation;
-    if (isSensorValue(field)) return hasSensorValue(field);
-    return true;
-  }),
-);
-const pickedTotals = computed<TotalsField[]>(() => {
-  const set = adjustments.value['totals-fields'];
-  const picked = typeof set === 'string' ? (set.split(',') as TotalsField[]) : AUTOMATIC_TOTALS;
-  return picked.filter((field) => offeredTotals.value.includes(field));
-});
-
-function toggleTotal(field: TotalsField): void {
-  const picked = pickedTotals.value;
-  const next = picked.includes(field) ? picked.filter((f) => f !== field) : [...picked, field];
-  if (next.length > 0) set('totals-fields', next.join(','));
-}
-
 /** A setting's value in words, for its row: "30 s", "Day", "Activities, Kilometers". */
 function valueText(setting: SettingDefinition): string {
-  if (setting.name === 'totals-fields')
-    return pickedTotals.value.map((field) => TOTALS_LABELS[field]).join(', ');
   if (setting.kind.type === 'number') return sliderValue(setting);
   return choiceLabel(setting.name, String(value(setting)));
 }
@@ -259,31 +193,6 @@ function valueText(setting: SettingDefinition): string {
                 />
                 <span>{{ value(setting) === true ? 'On' : 'Off' }}</span>
               </label>
-
-              <!-- The totals card's values, in the order picked. -->
-              <div v-else-if="setting.name === 'totals-fields'" class="chips">
-                <button
-                  v-for="field in offeredTotals"
-                  :key="field"
-                  type="button"
-                  class="chip"
-                  :aria-pressed="pickedTotals.includes(field)"
-                  @click="toggleTotal(field)"
-                >
-                  <span v-if="pickedTotals.includes(field)" class="order">{{
-                    pickedTotals.indexOf(field) + 1
-                  }}</span>
-                  {{ TOTALS_LABELS[field] }}
-                </button>
-                <button
-                  v-if="adjustments['totals-fields'] !== undefined"
-                  type="button"
-                  class="link"
-                  @click="set('totals-fields', undefined)"
-                >
-                  Use automatic totals
-                </button>
-              </div>
 
               <p v-if="settingHint(setting.name, count)" class="hint muted">
                 {{ settingHint(setting.name, count) }}

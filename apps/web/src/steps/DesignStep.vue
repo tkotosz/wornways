@@ -13,6 +13,7 @@
 // a sheet (Overlay has its tools on the picture instead); the sections along the bottom.
 import {
   METRICS,
+  TOTALS_FIELDS,
   parseWidgets,
   widgetsText,
   type Metric,
@@ -36,7 +37,7 @@ import WidgetEditor from '../components/WidgetEditor.vue';
 import WidgetList from '../components/WidgetList.vue';
 import WidgetSettings from '../components/WidgetSettings.vue';
 import type { EngineClient } from '../engine-client.ts';
-import type { PlanReport, Poster } from '../messages.ts';
+import type { PlanReport, Poster, PosterScene } from '../messages.ts';
 
 const props = defineProps<{
   engine: EngineClient;
@@ -71,6 +72,7 @@ const controls = ref<HTMLElement | null>(null);
 function open(id: Section): void {
   section.value = id;
   sheet.value = null;
+  selectedWidget.value = null;
   window.scrollTo({ top: 0 });
   controls.value?.scrollTo({ left: 0 });
 }
@@ -82,8 +84,8 @@ function openSetting(name: string, label: string): void {
   sheet.value = { name, label };
 }
 
-// Overlay: the widgets, arranged on the still (WidgetEditor) with the tools on it; on wide
-// screens also listed beside it.
+// Overlay and Ending: widgets arranged on the still (WidgetEditor) with the tools on it, over
+// the replay or on the totals card; on wide screens also listed beside it.
 /**
  * What the last still of the replay told: its widgets, the values the video can show and the
  * climb profile's shape, for drawing the widgets over the bare still.
@@ -93,30 +95,52 @@ const drawn = ref<{
   values: Map<Metric, MetricValue>;
   profile: number[] | null;
 } | null>(null);
-function onDrawn(poster: Poster): void {
+/** What the still of the ending told of the totals card; null when the video has none. */
+const drawnTotals = ref<{ widgets: Widget[]; values: Map<Metric, MetricValue> } | null>(null);
+function onDrawn(poster: Poster, scene: PosterScene): void {
   drawn.value = {
     widgets: poster.widgets,
     values: new Map(poster.values),
     profile: poster.profile,
   };
+  if (scene === 'ending')
+    drawnTotals.value = poster.totals
+      ? { widgets: poster.totals.widgets, values: new Map(poster.totals.values) }
+      : null;
 }
-/** The widgets as set, else the ones the still drew from the title and metrics settings. */
+/** Where the widgets being arranged are: over the replay, on the totals card, or nowhere. */
+const board = computed<'overlay' | 'totals' | null>(() =>
+  section.value === 'overlay'
+    ? 'overlay'
+    : section.value === 'ending' && drawnTotals.value
+      ? 'totals'
+      : null,
+);
+/** The setting that holds the widgets of the board. */
+const widgetSetting = computed(() => (board.value === 'totals' ? 'totals-widgets' : 'widgets'));
+/** The widgets as set, else the ones the still drew when none are. */
 const widgets = computed<Widget[]>(() => {
-  const set = adjustments.value['widgets'];
-  if (typeof set !== 'string') return drawn.value?.widgets ?? [];
+  const totals = board.value === 'totals';
+  const set = adjustments.value[widgetSetting.value];
+  if (typeof set !== 'string')
+    return (totals ? drawnTotals.value?.widgets : drawn.value?.widgets) ?? [];
   try {
-    return parseWidgets(set, METRICS);
+    return totals ? parseWidgets(set, TOTALS_FIELDS, { chart: false }) : parseWidgets(set, METRICS);
   } catch {
     return [];
   }
 });
-const values = computed(() => drawn.value?.values ?? new Map<Metric, MetricValue>());
+const values = computed(
+  () =>
+    (board.value === 'totals' ? drawnTotals.value?.values : drawn.value?.values) ??
+    new Map<Metric, MetricValue>(),
+);
 const title = computed(() => props.plan?.title ?? '');
 /** The widget picked on the still or in the list. */
 const selectedWidget = ref<number | null>(null);
 
 function setWidgets(list: Widget[]): void {
-  adjustments.value = { ...adjustments.value, widgets: widgetsText(list) };
+  adjustments.value = { ...adjustments.value, [widgetSetting.value]: widgetsText(list) };
 }
 
 function openWidget(index: number): void {
@@ -184,11 +208,15 @@ function writeText(text: string): void {
 
 /** The tools on the picture: what they show (see WidgetEditor), and what they do. */
 const watermark = computed(() => adjustments.value['watermark'] !== false);
-const toolState = computed(() => ({
-  chartOffered: !!props.plan?.hasElevation,
-  chart: widgets.value.some((widget) => widget.kind === 'elevation-chart'),
-  mark: watermark.value,
-}));
+const toolState = computed(() =>
+  board.value === 'totals'
+    ? { chartOffered: false, chart: false, mark: null }
+    : {
+        chartOffered: !!props.plan?.hasElevation,
+        chart: widgets.value.some((widget) => widget.kind === 'elevation-chart'),
+        mark: watermark.value,
+      },
+);
 
 function useTool(tool: 'text' | 'values' | 'chart' | 'mark'): void {
   if (tool === 'text') {
@@ -226,13 +254,13 @@ function useTool(tool: 'text' | 'values' | 'chart' | 'mark'): void {
           :seconds="plan?.seconds"
           :scene="section === 'ending' ? 'ending' : 'replay'"
           :editing="section === 'overlay' || section === 'ending'"
-          :hide-play="section === 'overlay' && selectedWidget !== null"
-          :bare="section === 'overlay'"
+          :hide-play="board !== null && selectedWidget !== null"
+          :bare="section === 'overlay' || section === 'ending'"
           @drawn="onDrawn"
         >
           <template #layer="{ size }">
             <WidgetEditor
-              v-if="section === 'overlay'"
+              v-if="board"
               v-model:selected="selectedWidget"
               :widgets="widgets"
               :values="values"
@@ -240,6 +268,7 @@ function useTool(tool: 'text' | 'values' | 'chart' | 'mark'): void {
               :profile="drawn?.profile ?? null"
               :size="size"
               :tools="toolState"
+              :card="board === 'totals'"
               @change="setWidgets"
               @edit="editingText = $event"
               @tool="useTool"
@@ -349,13 +378,13 @@ function useTool(tool: 'text' | 'values' | 'chart' | 'mark'): void {
             :seconds="plan?.seconds"
             :scene="section === 'ending' ? 'ending' : 'replay'"
             :editing="section === 'overlay' || section === 'ending'"
-            :hide-play="section === 'overlay' && selectedWidget !== null"
-            :bare="section === 'overlay'"
+            :hide-play="board !== null && selectedWidget !== null"
+            :bare="section === 'overlay' || section === 'ending'"
             @drawn="onDrawn"
           >
             <template #layer="{ size }">
               <WidgetEditor
-                v-if="section === 'overlay'"
+                v-if="board"
                 v-model:selected="selectedWidget"
                 :widgets="widgets"
                 :values="values"
@@ -363,6 +392,7 @@ function useTool(tool: 'text' | 'values' | 'chart' | 'mark'): void {
                 :profile="drawn?.profile ?? null"
                 :size="size"
                 :tools="toolState"
+                :card="board === 'totals'"
                 @change="setWidgets"
                 @edit="editingText = $event"
                 @tool="useTool"
@@ -380,7 +410,7 @@ function useTool(tool: 'text' | 'values' | 'chart' | 'mark'): void {
           />
           <template v-else>
             <WidgetList
-              v-if="section === 'overlay'"
+              v-if="board"
               class="widget-panel"
               :widgets="widgets"
               :values="values"
@@ -417,7 +447,7 @@ function useTool(tool: 'text' | 'values' | 'chart' | 'mark'): void {
       :values-only="sheet.name === 'values'"
       :widgets="widgets"
       :values="values"
-      :has-elevation="!!plan?.hasElevation"
+      :has-elevation="board === 'overlay' && !!plan?.hasElevation"
       :has-calories="!!plan?.hasCalories"
       @add="addWidget"
     />

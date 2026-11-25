@@ -32,7 +32,8 @@ export function previewSize(frame: { width: number; height: number }) {
  * Draws a still of the video the settings describe, at preview size, as a PNG: its last
  * frame, or for the ending the finished totals card over it when the video has one, else the
  * finished end card, else the last frame. With it come the widgets drawn, where each was
- * drawn on the last frame, and each value the video can show, for arranging them.
+ * drawn on the last frame, and each value the video can show, for arranging them; for the
+ * ending, also the totals card's widgets and values when it shows.
  */
 export async function makePoster(
   library: Track[],
@@ -56,7 +57,8 @@ export async function makePoster(
     size,
     // The replay's last frame: the finished picture, not the end card after it.
     lastFrameOnly: true,
-    hideWidgets: bare,
+    hideWidgets: bare && scene === 'replay',
+    hideTotalsWidgets: bare,
   });
   if (signal.aborted) throw new Canceled();
 
@@ -66,11 +68,10 @@ export async function makePoster(
   if (signal.aborted) throw new Canceled();
   renderer.renderFrame(last);
   const boxes = scene === 'replay' ? renderer.overlayBoxes() : { widgets: [] };
-  if (scene === 'ending') {
-    // The totals card is for several activities only, as in the video.
-    if (settings.totalsCard && selection.tracks.length > 1) renderer.drawFinishedCard('totals');
-    else if (settings.endCard) renderer.drawFinishedCard('end');
-  }
+  // The totals card is for several activities only, as in the video.
+  const totalsCard = scene === 'ending' && settings.totalsCard && selection.tracks.length > 1;
+  if (totalsCard) renderer.drawFinishedCard('totals');
+  else if (scene === 'ending' && settings.endCard) renderer.drawFinishedCard('end');
   const image = await (renderer.canvas as unknown as OffscreenCanvas).convertToBlob({
     type: 'image/png',
   });
@@ -80,5 +81,8 @@ export async function makePoster(
     widgets: renderer.widgets,
     values: [...renderer.finalValues],
     profile: renderer.profileShape(120),
+    totals: totalsCard
+      ? (({ widgets, values }) => ({ widgets, values: [...values] }))(renderer.totalsCard())
+      : null,
   };
 }

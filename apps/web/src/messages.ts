@@ -165,6 +165,8 @@ export type Poster = {
   values: [Metric, MetricValue][];
   /** The climb profile's shape, heights from 0 to 1; null without recorded elevation. */
   profile: number[] | null;
+  /** For the ending, when the totals card shows: its widgets and each total it can show. */
+  totals: { widgets: Widget[]; values: [Metric, MetricValue][] } | null;
 };
 
 export type PlanReport = {

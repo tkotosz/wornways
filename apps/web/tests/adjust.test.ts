@@ -89,7 +89,7 @@ describe('the settings offered', () => {
     expect(names('end-card')).toEqual(['end-card']);
     expect(names('camera')).toEqual(['camera']);
     expect(names('map')).toEqual(['map']);
-    expect(names('totals')).toEqual(['totals-card', 'totals-fields']);
+    expect(names('totals')).toEqual(['totals-card']);
   });
 
   it('calls the video length its duration', () => {

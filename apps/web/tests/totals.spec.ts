@@ -52,7 +52,10 @@ test('turns the totals card on for Recap, and leaves the switch to the person', 
   await expect(totals).not.toBeChecked();
 });
 
-test('picks the totals card values and their order', async ({ page, context }) => {
+test('arranges the totals card as widgets: the title and the totals, then more', async ({
+  page,
+  context,
+}) => {
   page.setDefaultTimeout(15_000);
   await offlineMap(context);
   await page.goto('/');
@@ -60,69 +63,47 @@ test('picks the totals card values and their order', async ({ page, context }) =
   await page.getByRole('button', { name: 'Continue' }).click(); // to Activities
   await pickPeriod(page);
   await page.getByRole('button', { name: 'Continue' }).click(); // to Design
-  await chooseStyle(page);
-  await openSection(page, 'Playback');
-  await page
-    .getByRole('radiogroup', { name: 'Preset' })
-    .getByRole('radio', { name: /Recap/ })
-    .click();
+  await chooseStyle(page, 'Recap');
   await openSection(page, 'Ending');
 
-  const group = page.getByTestId('group-totals');
-  const chip = (name: string) => group.getByRole('button', { name: new RegExp(`${name}$`) });
-  const picked = () =>
-    group.locator('.chip[aria-pressed="true"]').evaluateAll((chips) =>
-      chips
-        .map(
-          (c) =>
-            [
-              Number(c.querySelector('.order')?.textContent),
-              c.textContent!.replace(/^\s*\d+\s*/, '').trim(),
-            ] as const,
-        )
-        .sort((a, b) => a[0] - b[0])
-        .map(([, name]) => name),
-    );
+  // The card starts with the title over activities, kilometers, hours moving and meters
+  // climbed (the demo activities have heights), drawn by the page over the bare card.
+  const onCard = page.locator('[data-widget]');
+  await expect(onCard).toHaveCount(5);
+  await expect(page.getByTestId('widget-0')).toContainText('2026');
+  await expect(page.getByTestId('widget-1')).toContainText('25');
+  await expect(page.getByTestId('widget-1')).toContainText('activities');
+  await expect(page.getByTestId('widget-4')).toContainText('m climbed');
 
-  // Automatic: all four, in the usual order.
-  await expect.poll(picked).toEqual(['Activities', 'Kilometers', 'Hours moving', 'Meters climbed']);
-  await expect(group.getByRole('button', { name: 'Use automatic totals' })).toHaveCount(0);
+  // Its tools add a text or a total; there is no chart and no watermark on the card.
+  await expect(page.getByRole('button', { name: 'Show the elevation chart' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Show the watermark' })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Add a value' }).click();
+  const totals = page.getByRole('dialog', { name: 'Values' });
+  await expect(totals.getByRole('button', { name: / Distance$/ })).toBeDisabled();
+  await totals.getByRole('button', { name: / Days out$/ }).click();
+  await expect(onCard).toHaveCount(6);
+  await expect(page.getByTestId('widget-5')).toContainText('days out');
+  await page.getByRole('button', { name: 'Add a text' }).click();
+  await page.keyboard.type('What a spring');
+  await page.keyboard.press('Enter');
+  await expect(onCard).toHaveCount(7);
+  await expect(page.getByTestId('widget-6')).toContainText('What a spring');
 
-  // Unpicking renumbers the rest; picking again puts it last.
-  await chip('Activities').click();
-  await expect.poll(picked).toEqual(['Kilometers', 'Hours moving', 'Meters climbed']);
-  await chip('Activities').click();
-  await expect.poll(picked).toEqual(['Kilometers', 'Hours moving', 'Meters climbed', 'Activities']);
-  // The last one picked cannot be unpicked.
-  for (const name of ['Kilometers', 'Hours moving', 'Meters climbed']) await chip(name).click();
-  await expect.poll(picked).toEqual(['Activities']);
-  await chip('Activities').click();
-  await expect.poll(picked).toEqual(['Activities']);
+  // A picked one moves and goes with the keyboard, as over the replay.
+  const before = (await page.getByTestId('widget-1').boundingBox())!;
+  await page.getByTestId('widget-1').focus();
+  await page.keyboard.press('ArrowRight');
+  await expect
+    .poll(async () => (await page.getByTestId('widget-1').boundingBox())!.x)
+    .toBeGreaterThan(before.x);
+  await page.keyboard.press('Delete');
+  await expect(onCard).toHaveCount(6);
+  await expect(page.getByTestId('widget-1')).not.toContainText('activities');
 
-  // Every other total is offered too (the demo activities have heights).
-  for (const name of [
-    'Hours in total',
-    'Meters descended',
-    'Highest point',
-    'Average pace',
-    'Top speed',
-    'Dates',
-    'Days out',
-    'Longest activity',
-  ])
-    await expect(chip(name)).toHaveAttribute('aria-pressed', 'false');
-  // The pace and the dates are offered too, after the usual four.
-  await chip('Dates').click();
-  await chip('Average pace').click();
-  await expect.poll(picked).toEqual(['Activities', 'Dates', 'Average pace']);
-
-  // Back to automatic.
-  await group.getByRole('button', { name: 'Use automatic totals' }).click();
-  await expect.poll(picked).toEqual(['Activities', 'Kilometers', 'Hours moving', 'Meters climbed']);
-
-  // Switched off, the card's values hide.
-  await group.getByRole('switch', { name: 'Totals card' }).click();
-  await expect(chip('Activities')).toHaveCount(0);
+  // Switched off, the card and its widgets go.
+  await page.getByTestId('group-totals').getByRole('switch', { name: 'Totals card' }).click();
+  await expect(onCard).toHaveCount(0);
 });
 
 test('offers the totals card for several activities only', async ({ page, context }) => {

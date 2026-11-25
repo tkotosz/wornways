@@ -276,5 +276,8 @@ function showsCalories(settings: RenderSettings): boolean {
   const overReplay = settings.widgets
     ? settings.widgets.some((widget) => widget.kind === 'metric' && widget.metric === 'calories')
     : settings.metrics && !!settings.metricsFields?.includes('calories');
-  return overReplay || (settings.totalsCard && !!settings.totalsFields?.includes('calories'));
+  const onCard = (settings.totalsWidgets ?? []).some(
+    (widget) => widget.kind === 'metric' && widget.metric === 'calories',
+  );
+  return overReplay || (settings.totalsCard && onCard);
 }
