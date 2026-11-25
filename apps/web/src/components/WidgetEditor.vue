@@ -7,7 +7,8 @@
 // A tap picks a widget: the one under the finger, else the nearest within a finger's reach, so
 // a fingertip need not land on a small widget exactly. A picked one has an outline and a
 // corner handle. Dragging moves it, centered on where it is let go; it snaps to the frame's
-// center lines and in line with the other widgets' edges and middles, with a line shown, and
+// center lines and in line with the other widgets (their edges, and across their middles),
+// with a line shown, and
 // while it is dragged a bin shows at the bottom, where letting go removes it. Two fingers, or
 // the corner handle, resize it. A tap on a picked text widget asks for its text
 // (`edit`). The keyboard moves a picked widget with the arrow keys, resizes it with + and -,
@@ -80,17 +81,21 @@ const chartPath = computed(() => {
 /** How near a line, in pixels on the screen, a widget's edge or middle snaps to it. */
 const SNAP_PX = 7;
 
-/** A widget's outline on the screen, in percent of the frame: its edges and its middle. */
-type Edges = { x: [number, number, number]; y: [number, number, number] };
+/**
+ * What of a widget's outline others line up with, in percent of the frame: across its left
+ * edge, middle and right edge (for columns); down its top and bottom (for rows), not its
+ * middle, which falls between a value's number and its words.
+ */
+type Edges = { x: number[]; y: number[] };
 
 /**
- * Where the moving widget snaps, along one direction: of its edges and middle (`own`, as
- * offsets from its point), the one nearest a line within `reach`; the shift that puts it on
- * the line, and the line. Lines: the frame's middle, and the other widgets' edges and middles.
+ * Where the moving widget snaps, along one direction: of its own snap points (`own`, as
+ * offsets from its point, see `Edges`), the one nearest a line within `reach`; the shift that
+ * puts it on the line, and the line.
  */
 function snapTo(
   at: number,
-  own: [number, number, number],
+  own: number[],
   lines: number[],
   reach: number,
 ): { shift: number; line: number } | null {
@@ -164,14 +169,14 @@ function start(event: PointerEvent, index: number, resize: boolean): void {
     const y = (px: number) => ((px - area.top) / area.height) * 100;
     return {
       x: [x(box.left), x((box.left + box.right) / 2), x(box.right)],
-      y: [y(box.top), y((box.top + box.bottom) / 2), y(box.bottom)],
+      y: [y(box.top), y(box.bottom)],
     };
   };
   const elements = [...surface.querySelectorAll<HTMLElement>('[data-widget]')];
   const mine = elements.find((element) => Number(element.dataset.widget) === index);
-  const own = mine ? edgesOf(mine) : { x: [0, 0, 0], y: [0, 0, 0] };
-  const ownX = own.x.map((edge) => edge - widget.x) as [number, number, number];
-  const ownY = own.y.map((edge) => edge - widget.y) as [number, number, number];
+  const own = mine ? edgesOf(mine) : { x: [0], y: [0] };
+  const ownX = own.x.map((edge) => edge - widget.x);
+  const ownY = own.y.map((edge) => edge - widget.y);
   const others = elements.filter((element) => element !== mine).map(edgesOf);
   const linesX = others.flatMap((edges) => edges.x);
   const linesY = others.flatMap((edges) => edges.y);
@@ -206,8 +211,8 @@ function start(event: PointerEvent, index: number, resize: boolean): void {
     let x = Math.min(100, Math.max(0, widget.x + ((e.clientX - x0) / area.width) * 100));
     let y = Math.min(100, Math.max(0, widget.y + ((e.clientY - y0) / area.height) * 100));
     // Onto the frame's middle first, else in line with another widget's edge or middle.
-    const across = snapTo(x, [0, 0, 0], [50], reachX) ?? snapTo(x, ownX, linesX, reachX);
-    const down = snapTo(y, [0, 0, 0], [50], reachY) ?? snapTo(y, ownY, linesY, reachY);
+    const across = snapTo(x, [0], [50], reachX) ?? snapTo(x, ownX, linesX, reachX);
+    const down = snapTo(y, [0], [50], reachY) ?? snapTo(y, ownY, linesY, reachY);
     if (across) x += across.shift;
     if (down) y += down.shift;
     snap.value = { x: across?.line ?? null, y: down?.line ?? null };
