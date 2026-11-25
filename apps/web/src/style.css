@@ -150,3 +150,49 @@ button.link {
   clip-path: inset(50%);
   white-space: nowrap;
 }
+
+/* Phones: a list of settings, a row each: its name at the left, its value at the right (cut
+   short with … when long). A row opens its setting; a switch turns in place. */
+.setting-rows {
+  display: flex;
+  flex-direction: column;
+}
+
+.setting-rows-title {
+  margin: 0.8rem 0 0.1rem;
+  color: var(--muted);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.setting-rows-title:first-child {
+  margin-top: 0.2rem;
+}
+
+.setting-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  min-height: 2.9rem;
+  padding: 0;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  color: var(--text);
+  background: none;
+  font: inherit;
+  text-align: left;
+}
+
+.setting-row .value {
+  overflow: hidden;
+  color: var(--muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.setting-row .value::after {
+  content: ' ›';
+}

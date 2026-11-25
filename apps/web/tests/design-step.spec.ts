@@ -43,7 +43,7 @@ test('opens any section of the Design step from its bar, and leaves the step fro
 test.describe('the Design step on a phone', () => {
   test.use({ viewport: { width: 390, height: 780 }, isMobile: true, hasTouch: true });
 
-  test('is an editor screen: the preview, a panel of settings and the sections below', async ({
+  test('is an editor screen: the preview, a list of settings and the sections below', async ({
     page,
     context,
   }) => {
@@ -61,8 +61,8 @@ test.describe('the Design step on a phone', () => {
     const preview = page.getByTestId('preview').getByRole('img');
     const sections = page.getByRole('navigation', { name: 'Sections' });
     await expect(preview).toBeVisible();
-    for (const item of [preview, sections, page.getByRole('group', { name: 'Aspect ratio' })])
-      await expect(item).toBeInViewport({ ratio: 1 });
+    const shape = page.getByRole('button', { name: 'Shape: Story 9:16' });
+    for (const item of [preview, sections, shape]) await expect(item).toBeInViewport({ ratio: 1 });
     // The preview above the settings, the sections along the bottom, nothing to scroll.
     const previewBox = (await preview.boundingBox())!;
     const sectionsBox = (await sections.boundingBox())!;
@@ -72,40 +72,35 @@ test.describe('the Design step on a phone', () => {
       page.evaluate(() => document.documentElement.scrollHeight > window.innerHeight);
     expect(await pageScrolls()).toBe(false);
 
-    // A section's groups are tabs: Overlay opens on Title, and Metrics shows its own.
+    // The settings are a list with their values; a row opens its setting in a sheet, where
+    // a change shows in the list at once.
+    await shape.click();
+    const sheet = page.getByRole('dialog', { name: 'Shape' });
+    await sheet.getByRole('button', { name: 'Square 1:1' }).click();
+    await sheet.getByRole('button', { name: 'Done' }).click();
+    await expect(sheet).toBeHidden();
+    await expect(page.getByRole('button', { name: 'Shape: Square 1:1' })).toBeVisible();
+
+    // A choice alone shows its explanation; the lists of values pick in order.
+    await openSection(page, 'Playback');
+    await page.getByRole('button', { name: /^Grouping: / }).click();
+    const grouping = page.getByRole('dialog', { name: 'Grouping' });
+    await expect(grouping).toContainText('Which activities play together');
+    await grouping.getByRole('button', { name: 'Day', exact: true }).click();
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('button', { name: 'Grouping: Day' })).toBeVisible();
     await openSection(page, 'Overlay');
     await expectSection(page, 'Overlay');
-    const tabs = page.getByRole('navigation', { name: 'Overlay settings' });
-    await expect(tabs.getByRole('button', { name: 'Title' })).toHaveAttribute(
-      'aria-current',
-      'true',
-    );
-    await expect(page.getByRole('textbox', { name: 'Title' })).toBeVisible();
-    await tabs.getByRole('button', { name: 'Metrics' }).click();
-    await expect(page.getByRole('textbox', { name: 'Title' })).toHaveCount(0);
+    await page.getByRole('button', { name: /^Metrics: / }).click();
+    const values = page.getByRole('dialog', { name: 'Metrics' });
+    await values.getByRole('button', { name: 'Pace' }).click();
+    await values.getByRole('button', { name: 'Done' }).click();
+    await expect(page.getByRole('button', { name: /^Metrics: .*Pace$/ })).toBeVisible();
+
+    // A switch turns in place, and a group switched off keeps only its switch.
+    await page.getByRole('switch', { name: 'Show title' }).click();
+    await expect(page.getByRole('button', { name: /^Text: / })).toHaveCount(0);
     expect(await pageScrolls()).toBe(false);
-
-    // The values to show open in a dialog; picking one adds it to the line.
-    await page.getByRole('button', { name: 'Edit ›' }).click();
-    const dialog = page.getByRole('dialog', { name: 'Values on the video' });
-    await dialog.getByRole('button', { name: 'Pace' }).click();
-    await dialog.getByRole('button', { name: 'Close' }).click();
-    await expect(page.getByTestId('group-metrics')).toContainText('Pace');
-
-    // An explanation opens from its i.
-    await expect(page.getByText('In the order picked')).toHaveCount(0);
-    await page.getByRole('button', { name: 'About metrics' }).click();
-    await expect(page.getByText('In the order picked')).toBeVisible();
-
-    // Each section keeps its tab; Playback's are its parts.
-    await openSection(page, 'Playback');
-    await page.getByRole('button', { name: 'Timing' }).click();
-    await expect(page.getByRole('group', { name: 'Grouping' })).toBeVisible();
-    await openSection(page, 'Overlay');
-    await expect(tabs.getByRole('button', { name: 'Metrics' })).toHaveAttribute(
-      'aria-current',
-      'true',
-    );
 
     // The top bar leaves the step either way.
     await page.getByRole('button', { name: 'Continue to Export →' }).click();
