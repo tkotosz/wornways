@@ -71,6 +71,8 @@ export class StravaSession {
   private readonly lifetime = new AbortController();
   private readonly activities: RemoteActivities;
   private readonly browserCache: StravaCache<StravaActivity>;
+  /** Calories fetched this session, null where Strava has none. */
+  private readonly caloriesById = new Map<string, number | null>();
 
   readonly loadTiles = sessionTileLoader(this.signal);
 
@@ -177,6 +179,52 @@ export class StravaSession {
 
   selected(ids: string[]): Promise<Track[]> {
     return this.activities.selected(ids);
+  }
+
+  /**
+   * The tracks with their calories, which only Strava's detailed activity has: one more
+   * request per activity, so they are fetched only for a video that shows them, a few at a
+   * time, and kept like the tracks. A track Strava has no calories for stays without.
+   */
+  async withCalories(tracks: Track[], signal: AbortSignal): Promise<Track[]> {
+    const out = [...tracks];
+    let next = 0;
+    const worker = async () => {
+      while (next < out.length) {
+        const index = next++;
+        const track = out[index]!;
+        if (track.calories !== undefined) continue;
+        const calories = await this.calories(track.id, signal);
+        if (calories !== null) out[index] = { ...track, calories };
+      }
+    };
+    try {
+      await Promise.all(Array.from({ length: TRACK_REQUESTS }, worker));
+    } catch (error) {
+      if (error instanceof StravaError && !(error instanceof StravaExpired) && !signal.aborted)
+        throw new StravaError(
+          `${error.message} Calories take one more request per activity; leave them out to make the video now.`,
+        );
+      throw error;
+    }
+    return out;
+  }
+
+  private async calories(id: string, signal: AbortSignal): Promise<number | null> {
+    const known = this.caloriesById.get(id);
+    if (known !== undefined) return known;
+    const version = this.activities.row(id)?.version ?? '';
+    let calories = await this.browserCache.calories(id, version);
+    signal.throwIfAborted();
+    if (calories === undefined) {
+      const res = await this.get(new URLSearchParams({ calories: id }), signal, true);
+      const body = res.status === 404 ? null : ((await res.json()) as { calories?: unknown });
+      calories = typeof body?.calories === 'number' ? body.calories : null;
+      signal.throwIfAborted();
+      await this.browserCache.saveCalories(id, version, calories);
+    }
+    this.caloriesById.set(id, calories);
+    return calories;
   }
 
   /** The activities whose tracks this device keeps for the session, newest first. */

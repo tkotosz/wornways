@@ -193,6 +193,11 @@ export class RemoteActivities {
     for (const id of ids) this.tracks.delete(id);
   }
 
+  /** The listed activity with this id, with its version. */
+  row(id: string): RemoteActivity | undefined {
+    return this.activities.get(id);
+  }
+
   async selected(ids: string[]): Promise<Track[]> {
     const tracks = await Promise.all(ids.map((id) => this.tracks.get(id)));
     this.signal.throwIfAborted();

@@ -16,7 +16,15 @@ import {
 import type { PlanReport } from '../messages.ts';
 import { VideoProblem, problemText } from './video.ts';
 
-export function planVideo(library: Track[], input: SettingsInput): PlanReport {
+/**
+ * The plan for a video of these activities. `caloriesOnRequest`: the calories can be fetched
+ * when a video shows them (Strava), so they are offered before any is known.
+ */
+export function planVideo(
+  library: Track[],
+  input: SettingsInput,
+  caloriesOnRequest = false,
+): PlanReport {
   const settings = parseSettings(input);
   const selection = selectTracks(library, settings);
   if (selection.problem) throw new VideoProblem(problemText(selection.problem, settings));
@@ -32,7 +40,8 @@ export function planVideo(library: Track[], input: SettingsInput): PlanReport {
     sensors: SENSOR_CHANNELS.filter((channel) =>
       selection.tracks.some((track) => recorded(track.sensors, channel)),
     ),
-    hasCalories: selection.tracks.some((track) => track.calories !== undefined),
+    hasCalories:
+      caloriesOnRequest || selection.tracks.some((track) => track.calories !== undefined),
     seconds: plan.timeline.duration,
     groups: plan.groups ?? null,
     realPace: settings.groupPace === 'real',

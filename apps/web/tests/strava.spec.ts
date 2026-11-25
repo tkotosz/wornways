@@ -28,6 +28,7 @@ async function fakeStrava(
   const cookie = 'strava-test-session=1';
   const attributes = '; Path=/api/strava; Secure; HttpOnly; SameSite=Strict';
   const tracks: string[] = [];
+  const calories: string[] = [];
   const periods: number[] = [];
   const directApiRequests: string[] = [];
   const disconnects: boolean[] = [];
@@ -89,6 +90,11 @@ async function fakeStrava(
     if (!signedIn || sessionId !== grant.sessionId || expiredAccess)
       return route.fulfill({ status: 401 });
 
+    const caloriesOf = url.searchParams.get('calories');
+    if (caloriesOf !== null) {
+      calories.push(caloriesOf);
+      return route.fulfill({ json: { calories: caloriesOf === rideId ? 652 : null } });
+    }
     const id = url.searchParams.get('activity');
     if (id === null) {
       const after = Number(url.searchParams.get('after'));
@@ -175,6 +181,7 @@ async function fakeStrava(
     connections: () => connections,
     periods,
     tracks,
+    calories,
     directApiRequests,
     disconnects,
     expireAccess: () => {
@@ -340,6 +347,40 @@ test('shows a slow track download in a dialog that can be canceled', async ({ pa
   } finally {
     releaseTrack();
   }
+});
+
+test('fetches calories only for a video that shows them, and keeps them', async ({ page }) => {
+  const mock = await fakeStrava(page);
+  await page.goto('/');
+  await connect(page);
+  await page.getByRole('button', { name: 'Last year', exact: true }).click();
+  await page.getByRole('checkbox', { name: 'Strava test ride' }).check();
+  await page.getByRole('button', { name: 'Continue' }).click();
+  await page.getByRole('button', { name: 'Continue' }).click(); // to Appearance
+  await expect(page.getByRole('heading', { name: 'Make it yours' })).toBeVisible();
+
+  // Offered before any is known, and not asked for until picked.
+  const caloriesChip = page
+    .getByTestId('group-metrics')
+    .getByRole('button', { name: /^(\d+ )?Calories$/ });
+  await expect(caloriesChip).toHaveAttribute('aria-pressed', 'false');
+  expect(mock.calories).toEqual([]);
+  await caloriesChip.click();
+  await expect(caloriesChip).toHaveAttribute('aria-pressed', 'true');
+  await expect.poll(() => mock.calories).toEqual([rideId]);
+
+  // Kept: going back and forth, and after a reload, Strava is not asked again.
+  await page.getByRole('button', { name: 'Playback', exact: true }).click();
+  await page.getByRole('button', { name: 'Appearance', exact: true }).click();
+  await page.reload();
+  await expect(page.getByRole('checkbox', { name: 'Strava test ride' })).toBeChecked();
+  await page.getByRole('button', { name: 'Continue' }).click();
+  await page.getByRole('button', { name: 'Continue' }).click();
+  await expect(caloriesChip).toHaveAttribute('aria-pressed', 'true');
+  await expect(
+    page.getByRole('img', { name: 'Preview: the last frame of the video' }),
+  ).toBeVisible();
+  expect(mock.calories).toEqual([rideId]);
 });
 
 test('shows the tracks downloaded while Strava is the source', async ({ page }) => {
