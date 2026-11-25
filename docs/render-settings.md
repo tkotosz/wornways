@@ -150,6 +150,24 @@ to start. Races use the zoom-out camera, and so do videos whose activities are d
 less than a second each (typically a year or more), where following would jump from one
 activity to the next every few frames.
 
+### Widgets
+
+What is drawn over the replay is a list of widgets, each centered on a point of the frame
+(percent across and down) at a size (50 to 250%, 100 when left out), drawn in order:
+
+| Setting | CLI flag    | Values                                                | Default                                                |
+| ------- | ----------- | ----------------------------------------------------- | ------------------------------------------------------ |
+| Widgets | `--widgets` | `name@x,y,size` items separated by `;`; `""` for none | made from the title, metrics card and profile settings |
+
+A name is `text` (with its own text as `text:"Mallorca"`, else the title), any value of the
+metrics card below (its number with a few words under it), or `elevation-chart`. For
+example `text@50,6;distance@25,85,120;count@60,85;elevation-chart@50,94`.
+
+Without `--widgets`, the title, metrics card and elevation profile settings below say what
+is drawn: the title where its position puts it, the first value large where the card's
+position puts it and the others smaller in a row under it, and the elevation chart along
+the bottom.
+
 ### Title
 
 | Setting        | CLI flag           | Values                                                                                                           | Default                 |

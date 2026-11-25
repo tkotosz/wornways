@@ -6,10 +6,12 @@ import {
   PRESETS,
   PRESET_NAMES,
   SETTINGS,
+  type Metric,
   type Preset,
   type SettingDefinition,
   type SettingGroup,
   type SettingsInput,
+  type Widget,
 } from '@wornways/engine';
 import type { PlanReport } from './messages.ts';
 
@@ -38,7 +40,8 @@ export const SECTIONS: { id: Section; label: string; panels: Panel[] }[] = [
   {
     id: 'overlay',
     label: 'Overlay',
-    panels: ['title', 'metrics', 'elevation', 'watermark'],
+    // The widgets are arranged on the still (WidgetEditor) and listed above the watermark.
+    panels: ['watermark'],
   },
   {
     id: 'ending',
@@ -198,26 +201,7 @@ const LABELS: Record<string, string> = {
   duration: 'Video duration',
   size: 'Size',
   map: 'Street map',
-  title: 'Text',
-  'title-position': 'Position',
-  'title-size': 'Size',
-  metrics: 'Show metrics',
-  'metrics-fields': 'Metrics',
   'totals-fields': 'Values',
-  'metrics-position': 'Position',
-  'metrics-size': 'Size',
-};
-
-const POSITION_LABELS = {
-  'top-left': 'Top left',
-  'top-center': 'Top middle',
-  'top-right': 'Top right',
-  'middle-left': 'Middle left',
-  'middle-center': 'Center',
-  'middle-right': 'Middle right',
-  'bottom-left': 'Bottom left',
-  'bottom-center': 'Bottom middle',
-  'bottom-right': 'Bottom right',
 };
 
 /** The words shown for a choice's values. */
@@ -234,8 +218,6 @@ const CHOICE_LABELS: Record<string, Record<string, string>> = {
   'group-pace': { fit: 'Fit to the group', real: 'Real pace' },
   pace: { time: 'As recorded', distance: 'Even speed' },
   camera: { zoom: 'Zooms out', fixed: 'Fixed', follow: 'Follows' },
-  'title-position': POSITION_LABELS,
-  'metrics-position': POSITION_LABELS,
 };
 
 /** One line of explanation under a few settings. */
@@ -282,8 +264,6 @@ const STEPS: Record<string, number> = {
   overlap: 10,
   'end-pause': 0.5,
   'trim-radius': 50,
-  'title-size': 10,
-  'metrics-size': 10,
 };
 
 export const settingLabel = (setting: SettingDefinition) => LABELS[setting.name] ?? setting.label;
@@ -299,17 +279,7 @@ export const sliderStep = (setting: string) => STEPS[setting] ?? 1;
 
 /** A panel of settings in the Design step's sections. */
 export type Panel =
-  | 'timing'
-  | 'camera'
-  | 'privacy'
-  | 'map'
-  | 'title'
-  | 'metrics'
-  | 'elevation'
-  | 'watermark'
-  | 'pause'
-  | 'totals'
-  | 'end-card';
+  'timing' | 'camera' | 'privacy' | 'map' | 'watermark' | 'pause' | 'totals' | 'end-card';
 
 /** The settings of each panel on the screens, in order: mostly the settings table's groups. */
 const PANELS: Record<Panel, string[]> = {
@@ -318,9 +288,6 @@ const PANELS: Record<Panel, string[]> = {
   camera: ['camera'],
   privacy: ['trim-radius'],
   map: ['map'],
-  title: ['title', 'title-position', 'title-size'],
-  metrics: ['metrics', 'metrics-fields', 'metrics-position', 'metrics-size'],
-  elevation: ['elevation-profile'],
   watermark: ['watermark'],
   pause: ['end-pause'],
   totals: ['totals-card', 'totals-fields'],
@@ -328,12 +295,10 @@ const PANELS: Record<Panel, string[]> = {
 };
 
 /**
- * Whether a panel has something to set for this video: the elevation profile only when an
- * activity recorded elevation, the totals card only for several activities. Until the plan
- * is known, the totals card shows; the elevation profile waits for it.
+ * Whether a panel has something to set for this video: the totals card only for several
+ * activities. Until the plan is known, the totals card shows.
  */
 export function panelOffered(panel: Panel, plan: PlanReport | null | undefined): boolean {
-  if (panel === 'elevation') return !!plan && plan.hasElevation;
   if (panel === 'totals') return !plan || plan.activities > 1;
   return true;
 }
@@ -432,3 +397,26 @@ export function saveAdjustments(adjustments: Adjustments): void {
     // Without storage the adjustments last until the page is closed.
   }
 }
+
+/** A value's name: its metric's, or a few words where the name alone would be unclear. */
+const METRIC_NAMES: Partial<Record<Metric, string>> = {
+  moving: 'Moving time',
+  'top-speed': 'Top speed',
+  start: 'Start time',
+  elevation: 'Climbed',
+  highest: 'Highest point',
+  days: 'Days out',
+  longest: 'Longest activity',
+  'heart-rate': 'Heart rate',
+  'max-heart-rate': 'Max heart rate',
+};
+export const metricName = (metric: Metric) =>
+  METRIC_NAMES[metric] ?? metric.charAt(0).toUpperCase() + metric.slice(1);
+
+/** A widget's name in the list: "Text", a value's name, or "Elevation chart". */
+export const widgetLabel = (widget: Widget) =>
+  widget.kind === 'text'
+    ? 'Text'
+    : widget.kind === 'metric'
+      ? metricName(widget.metric)
+      : 'Elevation chart';

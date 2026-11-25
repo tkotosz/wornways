@@ -365,14 +365,15 @@ test('fetches calories only for a video that shows them, and keeps them', async 
   await openSection(page, 'Overlay');
   await expectSection(page, 'Overlay');
 
-  // Offered before any is known, and not asked for until picked.
-  const caloriesChip = page
-    .getByTestId('group-metrics')
-    .getByRole('button', { name: /^(\d+ )?Calories$/ });
-  await expect(caloriesChip).toHaveAttribute('aria-pressed', 'false');
+  // Offered before any is known, and not asked for until added to the picture.
   expect(mock.calories).toEqual([]);
-  await caloriesChip.click();
-  await expect(caloriesChip).toHaveAttribute('aria-pressed', 'true');
+  await page.getByRole('button', { name: 'Add a widget' }).click();
+  await page
+    .getByRole('dialog', { name: 'Add a widget' })
+    .getByRole('button', { name: / Calories$/ })
+    .click();
+  const calories = page.getByRole('button', { name: /^Calories/ });
+  await expect(calories).toBeVisible();
   await expect.poll(() => mock.calories).toEqual([rideId]);
 
   // Kept: going back and forth, and after a reload, Strava is not asked again.
@@ -383,7 +384,7 @@ test('fetches calories only for a video that shows them, and keeps them', async 
   await page.getByRole('button', { name: 'Continue' }).click();
   await chooseStyle(page);
   await openSection(page, 'Overlay');
-  await expect(caloriesChip).toHaveAttribute('aria-pressed', 'true');
+  await expect(calories).toBeVisible();
   await expect(
     page.getByRole('img', { name: 'Preview: the last frame of the video' }),
   ).toBeVisible();

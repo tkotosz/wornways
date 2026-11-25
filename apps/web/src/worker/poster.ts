@@ -7,12 +7,11 @@ import {
   prepareReplay,
   selectTracks,
   type CanvasLike,
-  type OverlayBoxes,
   type SettingsInput,
   type TileLoader,
   type Track,
 } from '@wornways/engine';
-import type { PosterScene } from '../messages.ts';
+import type { Poster, PosterScene } from '../messages.ts';
 import { loadFont } from './font.ts';
 import { cacheStorageTileCache } from './tile-cache.ts';
 import { Canceled, VideoProblem, problemText } from './video.ts';
@@ -32,8 +31,8 @@ export function previewSize(frame: { width: number; height: number }) {
 /**
  * Draws a still of the video the settings describe, at preview size, as a PNG: its last
  * frame, or for the ending the finished totals card over it when the video has one, else the
- * finished end card, else the last frame. With the last frame come the boxes its title,
- * metrics card, profile and watermark were drawn in, for editing them on the still.
+ * finished end card, else the last frame. With it come the widgets drawn, where each was
+ * drawn on the last frame, and each value the video can show, for arranging them.
  */
 export async function makePoster(
   library: Track[],
@@ -41,7 +40,7 @@ export async function makePoster(
   signal: AbortSignal,
   loadTiles: TileLoader = createTileLoader({ cache: cacheStorageTileCache }),
   scene: PosterScene = 'replay',
-): Promise<{ image: Blob; boxes: OverlayBoxes }> {
+): Promise<Poster> {
   const settings = parseSettings(input);
   const selection = selectTracks(library, settings);
   if (selection.problem) throw new VideoProblem(problemText(selection.problem, settings));
@@ -63,7 +62,7 @@ export async function makePoster(
   renderer.skipTo(last);
   if (signal.aborted) throw new Canceled();
   renderer.renderFrame(last);
-  const boxes = scene === 'replay' ? renderer.overlayBoxes() : {};
+  const boxes = scene === 'replay' ? renderer.overlayBoxes() : { widgets: [] };
   if (scene === 'ending') {
     // The totals card is for several activities only, as in the video.
     if (settings.totalsCard && selection.tracks.length > 1) renderer.drawFinishedCard('totals');
@@ -72,5 +71,5 @@ export async function makePoster(
   const image = await (renderer.canvas as unknown as OffscreenCanvas).convertToBlob({
     type: 'image/png',
   });
-  return { image, boxes };
+  return { image, boxes, widgets: renderer.widgets, values: [...renderer.finalValues] };
 }

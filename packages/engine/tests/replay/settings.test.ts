@@ -42,6 +42,7 @@ describe('parseSettings', () => {
       metricsFields: null,
       metricsPosition: 'bottom-left',
       titlePosition: 'top-center',
+      widgets: null,
       titleSize: 100,
       metricsSize: 100,
       totalsCard: false,

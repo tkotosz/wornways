@@ -60,12 +60,8 @@ describe('adjustSettings', () => {
 describe('the settings offered', () => {
   it('puts every panel in one section, in the order things are decided', () => {
     expect(SECTIONS.map((s) => s.id)).toEqual(['frame', 'playback', 'map', 'overlay', 'ending']);
-    expect(SECTIONS.find((s) => s.id === 'overlay')!.panels).toEqual([
-      'title',
-      'metrics',
-      'elevation',
-      'watermark',
-    ]);
+    // Overlay's widgets are arranged on the still; the watermark stays a setting.
+    expect(SECTIONS.find((s) => s.id === 'overlay')!.panels).toEqual(['watermark']);
     expect(SECTIONS.find((s) => s.id === 'ending')!.panels).toEqual([
       'pause',
       'totals',
@@ -94,15 +90,6 @@ describe('the settings offered', () => {
     expect(names('camera')).toEqual(['camera']);
     expect(names('map')).toEqual(['map']);
     expect(names('totals')).toEqual(['totals-card', 'totals-fields']);
-  });
-
-  it('keeps the metrics panel to the metrics', () => {
-    expect(offered('metrics').map((s) => s.name)).toEqual([
-      'metrics',
-      'metrics-fields',
-      'metrics-position',
-      'metrics-size',
-    ]);
   });
 
   it('calls the video length its duration', () => {

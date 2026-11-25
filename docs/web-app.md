@@ -139,26 +139,30 @@ list.
      picking a card goes back to that preset.
    - **Map:** the street map, and the replay privacy that hides each route's start and
      finish.
-   - **Overlay:** what is drawn over the replay: the title (on or off, starting as the
-     automatic one; switched off, a title written stays for switching it on again), its
-     position and size, the metrics (on or off, which ones in the order picked, their
-     position and size), the elevation profile (when an activity recorded elevation; on
-     for a single activity, off for several) and the small watermark at the bottom left,
-     on the map credit's line. A position is the top, middle or bottom row, left, middle
-     or right, or a point of the frame; text in the middle or at a point gets a soft dark
-     band behind it. The title and the metrics card are also arranged on the still: each
-     has an outline over where it was drawn (the boxes the engine reports with the still),
-     with its name on a tab when picked. Dragging an outline moves the block; it lets go
-     at a point, lined up by the third of the frame it falls in, and near a named position
-     both ways (the side margins or the middle across; the top, the middle or the bottom
-     down) it snaps to it, with a line for each side it snapped to. The handle on a picked
-     block's corner resizes it, in steps of 5%. While dragging, the outline follows the
-     pointer; the still is drawn again as soon as the block is let go, without the usual
-     pause. The arrow keys move a picked block by 1% of the frame (5% with Shift), and +
-     and - resize it. On a phone, picking a block opens its tab. On a story-shaped frame,
-     while a block is picked, hatched guides show what Instagram's own controls cover
-     (Meta's ads guide: 14% at the top, 35% at the bottom, 6% at each side). A position
-     set by dragging shows as "Placed on the picture" beside the nine squares.
+   - **Overlay:** what is drawn over the replay, as widgets arranged on the still the way
+     stickers are in a story editor: text (at first the title), one value each (a metric:
+     its number large with a few words under it, "1,147 km" over "distance"), and the
+     elevation chart (when an activity recorded elevation). A video starts with the widgets
+     the title, metrics and elevation profile settings describe: the title at the top, the
+     first value large at the bottom left with the others smaller in a row under it, and,
+     for a single activity, the chart along the bottom. Each widget is centered on its point
+     of the frame, so it keeps its place while its value changes during the replay; text
+     gets a soft dark band behind it. On the still each widget has an outline over where the
+     engine drew it (the boxes it reports with the still). A tap picks one: its name on a
+     tab, × to remove it and a corner handle. Dragging moves it; it snaps to the frame's
+     center lines, with a line shown, and while it is dragged a bin shows at the bottom,
+     where letting it go removes it. Two fingers, or the corner handle, resize it (50 to
+     250%). A tap on a picked text widget opens its text. The still is drawn again as soon
+     as a widget is let go, without the usual pause. The arrow keys move a picked widget by
+     1% of the frame (5% with Shift), + and - resize it and Delete removes it. On a
+     story-shaped frame, while a widget is picked or moved, hatched guides show what
+     Instagram's own controls cover (Meta's ads guide: 14% at the top, 35% at the bottom, 6%
+     at each side). Under the picture, "+ Add a widget" opens the palette: Text, the
+     elevation chart, and each value this video can show as a tile with its own number
+     (calories a service gives on request are offered before they are known); a value
+     already on the picture is dimmed. Then a row per widget with what it shows, which opens
+     its settings: its text (or back to the title), its size and "Remove from the picture".
+     The small watermark at the bottom left, on the map credit's line, stays a switch.
    - **Ending:** what comes after the replay: the end pause on the finished picture, the
      totals card (for several activities only; on for Recap) and the end card.
 4. **Export.** A stage in the video's shape, which shows the finished picture with a "Make

@@ -3,7 +3,7 @@ import { offlineMap } from './offline-map.ts';
 import { pickSource } from './sources.ts';
 import { chooseStyle, openSection, pickPeriod } from './steps.ts';
 
-test('offers the elevation profile for a single activity with elevation', async ({
+test('starts a single activity with elevation with the elevation chart, which can be removed', async ({
   page,
   context,
 }) => {
@@ -24,19 +24,21 @@ test('offers the elevation profile for a single activity with elevation', async 
   await chooseStyle(page);
   await openSection(page, 'Overlay');
 
-  const panel = page.getByTestId('group-elevation');
-  const profile = panel.getByRole('switch', { name: 'Elevation profile' });
-  await expect(profile).toBeChecked();
-  // Switched off, the preview is drawn again without it.
+  // A single activity starts with the elevation chart on the picture.
+  const chart = page.getByRole('button', { name: 'Elevation chart', exact: true });
+  await expect(chart).toBeVisible();
+  // Removed, the preview is drawn again without it.
   const picture = page.getByTestId('preview').getByRole('img');
   await expect(picture).toBeVisible();
+  await expect(page.getByText('Drawing preview')).toHaveCount(0);
   const before = await picture.getAttribute('src');
-  await profile.click();
-  await expect(profile).not.toBeChecked();
+  await chart.click();
+  await page.getByRole('button', { name: 'Remove from the picture' }).click();
+  await expect(chart).toHaveCount(0);
   await expect(picture).not.toHaveAttribute('src', before!);
 });
 
-test('leaves the elevation profile out where there is no elevation', async ({ page, context }) => {
+test('offers no elevation chart where there is no elevation', async ({ page, context }) => {
   page.setDefaultTimeout(15_000);
   await offlineMap(context);
   // A short ride recorded without heights.
@@ -59,11 +61,15 @@ test('leaves the elevation profile out where there is no elevation', async ({ pa
   await page.getByRole('button', { name: 'Continue' }).click(); // to Design
   await chooseStyle(page);
   await openSection(page, 'Overlay');
-  await expect(page.getByTestId('group-metrics')).toBeVisible();
-  await expect(page.getByTestId('group-elevation')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: /^Time: / })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Elevation chart', exact: true })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Add a widget' }).click();
+  const add = page.getByRole('dialog', { name: 'Add a widget' });
+  await expect(add.getByRole('button', { name: 'Text' })).toBeVisible();
+  await expect(add.getByRole('button', { name: 'Elevation chart' })).toHaveCount(0);
 });
 
-test('offers the elevation profile for several activities, off until switched on', async ({
+test('starts several activities without the elevation chart, which can be added', async ({
   page,
   context,
 }) => {
@@ -83,15 +89,19 @@ test('offers the elevation profile for several activities, off until switched on
   await chooseStyle(page);
   await openSection(page, 'Overlay');
 
-  const profile = page
-    .getByTestId('group-elevation')
-    .getByRole('switch', { name: 'Elevation profile' });
-  await expect(profile).not.toBeChecked();
+  // Several activities start without the chart; added, it is drawn.
+  const chart = page.getByRole('button', { name: 'Elevation chart', exact: true });
+  await expect(page.getByRole('button', { name: /^Time: / })).toBeVisible();
+  await expect(chart).toHaveCount(0);
   const picture = page.getByTestId('preview').getByRole('img');
   await expect(picture).toBeVisible();
   await expect(page.getByText('Drawing preview')).toHaveCount(0);
   const before = await picture.getAttribute('src');
-  await profile.click();
-  await expect(profile).toBeChecked();
+  await page.getByRole('button', { name: 'Add a widget' }).click();
+  await page
+    .getByRole('dialog', { name: 'Add a widget' })
+    .getByRole('button', { name: 'Elevation chart' })
+    .click();
+  await expect(chart).toBeVisible();
   await expect(picture).not.toHaveAttribute('src', before!);
 });

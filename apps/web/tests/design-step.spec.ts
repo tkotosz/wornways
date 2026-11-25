@@ -138,15 +138,17 @@ test.describe('the Design step on a phone', () => {
     await expect(page.getByRole('button', { name: 'Grouping: Day' })).toBeVisible();
     await openSection(page, 'Overlay');
     await expectSection(page, 'Overlay');
-    await page.getByRole('button', { name: /^Metrics: / }).click();
-    const values = page.getByRole('dialog', { name: 'Metrics' });
-    await values.getByRole('button', { name: 'Pace' }).click();
-    await values.getByRole('button', { name: 'Done' }).click();
-    await expect(page.getByRole('button', { name: /^Metrics: .*Pace$/ })).toBeVisible();
-
-    // A switch turns in place, and a group switched off keeps only its switch.
-    await page.getByRole('switch', { name: 'Show title' }).click();
-    await expect(page.getByRole('button', { name: /^Text: / })).toHaveCount(0);
+    // Overlay lists the widgets; one is added from the palette, and a switch turns in place.
+    await page.getByRole('button', { name: 'Add a widget' }).click();
+    await page
+      .getByRole('dialog', { name: 'Add a widget' })
+      .getByRole('button', { name: / Pace$/ })
+      .click();
+    await expect(page.getByRole('button', { name: /^Pace: / })).toBeVisible();
+    const watermark = page.getByRole('switch', { name: 'Show watermark' });
+    await expect(watermark).toBeChecked();
+    await watermark.click();
+    await expect(watermark).not.toBeChecked();
     expect(await pageScrolls()).toBe(false);
 
     // The top bar leaves the step either way.

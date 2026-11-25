@@ -1,6 +1,7 @@
 import { drawBasemap, type Basemap, type MapLabel, type Tile } from '../map/basemap.ts';
 import { levelsFor, mapLevelViews, type CameraPath, type LevelWindow } from './camera.ts';
 import { drawElevationProfile, elevationProfile } from './elevation-profile.ts';
+import { WIDGET_SIZE, startingWidgets, type Widget } from './widgets.ts';
 import { END_CARD_S, drawEndCard, endCardFrames } from './end-card.ts';
 import {
   TOTALS_CARD_S,
@@ -175,13 +176,14 @@ export const framePointText = (point: FramePoint) =>
 /** A box of the frame, in fractions of its width and height, 0 to 1. */
 export type FrameBox = { x: number; y: number; width: number; height: number };
 
-/** Where the last frame drew each block over the replay; a block not drawn is left out. */
-export type OverlayBoxes = {
-  title?: FrameBox;
-  metrics?: FrameBox;
-  elevation?: FrameBox;
-  watermark?: FrameBox;
-};
+/**
+ * Where the last frame drew each widget over the replay, in the order of the widgets (null
+ * for one with nothing to show), and the watermark.
+ */
+export type OverlayBoxes = { widgets: (FrameBox | null)[]; watermark?: FrameBox };
+
+/** A value as a widget shows it: its number ("1,147 km") and the words under it ("distance"). */
+export type MetricValue = { value: string; label: string };
 
 export type RenderOptions = {
   width: number;
@@ -222,7 +224,14 @@ export type RenderOptions = {
    * recorded. Default: what suits the video (see `defaultMetrics`).
    */
   metrics?: Metric[];
-  /** Where the metrics card sits; default bottom-left. */
+  /**
+   * What is drawn over the replay (see widgets.ts). Without it, the widgets the title, the
+   * metrics and the elevation profile options describe: the title where `titlePosition`
+   * puts it, the first metric large and the others smaller under it where
+   * `metricsPosition` puts them, the profile along the bottom.
+   */
+  widgets?: Widget[];
+  /** Where the metrics start, without `widgets`; default bottom-left. */
   metricsPosition?: Placement;
   /** Where the title sits; default top-center. */
   titlePosition?: Placement;
@@ -285,9 +294,29 @@ export type Renderer = {
    * or the end card with its mark and name.
    */
   drawFinishedCard(card: 'totals' | 'end'): void;
-  /** Where the replay frame drawn last put the title, the metrics card, the profile and the mark. */
+  /** Where the replay frame drawn last put each widget and the watermark. */
   overlayBoxes(): OverlayBoxes;
+  /** The widgets drawn: the ones given, or the ones the other options describe. */
+  readonly widgets: Widget[];
+  /** Each value this video can show, as it stands at the end of the replay. */
+  readonly finalValues: Map<Metric, MetricValue>;
 };
+
+/** Where an activity stands, for the values: as drawn so far, or at the end. */
+type MetricState = Pick<
+  Prepared,
+  | 'date'
+  | 'hasElevation'
+  | 'started'
+  | 'done'
+  | 'metres'
+  | 'climbed'
+  | 'descended'
+  | 'highest'
+  | 'moved'
+  | 'topSpeed'
+  | 'sensorsNow'
+>;
 
 type Prepared = Projected & {
   date: string;
@@ -323,13 +352,17 @@ const sensorEntries = (projected: Projected) =>
  * A sensor channel's text: heart rate, power, cadence (doubled into steps on foot) or
  * temperature, from its average over time or its highest value.
  */
-function sensorText(metric: Metric, value: number, onFoot: boolean): string {
+/** A sensor value as a widget shows it: the number with its unit, and its words. */
+function sensorText(metric: Metric, value: number, onFoot: boolean): [string, string] {
   const whole = Math.round(value);
-  if (metric === 'heart-rate') return `${whole} bpm avg`;
-  if (metric === 'max-heart-rate') return `${whole} bpm max`;
-  if (metric === 'power') return `${whole} W avg`;
-  if (metric === 'cadence') return onFoot ? `${Math.round(value * 2)} spm avg` : `${whole} rpm avg`;
-  return `${whole} °C avg`;
+  if (metric === 'heart-rate') return [`${whole} bpm`, 'average heart rate'];
+  if (metric === 'max-heart-rate') return [`${whole} bpm`, 'max heart rate'];
+  if (metric === 'power') return [`${whole} W`, 'average power'];
+  if (metric === 'cadence')
+    return onFoot
+      ? [`${Math.round(value * 2)} spm`, 'average cadence']
+      : [`${whole} rpm`, 'average cadence'];
+  return [`${whole} °C`, 'average temperature'];
 }
 
 type Rect = { x0: number; y0: number; x1: number; y1: number };
@@ -359,38 +392,6 @@ const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v
 const clockText = (s: number) =>
   `${Math.floor(s / 3600)}:${String(Math.floor((s % 3600) / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
 const smoothstep = (f: number) => f * f * (3 - 2 * f);
-/** The third of the frame a point's percent falls in: the first, the middle or the last. */
-const thirdOf = (percent: number) =>
-  percent < 100 / 3 ? 'start' : percent > 200 / 3 ? 'end' : 'middle';
-/**
- * The horizontal part of a placement: the side it is on, or the middle. A point lines up
- * by the third it falls in.
- */
-const sideOf = (place: Placement) => {
-  if (typeof place !== 'string') {
-    const third = thirdOf(place.x);
-    return third === 'start' ? 'left' : third === 'end' ? 'right' : 'center';
-  }
-  return place.endsWith('left') ? 'left' : place.endsWith('right') ? 'right' : 'center';
-};
-/** The vertical part of a placement: the frame's top, middle or bottom; "free" for a point. */
-const rowOf = (place: Placement) =>
-  typeof place !== 'string'
-    ? 'free'
-    : place.startsWith('top')
-      ? 'top'
-      : place.startsWith('middle')
-        ? 'middle'
-        : 'bottom';
-/**
- * The top of a block `height` tall placed at a point `y` percent down: the point is its
- * top in the frame's top third, its middle in the middle third, its bottom in the last.
- */
-const freeTop = (y: number, frameHeight: number, height: number) => {
-  const at = (y / 100) * frameHeight;
-  const third = thirdOf(y);
-  return third === 'start' ? at : third === 'middle' ? at - height / 2 : at - height;
-};
 const wholeNumber = (n: number) => Math.round(n).toLocaleString('en-US');
 
 /** Points of a route closer together than this, in pixels as drawn, add nothing to the line. */
@@ -452,11 +453,6 @@ export function createRenderer(
   const movingLabel = options.movingLabel ?? 'moving';
   const kind: OverlayKind =
     options.overlay === 'single' ? 'single' : timeline.clock ? 'race' : 'groups';
-  const metrics = options.metrics ?? defaultMetrics(kind);
-  const corner = options.metricsPosition ?? 'bottom-left';
-  const titleCorner = options.titlePosition ?? 'top-center';
-  const titleScale = options.titleScale ?? 1;
-  const metricsScale = options.metricsScale ?? 1;
   const unit = Math.min(W, H) / 1080; // scales strokes and type with the output size
   const withCalories = tracks.some((track) => track.calories !== undefined);
   // Pace is in minutes per kilometer only when every activity is on foot.
@@ -686,67 +682,50 @@ export function createRenderer(
 
   const frame = createCanvas(W, H);
   const ctx = frame.getContext('2d') as Context2DLike;
-  // Gradients that darken the map behind the counters and the title.
+  // A gradient that darkens the map at the bottom, behind the map credit.
   const bottomShade = ctx.createLinearGradient(0, H * 0.76, 0, H * 0.9);
   bottomShade.addColorStop(0, 'rgba(5, 6, 9, 0)');
   bottomShade.addColorStop(1, 'rgba(5, 6, 9, 0.88)');
-  const topShade = ctx.createLinearGradient(0, 0, 0, H * 0.12);
-  topShade.addColorStop(0, 'rgba(5, 6, 9, 0.88)');
-  topShade.addColorStop(1, 'rgba(5, 6, 9, 0)');
 
-  // Title and metrics card
+  // The widgets over the replay (see widgets.ts). Their sizes at 100%, in pixels.
   const margin = W * 0.07;
-  /** Where text with this alignment starts. */
-  const xOf = (side: 'left' | 'center' | 'right') =>
-    side === 'left' ? margin : side === 'right' ? W - margin : W / 2;
-  const titleFont = `600 ${Math.round(44 * unit * titleScale)}px ${fontFamily}`;
-  const headlineFont = `600 ${Math.round(60 * unit * metricsScale)}px ${fontFamily}`;
-  const statusFont = `400 ${Math.round(32 * unit * metricsScale)}px ${fontFamily}`;
-  const statusGap = 50 * unit * metricsScale; // from the large value down to the first line under it
-  const statusStep = 42 * unit * metricsScale; // between the lines under it
-  const cardRow = rowOf(corner);
-  const cardOnTop = cardRow === 'top';
-  const cardSide = sideOf(corner);
-  const titleRow = rowOf(titleCorner);
-  const titleOnTop = titleRow === 'top';
-  const titleSide = sideOf(titleCorner);
-  /** Where text placed at a point starts, across: the point. */
-  const cardX = typeof corner === 'string' ? xOf(cardSide) : (corner.x / 100) * W;
-  const titleX = typeof titleCorner === 'string' ? xOf(titleSide) : (titleCorner.x / 100) * W;
-  /**
-   * Whether the title and the card would meet: at named positions in the same row, on the
-   * same side or with either in the middle. Then they stack, the title first. A block
-   * placed at a point stays there.
-   */
-  const stacked =
-    !!options.title &&
-    cardRow !== 'free' &&
-    cardRow === titleRow &&
-    (cardSide === titleSide || cardSide === 'center' || titleSide === 'center');
-  // The parts of a block's height, in pixels: the title from its top to its baseline and
-  // below it; the card's large value from its top to its baseline, and below its last line.
-  const titleAscent = 44 * unit * titleScale;
-  const titleDescent = 12 * unit * titleScale;
-  const cardAscent = 60 * unit * metricsScale;
-  const cardDescent = 14 * unit * metricsScale;
+  const TEXT_SIZE = 44 * unit; // a text widget's letters
+  const VALUE_SIZE = 52 * unit; // a value's number
+  const LABEL_SIZE = 24 * unit; // the words under a value
+  const CHART_HEIGHT = 80 * unit;
+  const fontOf = (weight: number, px: number) => `${weight} ${Math.round(px)}px ${fontFamily}`;
   const hasElevation = prepared.some((tr) => tr.hasElevation);
 
-  // The climb profile: across the frame between the margins, just above the map credit.
-  const profileHeight = 80 * unit;
-  const profileBox = {
-    x: margin,
-    y: H - H * 0.012 - 34 * unit - profileHeight,
-    width: W - 2 * margin,
-    height: profileHeight,
-  };
-  const profile = options.elevationProfile
+  /** Each value as it stands at the end of the replay, for laying widgets out. */
+  const finalValues = metricValues(timeline.duration, finished());
+  /** The widgets set, else the ones the title, metrics and profile settings describe. */
+  const widgets: Widget[] =
+    options.widgets ??
+    startingWidgets(
+      {
+        title: !!options.title,
+        titlePosition: options.titlePosition ?? 'top-center',
+        titleSize: clamp((options.titleScale ?? 1) * 100, WIDGET_SIZE.min, WIDGET_SIZE.max),
+        metrics: (options.metrics ?? defaultMetrics(kind)).filter((m) => finalValues.has(m)),
+        metricsPosition: options.metricsPosition ?? 'bottom-left',
+        metricsSize: clamp((options.metricsScale ?? 1) * 100, 70, 200),
+        elevationChart: !!options.elevationProfile && hasElevation,
+      },
+      (widget) => {
+        const { width, height } = widgetPixels(widget, finalValues);
+        return { width: width / W, height: height / H };
+      },
+    ).map((widget) => ({
+      ...widget,
+      size: clamp(Math.round(widget.size), WIDGET_SIZE.min, WIDGET_SIZE.max),
+    }));
+  // The climb profile, sampled for the widest a chart is drawn.
+  const profile = widgets.some((widget) => widget.kind === 'elevation-chart')
     ? elevationProfile(
         tracks,
-        Math.round(Math.min(600, Math.max(50, profileBox.width / (3 * unit)))),
+        Math.round(Math.min(600, Math.max(50, (W - 2 * margin) / (3 * unit)))),
       )
     : null;
-  /** The lowest baseline text in the bottom row may take: above the profile when it shows. */
-  const textFloor = profile ? profileBox.y - 30 * unit : H * 0.955;
 
   const headFade = 0.35; // seconds a head dot lingers after its track finishes
   const headRadius = 15 * unit;
@@ -907,7 +886,11 @@ export function createRenderer(
   }
 
   /** The text of every metric this video can show, at video time `t`. */
-  function metricTexts(t: number): Map<Metric, string> {
+  /**
+   * Each value at video time `t`: its number and the words under it. `state` is where every
+   * activity stands: as drawn so far, or at the end (`finished`).
+   */
+  function metricValues(t: number, state: MetricState[] = prepared): Map<Metric, MetricValue> {
     let started = 0;
     let moving = 0;
     let metres = 0;
@@ -918,8 +901,8 @@ export function createRenderer(
     let longest = 0;
     let fastest = 0;
     const days = new Set<string>();
-    let date = prepared[0].date;
-    for (const tr of prepared) {
+    let date = state[0]!.date;
+    for (const tr of state) {
       if (!tr.done) moving++;
       if (!tr.started) continue;
       started++;
@@ -937,36 +920,41 @@ export function createRenderer(
     /** The activities' recorded time so far, added up. */
     const secondsSoFar = () =>
       tracks.reduce((sum, track, k) => sum + lastSecond(track) * timeline.progress(k, t), 0);
-    const texts = new Map<Metric, string>();
+    const texts = new Map<Metric, MetricValue>();
+    const set = (metric: Metric, value: string, label: string) =>
+      texts.set(metric, { value, label });
     if (kind === 'single') {
       // One activity: its own elapsed time and distance so far.
       const elapsed = Math.floor(lastSecond(tracks[0]) * timeline.progress(0, t));
-      texts.set('time', clockText(elapsed));
-      texts.set('distance', `${(metres / 1000).toFixed(1)} km`);
-      texts.set('pace', paceText(onFoot, elapsed, metres));
-      texts.set('date', prepared[0].date);
-      texts.set('start', `${timeFormat.format(tracks[0].startTime)} start`);
+      set('time', clockText(elapsed), 'time');
+      set('distance', `${(metres / 1000).toFixed(1)} km`, 'distance');
+      set('pace', paceText(onFoot, elapsed, metres), onFoot ? 'average pace' : 'average speed');
+      set('date', state[0]!.date, '');
+      set('start', timeFormat.format(tracks[0].startTime), 'start');
     } else if (timeline.clock) {
       // All at once: one shared clock, and how many are still out.
-      texts.set('time', clockText(Math.floor(timeline.clock(t))));
-      texts.set('count', moving > 0 ? `${moving} still ${movingLabel}` : 'all finished');
-      texts.set('distance', `${wholeNumber(metres / 1000)} km`);
-      texts.set('date', datesSpanned);
-      if (metrics.includes('pace')) texts.set('pace', paceText(onFoot, secondsSoFar(), metres));
+      set('time', clockText(Math.floor(timeline.clock(t))), 'time');
+      if (moving > 0) set('count', String(moving), `still ${movingLabel}`);
+      else set('count', 'all', 'finished');
+      set('distance', `${wholeNumber(metres / 1000)} km`, 'distance');
+      set('date', datesSpanned, '');
+      set(
+        'pace',
+        paceText(onFoot, secondsSoFar(), metres),
+        onFoot ? 'average pace' : 'average speed',
+      );
     } else {
-      if (metrics.includes('time') || metrics.includes('pace')) {
-        const seconds = secondsSoFar();
-        texts.set('time', clockText(Math.floor(seconds)));
-        texts.set('pace', paceText(onFoot, seconds, metres));
-      }
-      texts.set('date', timeline.label?.(t) ?? date);
-      texts.set('count', `${started} ${started === 1 ? singular : plural}`);
-      texts.set('distance', `${wholeNumber(metres / 1000)} km`);
+      const seconds = secondsSoFar();
+      set('time', clockText(Math.floor(seconds)), 'time');
+      set('pace', paceText(onFoot, seconds, metres), onFoot ? 'average pace' : 'average speed');
+      set('date', timeline.label?.(t) ?? date, '');
+      set('count', String(started), started === 1 ? singular : plural);
+      set('distance', `${wholeNumber(metres / 1000)} km`, 'distance');
     }
-    texts.set('moving', `${clockText(Math.floor(moved))} moving`);
+    set('moving', clockText(Math.floor(moved)), 'moving');
     // Sensor channels: averages over time, the highest heart rate, and calories so far.
     const sensorSums = new Map<SensorChannel, { total: number; time: number; max: number }>();
-    for (const tr of prepared) {
+    for (const tr of state) {
       if (!tr.started) continue;
       for (const [channel, now] of Object.entries(tr.sensorsNow) as [
         SensorChannel,
@@ -988,151 +976,165 @@ export function createRenderer(
     ];
     for (const [metric, channel] of averages) {
       const sum = sensorSums.get(channel);
-      if (sum && sum.time > 0) texts.set(metric, sensorText(metric, sum.total / sum.time, onFoot));
+      if (sum && sum.time > 0) set(metric, ...sensorText(metric, sum.total / sum.time, onFoot));
     }
     const heart = sensorSums.get('heartRate');
     if (heart && heart.max > 0)
-      texts.set('max-heart-rate', sensorText('max-heart-rate', heart.max, onFoot));
+      set('max-heart-rate', ...sensorText('max-heart-rate', heart.max, onFoot));
     if (withCalories)
-      texts.set(
+      set(
         'calories',
         `${wholeNumber(tracks.reduce((sum, track, k) => sum + (track.calories ?? 0) * timeline.progress(k, t), 0))} kcal`,
+        'calories',
       );
     const top = topSpeed(onFoot, fastest);
-    texts.set('top-speed', top.unit === '/km' ? `best ${top.value} /km` : `max ${top.value} km/h`);
+    set('top-speed', `${top.value} ${top.unit}`, top.unit === '/km' ? 'best pace' : 'top speed');
     if (kind !== 'single') {
-      texts.set('days', `${days.size} ${days.size === 1 ? 'day' : 'days'} out`);
-      texts.set('longest', `longest ${wholeNumber(longest / 1000)} km`);
+      set('days', String(days.size), days.size === 1 ? 'day out' : 'days out');
+      set('longest', `${wholeNumber(longest / 1000)} km`, 'longest');
     }
     if (hasElevation) {
-      texts.set('elevation', `↑${wholeNumber(climbed)} m`);
-      texts.set('descent', `↓${wholeNumber(descended)} m`);
-      if (Number.isFinite(highest)) texts.set('highest', `top ${wholeNumber(highest)} m`);
+      set('elevation', `${wholeNumber(climbed)} m`, 'climbed');
+      set('descent', `${wholeNumber(descended)} m`, 'descended');
+      if (Number.isFinite(highest)) set('highest', `${wholeNumber(highest)} m`, 'highest point');
     }
     return texts;
   }
 
-  type Card = {
-    /** The large value and the baseline it sits on. */
-    headline: string;
-    headlineY: number;
-    /** The other values, on as many lines as the frame's width needs. */
-    lines: string[];
-    /** Lowest pixel row the card reaches. */
-    bottom: number;
-  };
+  /** Where every activity stands once the replay has finished, for `metricValues`. */
+  function finished(): MetricState[] {
+    return prepared.map((tr) => {
+      const last = tr.count - 1;
+      const sensorsNow: MetricState['sensorsNow'] = {};
+      for (const [channel, sums] of sensorEntries(tr))
+        sensorsNow[channel] = {
+          total: sums.total[last]!,
+          time: sums.time[last]!,
+          max: sums.max[last]!,
+        };
+      return {
+        date: tr.date,
+        hasElevation: tr.hasElevation,
+        started: true,
+        done: true,
+        metres: tr.dist[last]!,
+        climbed: tr.climb[last]!,
+        descended: tr.descent[last]!,
+        highest: tr.top[last]!,
+        moved: tr.moving[last]!,
+        topSpeed: tr.fastest[last]!,
+        sensorsNow,
+      };
+    });
+  }
 
-  /** What the metrics card shows at video time `t` and where; null when there is no card. */
-  function layoutCard(t: number): Card | null {
-    const texts = metricTexts(t);
-    const shown = metrics.flatMap((metric) => texts.get(metric) ?? []);
-    if (shown.length === 0) return null;
-    const [headline, ...rest] = shown;
-
-    ctx.font = statusFont;
-    const lines: string[] = [];
-    for (const text of rest) {
-      const last = lines[lines.length - 1];
-      if (last === undefined) lines.push(text);
-      else if (ctx.measureText(`${last}  ·  ${text}`).width > W - 2 * margin) lines.push(text);
-      else lines[lines.length - 1] = `${last}  ·  ${text}`;
+  /** A widget's width and height in pixels, with the values it would show. */
+  function widgetPixels(
+    widget: Widget,
+    values: Map<Metric, MetricValue>,
+  ): { width: number; height: number } {
+    const scale = widget.size / 100;
+    if (widget.kind === 'elevation-chart')
+      return { width: Math.min(W, (W - 2 * margin) * scale), height: CHART_HEIGHT * scale };
+    if (widget.kind === 'text') {
+      const text = widget.text ?? options.title ?? '';
+      if (!text) return { width: 0, height: 0 };
+      ctx.font = fontOf(600, TEXT_SIZE * scale);
+      return { width: ctx.measureText(text).width, height: TEXT_SIZE * scale * 1.27 };
     }
-
-    const below = lines.length > 0 ? statusGap + (lines.length - 1) * statusStep : 0;
-    let headlineY: number;
-    if (typeof corner !== 'string') {
-      // At a point: lined up with it by the third it falls in.
-      headlineY = freeTop(corner.y, H, cardAscent + below + cardDescent) + cardAscent;
-    } else if (cardOnTop) {
-      // Under the title when both are in the same corner.
-      const underTitle = stacked ? 78 * unit * titleScale : 0;
-      headlineY = H * 0.075 + underTitle;
-    } else if (cardRow === 'middle') {
-      // The large value and the lines under it, centred on the frame's middle.
-      headlineY = H * 0.5 - below / 2 + 22 * unit * metricsScale;
-    } else {
-      // Raised when it has more lines, to stay clear of the bottom edge and the profile.
-      headlineY = Math.min(H * 0.875, textFloor - below);
+    const value = values.get(widget.metric);
+    if (!value) return { width: 0, height: 0 };
+    ctx.font = fontOf(600, VALUE_SIZE * scale);
+    let width = ctx.measureText(value.value).width;
+    let height = VALUE_SIZE * scale * 1.1;
+    if (value.label) {
+      ctx.font = fontOf(400, LABEL_SIZE * scale);
+      width = Math.max(width, ctx.measureText(value.label).width);
+      height += LABEL_SIZE * scale * 1.3;
     }
-    return { headline, headlineY, lines, bottom: headlineY + below + cardDescent };
+    return { width, height };
+  }
+
+  /** Where each widget sits at video time `t`, in pixels; null for one with nothing to show. */
+  function layoutWidgets(values: Map<Metric, MetricValue>): (Rect | null)[] {
+    return widgets.map((widget) => {
+      const { width, height } = widgetPixels(widget, values);
+      if (width === 0) return null;
+      const cx = (widget.x / 100) * W;
+      const cy = (widget.y / 100) * H;
+      return { x0: cx - width / 2, y0: cy - height / 2, x1: cx + width / 2, y1: cy + height / 2 };
+    });
   }
 
   /**
-   * The baseline the title sits on. At the top it keeps its place and a card in the same
-   * corner goes under it; at the bottom it goes above a card in the same corner.
+   * The rows text widgets take, with room around, merged where they meet: a soft dark band
+   * goes behind each, and place names fade under them.
    */
-  function titleY(card: Card | null): number {
-    if (typeof titleCorner !== 'string')
-      return freeTop(titleCorner.y, H, titleAscent + titleDescent) + titleAscent;
-    if (titleOnTop) return H * 0.075;
-    if (card && stacked) return card.headlineY - (60 * metricsScale + 30 * titleScale) * unit;
-    if (titleRow === 'middle') return H * 0.5 + 16 * unit * titleScale;
-    return Math.min(H * 0.93, textFloor);
+  function textBands(layout: (Rect | null)[]): { top: number; bottom: number }[] {
+    const room = H * 0.04;
+    const rows = layout
+      .flatMap((box, k) =>
+        box && widgets[k]!.kind !== 'elevation-chart'
+          ? [{ top: box.y0 - room, bottom: box.y1 + room }]
+          : [],
+      )
+      .sort((a, b) => a.top - b.top);
+    const bands: { top: number; bottom: number }[] = [];
+    for (const row of rows) {
+      const last = bands[bands.length - 1];
+      if (last && row.top <= last.bottom) last.bottom = Math.max(last.bottom, row.bottom);
+      else bands.push({ ...row });
+    }
+    return bands;
   }
 
-  /**
-   * The rows the title and the card take in the middle of the frame or at a point, with
-   * room for a shade around them; null when neither does.
-   */
-  function middleRows(
-    card: Card | null,
-    title: { y: number; top: number } | null,
-  ): { top: number; bottom: number } | null {
-    const rows: [number, number][] = [];
-    if (card && (cardRow === 'middle' || cardRow === 'free'))
-      rows.push([card.headlineY - cardAscent, card.bottom]);
-    if (title && (titleRow === 'middle' || titleRow === 'free'))
-      rows.push([title.top, title.y + titleDescent]);
-    if (rows.length === 0) return null;
-    const room = H * 0.06;
-    return {
-      top: Math.min(...rows.map(([top]) => top)) - room,
-      bottom: Math.max(...rows.map(([, bottom]) => bottom)) + room,
-    };
+  /** Draws one widget in its box: text, a value with its words, or the climb profile. */
+  function drawWidget(widget: Widget, box: Rect, values: Map<Metric, MetricValue>, t: number) {
+    const scale = widget.size / 100;
+    const cx = (box.x0 + box.x1) / 2;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'alphabetic';
+    if (widget.kind === 'text') {
+      ctx.font = fontOf(600, TEXT_SIZE * scale);
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.92)';
+      ctx.fillText(widget.text ?? options.title ?? '', cx, box.y0 + TEXT_SIZE * scale);
+    } else if (widget.kind === 'metric') {
+      const value = values.get(widget.metric)!;
+      ctx.font = fontOf(600, VALUE_SIZE * scale);
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.94)';
+      ctx.fillText(value.value, cx, box.y0 + VALUE_SIZE * scale * 0.95);
+      if (value.label) {
+        ctx.font = fontOf(400, LABEL_SIZE * scale);
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.66)';
+        ctx.fillText(value.label, cx, box.y0 + VALUE_SIZE * scale * 1.1 + LABEL_SIZE * scale);
+      }
+    } else if (profile) {
+      drawElevationProfile(
+        ctx,
+        profile,
+        { x: box.x0, y: box.y0, width: box.x1 - box.x0, height: box.y1 - box.y0 },
+        prepared.map((tr) => ({
+          meters: tr.started ? tr.metres : 0,
+          // One activity keeps its dot, also at the finish; several show theirs while moving.
+          dot: kind === 'single' ? 1 : headAlpha(tr, t),
+        })),
+        unit * scale,
+      );
+    }
   }
 
   const creditFont = `400 ${Math.round(19 * unit)}px ${fontFamily}`;
 
   function drawOverlay(t: number, zoom: number, tx: number, ty: number): void {
-    const card = layoutCard(t);
-    const title = options.title ? { y: titleY(card), top: 0 } : null;
-    if (title) title.top = title.y - titleAscent;
-    /**
-     * Where the shade at the bottom starts: higher when the title sits down there, or the
-     * card does above the profile.
-     */
-    let bottomStart =
-      title && titleRow === 'bottom' ? Math.min(H * 0.76, title.top - H * 0.06) : H * 0.76;
-    if (profile && card && cardRow === 'bottom')
-      bottomStart = Math.min(bottomStart, card.headlineY - cardAscent - H * 0.06);
-    /**
-     * The rows text in the middle of the frame or at a point takes, with room around; null
-     * when none.
-     */
-    const middleBand = middleRows(card, title);
+    const values = metricValues(t);
+    const layout = layoutWidgets(values);
+    /** The rows text takes, with room around: a band goes behind each. */
+    const bands = textBands(layout);
     if (attribution !== undefined) {
-      if (bottomStart === H * 0.76) ctx.fillStyle = bottomShade;
-      else {
-        const shade = ctx.createLinearGradient(0, bottomStart, 0, bottomStart + H * 0.14);
-        shade.addColorStop(0, 'rgba(5, 6, 9, 0)');
-        shade.addColorStop(1, 'rgba(5, 6, 9, 0.88)');
-        ctx.fillStyle = shade;
-      }
-      ctx.fillRect(0, bottomStart, W, H - bottomStart);
-      if (card && cardOnTop) {
-        // Dark behind the whole card, fading out below it.
-        const shade = ctx.createLinearGradient(0, card.bottom, 0, card.bottom + H * 0.1);
-        shade.addColorStop(0, 'rgba(5, 6, 9, 0.88)');
-        shade.addColorStop(1, 'rgba(5, 6, 9, 0)');
-        ctx.fillStyle = shade;
-        ctx.fillRect(0, 0, W, card.bottom + H * 0.1);
-      } else if (title && titleOnTop) {
-        ctx.fillStyle = topShade;
-        ctx.fillRect(0, 0, W, H * 0.12);
-      }
-      if (middleBand) {
-        // Dark behind text in the middle, fading out above and below it.
-        const { top, bottom } = middleBand;
+      // Dark at the bottom, behind the map credit, and a soft band behind text.
+      ctx.fillStyle = bottomShade;
+      ctx.fillRect(0, H * 0.76, W, H * 0.24);
+      for (const { top, bottom } of bands) {
         const shade = ctx.createLinearGradient(0, top, 0, bottom);
         shade.addColorStop(0, 'rgba(5, 6, 9, 0)');
         shade.addColorStop(0.3, 'rgba(5, 6, 9, 0.7)');
@@ -1171,22 +1173,17 @@ export function createRenderer(
       ctx.lineWidth = 5 * unit;
       ctx.strokeStyle = 'rgba(6, 8, 12, 0.75)';
       ctx.fillStyle = 'rgba(214, 222, 236, 0.72)';
-      const topLimit =
-        card && cardOnTop ? card.bottom + H * 0.01 : H * (title && titleOnTop ? 0.09 : 0.02);
-      const bottomLimit = Math.min(H * 0.8, bottomStart + H * 0.04);
       for (const [text, label] of visible) {
-        // Fade names out before they reach the counters or the title.
-        const nearBottom = clamp((bottomLimit - label.y) / (H * 0.04), 0, 1);
-        const nearTop = clamp((label.y - topLimit) / (H * 0.03), 0, 1);
-        // Names under text in the middle fade out too.
-        const awayFromMiddle = middleBand
-          ? clamp(
-              Math.max(middleBand.top - label.y, label.y - middleBand.bottom) / (H * 0.03),
-              0,
-              1,
-            )
-          : 1;
-        const alpha = label.alpha * nearBottom * nearTop * awayFromMiddle;
+        // Fade names out near the bottom, the top, and under text.
+        const nearBottom = clamp((H * 0.8 - label.y) / (H * 0.04), 0, 1);
+        const nearTop = clamp((label.y - H * 0.02) / (H * 0.03), 0, 1);
+        const awayFromText = Math.min(
+          1,
+          ...bands.map(({ top, bottom }) =>
+            clamp(Math.max(top - label.y, label.y - bottom) / (H * 0.03), 0, 1),
+          ),
+        );
+        const alpha = label.alpha * nearBottom * nearTop * awayFromText;
         if (alpha < 0.02) continue;
         ctx.globalAlpha = alpha;
         ctx.font = labelFont(label.size);
@@ -1214,74 +1211,34 @@ export function createRenderer(
     }
     ctx.globalCompositeOperation = 'source-over';
 
-    if (profile)
-      drawElevationProfile(
-        ctx,
-        profile,
-        profileBox,
-        prepared.map((tr) => ({
-          meters: tr.started ? tr.metres : 0,
-          // One activity keeps its dot, also at the finish; several show theirs while moving.
-          dot: kind === 'single' ? 1 : headAlpha(tr, t),
-        })),
-        unit,
-      );
-
-    ctx.textBaseline = 'alphabetic';
-    boxes = {};
-    /** A box from its edges in pixels, as fractions of the frame. */
-    const frameBox = (x0: number, y0: number, x1: number, y1: number): FrameBox => ({
-      x: x0 / W,
-      y: y0 / H,
-      width: (x1 - x0) / W,
-      height: (y1 - y0) / H,
+    /** A box in pixels as fractions of the frame. */
+    const frameBox = (box: Rect): FrameBox => ({
+      x: box.x0 / W,
+      y: box.y0 / H,
+      width: (box.x1 - box.x0) / W,
+      height: (box.y1 - box.y0) / H,
     });
-    /** The left edge of text this wide, drawn from `x` with this alignment. */
-    const leftOf = (x: number, width: number, side: 'left' | 'center' | 'right') =>
-      side === 'left' ? x : side === 'right' ? x - width : x - width / 2;
-    if (options.title && title) {
-      ctx.textAlign = titleSide;
-      ctx.font = titleFont;
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.92)';
-      ctx.fillText(options.title, titleX, title.y);
-      const width = ctx.measureText(options.title).width;
-      const left = leftOf(titleX, width, titleSide);
-      boxes.title = frameBox(left, title.top, left + width, title.y + titleDescent);
-    }
-    if (card) {
-      const x = cardX;
-      ctx.textAlign = cardSide;
-      ctx.font = headlineFont;
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.94)';
-      ctx.fillText(card.headline, x, card.headlineY);
-      let width = ctx.measureText(card.headline).width;
-      ctx.font = statusFont;
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
-      card.lines.forEach((line, i) => {
-        ctx.fillText(line, x, card.headlineY + statusGap + i * statusStep);
-        width = Math.max(width, ctx.measureText(line).width);
-      });
-      const left = leftOf(x, width, cardSide);
-      boxes.metrics = frameBox(left, card.headlineY - cardAscent, left + width, card.bottom);
-    }
-    if (profile)
-      boxes.elevation = frameBox(
-        profileBox.x,
-        profileBox.y,
-        profileBox.x + profileBox.width,
-        profileBox.y + profileBox.height,
-      );
+    widgets.forEach((widget, k) => {
+      const box = layout[k];
+      if (box) drawWidget(widget, box, values, t);
+    });
+    boxes = { widgets: layout.map((box) => (box ? frameBox(box) : null)) };
     if (options.watermark) {
       // At the bottom left, on the map credit's line, as far from the edge as the credit
       // is on the right: the two never meet, whatever the credit's length.
       const left = W * 0.03;
       const baseline = H - H * 0.012;
       const mark = drawWatermark(ctx, left, baseline, unit, fontFamily);
-      boxes.watermark = frameBox(left, baseline - mark.height, left + mark.width, baseline);
+      boxes.watermark = frameBox({
+        x0: left,
+        y0: baseline - mark.height,
+        x1: left + mark.width,
+        y1: baseline,
+      });
     }
   }
-  /** Where `drawOverlay` put each block, for `overlayBoxes`. */
-  let boxes: OverlayBoxes = {};
+  /** Where `drawOverlay` put each widget and the watermark, for `overlayBoxes`. */
+  let boxes: OverlayBoxes = { widgets: [] };
 
   /** A copy of the replay's last frame, which the totals card is drawn over. */
   let lastReplayFrame: CanvasLike | null = null;
@@ -1419,6 +1376,8 @@ export function createRenderer(
       else drawEndCard(ctx, base, END_CARD_S, { width: W, height: H, fontFamily });
     },
     overlayBoxes: () => boxes,
+    widgets,
+    finalValues,
     skipTo(index: number): void {
       // The end card is drawn over the replay's last frame, so it cannot be skipped to.
       if (index < nextFrame || index >= replayFrames)

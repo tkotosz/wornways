@@ -118,22 +118,15 @@ test('follows the guide to a highlight of the long ride', async ({ page }) => {
   await openSection(page, 'Playback');
   await expect(page.getByTestId('replay-summary')).toContainText('Highlight');
 
-  // The demo's routes carry heights, so the climb can be shown.
+  // The demo's routes carry heights: one activity starts with the elevation chart, and its
+  // climb, start time, descent, highest point and top speed can be added; a count cannot.
   await openSection(page, 'Overlay');
-  await expect(
-    page.getByTestId('group-metrics').getByRole('button', { name: 'Elevation' }),
-  ).toBeVisible();
-  // One activity offers its start time and its descent, not picked at first, and no count.
-  for (const name of ['Start time', 'Descent', 'Highest point', 'Top speed'])
-    await expect(
-      page.getByTestId('group-metrics').getByRole('button', { name, exact: true }),
-    ).toHaveAttribute('aria-pressed', 'false');
-  await expect(
-    page.getByTestId('group-metrics').getByRole('button', { name: 'Count', exact: true }),
-  ).toHaveCount(0);
-  await expect(
-    page.getByTestId('group-elevation').getByRole('switch', { name: 'Elevation profile' }),
-  ).toBeChecked();
+  await expect(page.getByRole('button', { name: 'Elevation chart', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Add a widget' }).click();
+  const add = page.getByRole('dialog', { name: 'Add a widget' });
+  for (const name of ['Climbed', 'Start time', 'Descent', 'Highest point', 'Top speed'])
+    await expect(add.getByRole('button', { name: new RegExp(` ${name}$`) })).toBeEnabled();
+  await expect(add.getByRole('button', { name: / Count$/ })).toHaveCount(0);
 });
 
 test('loads the demo only when it is picked, not with the app', async ({ page }) => {

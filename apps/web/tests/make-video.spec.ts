@@ -540,15 +540,15 @@ test('offers heart rate and cadence for an activity that recorded them', async (
   await chooseStyle(page);
   await openSection(page, 'Overlay');
   await expectSection(page, 'Overlay');
-  const metrics = page.getByTestId('group-metrics');
-  for (const name of ['Heart rate', 'Max heart rate', 'Cadence'])
-    await expect(metrics.getByRole('button', { name, exact: true })).toHaveAttribute(
-      'aria-pressed',
-      'false',
-    );
+  // The values it can show, as tiles with its own numbers, to add to the picture.
+  await page.getByRole('button', { name: 'Add a widget' }).click();
+  const add = page.getByRole('dialog', { name: 'Add a widget' });
+  const tile = (name: string) => add.getByRole('button', { name: new RegExp(` ${name}$`) });
+  await expect(tile('Heart rate')).toHaveText(/bpm/);
+  await expect(tile('Max heart rate')).toHaveText(/bpm/);
+  await expect(tile('Cadence')).toHaveText(/rpm/);
   // It recorded no power, temperature or calories.
-  for (const name of ['Power', 'Temperature', 'Calories'])
-    await expect(metrics.getByRole('button', { name, exact: true })).toHaveCount(0);
+  for (const name of ['Power', 'Temperature', 'Calories']) await expect(tile(name)).toHaveCount(0);
 });
 
 test('shares the video where the browser can share files', async ({ page, context }) => {
@@ -754,30 +754,28 @@ test('sets up the video and its text, and keeps both for the next visit', async 
   await slider('Video length').dispatchEvent('change');
   await expect(summary).toHaveText('10 seconds · Custom playback');
 
-  // Overlay: the title starts as the automatic one, with its position and size.
+  // Overlay: the widgets start from the title, the automatic one, and a race's values.
   await openSection(page, 'Overlay');
   await expectSection(page, 'Overlay');
-  const title = page.getByRole('textbox', { name: 'Title' });
-  await expect(title).toHaveValue('27 Apr – 2 May 2026');
-  await title.fill('Spring');
-  // Switched off, the title's settings hide; switched on again, the text is still there.
-  await page.getByRole('switch', { name: 'Show title' }).click();
-  await expect(title).toHaveCount(0);
-  await page.getByRole('switch', { name: 'Show title' }).click();
-  await expect(title).toHaveValue('Spring');
-  // Nine positions: the middle row too.
-  await expect(
-    page.getByTestId('group-title').getByRole('button', { name: 'Center' }),
-  ).toBeVisible();
-  await page.getByTestId('group-title').getByRole('button', { name: 'Bottom middle' }).click();
-  await expect(page.getByTestId('group-metrics')).toContainText('Show metrics');
-  // A race offers every metric, the dates and the pace too, though not picked at first.
+  const titleRow = page.getByRole('button', { name: /^Text: / });
+  await expect(titleRow).toHaveAccessibleName('Text: 27 Apr – 2 May 2026');
+  for (const name of ['Time', 'Count', 'Distance'])
+    await expect(page.getByRole('button', { name: new RegExp(`^${name}: `) })).toBeVisible();
+  // A widget's settings: its text and its size.
+  await titleRow.click();
+  const text = page.getByRole('dialog', { name: 'Text' });
+  await expect(text.getByRole('textbox', { name: 'Text' })).toHaveValue('27 Apr – 2 May 2026');
+  await text.getByRole('textbox', { name: 'Text' }).fill('Spring');
+  await text.getByRole('slider', { name: 'Size' }).fill('150');
+  await text.getByRole('slider', { name: 'Size' }).dispatchEvent('change');
+  await text.getByRole('button', { name: 'Done' }).click();
+  await expect(titleRow).toHaveAccessibleName('Text: Spring');
+  // A race offers every value to add, the dates and the pace too.
+  await page.getByRole('button', { name: 'Add a widget' }).click();
+  const add = page.getByRole('dialog', { name: 'Add a widget' });
   for (const name of ['Date', 'Pace', 'Top speed', 'Moving time', 'Days out', 'Longest activity'])
-    await expect(
-      page.getByTestId('group-metrics').getByRole('button', { name, exact: true }),
-    ).toHaveAttribute('aria-pressed', 'false');
-  await slider('Size').first().fill('150');
-  await slider('Size').first().dispatchEvent('change');
+    await expect(add.getByRole('button', { name: new RegExp(` ${name}$`) })).toBeEnabled();
+  await add.getByRole('button', { name: 'Done' }).click();
   await expect(page.getByRole('switch', { name: 'Show watermark' })).toBeChecked();
 
   // Ending: the end pause keeps the finished picture longer, added to the video. The end
@@ -826,10 +824,7 @@ test('sets up the video and its text, and keeps both for the next visit', async 
   await expect(chip('All')).toHaveAttribute('aria-pressed', 'true');
   await expect(chip('Real pace')).toHaveAttribute('aria-pressed', 'true');
   await openSection(page, 'Overlay');
-  await expect(page.getByRole('textbox', { name: 'Title' })).toHaveValue('Spring');
-  await expect(
-    page.getByTestId('group-title').getByRole('button', { name: 'Bottom middle' }),
-  ).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByRole('button', { name: /^Text: / })).toHaveAccessibleName('Text: Spring');
   await openSection(page, 'Ending');
   await expect(page.getByRole('switch', { name: 'Show end card' })).not.toBeChecked();
   await expect(slider('End pause')).toHaveValue('2.5');

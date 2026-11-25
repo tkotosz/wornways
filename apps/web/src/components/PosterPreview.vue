@@ -28,13 +28,14 @@ function dropDraft(): void {
 // any moment. Where things are arranged on the still (`editing`), it opens on the still and
 // Edit goes back to it from the draft. It stays in view beside the settings on wide screens
 // and sits above them on phones, where only the picture shows. While editing, the `layer`
-// slot is drawn over the still, with where its blocks were drawn; `placed` asks for the next
-// change to be drawn at once rather than after the usual pause, for a block let go after
-// dragging it.
+// slot is drawn over the still, with where its widgets were drawn; `placed` asks for the next
+// change to be drawn at once rather than after the usual pause, for a widget let go after
+// dragging it. Each still of the last frame is told (`drawn`): the widgets on it and the
+// values the video can show.
 import { parseSettings, type OverlayBoxes, type SettingsInput } from '@wornways/engine';
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { Canceled, type EngineClient } from '../engine-client.ts';
-import type { PosterScene, Progress } from '../messages.ts';
+import type { Poster, PosterScene, Progress } from '../messages.ts';
 
 const props = withDefaults(
   defineProps<{
@@ -48,13 +49,14 @@ const props = withDefaults(
   }>(),
   { seconds: undefined, scene: 'replay', editing: false },
 );
+const emit = defineEmits<{ drawn: [poster: Poster] }>();
 
 /** Waits this long after a change, so dragging a slider draws once, not at every step. */
 const PAUSE_MS = 400;
 
 const url = ref('');
-/** Where the still's title, metrics and the rest were drawn. */
-const boxes = ref<OverlayBoxes>({});
+/** Where the still's widgets and watermark were drawn. */
+const boxes = ref<OverlayBoxes>({ widgets: [] });
 /** Whether the next change is drawn without the pause (see `placed`). */
 let drawAtOnce = false;
 const placed = () => (drawAtOnce = true);
@@ -153,11 +155,13 @@ async function draw(): Promise<void> {
   const task = props.engine.makePoster(props.settings, props.scene);
   cancel = task.cancel;
   try {
-    const { image, boxes: drawn } = await task.result;
+    const poster = await task.result;
+    const { image, boxes: drawn } = poster;
     if (cancel !== task.cancel) return;
     if (url.value) URL.revokeObjectURL(url.value);
     url.value = URL.createObjectURL(image);
     boxes.value = drawn;
+    if (props.scene === 'replay') emit('drawn', poster);
     busy.value = false;
   } catch (caught) {
     // A newer drawing took over; it clears "busy" when it is done.

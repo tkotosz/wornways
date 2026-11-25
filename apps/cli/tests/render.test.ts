@@ -340,7 +340,17 @@ describe('the metrics card', () => {
   });
 
   it('grows with the text size', () => {
-    expect(lastFrame({ metricsScale: 2 }).bottomLeft).toBeGreaterThan(lastFrame({}).bottomLeft * 2);
+    const heightOfFirst = (options: Partial<RenderOptions>) => {
+      const renderer = createRenderer(
+        [route()],
+        chronologicalTimeline([5_000], { duration: 1 }),
+        (w, h) => createCanvas(w, h) as unknown as CanvasLike,
+        { width, height, fps: 10, overlay: 'single', ...options },
+      );
+      for (let f = 0; f < renderer.frameCount; f++) renderer.renderFrame(f);
+      return renderer.overlayBoxes().widgets[0]!.height;
+    };
+    expect(heightOfFirst({ metricsScale: 2 })).toBeCloseTo(heightOfFirst({}) * 2, 2);
   });
 });
 
@@ -562,7 +572,7 @@ describe('the title', () => {
   });
 });
 
-describe('a block placed at a point', () => {
+describe('widgets', () => {
   const width = 270;
   const height = 480;
 
@@ -571,10 +581,10 @@ describe('a block placed at a point', () => {
       [route()],
       chronologicalTimeline([5_000], { duration: 1 }),
       (w, h) => createCanvas(w, h) as unknown as CanvasLike,
-      { width, height, fps: 10, overlay: 'single', title: 'Morning', metrics: [], ...options },
+      { width, height, fps: 10, overlay: 'single', title: 'Morning', ...options },
     );
     for (let f = 0; f < renderer.frameCount; f++) renderer.renderFrame(f);
-    return { canvas: renderer.canvas, boxes: renderer.overlayBoxes() };
+    return renderer;
   }
   /** A box in pixels: left, top, right and bottom edges. */
   const edges = (box: { x: number; y: number; width: number; height: number }) => ({
@@ -584,52 +594,70 @@ describe('a block placed at a point', () => {
     bottom: (box.y + box.height) * height,
   });
 
-  it('lines up with the point by the third of the frame it falls in', () => {
-    // Left third, top third: the point is the block's top-left corner.
-    const topLeft = edges(lastFrame({ titlePosition: { x: 10, y: 20 } }).boxes.title!);
-    expect(topLeft.left).toBeCloseTo(27, 0);
-    expect(topLeft.top).toBeCloseTo(96, 0);
-    // Middle third both ways: the point is the block's middle.
-    const middle = edges(lastFrame({ titlePosition: { x: 50, y: 50 } }).boxes.title!);
-    expect((middle.left + middle.right) / 2).toBeCloseTo(135, 0);
-    expect((middle.top + middle.bottom) / 2).toBeCloseTo(240, 0);
-    // Last third both ways: the point is the block's bottom-right corner.
-    const bottomRight = edges(
-      lastFrame({ metricsPosition: { x: 90, y: 80 }, metrics: ['time'] }).boxes.metrics!,
+  it('draws each widget centered on its point, inside the box it reports, and nothing else', () => {
+    const renderer = lastFrame({
+      widgets: [
+        { kind: 'text', text: null, x: 50, y: 20, size: 100 },
+        { kind: 'metric', metric: 'distance', x: 30, y: 60, size: 150 },
+      ],
+    });
+    const [title, distance] = renderer.overlayBoxes().widgets.map((box) => edges(box!));
+    expect((title!.left + title!.right) / 2).toBeCloseTo(135, 0);
+    expect((title!.top + title!.bottom) / 2).toBeCloseTo(96, 0);
+    expect((distance!.left + distance!.right) / 2).toBeCloseTo(81, 0);
+    expect((distance!.top + distance!.bottom) / 2).toBeCloseTo(288, 0);
+    const inside = [title!, distance!].reduce(
+      (sum, box) =>
+        sum +
+        textPixels(
+          renderer.canvas,
+          Math.floor(box.left),
+          Math.floor(box.top),
+          Math.ceil(box.right),
+          Math.ceil(box.bottom),
+        ),
+      0,
     );
-    expect(bottomRight.right).toBeCloseTo(243, 0);
-    expect(bottomRight.bottom).toBeCloseTo(384, 0);
+    expect(inside).toBeGreaterThan(40);
+    expect(textPixels(renderer.canvas, 0, 0, width, height)).toBe(inside);
   });
 
-  it('is drawn inside the box reported for it, and nowhere else', () => {
-    const { canvas, boxes } = lastFrame({ titlePosition: { x: 30, y: 40 } });
-    const box = edges(boxes.title!);
-    const inside = textPixels(
-      canvas,
-      Math.floor(box.left),
-      Math.floor(box.top),
-      Math.ceil(box.right),
-      Math.ceil(box.bottom),
-    );
-    expect(inside).toBeGreaterThan(20);
-    expect(textPixels(canvas, 0, 0, width, height)).toBe(inside);
+  it('grows with its size', () => {
+    const at = (size: number) =>
+      edges(
+        lastFrame({
+          widgets: [{ kind: 'metric', metric: 'time', x: 50, y: 50, size }],
+        }).overlayBoxes().widgets[0]!,
+      );
+    const normal = at(100);
+    const double = at(200);
+    expect(double.right - double.left).toBeCloseTo((normal.right - normal.left) * 2, -1);
   });
 
-  it('stays where it was put, also where the other block is', () => {
-    const titleAlone = lastFrame({ titlePosition: { x: 10, y: 85 } });
-    const both = lastFrame({ titlePosition: { x: 10, y: 85 }, metrics: ['time'] });
-    expect(both.boxes.title).toEqual(titleAlone.boxes.title);
+  it('shows a value with the words under it, and leaves out one the video cannot show', () => {
+    const renderer = lastFrame({
+      widgets: [
+        { kind: 'metric', metric: 'distance', x: 50, y: 50, size: 100 },
+        { kind: 'metric', metric: 'count', x: 50, y: 80, size: 100 },
+      ],
+    });
+    expect(renderer.finalValues.get('distance')).toEqual({ value: '5.3 km', label: 'distance' });
+    // A single activity has no count.
+    expect(renderer.overlayBoxes().widgets[1]).toBeNull();
   });
 
-  it('reports the boxes of the named positions too, the profile and the watermark', () => {
-    const { boxes } = lastFrame({ metrics: ['time'], watermark: true });
-    const title = edges(boxes.title!);
-    // At the top in the middle.
-    expect((title.left + title.right) / 2).toBeCloseTo(135, 0);
-    expect(title.top).toBeLessThan(height * 0.1);
-    expect(boxes.metrics!.y).toBeGreaterThan(0.8);
-    expect(boxes.watermark!.x).toBeCloseTo(0.03, 2);
-    expect(boxes.elevation).toBeUndefined();
+  it('starts from the title, the metrics and the profile settings when none are given', () => {
+    const renderer = lastFrame({ metrics: ['time', 'distance'], watermark: true });
+    expect(renderer.widgets.map((widget) => widget.kind)).toEqual(['text', 'metric', 'metric']);
+    const [title, time, distance] = renderer.overlayBoxes().widgets.map((box) => edges(box!));
+    // The title at the top in the middle; the first value large at the bottom left, the
+    // other smaller in a row under it.
+    expect((title!.left + title!.right) / 2).toBeCloseTo(135, 0);
+    expect(title!.top).toBeLessThan(height * 0.1);
+    expect(time!.left).toBeCloseTo(width * 0.07, 0);
+    expect(distance!.top).toBeGreaterThan(time!.bottom);
+    expect(distance!.bottom - distance!.top).toBeLessThan(time!.bottom - time!.top);
+    expect(renderer.overlayBoxes().watermark!.x).toBeCloseTo(0.03, 2);
   });
 });
 

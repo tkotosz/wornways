@@ -5,7 +5,10 @@
 import type {
   FrequentPlace,
   Grouping,
+  Metric,
+  MetricValue,
   OverlayBoxes,
+  Widget,
   SensorChannel,
   SettingsInput,
   TrackEnd,
@@ -87,8 +90,11 @@ export type Reply =
   | { type: 'places'; id: number; places: FrequentPlace[] }
   | { type: 'progress'; id: number; progress: Progress }
   | { type: 'video-made'; id: number; video: ArrayBuffer; report: VideoReport }
-  /** The still, and for the last frame where its title, metrics and the rest were drawn. */
-  | { type: 'poster-made'; id: number; image: Blob; boxes: OverlayBoxes }
+  /**
+   * The still; for the last frame also where each widget was drawn, the widgets drawn, and
+   * each value this video can show.
+   */
+  | ({ type: 'poster-made'; id: number } & Poster)
   | { type: 'planned'; id: number; plan: PlanReport }
   | { type: 'strava-started' | 'strava-ended' | 'strava-closed' | 'strava-kept'; id: number }
   | { type: 'strava-listed'; id: number; activities: ActivitySummary[] }
@@ -147,6 +153,16 @@ export type Progress = {
 };
 
 /** How a video will be paced. */
+/** A still of the video, with what the editor needs to arrange the widgets on it. */
+export type Poster = {
+  image: Blob;
+  boxes: OverlayBoxes;
+  /** The widgets drawn: the ones set, or the ones the other settings describe. */
+  widgets: Widget[];
+  /** Each value this video can show, as it stands at the end. */
+  values: [Metric, MetricValue][];
+};
+
 export type PlanReport = {
   activities: number;
   meters: number;

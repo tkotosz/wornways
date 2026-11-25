@@ -3,17 +3,13 @@
 // for a choice, a slider for a number, a switch for on/off, and a few made to measure.
 import {
   AUTOMATIC_TOTALS,
-  METRICS,
   TOTALS_FIELDS,
-  defaultMetrics,
-  type Metric,
   type SettingDefinition,
   type SensorChannel,
   type TotalsField,
 } from '@wornways/engine';
 import { computed } from 'vue';
 import {
-  SHOW_TITLE,
   choiceLabel,
   offered,
   panelOffered,
@@ -48,9 +44,6 @@ const GROUP_TITLES: Record<Panel, string> = {
   camera: 'Camera',
   privacy: 'Replay privacy',
   map: 'Map',
-  title: 'Title',
-  metrics: 'Metrics',
-  elevation: 'Elevation',
   watermark: 'Watermark',
   pause: 'End pause',
   totals: 'Totals card',
@@ -86,13 +79,6 @@ function sliderValue(setting: SettingDefinition): string {
   return `${current}${unit === '%' ? '%' : ` ${unit}`}`;
 }
 
-// Title: the automatic one unless the person wrote another; empty for none.
-const autoTitle = computed(() => props.plan?.title ?? '');
-const titleSet = computed(() => typeof adjustments.value['title'] === 'string');
-
-// Metrics: the values this video can show, and the ones picked, in order.
-const showsMetrics = computed(() => adjustments.value['metrics'] !== false);
-const showsTitle = computed(() => adjustments.value[SHOW_TITLE] !== false);
 /** Whether the totals card is on: set, or started by the preset (Recap). */
 const showsTotals = computed(
   () =>
@@ -100,35 +86,9 @@ const showsTotals = computed(
       startingValue(adjustments.value, props.count, 'totals-card')) === true,
 );
 
-/** Whether a setting's row shows: a group switched off shows only its switch. */
+/** Whether a setting's row shows: the totals card switched off shows only its switch. */
 const shown = (group: Panel, name: string) =>
-  (group !== 'title' || showsTitle.value) &&
-  (group !== 'metrics' || name === 'metrics' || showsMetrics.value) &&
-  (group !== 'totals' || name === 'totals-card' || showsTotals.value);
-/** What the metrics have to describe: one activity, all at once, or activities in turn. */
-const kind = computed(() => {
-  if (!props.plan) return null;
-  if (props.plan.activities === 1) return 'single';
-  return props.plan.groups?.race ? 'race' : 'groups';
-});
-const offeredMetrics = computed(() =>
-  METRICS.filter((m) => {
-    if (!kind.value) return false;
-    if (m === 'count' || m === 'days' || m === 'longest') return kind.value !== 'single';
-    if (m === 'start') return kind.value === 'single';
-    if (m === 'elevation' || m === 'descent' || m === 'highest') return props.plan?.hasElevation;
-    if (isSensorValue(m)) return hasSensorValue(m);
-    return true;
-  }),
-);
-const pickedMetrics = computed<Metric[]>(() => {
-  if (!kind.value) return [];
-  const set = adjustments.value['metrics-fields'];
-  const picked =
-    typeof set === 'string' ? (set.split(',') as Metric[]) : defaultMetrics(kind.value);
-  return picked.filter((m) => offeredMetrics.value.includes(m));
-});
-
+  group !== 'totals' || name === 'totals-card' || showsTotals.value;
 /** The values that need a sensor channel, or calories, that some selected activity recorded. */
 const SENSOR_VALUES: Record<string, SensorChannel | 'calories'> = {
   'heart-rate': 'heartRate',
@@ -145,26 +105,6 @@ const hasSensorValue = (value: string) => {
     ? !!props.plan?.hasCalories
     : !!props.plan?.sensors.includes(needs as SensorChannel);
 };
-
-/** A metric's chip: its name, or a few words where the name alone would be unclear. */
-const METRIC_LABELS: Partial<Record<Metric, string>> = {
-  moving: 'Moving time',
-  'top-speed': 'Top speed',
-  start: 'Start time',
-  highest: 'Highest point',
-  days: 'Days out',
-  longest: 'Longest activity',
-  'heart-rate': 'Heart rate',
-  'max-heart-rate': 'Max heart rate',
-};
-const metricLabel = (metric: Metric) =>
-  METRIC_LABELS[metric] ?? metric.charAt(0).toUpperCase() + metric.slice(1);
-
-function toggleMetric(metric: Metric): void {
-  const picked = pickedMetrics.value;
-  const next = picked.includes(metric) ? picked.filter((m) => m !== metric) : [...picked, metric];
-  if (next.length > 0) set('metrics-fields', next.join(','));
-}
 
 // Totals card: the values it can show (elevation only when recorded), and the ones picked, in order.
 const TOTALS_LABELS: Record<TotalsField, string> = {
@@ -207,44 +147,23 @@ function toggleTotal(field: TotalsField): void {
   if (next.length > 0) set('totals-fields', next.join(','));
 }
 
-/** A setting's value in words, for its row: "30 s", "Top middle", "Time, Count, Distance". */
+/** A setting's value in words, for its row: "30 s", "Day", "Activities, Kilometers". */
 function valueText(setting: SettingDefinition): string {
-  if (setting.name === 'title')
-    return (titleSet.value ? String(adjustments.value['title']) : autoTitle.value) || 'No title';
-  if (setting.name === 'metrics-fields') return pickedMetrics.value.map(metricLabel).join(', ');
   if (setting.name === 'totals-fields')
     return pickedTotals.value.map((field) => TOTALS_LABELS[field]).join(', ');
   if (setting.kind.type === 'number') return sliderValue(setting);
-  const current = String(value(setting));
-  // A position dragged on the picture is a point, not one of the named ones.
-  if (setting.kind.type === 'choice' && !setting.kind.choices.includes(current))
-    return 'Placed on the picture';
-  return choiceLabel(setting.name, current);
+  return choiceLabel(setting.name, String(value(setting)));
 }
 </script>
 
 <template>
   <!-- Phones: a list, a row per setting with its value. A row opens the setting on its own
-       (`open`); a switch turns in place. A group switched off shows only its switch. -->
+       (`open`); a switch turns in place. The totals card switched off shows only its switch. -->
   <div v-if="view === 'rows'" class="setting-rows">
     <template v-for="g in groups" :key="g.group">
       <h3 v-if="groups.length > 1" class="setting-rows-title" :data-group="g.group">
         {{ GROUP_TITLES[g.group] }}
       </h3>
-      <label v-if="g.group === 'title'" class="setting-row">
-        <span>Show title</span>
-        <span class="switch">
-          <input
-            type="checkbox"
-            role="switch"
-            aria-label="Show title"
-            :checked="showsTitle"
-            @change="
-              set(SHOW_TITLE, ($event.target as HTMLInputElement).checked ? undefined : false)
-            "
-          />
-        </span>
-      </label>
       <template v-for="setting in g.main" :key="setting.name">
         <template v-if="shown(g.group, setting.name)">
           <label v-if="setting.kind.type === 'switch'" class="setting-row">
@@ -285,59 +204,22 @@ function valueText(setting: SettingDefinition): string {
         :data-testid="`group-${g.group}`"
       >
         <h2 v-if="!only">{{ GROUP_TITLES[g.group] }}</h2>
-        <!-- The title's switch, like the metrics' one; off, the video has no title. -->
-        <div v-if="g.group === 'title' && !only" class="setting">
-          <span class="label">Show title</span>
-          <label class="switch">
-            <input
-              type="checkbox"
-              role="switch"
-              aria-label="Show title"
-              :checked="showsTitle"
-              @change="
-                set(SHOW_TITLE, ($event.target as HTMLInputElement).checked ? undefined : false)
-              "
-            />
-            <span>{{ showsTitle ? 'On' : 'Off' }}</span>
-          </label>
-        </div>
         <template v-for="setting in g.main" :key="setting.name">
           <div v-if="only ? setting.name === only : shown(g.group, setting.name)" class="setting">
             <span :id="`label-${setting.name}`" class="label">{{ settingLabel(setting) }}</span>
             <div class="control" :aria-labelledby="`label-${setting.name}`" role="group">
-              <!-- A choice: one button per option; a position as a picker of the frame's nine spots. -->
-              <div
-                v-if="setting.kind.type === 'choice'"
-                :class="{ position: setting.name.endsWith('-position') }"
-              >
-                <div
-                  class="chips"
-                  :class="
-                    setting.name.endsWith('-position') ? 'corners' : only ? 'options' : undefined
-                  "
+              <!-- A choice: one button per option. -->
+              <div v-if="setting.kind.type === 'choice'" class="chips" :class="{ options: only }">
+                <button
+                  v-for="option in setting.kind.type === 'choice' ? setting.kind.choices : []"
+                  :key="option"
+                  type="button"
+                  class="chip"
+                  :aria-pressed="value(setting) === option"
+                  @click="set(setting.name, option)"
                 >
-                  <button
-                    v-for="option in setting.kind.type === 'choice' ? setting.kind.choices : []"
-                    :key="option"
-                    type="button"
-                    class="chip"
-                    :aria-pressed="value(setting) === option"
-                    :aria-label="
-                      setting.name.endsWith('-position')
-                        ? choiceLabel(setting.name, option)
-                        : undefined
-                    "
-                    @click="set(setting.name, option)"
-                  >
-                    {{
-                      setting.name.endsWith('-position') ? '' : choiceLabel(setting.name, option)
-                    }}
-                  </button>
-                </div>
-                <!-- The picked position in words beside the squares, or that it was dragged. -->
-                <span v-if="setting.name.endsWith('-position')" class="position-name muted">
-                  {{ valueText(setting) }}
-                </span>
+                  {{ choiceLabel(setting.name, option) }}
+                </button>
               </div>
 
               <!-- A number: a slider with its value. -->
@@ -377,50 +259,6 @@ function valueText(setting: SettingDefinition): string {
                 />
                 <span>{{ value(setting) === true ? 'On' : 'Off' }}</span>
               </label>
-
-              <!-- The title: the automatic one until the person writes another. -->
-              <div v-else-if="setting.name === 'title'" class="title">
-                <input
-                  type="text"
-                  aria-label="Title"
-                  placeholder="No title"
-                  :value="titleSet ? adjustments['title'] : autoTitle"
-                  @input="set('title', ($event.target as HTMLInputElement).value)"
-                />
-                <button
-                  v-if="titleSet && plan"
-                  type="button"
-                  class="link"
-                  @click="set('title', undefined)"
-                >
-                  Use "{{ autoTitle }}"
-                </button>
-              </div>
-
-              <!-- The metrics, in the order picked. -->
-              <div v-else-if="setting.name === 'metrics-fields'" class="chips">
-                <button
-                  v-for="metric in offeredMetrics"
-                  :key="metric"
-                  type="button"
-                  class="chip"
-                  :aria-pressed="pickedMetrics.includes(metric)"
-                  @click="toggleMetric(metric)"
-                >
-                  <span v-if="pickedMetrics.includes(metric)" class="order">{{
-                    pickedMetrics.indexOf(metric) + 1
-                  }}</span>
-                  {{ metricLabel(metric) }}
-                </button>
-                <button
-                  v-if="plan && adjustments['metrics-fields'] !== undefined"
-                  type="button"
-                  class="link"
-                  @click="set('metrics-fields', undefined)"
-                >
-                  Use automatic metrics
-                </button>
-              </div>
 
               <!-- The totals card's values, in the order picked. -->
               <div v-else-if="setting.name === 'totals-fields'" class="chips">
@@ -499,35 +337,6 @@ function valueText(setting: SettingDefinition): string {
   display: flex;
   flex-wrap: wrap;
   gap: 0.4rem;
-}
-
-/* The position picker: nine squares standing for the frame's top, middle and bottom rows,
-   each left, middle and right. */
-.corners {
-  display: grid;
-  grid-template-columns: repeat(3, 2.2rem);
-  gap: 0.3rem;
-}
-
-.corners .chip {
-  height: 2.2rem;
-  padding: 0;
-  border-radius: 6px;
-}
-
-.corners .chip[aria-pressed='true'] {
-  background: var(--accent);
-}
-
-.position {
-  display: flex;
-  align-items: center;
-  gap: 0.9rem;
-  min-width: 0;
-}
-
-.position-name {
-  font-size: 0.85rem;
 }
 
 .order {

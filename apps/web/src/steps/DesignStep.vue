@@ -11,11 +11,19 @@
 // out: the step bar on top; the preview takes most of the screen; under it, the open
 // section's settings as a list in a panel of fixed height, each row opening its setting in a
 // sheet; the sections along the bottom.
-import type { SettingsInput } from '@wornways/engine';
+import {
+  METRICS,
+  parseWidgets,
+  widgetsText,
+  type Metric,
+  type MetricValue,
+  type SettingsInput,
+  type Widget,
+} from '@wornways/engine';
 import { computed, onBeforeUnmount, ref } from 'vue';
-import { SECTIONS, countOf, type Adjustments, type Section } from '../adjust.ts';
+import { SECTIONS, countOf, widgetLabel, type Adjustments, type Section } from '../adjust.ts';
+import AddWidget from '../components/AddWidget.vue';
 import FramePanel from '../components/FramePanel.vue';
-import OverlayEditor from '../components/OverlayEditor.vue';
 import PlaybackPanel from '../components/PlaybackPanel.vue';
 import PosterPreview from '../components/PosterPreview.vue';
 import SettingSheet from '../components/SettingSheet.vue';
@@ -23,10 +31,13 @@ import StyleChooser from '../components/StyleChooser.vue';
 import SettingsGroups from '../components/SettingsGroups.vue';
 import StepBar from '../components/StepBar.vue';
 import StepNav from '../components/StepNav.vue';
+import WidgetEditor from '../components/WidgetEditor.vue';
+import WidgetList from '../components/WidgetList.vue';
+import WidgetSettings from '../components/WidgetSettings.vue';
 import type { EngineClient } from '../engine-client.ts';
-import type { PlanReport } from '../messages.ts';
+import type { PlanReport, Poster } from '../messages.ts';
 
-defineProps<{
+const props = defineProps<{
   engine: EngineClient;
   /** The settings of the whole video, for the preview. */
   settings: SettingsInput;
@@ -70,13 +81,55 @@ function openSetting(name: string, label: string): void {
   sheet.value = { name, label };
 }
 
-/**
- * In Overlay, the title and the metrics card are also arranged on the still (OverlayEditor);
- * on phones, picking one there brings its settings into view in the list.
- */
-function showGroup(group: string): void {
-  const heading = controls.value?.querySelector<HTMLElement>(`[data-group="${group}"]`);
-  if (heading) controls.value?.scrollTo({ top: heading.offsetTop, behavior: 'smooth' });
+// Overlay: the widgets, arranged on the still (WidgetEditor) and listed under it.
+/** What the last still of the replay drew: its widgets and the values the video can show. */
+const drawn = ref<{ widgets: Widget[]; values: Map<Metric, MetricValue> } | null>(null);
+function onDrawn(poster: Poster): void {
+  drawn.value = { widgets: poster.widgets, values: new Map(poster.values) };
+}
+/** The widgets as set, else the ones the still drew from the title and metrics settings. */
+const widgets = computed<Widget[]>(() => {
+  const set = adjustments.value['widgets'];
+  if (typeof set !== 'string') return drawn.value?.widgets ?? [];
+  try {
+    return parseWidgets(set, METRICS);
+  } catch {
+    return [];
+  }
+});
+const values = computed(() => drawn.value?.values ?? new Map<Metric, MetricValue>());
+const title = computed(() => props.plan?.title ?? '');
+/** The widget picked on the still or in the list. */
+const selectedWidget = ref<number | null>(null);
+
+function setWidgets(list: Widget[]): void {
+  adjustments.value = { ...adjustments.value, widgets: widgetsText(list) };
+}
+
+function openWidget(index: number): void {
+  selectedWidget.value = index;
+  sheet.value = { name: `widget:${index}`, label: widgetLabel(widgets.value[index]!) };
+}
+
+/** The widget a widget sheet is about. */
+const sheetWidget = computed(() =>
+  sheet.value?.name.startsWith('widget:') ? Number(sheet.value.name.slice(7)) : null,
+);
+
+function addWidget(widget: Widget): void {
+  setWidgets([...widgets.value, widget]);
+  selectedWidget.value = widgets.value.length - 1;
+  sheet.value = null;
+}
+
+function changeWidget(index: number, widget: Widget): void {
+  setWidgets(widgets.value.map((w, k) => (k === index ? widget : w)));
+}
+
+function removeWidget(index: number): void {
+  setWidgets(widgets.value.filter((_, k) => k !== index));
+  selectedWidget.value = null;
+  sheet.value = null;
 }
 </script>
 
@@ -100,15 +153,18 @@ function showGroup(group: string): void {
           :seconds="plan?.seconds"
           :scene="section === 'ending' ? 'ending' : 'replay'"
           :editing="section === 'overlay' || section === 'ending'"
+          @drawn="onDrawn"
         >
           <template #layer="{ boxes, ratio, placed }">
-            <OverlayEditor
+            <WidgetEditor
               v-if="section === 'overlay'"
-              v-model="adjustments"
-              :boxes="boxes"
+              v-model:selected="selectedWidget"
+              :widgets="widgets"
+              :boxes="boxes.widgets"
               :ratio="ratio"
+              @change="setWidgets"
               @placed="placed"
-              @select="showGroup"
+              @edit="openWidget"
             />
           </template>
         </PosterPreview>
@@ -129,8 +185,17 @@ function showGroup(group: string): void {
           view="rows"
           @open="openSetting"
         />
+        <WidgetList
+          v-if="section === 'overlay'"
+          :widgets="widgets"
+          :values="values"
+          :title="title"
+          :selected="selectedWidget"
+          @add="sheet = { name: 'add-widget', label: 'Add a widget' }"
+          @open="openWidget"
+        />
         <SettingsGroups
-          v-else
+          v-if="section !== 'frame' && section !== 'playback'"
           v-model="adjustments"
           :groups="current.panels"
           :count="countOf(activities)"
@@ -139,26 +204,6 @@ function showGroup(group: string): void {
           @open="openSetting"
         />
       </div>
-
-      <!-- The setting being changed, on its own. -->
-      <SettingSheet v-if="sheet" :title="sheet.label" @close="sheet = null">
-        <FramePanel v-if="section === 'frame'" v-model="adjustments" :only="sheet.name" />
-        <PlaybackPanel
-          v-else-if="section === 'playback'"
-          v-model="adjustments"
-          :activities="activities"
-          :plan="plan"
-          :only="sheet.name"
-        />
-        <SettingsGroups
-          v-else
-          v-model="adjustments"
-          :groups="current.panels"
-          :count="countOf(activities)"
-          :plan="plan"
-          :only="sheet.name"
-        />
-      </SettingSheet>
 
       <nav class="sections" aria-label="Sections">
         <button
@@ -228,14 +273,18 @@ function showGroup(group: string): void {
             :seconds="plan?.seconds"
             :scene="section === 'ending' ? 'ending' : 'replay'"
             :editing="section === 'overlay' || section === 'ending'"
+            @drawn="onDrawn"
           >
             <template #layer="{ boxes, ratio, placed }">
-              <OverlayEditor
+              <WidgetEditor
                 v-if="section === 'overlay'"
-                v-model="adjustments"
-                :boxes="boxes"
+                v-model:selected="selectedWidget"
+                :widgets="widgets"
+                :boxes="boxes.widgets"
                 :ratio="ratio"
+                @change="setWidgets"
                 @placed="placed"
+                @edit="openWidget"
               />
             </template>
           </PosterPreview>
@@ -248,19 +297,65 @@ function showGroup(group: string): void {
             :activities="activities"
             :plan="plan"
           />
-          <SettingsGroups
-            v-else
-            v-model="adjustments"
-            :groups="current.panels"
-            :count="countOf(activities)"
-            :plan="plan"
-          />
+          <template v-else>
+            <WidgetList
+              v-if="section === 'overlay'"
+              class="widget-panel"
+              :widgets="widgets"
+              :values="values"
+              :title="title"
+              :selected="selectedWidget"
+              @add="sheet = { name: 'add-widget', label: 'Add a widget' }"
+              @open="openWidget"
+            />
+            <SettingsGroups
+              v-model="adjustments"
+              :groups="current.panels"
+              :count="countOf(activities)"
+              :plan="plan"
+            />
+          </template>
         </div>
       </div>
     </template>
 
     <StepNav step="design" :next-disabled="choosing" @back="emit('back')" @next="emit('next')" />
   </section>
+
+  <!-- The setting being changed, on its own: from the phone's list, or a widget's. -->
+  <SettingSheet v-if="sheet" :title="sheet.label" @close="sheet = null">
+    <AddWidget
+      v-if="sheet.name === 'add-widget'"
+      :widgets="widgets"
+      :values="values"
+      :has-elevation="!!plan?.hasElevation"
+      :has-calories="!!plan?.hasCalories"
+      @add="addWidget"
+    />
+    <WidgetSettings
+      v-else-if="sheetWidget !== null && widgets[sheetWidget]"
+      :widget="widgets[sheetWidget]!"
+      :title="title"
+      @change="changeWidget(sheetWidget, $event)"
+      @remove="removeWidget(sheetWidget)"
+    />
+    <FramePanel v-else-if="section === 'frame'" v-model="adjustments" :only="sheet.name" />
+    <PlaybackPanel
+      v-else-if="section === 'playback'"
+      v-model="adjustments"
+      :activities="activities"
+      :plan="plan"
+      :only="sheet.name"
+    />
+    <SettingsGroups
+      v-else
+      v-model="adjustments"
+      :groups="current.panels"
+      :count="countOf(activities)"
+      :plan="plan"
+      :only="sheet.name"
+    />
+  </SettingSheet>
 </template>
 
 <style scoped>
@@ -289,6 +384,13 @@ function showGroup(group: string): void {
 .layout .stage {
   position: sticky;
   top: calc(var(--top-bar-height, 0px) + 1.5rem);
+}
+
+/* The widgets in a box like the settings panels. */
+.widget-panel {
+  padding: 0 1.2rem 0.6rem;
+  border-radius: 14px;
+  background: var(--panel);
 }
 
 .settings {

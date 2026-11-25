@@ -49,6 +49,7 @@ export {
   parseFramePoint,
   type FrameBox,
   type FramePoint,
+  type MetricValue,
   type OverlayBoxes,
   type Placement,
   type CanvasFactory,
@@ -60,6 +61,14 @@ export {
   type RenderOptions,
   type Renderer,
 } from './replay/render.ts';
+export {
+  WIDGET_SIZE,
+  parseWidgets,
+  startingWidgets,
+  widgetName,
+  widgetsText,
+  type Widget,
+} from './replay/widgets.ts';
 export { distanceM, mercatorX, mercatorY } from './track/geo.ts';
 export { MVT_LINE, decodeMvt, type MvtFeature, type MvtLayer } from './map/mvt.ts';
 export { fitView, trackArea, type View } from './replay/view.ts';

@@ -1,12 +1,13 @@
 // The page's way to talk to the worker: each method sends one request and returns a
 // promise for its reply.
 
-import type { FrequentPlace, OverlayBoxes, SettingsInput, TrackEnd } from '@wornways/engine';
+import type { FrequentPlace, SettingsInput, TrackEnd } from '@wornways/engine';
 import type {
   ActivitySummary,
   ImportReport,
   MatchReport,
   PlanReport,
+  Poster,
   PosterScene,
   Progress,
   Reply,
@@ -266,7 +267,7 @@ export class EngineClient {
   makePoster(
     settings: SettingsInput,
     scene: PosterScene = 'replay',
-  ): { result: Promise<{ image: Blob; boxes: OverlayBoxes }>; cancel: () => void } {
+  ): { result: Promise<Poster>; cancel: () => void } {
     const id = this.nextId++;
     const result = this.send({
       type: 'make-poster',
@@ -275,7 +276,10 @@ export class EngineClient {
       source: this.source,
       scene,
     }).then((reply) => {
-      if (reply.type === 'poster-made') return { image: reply.image, boxes: reply.boxes };
+      if (reply.type === 'poster-made') {
+        const { type: _, id: __, ...poster } = reply;
+        return poster;
+      }
       throw this.errorFor(reply);
     });
     return {

@@ -11,6 +11,7 @@ import { AUTOMATIC_TOTALS, TOTALS_CARD_S, TOTALS_FIELDS, type TotalsField } from
 import { PRESETS, PRESET_NAMES, type Preset } from './presets.ts';
 import type { Grouping } from './plans.ts';
 import { METRICS, POSITIONS, parseFramePoint, type Metric, type Placement } from './render.ts';
+import { parseWidgets, type Widget } from './widgets.ts';
 
 export type RenderSettings = {
   // Which activities
@@ -81,6 +82,12 @@ export type RenderSettings = {
   metricsPosition: Placement;
   /** Size of the metrics card in percent of the normal size. */
   metricsSize: number;
+
+  /**
+   * What is drawn over the replay; null: the widgets the title, metrics and elevation
+   * profile settings describe.
+   */
+  widgets: Widget[] | null;
 
   /** Whether a video of several activities shows their totals after the replay. */
   totalsCard: boolean;
@@ -458,6 +465,21 @@ export const SETTINGS: readonly SettingDefinition[] = [
   },
 
   {
+    name: 'widgets',
+    label: 'Widgets',
+    group: 'look',
+    kind: { type: 'text', valueName: 'widgets' },
+    default: null,
+    automatic: 'the title, the metrics and the elevation profile as set',
+    help:
+      'What is drawn over the replay, each widget centered on a point in percent across and ' +
+      'down, with a size in percent (50 to 250, 100 when left out), separated by ";": ' +
+      'text:"Your text"@x,y,size (text@x,y for the title), a value such as distance@x,y,size ' +
+      '(any value of --metrics-fields), or elevation-chart@x,y,size. Later widgets are drawn ' +
+      'over earlier ones. "" draws none. Without it, the title, the metrics card and the ' +
+      'elevation profile settings say what is drawn.',
+  },
+  {
     name: 'totals-card',
     label: 'Totals card',
     group: 'look',
@@ -626,6 +648,16 @@ export function parseSettings(input: SettingsInput): RenderSettings {
       );
     return n;
   };
+  /** The widgets, or null when left to the other settings. */
+  const widgetList = (name: string): Widget[] | null => {
+    const value = text(name);
+    if (value === null) return null;
+    try {
+      return parseWidgets(value, METRICS);
+    } catch (error) {
+      throw new SettingsError(name, error instanceof Error ? error.message : String(error));
+    }
+  };
   /** A named position, or a point of the frame. */
   const placement = (name: string): Placement => {
     const kind = definition(name).kind;
@@ -744,6 +776,7 @@ export function parseSettings(input: SettingsInput): RenderSettings {
     metricsFields: choiceList<Metric>('metrics-fields'),
     metricsPosition: placement('metrics-position'),
     metricsSize: number('metrics-size'),
+    widgets: widgetList('widgets'),
     totalsCard: flag('totals-card'),
     totalsFields: choiceList<TotalsField>('totals-fields'),
     endCard: flag('end-card'),

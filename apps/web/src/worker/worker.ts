@@ -215,7 +215,7 @@ async function answer(request: Exclude<Request, { type: 'cancel' }>, signal: Abo
         plan: planVideo(await tracks(), request.settings, source === 'strava'),
       });
     case 'make-poster': {
-      const { image, boxes } = await makePoster(
+      const poster = await makePoster(
         await tracks(),
         request.settings,
         renderSignal,
@@ -223,7 +223,7 @@ async function answer(request: Exclude<Request, { type: 'cancel' }>, signal: Abo
         request.scene,
       );
       renderSignal.throwIfAborted();
-      return reply({ type: 'poster-made', id, image, boxes });
+      return reply({ type: 'poster-made', id, ...poster });
     }
     case 'make-video': {
       const { video, report } = await makeVideo(
@@ -267,10 +267,13 @@ async function handle(request: Request): Promise<void> {
 
 self.onmessage = (event: MessageEvent<Request>) => void handle(event.data);
 
-/** Whether the video shows calories: over the replay, or on the totals card. */
+/**
+ * Whether the video shows calories: in a widget over the replay (or, without widgets set, in
+ * the metrics the widgets start from), or on the totals card.
+ */
 function showsCalories(settings: RenderSettings): boolean {
-  return (
-    (settings.metrics && !!settings.metricsFields?.includes('calories')) ||
-    (settings.totalsCard && !!settings.totalsFields?.includes('calories'))
-  );
+  const overReplay = settings.widgets
+    ? settings.widgets.some((widget) => widget.kind === 'metric' && widget.metric === 'calories')
+    : settings.metrics && !!settings.metricsFields?.includes('calories');
+  return overReplay || (settings.totalsCard && !!settings.totalsFields?.includes('calories'));
 }
