@@ -133,3 +133,33 @@ test('moves, resizes and removes a picked widget with the keyboard', async ({ pa
   await page.keyboard.press('Delete');
   await expect(page.getByRole('button', { name: /^Date: / })).toHaveCount(0);
 });
+
+test('adds a widget clear of Play, and Play steps aside while a widget is picked', async ({
+  page,
+  context,
+}) => {
+  page.setDefaultTimeout(15_000);
+  await offlineMap(context);
+  await openOverlay(page);
+  const play = page.getByRole('button', { name: 'Play preview' });
+  await expect(play).toBeVisible();
+  await outline(page, 0).click({ position: { x: 10, y: 6 } });
+  await expect(play).toHaveCount(0);
+
+  await page.getByRole('button', { name: 'Add a widget' }).click();
+  await page
+    .getByRole('dialog', { name: 'Add a widget' })
+    .getByRole('button', { name: 'Text' })
+    .click();
+  await expect(outline(page, 4)).toBeVisible();
+  const frame = (await page.getByTestId('preview').locator('.frame').boundingBox())!;
+  const added = (await outline(page, 4).boundingBox())!;
+  // Clear of the middle, where Play sits: Play's 3.4rem circle does not reach its box.
+  const middle = { x: frame.x + frame.width / 2, y: frame.y + frame.height / 2 };
+  const clear =
+    added.x > middle.x + 28 ||
+    added.x + added.width < middle.x - 28 ||
+    added.y > middle.y + 28 ||
+    added.y + added.height < middle.y - 28;
+  expect(clear).toBe(true);
+});

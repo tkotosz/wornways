@@ -116,8 +116,28 @@ const sheetWidget = computed(() =>
   sheet.value?.name.startsWith('widget:') ? Number(sheet.value.name.slice(7)) : null,
 );
 
+/**
+ * Where a new widget goes: of a few spots clear of the middle, where Play sits, the one
+ * furthest from the widgets already there; the chart keeps its place near the bottom.
+ */
+function freeSpot(widget: Widget): Widget {
+  if (widget.kind === 'elevation-chart') return widget;
+  const spots = [
+    { x: 50, y: 28 },
+    { x: 50, y: 70 },
+    { x: 30, y: 38 },
+    { x: 70, y: 38 },
+    { x: 30, y: 62 },
+    { x: 70, y: 62 },
+  ];
+  const distance = (spot: { x: number; y: number }) =>
+    Math.min(Infinity, ...widgets.value.map((w) => Math.hypot(w.x - spot.x, w.y - spot.y)));
+  const best = spots.reduce((a, b) => (distance(b) > distance(a) ? b : a));
+  return { ...widget, ...best };
+}
+
 function addWidget(widget: Widget): void {
-  setWidgets([...widgets.value, widget]);
+  setWidgets([...widgets.value, freeSpot(widget)]);
   selectedWidget.value = widgets.value.length - 1;
   sheet.value = null;
 }
@@ -153,6 +173,7 @@ function removeWidget(index: number): void {
           :seconds="plan?.seconds"
           :scene="section === 'ending' ? 'ending' : 'replay'"
           :editing="section === 'overlay' || section === 'ending'"
+          :hide-play="section === 'overlay' && selectedWidget !== null"
           @drawn="onDrawn"
         >
           <template #layer="{ boxes, ratio, placed }">
@@ -273,6 +294,7 @@ function removeWidget(index: number): void {
             :seconds="plan?.seconds"
             :scene="section === 'ending' ? 'ending' : 'replay'"
             :editing="section === 'overlay' || section === 'ending'"
+            :hide-play="section === 'overlay' && selectedWidget !== null"
             @drawn="onDrawn"
           >
             <template #layer="{ boxes, ratio, placed }">

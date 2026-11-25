@@ -46,8 +46,10 @@ const props = withDefaults(
     scene?: PosterScene;
     /** Things are arranged on the still: it shows until Play, and Edit goes back to it. */
     editing?: boolean;
+    /** Play steps aside, as while a widget is picked on the still, to leave it to the edit. */
+    hidePlay?: boolean;
   }>(),
-  { seconds: undefined, scene: 'replay', editing: false },
+  { seconds: undefined, scene: 'replay', editing: false, hidePlay: false },
 );
 const emit = defineEmits<{ drawn: [poster: Poster] }>();
 
@@ -246,7 +248,7 @@ onBeforeUnmount(() => {
           Edit
         </button>
         <button
-          v-if="url && !draftUrl && !drafting && !busy"
+          v-if="url && !draftUrl && !drafting && !busy && !hidePlay"
           type="button"
           class="play"
           aria-label="Play preview"
