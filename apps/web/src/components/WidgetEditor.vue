@@ -489,9 +489,10 @@ const story = computed(() => props.size.width / props.size.height < 0.8);
   font-weight: 700;
 }
 
+/* A tool that is on: white with a dark icon, as story editors show it. */
 .tool[aria-pressed='true'] {
-  color: #1a110b;
-  background: rgba(255, 138, 42, 0.92);
+  color: #12151c;
+  background: rgba(255, 255, 255, 0.92);
 }
 
 .tool svg {
@@ -502,6 +503,12 @@ const story = computed(() => props.size.width / props.size.height < 0.8);
 
 .tool img {
   width: 1.5rem;
+}
+
+/* The mark while the watermark is off: faded, without its color. */
+.tool[aria-pressed='false'] img {
+  opacity: 0.6;
+  filter: grayscale(1) brightness(1.6);
 }
 
 /* A widget centered on its point, with a faint outline until it is picked. */
