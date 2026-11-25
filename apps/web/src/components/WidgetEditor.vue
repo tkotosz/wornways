@@ -2,7 +2,8 @@
 // Arranging the widgets on the still of the video's last frame, as stickers are arranged in a
 // story editor. Each widget has an outline over where the engine drew it (the boxes it
 // reports with the still). A tap picks one: its outline, × to remove it and a corner handle.
-// Dragging moves it, centered on where it is let go; it snaps to the frame's center lines,
+// Dragging moves it, centered on where it is let go: a copy of it, cut from the still,
+// follows the finger, and stays where it was let go until the picture drawn for it arrives; it snaps to the frame's center lines,
 // with a line shown, and while it is dragged a bin shows at the bottom, where letting go
 // removes it. Two fingers, or the corner handle, resize it. A tap on a picked text widget
 // asks for its text (`edit`). The picture is redrawn as soon as a widget is let go
@@ -18,6 +19,8 @@ const props = defineProps<{
   widgets: Widget[];
   /** Where the still drew each widget, in the same order; null for one not drawn. */
   boxes: (FrameBox | null)[];
+  /** The still's picture, cut from for a widget being moved (see `ghost`). */
+  still: string;
   /** The frame's width over its height. */
   ratio: number;
 }>();
@@ -212,6 +215,20 @@ function key(event: KeyboardEvent, index: number): void {
   }
 }
 
+/**
+ * The still placed in a widget's moving box so that the part it drew the widget in fills
+ * it: the copy that follows the finger, at the widget's new size while it is resized.
+ */
+function ghost(index: number) {
+  const drawn = props.boxes[index]!;
+  return {
+    width: `${100 / drawn.width}%`,
+    height: `${100 / drawn.height}%`,
+    left: `${(-drawn.x / drawn.width) * 100}%`,
+    top: `${(-drawn.y / drawn.height) * 100}%`,
+  };
+}
+
 /** A box as CSS for its outline, in percent of the frame. */
 const place = (box: FrameBox) => ({
   left: `${box.x * 100}%`,
@@ -260,6 +277,13 @@ const story = computed(() => props.ratio < 0.8);
       @focus="selected = o.index"
       @keydown="key($event, o.index)"
     >
+      <span
+        v-if="moving?.index === o.index && still && boxes[o.index]"
+        class="ghost"
+        aria-hidden="true"
+      >
+        <img :src="still" alt="" :style="ghost(o.index)" />
+      </span>
       <span class="name" aria-hidden="true">{{ widgetLabel(o.widget) }}</span>
       <template v-if="selected === o.index && !moving">
         <button
@@ -299,6 +323,26 @@ const story = computed(() => props.ratio < 0.8);
   border-radius: 4px;
   cursor: grab;
   touch-action: none;
+}
+
+/* A larger place to touch than the widget itself, for fingers. */
+.widget::before {
+  content: '';
+  position: absolute;
+  inset: -8px;
+}
+
+/* The copy of the widget that follows the finger, cut from the still. */
+.ghost {
+  position: absolute;
+  inset: 3px;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.ghost img {
+  position: absolute;
+  max-width: none;
 }
 
 .widget.selected,

@@ -241,6 +241,7 @@ onBeforeUnmount(() => {
           v-if="editing && url && !draftUrl && scene === 'replay'"
           name="layer"
           :boxes="boxes"
+          :still="url"
           :ratio="frame.width / frame.height"
           :placed="placed"
         />
@@ -401,7 +402,15 @@ onBeforeUnmount(() => {
   background: var(--accent);
 }
 
+/* Cancel takes taps. */
+.status button {
+  pointer-events: auto;
+}
+
+/* A line over the picture says what it is doing; taps go through it to what is under it,
+   except its own Cancel. */
 .status {
+  pointer-events: none;
   position: absolute;
   inset: auto 0.5rem 0.5rem;
   padding: 0.3rem 0.5rem;

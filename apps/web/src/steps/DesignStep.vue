@@ -176,12 +176,13 @@ function removeWidget(index: number): void {
           :hide-play="section === 'overlay' && selectedWidget !== null"
           @drawn="onDrawn"
         >
-          <template #layer="{ boxes, ratio, placed }">
+          <template #layer="{ boxes, still, ratio, placed }">
             <WidgetEditor
               v-if="section === 'overlay'"
               v-model:selected="selectedWidget"
               :widgets="widgets"
               :boxes="boxes.widgets"
+              :still="still"
               :ratio="ratio"
               @change="setWidgets"
               @placed="placed"
@@ -297,12 +298,13 @@ function removeWidget(index: number): void {
             :hide-play="section === 'overlay' && selectedWidget !== null"
             @drawn="onDrawn"
           >
-            <template #layer="{ boxes, ratio, placed }">
+            <template #layer="{ boxes, still, ratio, placed }">
               <WidgetEditor
                 v-if="section === 'overlay'"
                 v-model:selected="selectedWidget"
                 :widgets="widgets"
                 :boxes="boxes.widgets"
+                :still="still"
                 :ratio="ratio"
                 @change="setWidgets"
                 @placed="placed"

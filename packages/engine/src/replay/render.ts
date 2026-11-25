@@ -36,6 +36,10 @@ export interface Context2DLike {
   font: string;
   textAlign: string;
   textBaseline: string;
+  shadowColor: string;
+  shadowBlur: number;
+  shadowOffsetX: number;
+  shadowOffsetY: number;
   setTransform(a: number, b: number, c: number, d: number, e: number, f: number): void;
   beginPath(): void;
   closePath(): void;
@@ -1067,33 +1071,18 @@ export function createRenderer(
   }
 
   /**
-   * The rows text widgets take, with room around, merged where they meet: a soft dark band
-   * goes behind each, and place names fade under them.
+   * Draws one widget in its box: text, a value with its words, or the climb profile. Text has
+   * a soft shadow around its letters, so it reads on a busy map without darkening the frame.
    */
-  function textBands(layout: (Rect | null)[]): { top: number; bottom: number }[] {
-    const room = H * 0.04;
-    const rows = layout
-      .flatMap((box, k) =>
-        box && widgets[k]!.kind !== 'elevation-chart'
-          ? [{ top: box.y0 - room, bottom: box.y1 + room }]
-          : [],
-      )
-      .sort((a, b) => a.top - b.top);
-    const bands: { top: number; bottom: number }[] = [];
-    for (const row of rows) {
-      const last = bands[bands.length - 1];
-      if (last && row.top <= last.bottom) last.bottom = Math.max(last.bottom, row.bottom);
-      else bands.push({ ...row });
-    }
-    return bands;
-  }
-
-  /** Draws one widget in its box: text, a value with its words, or the climb profile. */
   function drawWidget(widget: Widget, box: Rect, values: Map<Metric, MetricValue>, t: number) {
     const scale = widget.size / 100;
     const cx = (box.x0 + box.x1) / 2;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'alphabetic';
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.75)';
+    ctx.shadowBlur = 14 * unit * scale;
+    ctx.shadowOffsetX = 0;
+    ctx.shadowOffsetY = 2 * unit * scale;
     if (widget.kind === 'text') {
       ctx.font = fontOf(600, TEXT_SIZE * scale);
       ctx.fillStyle = 'rgba(255, 255, 255, 0.92)';
@@ -1109,6 +1098,7 @@ export function createRenderer(
         ctx.fillText(value.label, cx, box.y0 + VALUE_SIZE * scale * 1.1 + LABEL_SIZE * scale);
       }
     } else if (profile) {
+      ctx.shadowColor = 'rgba(0, 0, 0, 0)';
       drawElevationProfile(
         ctx,
         profile,
@@ -1121,6 +1111,9 @@ export function createRenderer(
         unit * scale,
       );
     }
+    ctx.shadowColor = 'rgba(0, 0, 0, 0)';
+    ctx.shadowBlur = 0;
+    ctx.shadowOffsetY = 0;
   }
 
   const creditFont = `400 ${Math.round(19 * unit)}px ${fontFamily}`;
@@ -1128,21 +1121,17 @@ export function createRenderer(
   function drawOverlay(t: number, zoom: number, tx: number, ty: number): void {
     const values = metricValues(t);
     const layout = layoutWidgets(values);
-    /** The rows text takes, with room around: a band goes behind each. */
-    const bands = textBands(layout);
+    /** Where text widgets sit, with room around: place names fade under them. */
+    const room = 10 * unit;
+    const textBoxes = layout.flatMap((box, k) =>
+      box && widgets[k]!.kind !== 'elevation-chart'
+        ? [{ x0: box.x0 - room, y0: box.y0 - room, x1: box.x1 + room, y1: box.y1 + room }]
+        : [],
+    );
     if (attribution !== undefined) {
-      // Dark at the bottom, behind the map credit, and a soft band behind text.
+      // Dark at the bottom, behind the map credit.
       ctx.fillStyle = bottomShade;
       ctx.fillRect(0, H * 0.76, W, H * 0.24);
-      for (const { top, bottom } of bands) {
-        const shade = ctx.createLinearGradient(0, top, 0, bottom);
-        shade.addColorStop(0, 'rgba(5, 6, 9, 0)');
-        shade.addColorStop(0.3, 'rgba(5, 6, 9, 0.7)');
-        shade.addColorStop(0.7, 'rgba(5, 6, 9, 0.7)');
-        shade.addColorStop(1, 'rgba(5, 6, 9, 0)');
-        ctx.fillStyle = shade;
-        ctx.fillRect(0, top, W, bottom - top);
-      }
       ctx.font = creditFont;
       ctx.textAlign = 'right';
       ctx.textBaseline = 'alphabetic';
@@ -1179,8 +1168,13 @@ export function createRenderer(
         const nearTop = clamp((label.y - H * 0.02) / (H * 0.03), 0, 1);
         const awayFromText = Math.min(
           1,
-          ...bands.map(({ top, bottom }) =>
-            clamp(Math.max(top - label.y, label.y - bottom) / (H * 0.03), 0, 1),
+          ...textBoxes.map((box) =>
+            clamp(
+              Math.max(box.y0 - label.y, label.y - box.y1, box.x0 - label.x, label.x - box.x1) /
+                (H * 0.02),
+              0,
+              1,
+            ),
           ),
         );
         const alpha = label.alpha * nearBottom * nearTop * awayFromText;

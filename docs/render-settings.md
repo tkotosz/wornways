@@ -183,8 +183,7 @@ A point is a place on the frame, in percent of its width across and of its heigh
 block lines up with it by the third of the frame the point falls in: across, its left edge,
 its middle or its right edge; down, its top, its middle or its bottom. So `7%,5%` puts the
 top-left corner of the title near the top-left corner of the frame, and `50%,50%` centers it.
-A block placed at a point stays there, also over another block, and gets a soft dark band
-behind it, like text in the middle row. The metrics card takes points the same way.
+A block placed at a point stays there, also over another block. The metrics card takes points the same way.
 
 ### Metrics card
 

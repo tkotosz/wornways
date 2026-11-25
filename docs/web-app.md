@@ -146,25 +146,27 @@ list.
      the title, metrics and elevation profile settings describe: the title at the top, the
      first value large at the bottom left with the others smaller in a row under it, and,
      for a single activity, the chart along the bottom. Each widget is centered on its point
-     of the frame, so it keeps its place while its value changes during the replay; text
-     gets a soft dark band behind it. On the still each widget has an outline over where the
-     engine drew it (the boxes it reports with the still). A tap picks one: its name on a
-     tab, × to remove it and a corner handle; Play steps aside while one is picked, and a
-     tap on the picture outside the widgets lets it go. Dragging moves it; it snaps to the
-     frame's center lines, with a line shown, and while it is dragged a bin shows at the
-     bottom, where letting it go removes it. Two fingers, or the corner handle, resize it
-     (50 to 250%). A tap on a picked text widget opens its text. The still is drawn again as
-     soon as a widget is let go, without the usual pause. The arrow keys move a picked
-     widget by 1% of the frame (5% with Shift), + and - resize it and Delete removes it. On
-     a story-shaped frame, while a widget is picked or moved, hatched guides show what
-     Instagram's own controls cover (Meta's ads guide: 14% at the top, 35% at the bottom, 6%
-     at each side). Under the picture, "+ Add a widget" opens the palette: Text, the
-     elevation chart, and each value this video can show as a tile with its own number
-     (calories a service gives on request are offered before they are known); a value
-     already on the picture is dimmed, and a new widget comes in a free spot clear of the
-     middle, where Play sits. Then a row per widget with what it shows, which opens its
-     settings: its text (or back to the title), its size and "Remove from the picture". The
-     small watermark at the bottom left, on the map credit's line, stays a switch.
+     of the frame, so it keeps its place while its value changes during the replay; text has
+     a soft shadow around its letters, so it reads on a busy map without darkening the
+     frame. On the still each widget has an outline over where the engine drew it (the boxes
+     it reports with the still). A tap picks one: its name on a tab, × to remove it and a
+     corner handle; Play steps aside while one is picked, and a tap on the picture outside
+     the widgets lets it go. Dragging moves it, a copy of it cut from the still following
+     the finger until the picture drawn for it arrives; it snaps to the frame's center
+     lines, with a line shown, and while it is dragged a bin shows at the bottom, where
+     letting it go removes it. Two fingers, or the corner handle, resize it (50 to 250%). A
+     tap on a picked text widget opens its text. The still is drawn again as soon as a
+     widget is let go, without the usual pause. The arrow keys move a picked widget by 1% of
+     the frame (5% with Shift), + and - resize it and Delete removes it. On a story-shaped
+     frame, while a widget is picked or moved, hatched guides show what Instagram's own
+     controls cover (Meta's ads guide: 14% at the top, 35% at the bottom, 6% at each side).
+     Under the picture, "+ Add a widget" opens the palette: Text, the elevation chart, and
+     each value this video can show as a tile with its own number (calories a service gives
+     on request are offered before they are known); a value already on the picture is
+     dimmed, and a new widget comes in a free spot clear of the middle, where Play sits.
+     Then a row per widget with what it shows, which opens its settings: its text (or back
+     to the title), its size and "Remove from the picture". The small watermark at the
+     bottom left, on the map credit's line, stays a switch.
    - **Ending:** what comes after the replay: the end pause on the finished picture, the
      totals card (for several activities only; on for Recap) and the end card.
 4. **Export.** A stage in the video's shape, which shows the finished picture with a "Make
