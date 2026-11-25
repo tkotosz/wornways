@@ -173,7 +173,7 @@ function removeWidget(index: number): void {
           :seconds="plan?.seconds"
           :scene="section === 'ending' ? 'ending' : 'replay'"
           :editing="section === 'overlay' || section === 'ending'"
-          :hide-play="section === 'overlay' && selectedWidget !== null"
+          :hide-play="section === 'overlay'"
           @drawn="onDrawn"
         >
           <template #layer="{ boxes, still, ratio, placed }">
@@ -295,7 +295,7 @@ function removeWidget(index: number): void {
             :seconds="plan?.seconds"
             :scene="section === 'ending' ? 'ending' : 'replay'"
             :editing="section === 'overlay' || section === 'ending'"
-            :hide-play="section === 'overlay' && selectedWidget !== null"
+            :hide-play="section === 'overlay'"
             @drawn="onDrawn"
           >
             <template #layer="{ boxes, still, ratio, placed }">

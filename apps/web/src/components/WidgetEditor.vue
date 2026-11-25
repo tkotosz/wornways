@@ -111,6 +111,7 @@ function start(event: PointerEvent, index: number, resize: boolean): void {
   // A second finger while one is down: the drag under way turns into resizing.
   if (holding) {
     pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    layer.value.setPointerCapture(event.pointerId);
     return;
   }
   // A new hold: no finger is left from one before, whatever the browser told of it.
@@ -173,13 +174,15 @@ function start(event: PointerEvent, index: number, resize: boolean): void {
     };
   };
   const end = (e: PointerEvent) => {
+    if (!holding) return;
     pointers.delete(e.pointerId);
     if (pointers.size > 0 && e.type !== 'pointercancel') return;
     holding = false;
     pointers.clear();
-    window.removeEventListener('pointermove', move);
-    window.removeEventListener('pointerup', end);
-    window.removeEventListener('pointercancel', end);
+    surface.removeEventListener('pointermove', move);
+    surface.removeEventListener('pointerup', end);
+    surface.removeEventListener('pointercancel', end);
+    surface.removeEventListener('lostpointercapture', end);
     const bin = overBin.value;
     overBin.value = false;
     if (bin) return remove(index);
@@ -199,15 +202,22 @@ function start(event: PointerEvent, index: number, resize: boolean): void {
         y: round((now.box.y + now.box.height / 2) * 100),
       });
   };
-  window.addEventListener('pointermove', move);
-  window.addEventListener('pointerup', end);
-  window.addEventListener('pointercancel', end);
+  // Every move of the finger comes to the layer, which stays while the outlines under the
+  // finger change, and the hold ends however the browser lets the finger go.
+  const surface = layer.value;
+  surface.setPointerCapture(event.pointerId);
+  surface.addEventListener('pointermove', move);
+  surface.addEventListener('pointerup', end);
+  surface.addEventListener('pointercancel', end);
+  surface.addEventListener('lostpointercapture', end);
 }
 
 /** A second finger on the picture while a widget is held resizes it; else a tap lets go. */
 function secondFinger(event: PointerEvent): void {
-  if (holding) pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
-  else selected.value = null;
+  if (holding) {
+    pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    layer.value?.setPointerCapture(event.pointerId);
+  } else selected.value = null;
 }
 
 /** Arrow keys move the picked widget by 1% of the frame (Shift: 5%), + and - resize it. */
@@ -331,6 +341,8 @@ const story = computed(() => props.ratio < 0.8);
 .layer {
   position: absolute;
   inset: 0;
+  /* Its own stacking: the widgets' touch margins sit under the widgets, over the picture. */
+  isolation: isolate;
   touch-action: none;
   user-select: none;
   -webkit-touch-callout: none;
@@ -348,11 +360,20 @@ const story = computed(() => props.ratio < 0.8);
   touch-action: none;
 }
 
-/* A larger place to touch than the widget itself, for fingers. */
+/* A larger place to touch than the widget itself, for fingers: more across than down, as
+   widgets often sit one above another. Under the other widgets, so it never takes a touch
+   meant for one of them. */
 .widget::before {
   content: '';
   position: absolute;
-  inset: -8px;
+  z-index: -1;
+  inset: -3px -10px;
+}
+
+/* The picked widget, and the one moving, above the others. */
+.widget.selected,
+.widget.moving {
+  z-index: 1;
 }
 
 /* The copy of the widget that follows the finger, cut from the still. */
