@@ -17,6 +17,7 @@ import {
   valueOf,
   withPreset,
   type Adjustments,
+  type PlaybackPart,
   type PresetChoice,
 } from '../adjust.ts';
 import ExactNumber from './ExactNumber.vue';
@@ -25,7 +26,15 @@ import PresetDrawing from './PresetDrawing.vue';
 import SettingsGroups from './SettingsGroups.vue';
 import type { PlanReport } from '../messages.ts';
 
-const props = defineProps<{ activities: number; plan: PlanReport | null }>();
+const props = defineProps<{
+  activities: number;
+  plan: PlanReport | null;
+  /**
+   * Phones: one part at a time, compact: the presets on a sideways row, the length, or one
+   * of Fine-tune's groups. Without it, all of them, with Fine-tune folded.
+   */
+  part?: PlaybackPart;
+}>();
 const adjustments = defineModel<Adjustments>({ required: true });
 
 /** One activity gets its own presets; several get the others. */
@@ -59,9 +68,9 @@ const fineTuneOpen = ref(false);
 </script>
 
 <template>
-  <div class="settings">
-    <h2 class="kicker">Playback style</h2>
-    <div class="presets" role="radiogroup" aria-label="Preset">
+  <div class="settings" :class="{ compact: part }">
+    <h2 v-if="!part" class="kicker">Playback style</h2>
+    <div v-if="!part || part === 'style'" class="presets" role="radiogroup" aria-label="Preset">
       <button
         v-for="name in presetChoices(count)"
         :key="name"
@@ -80,11 +89,11 @@ const fineTuneOpen = ref(false);
       </button>
     </div>
 
-    <div class="length">
+    <div v-if="!part || part === 'length'" class="length">
       <div class="length-head">
         <div>
           <strong>Video length</strong>
-          <p class="muted small">
+          <p v-if="!part" class="muted small">
             {{
               count === 'one'
                 ? settingHint('duration', 'one')
@@ -113,7 +122,7 @@ const fineTuneOpen = ref(false);
       />
     </div>
 
-    <div class="summary" role="status">
+    <div v-if="!part || part === 'style' || part === 'length'" class="summary" role="status">
       <span class="icon" aria-hidden="true">▶</span>
       <div>
         <span class="caption">Your replay</span>
@@ -125,7 +134,20 @@ const fineTuneOpen = ref(false);
       </div>
     </div>
 
-    <div class="fine-tune">
+    <!-- Phones: Fine-tune's groups are tabs of their own. -->
+    <template v-if="part === 'timing' || part === 'camera'">
+      <SettingsGroups v-model="tuned" :groups="[part]" :count="count" compact />
+      <button
+        v-if="part === 'timing'"
+        type="button"
+        class="link reset"
+        @click="adjustments = resetPlayback(adjustments, count)"
+      >
+        Reset playback to defaults
+      </button>
+    </template>
+
+    <div v-if="!part" class="fine-tune">
       <button
         type="button"
         class="fine-tune-toggle"
@@ -348,5 +370,76 @@ const fineTuneOpen = ref(false);
     flex: none;
     width: 3.4rem;
   }
+}
+
+/* Phones, one part at a time: no boxes, the presets as small cards on a sideways row. */
+.compact .presets {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 0.6rem;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.compact .preset {
+  flex: none;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.5rem;
+  width: 12.5rem;
+  padding: 0.55rem 0.65rem;
+  border-radius: 10px;
+}
+
+.compact .drawing {
+  width: 2.4rem;
+}
+
+.compact .text {
+  gap: 0.1rem;
+  padding-right: 0;
+  font-size: 0.9rem;
+}
+
+.compact .text .muted {
+  display: -webkit-box;
+  overflow: hidden;
+  font-size: 0.72rem;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+}
+
+.compact .check {
+  display: none;
+}
+
+.compact .length {
+  margin-bottom: 0.6rem;
+  padding: 0;
+  border: 0;
+  background: none;
+}
+
+.compact .length-head {
+  align-items: center;
+  margin-bottom: 0.3rem;
+}
+
+.compact .summary {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  font-size: 0.85rem;
+}
+
+.compact .summary .icon {
+  display: none;
+}
+
+.reset {
+  align-self: flex-start;
+  margin-top: 0.6rem;
 }
 </style>

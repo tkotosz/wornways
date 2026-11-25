@@ -22,29 +22,51 @@ export type Adjustments = Record<string, string | boolean>;
  */
 export const SHOW_TITLE = 'show-title';
 
+/** On phones, the Playback section in parts, one at a time: its tabs. */
+export type PlaybackPart = 'style' | 'length' | 'timing' | 'camera';
+export const PLAYBACK_PARTS: { id: PlaybackPart; label: string }[] = [
+  { id: 'style', label: 'Style' },
+  { id: 'length', label: 'Length' },
+  { id: 'timing', label: 'Timing' },
+  { id: 'camera', label: 'Camera' },
+];
+
+/** On phones, the tab of each panel in its section. */
+export const PANEL_TABS: Record<Panel, string> = {
+  timing: 'Timing',
+  camera: 'Camera',
+  privacy: 'Privacy',
+  map: 'Map',
+  title: 'Title',
+  metrics: 'Metrics',
+  elevation: 'Elevation',
+  watermark: 'Watermark',
+  pause: 'Pause',
+  totals: 'Totals',
+  'end-card': 'End card',
+};
+
 /** The panels of Fine-tune playback, in the Playback section. */
 export const PLAYBACK_PANELS: Panel[] = ['timing', 'camera'];
 
 /**
- * The sections of the Video step, in the order things are decided: where the video will be
+ * The sections of the Design step, in the order things are decided: where the video will be
  * posted, how the routes play, the map, what is drawn over the replay, and what comes after
  * it. Frame and Playback have controls of their own; the others are panels.
  */
 export type Section = 'frame' | 'playback' | 'map' | 'overlay' | 'ending';
-export const SECTIONS: { id: Section; label: string; heading: string; panels: Panel[] }[] = [
-  { id: 'frame', label: 'Frame', heading: 'Where will you post it?', panels: [] },
-  { id: 'playback', label: 'Playback', heading: 'How should your routes play?', panels: [] },
-  { id: 'map', label: 'Map', heading: 'How should the map look?', panels: ['map', 'privacy'] },
+export const SECTIONS: { id: Section; label: string; panels: Panel[] }[] = [
+  { id: 'frame', label: 'Frame', panels: [] },
+  { id: 'playback', label: 'Playback', panels: [] },
+  { id: 'map', label: 'Map', panels: ['map', 'privacy'] },
   {
     id: 'overlay',
     label: 'Overlay',
-    heading: 'What goes on the video?',
     panels: ['title', 'metrics', 'elevation', 'watermark'],
   },
   {
     id: 'ending',
     label: 'Ending',
-    heading: 'How should it end?',
     panels: ['pause', 'totals', 'end-card'],
   },
 ];
@@ -107,7 +129,7 @@ const presetPlayback = (preset: PresetChoice): Adjustments =>
 
 /**
  * The preset's values of other settings, such as the totals card: where they start, until
- * the person sets them in the Video step.
+ * the person sets them in the Design step.
  */
 const presetStarting = (preset: PresetChoice): Adjustments =>
   Object.fromEntries(
@@ -299,7 +321,7 @@ export const settingHint = (setting: string, count: ActivityCount) =>
 
 export const sliderStep = (setting: string) => STEPS[setting] ?? 1;
 
-/** A panel of settings in the Video step's sections. */
+/** A panel of settings in the Design step's sections. */
 export type Panel =
   | 'timing'
   | 'camera'

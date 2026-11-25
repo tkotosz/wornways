@@ -25,9 +25,8 @@ always go back to an earlier step; nothing is lost by moving between steps.
 ┌──────────────────────────────────────────────────────────────────────────┐
 │ wornways                                 Your files stay on this device │
 ├──────────────────────────────────────────────────────────────────────────┤
-│        (✓ Source) (✓ Activities) (3 Video) (4 Export)                    │
+│        (✓ Source) (✓ Activities) (3 Design) (4 Export)                   │
 ├──────────────────────────────────────────────────────────────────────────┤
-│ How should your routes play?                                             │
 │ (Frame) [Playback] (Map) (Overlay) (Ending)                              │
 │ ┌─────────────┐  PLAYBACK STYLE                                          │
 │ │             │  ┌────────────────┐ ┌────────────────┐ ┌──────────────┐  │
@@ -82,13 +81,22 @@ phone.
    matching activities in the same grid, all ticked at first, with their count and total
    distance; the ticked ones are what the video shows, and unticked ones stay unticked
    when the filters change. Nothing can be deleted here.
-3. **Video.** The video itself, in sections, with a section bar under the heading, in
-   the order things are decided. Continue goes to the next section, and from the last to
+3. **Design.** How the video plays and looks, in sections, with a section bar under the
+   step bar, in the order things are decided; the bar shows where the person is, so the
+   step has no title of its own. Continue goes to the next section, and from the last to
    Export; Back goes to the section before, and from the first to Activities; the bar
    opens any section, since every setting has a default. The section open last is kept
-   while the app is open. Beside the sections on wide screens, above them on phones, one
-   live preview stays while the sections change (see Preview). The settings of this step
-   are remembered for the next visit.
+   while the app is open. One live preview stays while the sections change (see
+   Preview). On wide screens it sits beside the settings and the page scrolls. On phones
+   the step is a full editor screen that does not scroll, laid out like photo and video
+   editors: a slim top bar (← Activities, the step, Export →) in place of the app's header
+   and step bar; the preview alone, with no lines around it, as large as the room allows; under it the open section's
+   settings in a panel of fixed height, so the picture does not jump, with a tab for each
+   group (Playback: Style, Length, Timing, Camera; Map: Map, Privacy; Overlay: Title,
+   Metrics, Elevation, Watermark; Ending: Pause, Totals, End card) and each setting on a
+   compact row beside its label, its explanation behind an i; the values to show open in a
+   dialog; the five sections along the bottom, with a drawing each. The settings of this
+   step are remembered for the next visit.
    - **Frame:** the aspect ratio (Story, Square or Landscape, for where the video will be
      posted, or a custom size) and the frame rate (24, 30 or 60 fps). It comes first
      because the shape decides how everything else looks.
@@ -221,7 +229,7 @@ for exporting an account or a single activity from Strava or Garmin.
 - A reload opens Ride with GPS again when it is the chosen source, with the tab's filters
   and selection; choosing files, Strava or the demo keeps the connection. When the person
   comes back from connecting one service, that one is the chosen source; the other one's
-  connection stays. The look of the video (the Video step) is the same one files use.
+  connection stays. The look of the video (the Design step) is the same one files use.
 - Trips get the id `rwgps-<trip id>`, and Ride with GPS's activity types (`cycling:road`,
   `running:trail`, ...) are mapped to the same sport names as files. There is no webhook:
   changes on Ride with GPS show up the next time the list is read.

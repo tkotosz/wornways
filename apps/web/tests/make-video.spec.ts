@@ -4,7 +4,7 @@ import path from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
 import { offlineMap } from './offline-map.ts';
 import { pickSource } from './sources.ts';
-import { openSection, openStep } from './steps.ts';
+import { expectSection, openSection, openStep } from './steps.ts';
 
 const fixtures = new URL('../../../packages/engine/tests/import/fixtures/', import.meta.url);
 const fixture = (name: string) => new URL(name, fixtures).pathname;
@@ -368,7 +368,7 @@ test('accepts month and year bounds and validates custom frame sizes', async ({
   await to.press('Enter');
   await expect(page.getByTestId('chosen-count')).toContainText('1 of 1 activity');
 
-  await openStep(page, 'Video'); // opens on Frame
+  await openStep(page, 'Design'); // opens on Frame
   await page.getByRole('button', { name: 'Custom size' }).click();
   const size = page.getByRole('textbox', { name: 'Frame size in pixels' });
   await size.fill('641x480');
@@ -436,9 +436,9 @@ test('keeps the video while the choice stays the same', async ({ page, context }
   await page.getByRole('button', { name: 'Make video' }).click();
   await expect(page.getByTestId('result')).toBeVisible({ timeout: 150_000 });
 
-  // Back opens the Video step's last section, Ending, whose Continue comes back.
+  // Back opens the Design step's last section, Ending, whose Continue comes back.
   await page.getByRole('button', { name: '← Back' }).click();
-  await expect(page.getByRole('heading', { name: 'How should it end?' })).toBeVisible();
+  await expectSection(page, 'Ending');
   await page.getByRole('button', { name: 'Continue' }).click();
   await expect(page.getByTestId('result')).toBeVisible();
   // With a video made, the next thing to do is to download it.
@@ -522,7 +522,7 @@ test('offers heart rate and cadence for an activity that recorded them', async (
   await page.getByRole('button', { name: 'Continue' }).click(); // to Activities
   await page.getByRole('button', { name: 'Continue' }).click(); // to Video
   await openSection(page, 'Overlay');
-  await expect(page.getByRole('heading', { name: 'What goes on the video?' })).toBeVisible();
+  await expectSection(page, 'Overlay');
   const metrics = page.getByTestId('group-metrics');
   for (const name of ['Heart rate', 'Max heart rate', 'Cadence'])
     await expect(metrics.getByRole('button', { name, exact: true })).toHaveAttribute(
@@ -683,7 +683,7 @@ test('sets up the video and its text, and keeps both for the next visit', async 
   await addFiles(page, 'morning-ride.fit', 'trail-run.tcx');
   await page.getByRole('button', { name: 'Continue' }).click(); // to Activities
   await page.getByRole('button', { name: 'Continue' }).click(); // to Video, its Frame
-  await expect(page.getByRole('heading', { name: 'Where will you post it?' })).toBeVisible();
+  await expectSection(page, 'Frame');
   await page.getByRole('button', { name: 'Continue' }).click(); // to Playback
   const chip = (name: string) => page.getByRole('button', { name, exact: true });
   const slider = (name: string) => page.getByRole('slider', { name });
@@ -730,7 +730,7 @@ test('sets up the video and its text, and keeps both for the next visit', async 
 
   // Overlay: the title starts as the automatic one, with its position and size.
   await openSection(page, 'Overlay');
-  await expect(page.getByRole('heading', { name: 'What goes on the video?' })).toBeVisible();
+  await expectSection(page, 'Overlay');
   const title = page.getByRole('textbox', { name: 'Title' });
   await expect(title).toHaveValue('27 Apr – 2 May 2026');
   await title.fill('Spring');
@@ -790,7 +790,7 @@ test('sets up the video and its text, and keeps both for the next visit', async 
   await expect(page.getByTestId('made')).toContainText('12.5 s');
 
   await page.reload();
-  await openStep(page, 'Video');
+  await openStep(page, 'Design');
   await expect(chip('Square 1:1')).toHaveAttribute('aria-pressed', 'true');
   await openSection(page, 'Playback');
   await expect(summary).toHaveText('10 seconds · Custom playback');
@@ -836,12 +836,12 @@ test('offers Highlight for a single activity, and the other presets for several'
   await expect(follows).toHaveAttribute('aria-pressed', 'true');
   await page.getByRole('button', { name: /Fine-tune playback/ }).click();
   await page.getByRole('button', { name: 'Continue' }).click();
-  await expect(page.getByRole('heading', { name: 'How should the map look?' })).toBeVisible();
+  await expectSection(page, 'Map');
 
   // Several: the presets for several, with their own default.
   await page.getByRole('button', { name: 'Activities', exact: true }).click();
   await trailRun(page).click();
-  await openStep(page, 'Video');
+  await openStep(page, 'Design');
   await openSection(page, 'Playback');
   await expect(presets).toHaveCount(3);
   await expect(preset('All at once')).toHaveAttribute('aria-checked', 'true');

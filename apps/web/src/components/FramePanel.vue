@@ -5,6 +5,8 @@ import { SETTINGS, SIZE_PRESETS, parseFrameSize } from '@wornways/engine';
 import { computed, ref } from 'vue';
 import { FRAME_RATES, SIZE_LABELS, type Adjustments } from '../adjust.ts';
 
+/** Phones: no box or heading, each row beside its label, the shapes on one sideways row. */
+defineProps<{ compact?: boolean }>();
 const adjustments = defineModel<Adjustments>({ required: true });
 
 const size = computed(() =>
@@ -44,10 +46,10 @@ function editSize(): void {
 </script>
 
 <template>
-  <div class="frame" data-testid="frame">
-    <h2>Frame</h2>
+  <div class="frame" :class="{ compact }" data-testid="frame">
+    <h2 v-if="!compact">Frame</h2>
     <div class="row">
-      <span class="label">Aspect ratio</span>
+      <span class="label">{{ compact ? 'Shape' : 'Aspect ratio' }}</span>
       <div class="chips" role="group" aria-label="Aspect ratio">
         <button
           v-for="name in Object.keys(SIZE_PRESETS)"
@@ -102,7 +104,7 @@ function editSize(): void {
           {{ rate }} fps
         </button>
       </div>
-      <p class="hint muted">
+      <p v-if="!compact" class="hint muted">
         30 fps works well for most videos; 60 fps is smoother but makes larger files.
       </p>
     </div>
@@ -155,5 +157,38 @@ function editSize(): void {
   background: var(--background);
   color: var(--text);
   font: inherit;
+}
+
+.frame.compact {
+  gap: 0.7rem;
+  padding: 0;
+  border-radius: 0;
+  background: none;
+}
+
+.compact .row {
+  display: grid;
+  grid-template-columns: 6.5rem minmax(0, 1fr);
+  gap: 0.4rem 0.75rem;
+  align-items: center;
+}
+
+.compact .label {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.compact .row > :not(.label) {
+  grid-column: 2;
+}
+
+.compact .chips[role='group'] {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.compact .chip {
+  flex: none;
 }
 </style>

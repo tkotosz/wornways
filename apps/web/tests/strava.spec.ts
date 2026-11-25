@@ -1,6 +1,6 @@
 import { expect, test, type Page, type WebSocketRoute } from '@playwright/test';
 import { pickSource } from './sources.ts';
-import { openSection, openStep } from './steps.ts';
+import { expectSection, openSection } from './steps.ts';
 
 const olderYear = new Date().getFullYear() - 1;
 const csrf = 'strava-test-state';
@@ -237,9 +237,9 @@ test.describe('Strava on a phone', () => {
     await expect(page.getByRole('status')).toContainText('no usable GPS track');
     await page.getByRole('checkbox', { name: 'Strava test ride' }).check();
     await page.getByRole('button', { name: 'Continue' }).click();
-    await expect(page.getByRole('heading', { name: 'Where will you post it?' })).toBeVisible();
+    await expectSection(page, 'Frame');
     await expect(page.getByTestId('preview').getByRole('img')).toBeVisible();
-    await openStep(page, 'Export');
+    await page.getByRole('button', { name: 'Export →' }).click();
     await page.getByRole('button', { name: 'Make video' }).click();
     await expect(page.getByTestId('result')).toBeVisible({ timeout: 60_000 });
     const download = page.waitForEvent('download');
@@ -342,7 +342,7 @@ test('shows a slow track download in a dialog that can be canceled', async ({ pa
     // The track under way still arrives and is kept: going on again does not fetch it twice.
     releaseTrack();
     await page.getByRole('button', { name: 'Continue' }).click();
-    await expect(page.getByRole('heading', { name: 'Where will you post it?' })).toBeVisible();
+    await expectSection(page, 'Frame');
     expect(mock.tracks.filter((id) => id === rideId)).toHaveLength(1);
   } finally {
     releaseTrack();
@@ -357,7 +357,7 @@ test('fetches calories only for a video that shows them, and keeps them', async 
   await page.getByRole('checkbox', { name: 'Strava test ride' }).check();
   await page.getByRole('button', { name: 'Continue' }).click();
   await openSection(page, 'Overlay');
-  await expect(page.getByRole('heading', { name: 'What goes on the video?' })).toBeVisible();
+  await expectSection(page, 'Overlay');
 
   // Offered before any is known, and not asked for until picked.
   const caloriesChip = page
@@ -390,7 +390,7 @@ test('shows the tracks downloaded while Strava is the source', async ({ page }) 
   await page.getByRole('button', { name: 'Last year', exact: true }).click();
   await page.getByRole('checkbox', { name: 'Strava test ride' }).check();
   await page.getByRole('button', { name: 'Continue' }).click();
-  await expect(page.getByRole('heading', { name: 'Where will you post it?' })).toBeVisible();
+  await expectSection(page, 'Frame');
 
   await page.getByRole('button', { name: 'Source', exact: true }).click();
   await expect(page.getByTestId('downloaded-count')).toHaveText(
@@ -411,7 +411,7 @@ test('shows the tracks downloaded while Strava is the source', async ({ page }) 
   await page.getByRole('button', { name: 'Last year', exact: true }).click();
   await expect(page.getByRole('checkbox', { name: 'Strava test ride' })).toBeChecked();
   await page.getByRole('button', { name: 'Continue' }).click();
-  await expect(page.getByRole('heading', { name: 'Where will you post it?' })).toBeVisible();
+  await expectSection(page, 'Frame');
   await page.getByRole('button', { name: 'Source', exact: true }).click();
   await expect(page.getByTestId('downloaded')).toContainText('Strava test ride');
   expect(mock.tracks.filter((id) => id === rideId)).toHaveLength(1);
@@ -523,7 +523,7 @@ test('reuses the selected track after a reload and socket interruption', async (
   await page.getByRole('button', { name: 'Continue' }).click();
   await expect(page.getByRole('checkbox', { name: 'Strava test ride' })).toBeChecked();
   await page.getByRole('button', { name: 'Continue' }).click();
-  await expect(page.getByRole('heading', { name: 'Where will you post it?' })).toBeVisible();
+  await expectSection(page, 'Frame');
   expect(mock.tracks.filter((id) => id === rideId)).toHaveLength(1);
   const savedDraft = () => page.evaluate(() => sessionStorage.getItem('wornways-strava-draft'));
   await expect.poll(savedDraft).toMatch(/^[A-Za-z0-9+/]+={0,2}$/);
@@ -550,7 +550,7 @@ test('reuses the selected track after a reload and socket interruption', async (
   await expect(page.getByRole('checkbox', { name: 'Strava test ride' })).toBeChecked();
   expect(mock.exchanges()).toBe(1);
   await page.getByRole('button', { name: 'Continue' }).click();
-  await expect(page.getByRole('heading', { name: 'Where will you post it?' })).toBeVisible();
+  await expectSection(page, 'Frame');
   expect(mock.tracks.filter((id) => id === rideId)).toHaveLength(1);
 });
 
@@ -561,7 +561,7 @@ test('validates cached activities on reload and removes deleted tracks', async (
   await page.getByRole('button', { name: 'Last year', exact: true }).click();
   await page.getByRole('checkbox', { name: 'Strava test ride' }).check();
   await page.getByRole('button', { name: 'Continue' }).click();
-  await expect(page.getByRole('heading', { name: 'Where will you post it?' })).toBeVisible();
+  await expectSection(page, 'Frame');
 
   const cached = () =>
     page.evaluate(`

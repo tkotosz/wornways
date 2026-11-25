@@ -11,7 +11,7 @@ import {
   type SensorChannel,
   type TotalsField,
 } from '@wornways/engine';
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import {
   SHOW_TITLE,
   choiceLabel,
@@ -27,12 +27,18 @@ import {
 } from '../adjust.ts';
 import type { PlanReport } from '../messages.ts';
 import ExactNumber from './ExactNumber.vue';
+import ModalPanel from './ModalPanel.vue';
 
 const props = defineProps<{
   /** The groups to show, in order. */
   groups: Panel[];
   count: ActivityCount;
   plan?: PlanReport | null;
+  /**
+   * Phones: no box or heading (the group is a tab), each setting on a row beside its label,
+   * choices on one row that scrolls sideways, and the lists of values in a dialog.
+   */
+  compact?: boolean;
 }>();
 const adjustments = defineModel<Adjustments>({ required: true });
 
@@ -49,6 +55,9 @@ const GROUP_TITLES: Record<Panel, string> = {
   totals: 'Totals card',
   'end-card': 'End card',
 };
+
+/** Compact: the setting whose explanation is open; the others show only their ⓘ. */
+const hintOpen = ref<string | null>(null);
 
 const groups = computed(() =>
   props.groups
@@ -204,8 +213,13 @@ function toggleTotal(field: TotalsField): void {
 <template>
   <div class="groups">
     <template v-for="g in groups" :key="g.group">
-      <div v-if="g.main.length" class="group" :data-testid="`group-${g.group}`">
-        <h2 v-if="GROUP_TITLES[g.group]">{{ GROUP_TITLES[g.group] }}</h2>
+      <div
+        v-if="g.main.length"
+        class="group"
+        :class="{ compact }"
+        :data-testid="`group-${g.group}`"
+      >
+        <h2 v-if="!compact">{{ GROUP_TITLES[g.group] }}</h2>
         <!-- The title's switch, like the metrics' one; off, the video has no title. -->
         <div v-if="g.group === 'title'" class="setting">
           <span class="label">Show title</span>
@@ -224,8 +238,20 @@ function toggleTotal(field: TotalsField): void {
         </div>
         <template v-for="setting in g.main" :key="setting.name">
           <div v-if="shown(g.group, setting.name)" class="setting">
-            <span :id="`label-${setting.name}`" class="label">
-              {{ settingLabel(setting) }}
+            <span class="label-cell">
+              <span :id="`label-${setting.name}`" class="label">
+                {{ settingLabel(setting) }}
+              </span>
+              <button
+                v-if="compact && settingHint(setting.name, count)"
+                type="button"
+                class="about"
+                :aria-expanded="hintOpen === setting.name"
+                :aria-label="`About ${settingLabel(setting).toLowerCase()}`"
+                @click="hintOpen = hintOpen === setting.name ? null : setting.name"
+              >
+                i
+              </button>
             </span>
             <div class="control" :aria-labelledby="`label-${setting.name}`" role="group">
               <!-- A choice: one button per option; a position as a picker of the frame's nine spots. -->
@@ -308,7 +334,41 @@ function toggleTotal(field: TotalsField): void {
                 </button>
               </div>
 
-              <!-- The metrics, in the order picked. -->
+              <!-- The metrics, in the order picked; on a phone, in a dialog. -->
+              <div v-else-if="setting.name === 'metrics-fields' && compact" class="list">
+                <span class="picked">{{ pickedMetrics.map(metricLabel).join(', ') }}</span>
+                <ModalPanel title="Values on the video">
+                  <template #trigger="{ open }">
+                    <button type="button" class="link" aria-haspopup="dialog" @click="open">
+                      Edit ›
+                    </button>
+                  </template>
+                  <p class="muted list-hint">They show in the order they are picked.</p>
+                  <div class="chips wrap">
+                    <button
+                      v-for="metric in offeredMetrics"
+                      :key="metric"
+                      type="button"
+                      class="chip"
+                      :aria-pressed="pickedMetrics.includes(metric)"
+                      @click="toggleMetric(metric)"
+                    >
+                      <span v-if="pickedMetrics.includes(metric)" class="order">{{
+                        pickedMetrics.indexOf(metric) + 1
+                      }}</span>
+                      {{ metricLabel(metric) }}
+                    </button>
+                  </div>
+                  <button
+                    v-if="plan && adjustments['metrics-fields'] !== undefined"
+                    type="button"
+                    class="link"
+                    @click="set('metrics-fields', undefined)"
+                  >
+                    Use automatic metrics
+                  </button>
+                </ModalPanel>
+              </div>
               <div v-else-if="setting.name === 'metrics-fields'" class="chips">
                 <button
                   v-for="metric in offeredMetrics"
@@ -333,7 +393,43 @@ function toggleTotal(field: TotalsField): void {
                 </button>
               </div>
 
-              <!-- The totals card's values, in the order picked. -->
+              <!-- The totals card's values, in the order picked; on a phone, in a dialog. -->
+              <div v-else-if="setting.name === 'totals-fields' && compact" class="list">
+                <span class="picked">{{
+                  pickedTotals.map((field) => TOTALS_LABELS[field]).join(', ')
+                }}</span>
+                <ModalPanel title="Values on the totals card">
+                  <template #trigger="{ open }">
+                    <button type="button" class="link" aria-haspopup="dialog" @click="open">
+                      Edit ›
+                    </button>
+                  </template>
+                  <p class="muted list-hint">They show in the order they are picked.</p>
+                  <div class="chips wrap">
+                    <button
+                      v-for="field in offeredTotals"
+                      :key="field"
+                      type="button"
+                      class="chip"
+                      :aria-pressed="pickedTotals.includes(field)"
+                      @click="toggleTotal(field)"
+                    >
+                      <span v-if="pickedTotals.includes(field)" class="order">{{
+                        pickedTotals.indexOf(field) + 1
+                      }}</span>
+                      {{ TOTALS_LABELS[field] }}
+                    </button>
+                  </div>
+                  <button
+                    v-if="adjustments['totals-fields'] !== undefined"
+                    type="button"
+                    class="link"
+                    @click="set('totals-fields', undefined)"
+                  >
+                    Use automatic totals
+                  </button>
+                </ModalPanel>
+              </div>
               <div v-else-if="setting.name === 'totals-fields'" class="chips">
                 <button
                   v-for="field in offeredTotals"
@@ -358,7 +454,10 @@ function toggleTotal(field: TotalsField): void {
                 </button>
               </div>
 
-              <p v-if="settingHint(setting.name, count)" class="hint muted">
+              <p
+                v-if="settingHint(setting.name, count) && (!compact || hintOpen === setting.name)"
+                class="hint muted"
+              >
                 {{ settingHint(setting.name, count) }}
               </p>
             </div>
@@ -525,5 +624,106 @@ function toggleTotal(field: TotalsField): void {
     grid-template-columns: 1fr;
     gap: 0.4rem;
   }
+}
+
+/* Phones: the group is a tab of its own, so no box; a label beside each setting, choices on
+   one row that scrolls sideways, smaller position squares. */
+.group.compact {
+  gap: 0.7rem;
+  padding: 0;
+  border-radius: 0;
+  background: none;
+}
+
+.group.compact .setting {
+  grid-template-columns: 6.5rem minmax(0, 1fr);
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.group.compact .label {
+  padding-top: 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.group.compact .chips:not(.corners, .wrap) {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.group.compact .chip {
+  flex: none;
+}
+
+.group.compact .corners {
+  grid-template-columns: repeat(3, 1.7rem);
+  gap: 0.25rem;
+}
+
+.group.compact .corners .chip {
+  height: 1.3rem;
+  border-radius: 4px;
+}
+
+.group.compact .switch {
+  padding-top: 0;
+}
+
+.label-cell {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+/* A small round i that opens the setting's explanation under it. */
+.about {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 1.1rem;
+  height: 1.1rem;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  color: var(--muted);
+  background: none;
+  font:
+    italic 600 0.7rem / 1 Georgia,
+    serif;
+}
+
+.about[aria-expanded='true'] {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.group.compact .hint {
+  margin-top: 0.25rem;
+  font-size: 0.75rem;
+}
+
+.list {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.picked {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.list-hint {
+  margin: 0 0 0.8rem;
+  font-size: 0.85rem;
+}
+
+.chips.wrap {
+  margin-bottom: 0.8rem;
 }
 </style>

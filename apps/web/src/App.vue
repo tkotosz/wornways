@@ -29,7 +29,7 @@ import type { ActivitySummary, MatchReport, PlanReport, Source } from './message
 import ActivitiesStep from './steps/ActivitiesStep.vue';
 import ExportStep from './steps/ExportStep.vue';
 import ImportStep from './steps/ImportStep.vue';
-import VideoStep from './steps/VideoStep.vue';
+import DesignStep from './steps/DesignStep.vue';
 import { useDemo } from './use-demo.ts';
 import { useMatches } from './use-matches.ts';
 import { useRideWithGps } from './use-ridewithgps.ts';
@@ -37,14 +37,14 @@ import { useStrava } from './use-strava.ts';
 
 const props = defineProps<{ engine: EngineClient }>();
 
-type Step = 'import' | 'activities' | 'video' | 'export';
+type Step = 'import' | 'activities' | 'design' | 'export';
 const steps: { id: Step; label: string }[] = [
   { id: 'import', label: 'Source' },
   { id: 'activities', label: 'Activities' },
-  { id: 'video', label: 'Video' },
+  { id: 'design', label: 'Design' },
   { id: 'export', label: 'Export' },
 ];
-/** The Video step's open section, kept while the app is open, like the step. */
+/** The Design step's open section, kept while the app is open, like the step. */
 const section = ref<Section>('frame');
 const stepIndex = computed(() => steps.findIndex((s) => s.id === step.value));
 
@@ -440,7 +440,7 @@ onMounted(() => {
 
 <template>
   <!-- The header and the step bar stay at the top of the window while a step scrolls. -->
-  <div ref="topBar" class="top-bar">
+  <div ref="topBar" class="top-bar" :class="{ editing: step === 'design' }">
     <header class="header">
       <span class="brand">
         <img class="mark" src="/icons/route.svg" alt="" />
@@ -583,18 +583,19 @@ onMounted(() => {
         :notice="source === 'rwgps' ? rwgps.notice.value : stravaNotice"
         :can-retry="strava && (!stravaReady || sourceRows.length === 0)"
         @back="navigate('import')"
-        @next="navigate('video')"
+        @next="navigate('design')"
         @change-source="changeSource()"
         @retry="retryStrava()"
       />
-      <VideoStep
-        v-else-if="step === 'video'"
+      <DesignStep
+        v-else-if="step === 'design'"
         v-model="adjustments"
         v-model:section="section"
         :engine="engine"
         :settings="settings"
         :activities="chosenIds.length"
         :plan="plan"
+        :step-label="`Step ${stepIndex + 1} of ${steps.length}`"
         @back="step = 'activities'"
         @next="step = 'export'"
       />
@@ -607,7 +608,7 @@ onMounted(() => {
         :plan-error="planError"
         @back="
           section = 'ending';
-          step = 'video';
+          step = 'design';
         "
       />
     </template>
@@ -631,6 +632,13 @@ onMounted(() => {
   z-index: 10;
   background: var(--background);
   border-bottom: 1px solid var(--line);
+}
+
+/* Phones: the Design step is an editor screen with a top bar of its own. */
+@media (max-width: 760px) {
+  .top-bar.editing {
+    display: none;
+  }
 }
 
 .header {
@@ -716,8 +724,10 @@ onMounted(() => {
 /* Phones: one row. The first step says that files stay on the device, and a long version
    ends in … rather than moving About to a row of its own. */
 @media (max-width: 560px) {
+  /* Tighter, to leave the screen to the steps (10 px: whole pixels, as above). */
   .header {
     flex-wrap: nowrap;
+    padding-block: 0.625rem;
   }
 
   .promise {
@@ -847,6 +857,10 @@ onMounted(() => {
     display: block;
   }
 
+  .steps-row {
+    padding-block: 0.625rem 0.75rem;
+  }
+
   .stepper-row {
     display: flex;
     justify-content: space-between;
@@ -856,9 +870,11 @@ onMounted(() => {
     font-size: 0.8rem;
   }
 
+  /* A column per step, however many there are. */
   .segments {
     display: grid;
-    grid-template-columns: repeat(5, 1fr);
+    grid-auto-columns: 1fr;
+    grid-auto-flow: column;
     gap: 0.3rem;
   }
 

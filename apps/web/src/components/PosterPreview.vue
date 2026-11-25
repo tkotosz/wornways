@@ -27,7 +27,7 @@ function dropDraft(): void {
 // small and at a low frame rate, and plays it in place of the picture, with a bar to move to
 // any moment. Where things are arranged on the still (`editing`), it opens on the still and
 // Edit goes back to it from the draft. It stays in view beside the settings on wide screens
-// and sits above them on phones.
+// and sits above them on phones, where only the picture shows.
 import { parseSettings, type SettingsInput } from '@wornways/engine';
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { Canceled, type EngineClient } from '../engine-client.ts';
@@ -198,50 +198,52 @@ onBeforeUnmount(() => {
       Live preview
       <span class="shape">{{ shape }}</span>
     </div>
-    <div class="frame" :style="{ aspectRatio: aspect }">
-      <video
-        v-if="draftUrl"
-        :src="draftUrl"
-        :poster="url || undefined"
-        data-testid="preview-video"
-        aria-label="Preview of the video"
-        controls
-        autoplay
-        loop
-        muted
-        playsinline
-      />
-      <img
-        v-else-if="url"
-        :src="url"
-        :alt="
-          scene === 'ending'
-            ? 'Preview: the ending of the video'
-            : 'Preview: the last frame of the video'
-        "
-      />
-      <button v-if="editing && draftUrl" type="button" class="edit" @click="playing = false">
-        Edit
-      </button>
-      <button
-        v-if="url && !draftUrl && !drafting && !busy"
-        type="button"
-        :class="['play', { corner: editing }]"
-        aria-label="Play preview"
-        @click="play"
-      >
-        <span aria-hidden="true">▶</span>
-      </button>
-      <div v-if="drafting" class="status making" role="status">
-        <span>{{ draftStatus }}</span>
-        <span class="bar" aria-hidden="true"
-          ><span :style="{ width: `${draftShare * 100}%` }"
-        /></span>
-        <button type="button" class="link" @click="stopDraft">Cancel</button>
+    <div class="fit">
+      <div class="frame" :style="{ aspectRatio: aspect, '--ratio': frame.width / frame.height }">
+        <video
+          v-if="draftUrl"
+          :src="draftUrl"
+          :poster="url || undefined"
+          data-testid="preview-video"
+          aria-label="Preview of the video"
+          controls
+          autoplay
+          loop
+          muted
+          playsinline
+        />
+        <img
+          v-else-if="url"
+          :src="url"
+          :alt="
+            scene === 'ending'
+              ? 'Preview: the ending of the video'
+              : 'Preview: the last frame of the video'
+          "
+        />
+        <button v-if="editing && draftUrl" type="button" class="edit" @click="playing = false">
+          Edit
+        </button>
+        <button
+          v-if="url && !draftUrl && !drafting && !busy"
+          type="button"
+          :class="['play', { corner: editing }]"
+          aria-label="Play preview"
+          @click="play"
+        >
+          <span aria-hidden="true">▶</span>
+        </button>
+        <div v-if="drafting" class="status making" role="status">
+          <span>{{ draftStatus }}</span>
+          <span class="bar" aria-hidden="true"
+            ><span :style="{ width: `${draftShare * 100}%` }"
+          /></span>
+          <button type="button" class="link" @click="stopDraft">Cancel</button>
+        </div>
+        <span v-else-if="busy" class="status">Drawing preview…</span>
+        <span v-else-if="error" class="status error">{{ error }}</span>
+        <span v-else-if="draftError" class="status error">{{ draftError }}</span>
       </div>
-      <span v-else-if="busy" class="status">Drawing preview…</span>
-      <span v-else-if="error" class="status error">{{ error }}</span>
-      <span v-else-if="draftError" class="status error">{{ draftError }}</span>
     </div>
     <!-- The finished video's frame, not the preview's, which is drawn smaller. -->
     <p class="caption muted" data-testid="video-frame">
@@ -252,7 +254,7 @@ onBeforeUnmount(() => {
       Playing a quick draft at {{ shownDraft.width }} × {{ shownDraft.height }} and
       {{ shownDraft.fps }} fps. The video is made in full on Export.
     </p>
-    <p v-else-if="url && !drafting" class="caption muted">
+    <p v-else-if="url && !drafting" class="caption muted hint">
       {{ scene === 'ending' ? 'How the video ends.' : 'The finished picture.' }} Press play to see
       it move.
     </p>
@@ -260,11 +262,8 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
-/* A box, kept in view beside the settings while they scroll. */
+/* A box; the step around it keeps it in view. */
 .preview {
-  position: sticky;
-  /* Below the app's top bar, which sticks to the window too. */
-  top: calc(var(--top-bar-height, 0px) + 1.5rem);
   padding: 0.9rem;
   border: 1px solid var(--line);
   border-radius: 14px;
@@ -399,15 +398,34 @@ onBeforeUnmount(() => {
   text-align: center;
 }
 
-/* Phones: above the settings, small enough to leave room for them. */
+/* Phones: only the picture, as large as the height it is given allows (the room above the
+   settings); the lines around it would take that room. */
 @media (max-width: 760px) {
   .preview {
-    position: static;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    padding: 0;
+    border: 0;
+    background: none;
   }
 
+  .heading,
+  .caption {
+    display: none;
+  }
+
+  .fit {
+    flex: 1 1 0;
+    min-height: 0;
+    container-type: size;
+    display: grid;
+    place-items: center;
+  }
+
+  /* As wide as fits both the width and the height, keeping the video's shape. */
   .frame {
-    max-height: 32vh;
-    margin: 0 auto;
+    width: min(100cqw, 100cqh * var(--ratio));
   }
 }
 </style>
