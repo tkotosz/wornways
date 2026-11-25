@@ -36,14 +36,19 @@ always go back to an earlier step; nothing is lost by moving between steps.
 │ │             │  Video length ─────────●──────────────────  30 seconds   │
 │ └─────────────┘  ▶ YOUR REPLAY  30 seconds · Recap                       │
 │                  Fine-tune playback   Optional: grouping, pace and camera│
-│ [← Back]                                                  [Continue →]   │
+│ [← Activities]                                               [Export →]  │
 └──────────────────────────────────────────────────────────────────────────┘
 ```
 
 The step bar shows a pill per step, numbered, with a tick on the steps behind the current
-one, which is outlined in orange. On a phone it shows "Step 3 of 4", the step's name and a
-bar with a segment per step; each segment opens its step. Each step is one column on a
-phone.
+one, which is outlined in orange; a pill opens its step. Moving between steps works the
+same way on every step: the buttons name the step they go to ("← Source", "Design →") and
+always change the step. On wide screens they sit in a bar at the bottom of the step, which
+stays at the bottom of the window while the step is taller, with the step's own actions
+between them (Download and Share on Export). On a phone they sit in a slim bar at the top
+of the window, in place of the pills: the way back at the left, "Step 2 of 4 · Activities"
+in the middle, the way on at the right; the bottom bar then holds only the step's own
+actions, when there are some. Each step is one column on a phone.
 
 1. **Source.** Where the activities come from: files on this device, Strava, Ride with
    GPS (the last two where the site offers them) or the demo. One source is chosen at a
@@ -51,11 +56,11 @@ phone.
    step lists them as cards like the playback presets, in the order Demo, Files, Ride
    with GPS, Strava, each with an icon and where it stands ("25 made-up activities", "3
    activities on this device", "Connected · 12 downloaded", "Not connected"). Until a
-   source is picked, Continue and the later steps are disabled. Ride with GPS's card
+   source is picked, the way on and the later steps are disabled. Ride with GPS's card
    shows its official icon; Strava's brand rules allow only its connect button and
    badges, so its card has a drawing. Picking one shows what it needs, under a "Current
-   source" heading with the source's name, with "← Change source" at the bottom left,
-   which clears the choice and lists the sources again (connections stay): for files, a
+   source" heading with the source's name, with "Change source" beside it, which clears
+   the choice and lists the sources again (connections stay): for files, a
    drop zone and file and folder pickers, a report of what the last import added and what
    could not be read (closable), and the library as a grid with a header row (date, name,
    sport, distance) and a delete button per row ("Delete saved activities" removes them
@@ -83,19 +88,22 @@ phone.
    when the filters change. Nothing can be deleted here.
 3. **Design.** How the video plays and looks, in sections, with a section bar under the
    step bar, in the order things are decided; the bar shows where the person is, so the
-   step has no title of its own. Continue goes to the next section, and from the last to
-   Export; Back goes to the section before, and from the first to Activities; the bar
-   opens any section, since every setting has a default. The section open last is kept
-   while the app is open. One live preview stays while the sections change (see
+   step has no title of its own. The bar opens any section, in any order, since every
+   setting has a default; the buttons to Activities and Export leave the step from any
+   section. The section open last is kept while the app is open, also when coming back
+   from Export. One live preview stays while the sections change (see
    Preview). On wide screens it sits beside the settings and the page scrolls. On phones
    the step is a full editor screen that does not scroll, laid out like photo and video
-   editors: a slim top bar (← Activities, the step, Export →) in place of the app's header
-   and step bar; the preview alone, with no lines around it, as large as the room allows; under it the open section's
+   editors: the slim step bar on top, in place of the app's header; the preview alone,
+   with no lines around it, as large as the room allows; under it the open section's
    settings in a panel of fixed height, so the picture does not jump, with a tab for each
    group (Playback: Style, Length, Timing, Camera; Map: Map, Privacy; Overlay: Title,
    Metrics, Elevation, Watermark; Ending: Pause, Totals, End card) and each setting on a
-   compact row beside its label, its explanation behind an i; the values to show open in a
-   dialog; the five sections along the bottom, with a drawing each. The settings of this
+   compact row beside its label, its explanation behind an i: choices as chips on a row
+   that scrolls sideways (the presets too, with the picked one's line under them),
+   numbers as a slider with the exact value, a position as the nine squares with its name
+   beside them; the values to show open in a dialog; the five sections along the bottom,
+   with a drawing each. The settings of this
    step are remembered for the next visit.
    - **Frame:** the aspect ratio (Story, Square or Landscape, for where the video will be
      posted, or a custom size) and the frame rate (24, 30 or 60 fps). It comes first
@@ -124,8 +132,8 @@ phone.
      totals card (for several activities only; on for Recap) and the end card.
 4. **Export.** A stage in the video's shape, which shows the finished picture with a "Make
    video" button in the middle; while the video is made, its progress and a way to
-   cancel; then the video itself, playing. Download then appears in the bottom bar where
-   Continue is on the other steps, and beside it Share, which hands the video to another
+   cancel; then the video itself, playing. Download then appears in the bottom bar, and
+   beside it Share, which hands the video to another
    app through the system's share sheet. Share shows only where the browser can share
    files (mostly on phones) and is then the main button.
 

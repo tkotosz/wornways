@@ -139,3 +139,14 @@ button.link {
   border-top: 1px solid var(--line);
   background: var(--background);
 }
+
+/* Read by screen readers, not drawn: a heading the layout shows otherwise, or the words that
+   make a short button say what it does. */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}

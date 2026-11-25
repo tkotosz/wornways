@@ -10,6 +10,7 @@ import AddFiles from '../components/AddFiles.vue';
 import GettingFiles from '../components/GettingFiles.vue';
 import LoadingStatus from '../components/LoadingStatus.vue';
 import SourceIcon from '../components/SourceIcon.vue';
+import StepNav from '../components/StepNav.vue';
 import type { EngineClient } from '../engine-client.ts';
 import { countText, timeText } from '../format.ts';
 import type { ActivitySummary, Source } from '../messages.ts';
@@ -228,6 +229,9 @@ async function remove(ids: string[] | 'all'): Promise<void> {
           <p class="kicker">Current source</p>
           <h1 data-testid="chosen-source">{{ NAMES[chosen] }}</h1>
         </div>
+        <button type="button" class="link change" @click="emit('changeSource')">
+          Change source
+        </button>
       </header>
 
       <div v-if="chosen === 'files'" class="screen" data-testid="files-source">
@@ -351,15 +355,7 @@ async function remove(ids: string[] | 'all'): Promise<void> {
       />
     </template>
 
-    <div class="footer">
-      <button v-if="!listing" type="button" class="secondary" @click="emit('changeSource')">
-        ← Change source
-      </button>
-      <span v-else />
-      <button type="button" class="primary" :disabled="!ready" @click="emit('next')">
-        Continue →
-      </button>
-    </div>
+    <StepNav step="import" :next-disabled="!ready" @next="emit('next')" />
   </section>
 </template>
 
@@ -430,6 +426,11 @@ async function remove(ids: string[] | 'all'): Promise<void> {
 
 .chosen h1 {
   margin: 0;
+}
+
+/* Back to the list of sources, at the end of the row. */
+.change {
+  margin-left: auto;
 }
 
 .kicker {

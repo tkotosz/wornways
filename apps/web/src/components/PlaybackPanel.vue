@@ -83,17 +83,54 @@ const fineTuneOpen = ref(false);
         <PresetDrawing class="drawing" :preset="name" />
         <span class="text">
           <strong>{{ PRESET_LABELS[name] }}</strong>
-          <span class="muted">{{ PRESET_LINES[name] }}</span>
+          <span v-if="!part" class="muted">{{ PRESET_LINES[name] }}</span>
         </span>
         <span v-if="preset === name" class="check" aria-hidden="true">✓</span>
       </button>
     </div>
 
-    <div v-if="!part || part === 'length'" class="length">
+    <!-- Phones: the picked preset's line under the row of small cards. -->
+    <p v-if="part === 'style'" class="muted small" data-testid="preset-line">
+      {{
+        preset === 'custom'
+          ? 'Your own timing and camera, set under Timing and Camera.'
+          : PRESET_LINES[preset]
+      }}
+    </p>
+
+    <!-- Phones: the length as a row like the other settings, with what the video plays. -->
+    <template v-if="part === 'length'">
+      <div class="length-row">
+        <span id="label-length" class="label">Length</span>
+        <div class="slider" role="group" aria-labelledby="label-length">
+          <input
+            type="range"
+            :min="durationRange.min"
+            :max="durationRange.max"
+            step="1"
+            :value="durationShown ?? duration"
+            aria-label="Video length"
+            @input="durationShown = Number(($event.target as HTMLInputElement).value)"
+            @change="setDuration(Number(($event.target as HTMLInputElement).value))"
+          />
+          <ExactNumber
+            label="Exact video length in seconds"
+            :min="durationRange.min"
+            :max="durationRange.max"
+            :value="durationShown ?? duration"
+            unit="s"
+            @change="setDuration"
+          />
+        </div>
+      </div>
+      <PacingLine v-if="plan" class="muted small" :plan="plan" />
+    </template>
+
+    <div v-if="!part" class="length">
       <div class="length-head">
         <div>
           <strong>Video length</strong>
-          <p v-if="!part" class="muted small">
+          <p class="muted small">
             {{
               count === 'one'
                 ? settingHint('duration', 'one')
@@ -122,7 +159,7 @@ const fineTuneOpen = ref(false);
       />
     </div>
 
-    <div v-if="!part || part === 'style' || part === 'length'" class="summary" role="status">
+    <div v-if="!part" class="summary" role="status">
       <span class="icon" aria-hidden="true">▶</span>
       <div>
         <span class="caption">Your replay</span>
@@ -372,7 +409,8 @@ const fineTuneOpen = ref(false);
   }
 }
 
-/* Phones, one part at a time: no boxes, the presets as small cards on a sideways row. */
+/* Phones, one part at a time: no boxes; the presets as chips like the other choices, on a
+   row that scrolls sideways, the picked one's line under them; the length as a row like the other settings. */
 .compact .presets {
   display: flex;
   gap: 0.5rem;
@@ -383,59 +421,54 @@ const fineTuneOpen = ref(false);
 
 .compact .preset {
   flex: none;
-  flex-direction: row;
-  align-items: center;
-  gap: 0.5rem;
-  width: 12.5rem;
-  padding: 0.55rem 0.65rem;
-  border-radius: 10px;
+  padding: 0.35rem 0.85rem;
+  border-radius: 999px;
+  box-shadow: none;
+  color: var(--muted);
+  background: transparent;
 }
 
-.compact .drawing {
-  width: 2.4rem;
+.compact .preset[aria-checked='true'] {
+  color: var(--text);
+  background: rgba(255, 138, 42, 0.12);
 }
 
-.compact .text {
-  gap: 0.1rem;
-  padding-right: 0;
-  font-size: 0.9rem;
-}
-
-.compact .text .muted {
-  display: -webkit-box;
-  overflow: hidden;
-  font-size: 0.72rem;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  line-clamp: 2;
-}
-
+.compact .drawing,
 .compact .check {
   display: none;
 }
 
-.compact .length {
-  margin-bottom: 0.6rem;
-  padding: 0;
-  border: 0;
-  background: none;
+.compact .text {
+  padding-right: 0;
+  white-space: nowrap;
 }
 
-.compact .length-head {
+.compact .text strong {
+  font-weight: 400;
+}
+
+.length-row {
+  display: grid;
+  grid-template-columns: 6.5rem minmax(0, 1fr);
+  gap: 0.75rem;
   align-items: center;
-  margin-bottom: 0.3rem;
+  margin-bottom: 0.6rem;
 }
 
-.compact .summary {
-  margin: 0;
-  padding: 0;
-  border: 0;
-  background: none;
+.length-row .label {
+  color: var(--muted);
   font-size: 0.85rem;
 }
 
-.compact .summary .icon {
-  display: none;
+.length-row .slider {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.length-row input[type='range'] {
+  flex: 1;
+  min-width: 0;
 }
 
 .reset {

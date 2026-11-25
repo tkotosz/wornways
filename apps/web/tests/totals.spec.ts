@@ -13,7 +13,7 @@ test('turns the totals card on for Recap, and leaves the switch to the person', 
   await pickSource(page, 'demo');
   await expect(page.getByTestId('demo-count')).toHaveText('25 made-up activities');
   await page.getByRole('button', { name: 'Continue' }).click(); // to Activities
-  await page.getByRole('button', { name: 'Continue' }).click(); // to Video
+  await page.getByRole('button', { name: 'Continue' }).click(); // to Design
 
   const presets = page.getByRole('radiogroup', { name: 'Preset' });
   const totals = page.getByTestId('group-totals').getByRole('switch', { name: 'Totals card' });
@@ -56,7 +56,7 @@ test('picks the totals card values and their order', async ({ page, context }) =
   await page.goto('/');
   await pickSource(page, 'demo');
   await page.getByRole('button', { name: 'Continue' }).click(); // to Activities
-  await page.getByRole('button', { name: 'Continue' }).click(); // to Video
+  await page.getByRole('button', { name: 'Continue' }).click(); // to Design
   await openSection(page, 'Playback');
   await page
     .getByRole('radiogroup', { name: 'Preset' })
@@ -130,7 +130,7 @@ test('offers the totals card for several activities only', async ({ page, contex
   await page.getByRole('button', { name: 'Continue' }).click();
   await page.getByRole('checkbox', { name: 'Select all shown' }).click();
   await page.getByTestId('chosen').getByText('Easy run').click();
-  await page.getByRole('button', { name: 'Continue' }).click(); // to Video
+  await page.getByRole('button', { name: 'Continue' }).click(); // to Design
   await openSection(page, 'Ending');
   await expect(page.getByTestId('group-end-card')).toBeVisible();
   await expect(page.getByTestId('group-totals')).toHaveCount(0);

@@ -34,7 +34,7 @@ test('tries the demo, makes a video of it, and stores nothing on this device', a
   await page.getByRole('checkbox', { name: 'Select all shown' }).click();
   await page.getByTestId('chosen').getByText('Easy run').click();
   await expect(count).toContainText('1 of 25 activities selected');
-  await page.getByRole('button', { name: 'Continue' }).click(); // to Video
+  await page.getByRole('button', { name: 'Continue' }).click(); // to Design
   await openStep(page, 'Export');
   await page.getByRole('button', { name: 'Make video' }).click();
   await expect(page.getByTestId('result')).toBeVisible({ timeout: 150_000 });
@@ -64,7 +64,7 @@ test('offers the demo next to the files on this device, and keeps them apart', a
   await expect(page.getByTestId('chosen-source')).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Continue' })).toBeDisabled();
   await expect(page.getByRole('button', { name: 'Activities', exact: true })).toBeDisabled();
-  await expect(page.getByRole('button', { name: '← Back', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: /^← Back/ })).toHaveCount(0);
   await page.reload();
   await expect(page.getByTestId('chosen-source')).toHaveCount(0);
   await expect(page.getByTestId('choose-demo')).toContainText('25 made-up activities');
@@ -110,7 +110,7 @@ test('follows the guide to a highlight of the long ride', async ({ page }) => {
   await expect(ride).toContainText('104 km');
   await ride.click();
   await expect(page.getByTestId('chosen-count')).toContainText('1 of 25 activities selected');
-  await page.getByRole('button', { name: 'Continue' }).click(); // to Video
+  await page.getByRole('button', { name: 'Continue' }).click(); // to Design
   await openSection(page, 'Playback');
   await expect(page.getByTestId('replay-summary')).toContainText('Highlight');
 

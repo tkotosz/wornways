@@ -404,7 +404,7 @@ test('makes a video of activities within the chosen distance range', async ({ pa
   await expect(page.getByRole('alert')).toHaveText('No activities match the distance range.');
   await maximum.fill('40');
   await expect(count).toContainText('3 of 3 activities');
-  await page.getByRole('button', { name: 'Continue' }).click(); // to Video
+  await page.getByRole('button', { name: 'Continue' }).click(); // to Design
   await openStep(page, 'Export');
 
   await expect(page.getByText('A replay of 3 activities')).toBeVisible();
@@ -431,14 +431,14 @@ test('keeps the video while the choice stays the same', async ({ page, context }
   await page.goto('/');
   await addFiles(page, 'morning-ride.fit', 'trail-run.tcx');
   await page.getByRole('button', { name: 'Continue' }).click(); // to Activities
-  await page.getByRole('button', { name: 'Continue' }).click(); // to Video
+  await page.getByRole('button', { name: 'Continue' }).click(); // to Design
   await openStep(page, 'Export');
   await page.getByRole('button', { name: 'Make video' }).click();
   await expect(page.getByTestId('result')).toBeVisible({ timeout: 150_000 });
 
-  // Back opens the Design step's last section, Ending, whose Continue comes back.
-  await page.getByRole('button', { name: '← Back' }).click();
-  await expectSection(page, 'Ending');
+  // Back opens the Design step on the section left open, and Continue comes back.
+  await page.getByRole('button', { name: '← Back to Design' }).click();
+  await expectSection(page, 'Frame');
   await page.getByRole('button', { name: 'Continue' }).click();
   await expect(page.getByTestId('result')).toBeVisible();
   // With a video made, the next thing to do is to download it.
@@ -473,12 +473,12 @@ test('previews and exports trimmed routes and leaves out routes too short to sho
   });
   await expect(page.getByTestId('activity-count')).toContainText('2 activities');
   await page.getByRole('button', { name: 'Continue' }).click(); // to Activities
-  await page.getByRole('button', { name: 'Continue' }).click(); // to Video
+  await page.getByRole('button', { name: 'Continue' }).click(); // to Design
   await openSection(page, 'Playback');
   const length = page.getByRole('slider', { name: 'Video length' });
   await length.fill('5');
   await length.dispatchEvent('change');
-  await page.getByRole('button', { name: 'Continue' }).click(); // to Map
+  await openSection(page, 'Map');
   const trim = page.getByRole('slider', { name: 'Trim start and finish' });
   await expect(trim).toHaveAttribute('aria-valuetext', 'Off');
   const preview = page.getByRole('img', { name: 'Preview: the last frame of the video' });
@@ -520,7 +520,7 @@ test('offers heart rate and cadence for an activity that recorded them', async (
   await page.goto('/');
   await addFiles(page, 'heart-rate-ride.gpx');
   await page.getByRole('button', { name: 'Continue' }).click(); // to Activities
-  await page.getByRole('button', { name: 'Continue' }).click(); // to Video
+  await page.getByRole('button', { name: 'Continue' }).click(); // to Design
   await openSection(page, 'Overlay');
   await expectSection(page, 'Overlay');
   const metrics = page.getByTestId('group-metrics');
@@ -546,36 +546,38 @@ test('shares the video where the browser can share files', async ({ page, contex
   await page.goto('/');
   await addFiles(page, 'morning-ride.fit');
   await page.getByRole('button', { name: 'Continue' }).click(); // to Activities
-  await page.getByRole('button', { name: 'Continue' }).click(); // to Video
+  await page.getByRole('button', { name: 'Continue' }).click(); // to Design
   await openStep(page, 'Export');
   await page.getByRole('button', { name: 'Make video' }).click();
   await expect(page.getByTestId('result')).toBeVisible({ timeout: 150_000 });
 
-  const back = page.getByRole('button', { name: '← Back' });
+  const back = page.getByRole('button', { name: '← Back to Design' });
   const download = page.getByRole('link', { name: 'Download', exact: true });
   const share = page.getByRole('button', { name: 'Share', exact: true });
   await expect(download).toBeVisible();
+  const bar = page.locator('.step-footer');
+  const box = async (item: typeof bar) => (await item.boundingBox())!;
+  const center = (box: { x: number; width: number }) => box.x + box.width / 2;
 
-  // On a phone, Back sits at the left, Share at the right and Download in the middle of the
-  // bar, all on one row. A 320 px phone has too little room to center it exactly.
-  for (const [width, offCenter] of [
-    [390, 1],
-    [360, 1],
-    [320, 3],
-  ]) {
-    await page.setViewportSize({ width, height: 844 });
-    const [bar, left, middle, right] = await Promise.all(
-      [page.locator('.footer'), back, download, share].map(
-        async (item) => (await item.boundingBox())!,
-      ),
-    );
-    const center = (box: { x: number; width: number }) => box.x + box.width / 2;
-    expect(Math.abs(center(middle) - center(bar))).toBeLessThan(offCenter);
+  // Wide screens: Back at the left of the bottom bar, Share at the right and Download in the
+  // middle, on one row.
+  {
+    const [row, left, middle, right] = await Promise.all([bar, back, download, share].map(box));
+    expect(Math.abs(center(middle) - center(row))).toBeLessThan(1);
+    expect(left.x).toBeCloseTo(row.x, 0);
+    expect(right.x + right.width).toBeCloseTo(row.x + row.width, 0);
     expect(left.y).toBeCloseTo(middle.y, 0);
-    expect(left.x).toBeCloseTo(bar.x, 0);
-    expect(right.x + right.width).toBeCloseTo(bar.x + bar.width, 0);
-    expect(left.x + left.width).toBeLessThan(middle.x);
-    expect(middle.x + middle.width).toBeLessThan(right.x);
+    expect(left.y).toBeCloseTo(right.y, 0);
+  }
+
+  // Phones: Back is in the step bar at the top; Download and Share share the bottom bar.
+  for (const width of [390, 360, 320]) {
+    await page.setViewportSize({ width, height: 844 });
+    const [row, top, left, right] = await Promise.all([bar, back, download, share].map(box));
+    expect(top.y).toBeLessThan(row.y - 300);
+    expect(left.x).toBeCloseTo(row.x, 0);
+    expect(right.x + right.width).toBeCloseTo(row.x + row.width, 0);
+    expect(left.width).toBeCloseTo(right.width, 0);
     expect(left.y).toBeCloseTo(right.y, 0);
   }
   await page.screenshot({ path: 'test-results/export-footer-phone.png' });
@@ -682,9 +684,9 @@ test('sets up the video and its text, and keeps both for the next visit', async 
   await page.goto('/');
   await addFiles(page, 'morning-ride.fit', 'trail-run.tcx');
   await page.getByRole('button', { name: 'Continue' }).click(); // to Activities
-  await page.getByRole('button', { name: 'Continue' }).click(); // to Video, its Frame
+  await page.getByRole('button', { name: 'Continue' }).click(); // to Design, its Frame
   await expectSection(page, 'Frame');
-  await page.getByRole('button', { name: 'Continue' }).click(); // to Playback
+  await openSection(page, 'Playback');
   const chip = (name: string) => page.getByRole('button', { name, exact: true });
   const slider = (name: string) => page.getByRole('slider', { name });
   const preset = (name: string) => page.getByRole('radio', { name: new RegExp(`^${name}`) });
@@ -756,7 +758,7 @@ test('sets up the video and its text, and keeps both for the next visit', async 
 
   // Ending: the end pause keeps the finished picture longer, added to the video. The end
   // card is on unless switched off; off, the video ends with the replay and the pause.
-  await page.getByRole('button', { name: 'Continue' }).click(); // to Ending
+  await openSection(page, 'Ending');
   await slider('End pause').fill('2.5');
   await slider('End pause').dispatchEvent('change');
   const endCard = page.getByRole('switch', { name: 'Show end card' });
@@ -815,7 +817,7 @@ test('offers Highlight for a single activity, and the other presets for several'
   await addFiles(page, 'morning-ride.fit', 'trail-run.tcx');
   await page.getByRole('button', { name: 'Continue' }).click(); // to Activities
   await trailRun(page).click();
-  await page.getByRole('button', { name: 'Continue' }).click(); // to Video
+  await page.getByRole('button', { name: 'Continue' }).click(); // to Design
   await openSection(page, 'Playback');
   const presets = page.getByRole('radio');
   const preset = (name: string) => page.getByRole('radio', { name: new RegExp(`^${name}`) });
@@ -835,8 +837,6 @@ test('offers Highlight for a single activity, and the other presets for several'
   await follows.click();
   await expect(follows).toHaveAttribute('aria-pressed', 'true');
   await page.getByRole('button', { name: /Fine-tune playback/ }).click();
-  await page.getByRole('button', { name: 'Continue' }).click();
-  await expectSection(page, 'Map');
 
   // Several: the presets for several, with their own default.
   await page.getByRole('button', { name: 'Activities', exact: true }).click();

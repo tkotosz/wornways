@@ -7,6 +7,7 @@ import ActivityFilters from '../components/ActivityFilters.vue';
 import ActivityGrid from '../components/ActivityGrid.vue';
 import DemoGuide from '../components/DemoGuide.vue';
 import LoadingStatus from '../components/LoadingStatus.vue';
+import StepNav from '../components/StepNav.vue';
 import type { EngineClient } from '../engine-client.ts';
 import type { ActivitySummary, MatchReport, Source } from '../messages.ts';
 
@@ -81,17 +82,12 @@ const ticked = computed(() => rows.value.filter((a) => !choice.value.excluded.in
       @update:excluded="choice = { ...choice, excluded: $event }"
     />
 
-    <div class="footer">
-      <button type="button" class="secondary" @click="emit('back')">← Back</button>
-      <button
-        type="button"
-        class="primary"
-        :disabled="!!busy || matching || ticked.length === 0 || placeMissing(choice)"
-        @click="emit('next')"
-      >
-        Continue →
-      </button>
-    </div>
+    <StepNav
+      step="activities"
+      :next-disabled="!!busy || matching || ticked.length === 0 || placeMissing(choice)"
+      @back="emit('back')"
+      @next="emit('next')"
+    />
   </section>
 </template>
 

@@ -4,12 +4,13 @@
 // in view while the sections change. Where things are arranged on the picture (Overlay,
 // Ending), it opens on a still; Play shows the draft and Edit goes back.
 //
-// Wide screens: the section bar on top, the preview beside the settings, Back and Continue
-// below; the page scrolls.
+// The sections are opened from the section bar, in any order; the buttons to the steps
+// before and after (StepNav, StepBar) leave the step, as on every step.
+// Wide screens: the section bar on top, the preview beside the settings; the page scrolls.
 // Phones: a full editor screen that does not scroll, as photo and video editors are laid
-// out. A slim bar on top leaves the step; the preview takes most of the screen; under it, the
-// open section's settings, one group at a time in a panel of fixed height; the sections
-// along the bottom.
+// out: the step bar on top; the preview takes most of the screen; under it, the open
+// section's settings, one group at a time in a panel of fixed height; the sections along the
+// bottom.
 import type { SettingsInput } from '@wornways/engine';
 import { computed, onBeforeUnmount, ref } from 'vue';
 import {
@@ -26,6 +27,8 @@ import FramePanel from '../components/FramePanel.vue';
 import PlaybackPanel from '../components/PlaybackPanel.vue';
 import PosterPreview from '../components/PosterPreview.vue';
 import SettingsGroups from '../components/SettingsGroups.vue';
+import StepBar from '../components/StepBar.vue';
+import StepNav from '../components/StepNav.vue';
 import type { EngineClient } from '../engine-client.ts';
 import type { PlanReport } from '../messages.ts';
 
@@ -35,15 +38,12 @@ const props = defineProps<{
   settings: SettingsInput;
   activities: number;
   plan: PlanReport | null;
-  /** Where the step stands among the steps, e.g. "Step 3 of 4", for the phone's top bar. */
-  stepLabel: string;
 }>();
 const adjustments = defineModel<Adjustments>({ required: true });
 const section = defineModel<Section>('section', { required: true });
 const emit = defineEmits<{ back: []; next: [] }>();
 
-const index = computed(() => SECTIONS.findIndex((s) => s.id === section.value));
-const current = computed(() => SECTIONS[index.value]!);
+const current = computed(() => SECTIONS.find((s) => s.id === section.value)!);
 
 /** Phones get the editor screen; the width matches the phone layout of the app's styles. */
 const phoneQuery = window.matchMedia('(max-width: 760px)');
@@ -59,18 +59,6 @@ function open(id: Section): void {
   section.value = id;
   window.scrollTo({ top: 0 });
   controls.value?.scrollTo({ top: 0 });
-}
-
-/** Back goes to the section before, and from the first to the step before. */
-function back(): void {
-  if (index.value === 0) emit('back');
-  else open(SECTIONS[index.value - 1]!.id);
-}
-
-/** Continue goes to the next section, and from the last to the next step. */
-function next(): void {
-  if (index.value === SECTIONS.length - 1) emit('next');
-  else open(SECTIONS[index.value + 1]!.id);
 }
 
 // Phones: each section's settings in groups, a tab each: Playback in its parts, Frame in
@@ -100,9 +88,7 @@ function openTab(id: string): void {
   <section v-if="phone" class="editor">
     <h1 class="visually-hidden">Design your video</h1>
     <header class="top">
-      <button type="button" class="leave" @click="emit('back')">← Activities</button>
-      <span class="where muted">{{ stepLabel }} · <b>Design</b></span>
-      <button type="button" class="primary export" @click="emit('next')">Export →</button>
+      <StepBar step="design" @back="emit('back')" @next="emit('next')" />
     </header>
 
     <div class="stage">
@@ -226,24 +212,11 @@ function openTab(id: string): void {
       </div>
     </div>
 
-    <div class="footer">
-      <button type="button" class="secondary" @click="back">← Back</button>
-      <button type="button" class="primary" @click="next">Continue →</button>
-    </div>
+    <StepNav step="design" @back="emit('back')" @next="emit('next')" />
   </section>
 </template>
 
 <style scoped>
-/* Kept for screen readers, not drawn. */
-.visually-hidden {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip-path: inset(50%);
-  white-space: nowrap;
-}
-
 /* Wide screens: the sections as a row of pills, the open one filled. */
 .sections-bar {
   display: flex;
@@ -289,40 +262,9 @@ function openTab(id: string): void {
 }
 
 .top {
-  display: flex;
   flex: none;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
-  padding: calc(0.5rem + env(safe-area-inset-top)) 0.75rem 0.5rem;
+  padding-top: env(safe-area-inset-top);
   border-bottom: 1px solid var(--line);
-}
-
-.leave {
-  padding: 0.4rem 0.25rem;
-  border: 0;
-  color: var(--muted);
-  background: none;
-  font: inherit;
-}
-
-.where {
-  overflow: hidden;
-  font-size: 0.8rem;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.where b {
-  color: var(--text);
-  font-weight: 600;
-}
-
-.export {
-  flex: none;
-  padding: 0.4rem 0.9rem;
-  border-radius: 999px;
-  font-size: 0.9rem;
 }
 
 /* The preview takes what the rest leaves. */

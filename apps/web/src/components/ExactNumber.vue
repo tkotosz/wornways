@@ -49,7 +49,7 @@ function apply(event: KeyboardEvent): void {
 }
 
 input {
-  width: 5rem;
+  width: 4rem;
   min-width: 0;
   padding: 0.25rem 0.4rem;
   border: 1px solid var(--line);

@@ -246,7 +246,9 @@ test.describe('Strava on a phone', () => {
     await page.getByRole('link', { name: 'Download' }).click();
     expect((await download).suggestedFilename()).toMatch(/\.mp4$/);
     await expect(page.getByRole('button', { name: 'Done', exact: true })).toHaveCount(0);
-    await page.getByRole('button', { name: 'Go to Source' }).click();
+    for (const step of ['Design', 'Activities', 'Source']) {
+      await page.getByRole('button', { name: `← Back to ${step}` }).click();
+    }
     await expect(page.getByTestId('chosen-source')).toHaveText('Strava');
     await page.getByRole('button', { name: 'Change source' }).click();
     await pickSource(page, 'files');
@@ -518,7 +520,7 @@ test('reuses the selected track after a reload and socket interruption', async (
   await minimum.fill('1,4');
   await expect(page.getByTestId('chosen-count')).toContainText('of 1 activity');
   await page.getByRole('checkbox', { name: 'Strava test ride' }).check();
-  await page.getByRole('button', { name: '← Back', exact: true }).click();
+  await page.getByRole('button', { name: '← Back to Source' }).click();
   await expect(page.getByRole('button', { name: 'Disconnect Strava' })).toBeVisible();
   await page.getByRole('button', { name: 'Continue' }).click();
   await expect(page.getByRole('checkbox', { name: 'Strava test ride' })).toBeChecked();

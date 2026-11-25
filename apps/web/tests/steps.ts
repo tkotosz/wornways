@@ -2,13 +2,11 @@ import { expect, type Page } from '@playwright/test';
 
 type SectionName = 'Frame' | 'Playback' | 'Map' | 'Overlay' | 'Ending';
 
-/** Opens a step from the step bar: its pill, or on a phone its segment ("Go to …"). */
+/** Opens a step from the step bar's pills (wide screens). */
 export function openStep(page: Page, name: 'Source' | 'Activities' | 'Design' | 'Export') {
   return page
     .getByRole('navigation', { name: 'Steps' })
-    .getByRole('button', { name: new RegExp(`^(Go to )?${name}$`) })
-    .filter({ visible: true })
-    .first()
+    .getByRole('button', { name, exact: true })
     .click();
 }
 

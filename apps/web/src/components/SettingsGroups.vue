@@ -257,24 +257,31 @@ function toggleTotal(field: TotalsField): void {
               <!-- A choice: one button per option; a position as a picker of the frame's nine spots. -->
               <div
                 v-if="setting.kind.type === 'choice'"
-                class="chips"
-                :class="{ corners: setting.name.endsWith('-position') }"
+                :class="{ position: setting.name.endsWith('-position') }"
               >
-                <button
-                  v-for="option in setting.kind.type === 'choice' ? setting.kind.choices : []"
-                  :key="option"
-                  type="button"
-                  class="chip"
-                  :aria-pressed="value(setting) === option"
-                  :aria-label="
-                    setting.name.endsWith('-position')
-                      ? choiceLabel(setting.name, option)
-                      : undefined
-                  "
-                  @click="set(setting.name, option)"
-                >
-                  {{ setting.name.endsWith('-position') ? '' : choiceLabel(setting.name, option) }}
-                </button>
+                <div class="chips" :class="{ corners: setting.name.endsWith('-position') }">
+                  <button
+                    v-for="option in setting.kind.type === 'choice' ? setting.kind.choices : []"
+                    :key="option"
+                    type="button"
+                    class="chip"
+                    :aria-pressed="value(setting) === option"
+                    :aria-label="
+                      setting.name.endsWith('-position')
+                        ? choiceLabel(setting.name, option)
+                        : undefined
+                    "
+                    @click="set(setting.name, option)"
+                  >
+                    {{
+                      setting.name.endsWith('-position') ? '' : choiceLabel(setting.name, option)
+                    }}
+                  </button>
+                </div>
+                <!-- The picked position in words beside the squares. -->
+                <span v-if="setting.name.endsWith('-position')" class="position-name muted">
+                  {{ choiceLabel(setting.name, String(value(setting))) }}
+                </span>
               </div>
 
               <!-- A number: a slider with its value. -->
@@ -527,6 +534,21 @@ function toggleTotal(field: TotalsField): void {
   border-radius: 6px;
 }
 
+.corners .chip[aria-pressed='true'] {
+  background: var(--accent);
+}
+
+.position {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  min-width: 0;
+}
+
+.position-name {
+  font-size: 0.85rem;
+}
+
 .order {
   display: inline-grid;
   place-items: center;
@@ -671,17 +693,31 @@ function toggleTotal(field: TotalsField): void {
   padding-top: 0;
 }
 
+.group.compact .title input {
+  flex: 1 1 auto;
+  width: 100%;
+  min-width: 0;
+}
+
+.group.compact .slider {
+  gap: 0.6rem;
+}
+
+.group.compact .slider input[type='range'] {
+  min-width: 0;
+}
+
+/* The i follows the label's last word, also when the label takes two lines. */
 .label-cell {
-  display: flex;
-  align-items: center;
-  gap: 0.35rem;
+  display: block;
 }
 
 /* A small round i that opens the setting's explanation under it. */
 .about {
-  display: grid;
-  flex: none;
+  display: inline-grid;
   place-items: center;
+  margin-left: 0.3rem;
+  vertical-align: 0.05rem;
   width: 1.1rem;
   height: 1.1rem;
   padding: 0;

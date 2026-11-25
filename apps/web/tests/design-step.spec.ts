@@ -3,7 +3,7 @@ import { offlineMap } from './offline-map.ts';
 import { pickSource } from './sources.ts';
 import { expectSection, openSection, openStep } from './steps.ts';
 
-test('walks the Design step section by section, and opens any from its bar', async ({
+test('opens any section of the Design step from its bar, and leaves the step from any', async ({
   page,
   context,
 }) => {
@@ -20,20 +20,15 @@ test('walks the Design step section by section, and opens any from its bar', asy
   // No visible title above the section bar; the heading is there for screen readers.
   await expect(page.getByRole('heading', { level: 1, name: 'Design your video' })).toBeAttached();
 
-  // Continue goes through the sections in order, then to Export.
-  for (const [i, name] of order.entries()) {
-    await expectSection(page, name);
-    if (i < order.length - 1) await page.getByRole('button', { name: 'Continue' }).click();
-  }
-  await page.getByRole('button', { name: 'Continue' }).click();
+  // The bar at the bottom names the steps before and after, and leaves the step from any
+  // section.
+  await expectSection(page, 'Frame');
+  await openSection(page, 'Overlay');
+  await page.getByRole('button', { name: 'Continue to Export →' }).click();
   await expect(page.getByRole('button', { name: 'Make video' })).toBeVisible();
-
-  // Back comes into the last section and goes through them backwards, then to Activities.
-  await page.getByRole('button', { name: '← Back' }).click();
-  for (const name of [...order].reverse()) {
-    await expectSection(page, name);
-    await page.getByRole('button', { name: '← Back' }).click();
-  }
+  await page.getByRole('button', { name: '← Back to Design' }).click();
+  await expectSection(page, 'Overlay');
+  await page.getByRole('button', { name: '← Back to Activities' }).click();
   await expect(page.getByTestId('chosen-count')).toBeVisible();
 
   // The bar opens any section, and the section stays open after leaving the step.
@@ -113,10 +108,10 @@ test.describe('the Design step on a phone', () => {
     );
 
     // The top bar leaves the step either way.
-    await page.getByRole('button', { name: 'Export →' }).click();
+    await page.getByRole('button', { name: 'Continue to Export →' }).click();
     await expect(page.getByRole('button', { name: 'Make video' })).toBeVisible();
-    await openStep(page, 'Design');
-    await page.getByRole('button', { name: '← Activities' }).click();
+    await page.getByRole('button', { name: '← Back to Design' }).click();
+    await page.getByRole('button', { name: '← Back to Activities' }).click();
     await expect(page.getByTestId('chosen-count')).toBeVisible();
   });
 });

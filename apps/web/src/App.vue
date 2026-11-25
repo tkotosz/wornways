@@ -30,6 +30,7 @@ import ActivitiesStep from './steps/ActivitiesStep.vue';
 import ExportStep from './steps/ExportStep.vue';
 import ImportStep from './steps/ImportStep.vue';
 import DesignStep from './steps/DesignStep.vue';
+import { STEPS, type Step } from './step-list.ts';
 import { useDemo } from './use-demo.ts';
 import { useMatches } from './use-matches.ts';
 import { useRideWithGps } from './use-ridewithgps.ts';
@@ -37,13 +38,7 @@ import { useStrava } from './use-strava.ts';
 
 const props = defineProps<{ engine: EngineClient }>();
 
-type Step = 'import' | 'activities' | 'design' | 'export';
-const steps: { id: Step; label: string }[] = [
-  { id: 'import', label: 'Source' },
-  { id: 'activities', label: 'Activities' },
-  { id: 'design', label: 'Design' },
-  { id: 'export', label: 'Export' },
-];
+const steps = STEPS;
 /** The Design step's open section, kept while the app is open, like the step. */
 const section = ref<Section>('frame');
 const stepIndex = computed(() => steps.findIndex((s) => s.id === step.value));
@@ -512,25 +507,9 @@ onMounted(() => {
           </button>
         </li>
       </ol>
-      <!-- Phones: which step of how many, over a bar with a segment per step. -->
-      <div class="stepper">
-        <div class="stepper-row">
-          <strong>Step {{ stepIndex + 1 }} of {{ steps.length }}</strong>
-          <span class="muted">{{ steps[stepIndex]?.label }}</span>
-        </div>
-        <div class="segments">
-          <button
-            v-for="(s, i) in steps"
-            :key="s.id"
-            type="button"
-            :class="{ current: s.id === step, done: i < stepIndex }"
-            :aria-label="`Go to ${s.label}`"
-            :disabled="!reachable(s.id)"
-            @click="navigate(s.id)"
-          />
-        </div>
-      </div>
     </nav>
+    <!-- Phones: the step's bar (StepBar), with the way back, the step and the way on. -->
+    <div id="step-nav" class="step-nav" />
   </div>
 
   <main class="main">
@@ -595,7 +574,6 @@ onMounted(() => {
         :settings="settings"
         :activities="chosenIds.length"
         :plan="plan"
-        :step-label="`Step ${stepIndex + 1} of ${steps.length}`"
         @back="step = 'activities'"
         @next="step = 'export'"
       />
@@ -606,10 +584,7 @@ onMounted(() => {
         :settings="settings"
         :plan="plan"
         :plan-error="planError"
-        @back="
-          section = 'ending';
-          step = 'design';
-        "
+        @back="step = 'design'"
       />
     </template>
   </main>
@@ -843,55 +818,18 @@ onMounted(() => {
   cursor: default;
 }
 
-/* Phones: which step of how many, and a segment per step. */
-.stepper {
+/* Phones: the step's bar in place of the pills. */
+.step-nav {
   display: none;
 }
 
-@media (max-width: 700px) {
-  .steps {
+@media (max-width: 760px) {
+  .steps-row {
     display: none;
   }
 
-  .stepper {
+  .step-nav {
     display: block;
-  }
-
-  .steps-row {
-    padding-block: 0.625rem 0.75rem;
-  }
-
-  .stepper-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 0.5rem;
-    margin-bottom: 0.5rem;
-    font-size: 0.8rem;
-  }
-
-  /* A column per step, however many there are. */
-  .segments {
-    display: grid;
-    grid-auto-columns: 1fr;
-    grid-auto-flow: column;
-    gap: 0.3rem;
-  }
-
-  .segments button {
-    height: 5px;
-    padding: 0;
-    border: 0;
-    border-radius: 99px;
-    background: var(--line);
-  }
-
-  .segments button.done {
-    background: #a45b2e;
-  }
-
-  .segments button.current {
-    background: var(--accent);
   }
 }
 </style>
