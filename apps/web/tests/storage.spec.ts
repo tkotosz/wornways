@@ -1,6 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 import { pickSource } from './sources.ts';
+import { pickPeriod } from './steps.ts';
 
 const activity = new URL(
   '../../../packages/engine/tests/import/fixtures/trail-run.tcx',
@@ -83,5 +84,6 @@ test('preserves separate activities imported with the same name in two tabs', as
     ),
   );
   await page.reload();
+  await pickPeriod(page);
   await expect(page.getByTestId('chosen-count')).toContainText('2 activities');
 });

@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { offlineMap } from './offline-map.ts';
 import { pickSource } from './sources.ts';
-import { expectSection, openSection, openStep } from './steps.ts';
+import { expectSection, openSection, openStep, pickPeriod } from './steps.ts';
 
 test('opens any section of the Design step from its bar, and leaves the step from any', async ({
   page,
@@ -12,6 +12,7 @@ test('opens any section of the Design step from its bar, and leaves the step fro
   await page.goto('/');
   await pickSource(page, 'demo');
   await page.getByRole('button', { name: 'Continue' }).click(); // to Activities
+  await pickPeriod(page);
   await page.getByRole('button', { name: 'Continue' }).click(); // to Design
 
   const sections = page.getByRole('navigation', { name: 'Sections' }).getByRole('button');
@@ -52,6 +53,7 @@ test.describe('the Design step on a phone', () => {
     await page.goto('/');
     await pickSource(page, 'demo');
     await page.getByRole('button', { name: 'Continue' }).click(); // to Activities
+    await pickPeriod(page);
     await page.getByRole('button', { name: 'Continue' }).click(); // to Design
 
     // The app's header and step bar make way for the editor's own top bar.

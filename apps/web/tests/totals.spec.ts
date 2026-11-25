@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { offlineMap } from './offline-map.ts';
 import { pickSource } from './sources.ts';
-import { openSection } from './steps.ts';
+import { openSection, pickPeriod } from './steps.ts';
 
 test('turns the totals card on for Recap, and leaves the switch to the person', async ({
   page,
@@ -13,6 +13,7 @@ test('turns the totals card on for Recap, and leaves the switch to the person', 
   await pickSource(page, 'demo');
   await expect(page.getByTestId('demo-count')).toHaveText('25 made-up activities');
   await page.getByRole('button', { name: 'Continue' }).click(); // to Activities
+  await pickPeriod(page);
   await page.getByRole('button', { name: 'Continue' }).click(); // to Design
 
   const presets = page.getByRole('radiogroup', { name: 'Preset' });
@@ -56,6 +57,7 @@ test('picks the totals card values and their order', async ({ page, context }) =
   await page.goto('/');
   await pickSource(page, 'demo');
   await page.getByRole('button', { name: 'Continue' }).click(); // to Activities
+  await pickPeriod(page);
   await page.getByRole('button', { name: 'Continue' }).click(); // to Design
   await openSection(page, 'Playback');
   await page
@@ -128,6 +130,7 @@ test('offers the totals card for several activities only', async ({ page, contex
   await pickSource(page, 'demo');
   await expect(page.getByTestId('demo-count')).toHaveText('25 made-up activities');
   await page.getByRole('button', { name: 'Continue' }).click();
+  await pickPeriod(page);
   await page.getByRole('checkbox', { name: 'Select all shown' }).click();
   await page.getByTestId('chosen').getByText('Easy run').click();
   await page.getByRole('button', { name: 'Continue' }).click(); // to Design

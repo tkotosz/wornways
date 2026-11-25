@@ -1,13 +1,14 @@
 import { expect, test, type Page } from '@playwright/test';
 import { offlineMap } from './offline-map.ts';
 import { pickSource } from './sources.ts';
-import { openSection } from './steps.ts';
+import { openSection, pickPeriod } from './steps.ts';
 
 /** Opens the demo's Design step on Overlay, where the title is arranged on the still. */
 async function openOverlay(page: Page) {
   await page.goto('/');
   await pickSource(page, 'demo');
   await page.getByRole('button', { name: 'Continue' }).click(); // to Activities
+  await pickPeriod(page);
   await page.getByRole('button', { name: 'Continue' }).click(); // to Design
   await openSection(page, 'Overlay');
   await expect(page.getByTestId('edit-title')).toBeVisible();

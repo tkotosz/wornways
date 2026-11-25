@@ -24,3 +24,11 @@ export function expectSection(page: Page, name: SectionName) {
     page.getByRole('navigation', { name: 'Sections' }).getByRole('button', { name, exact: true }),
   ).toHaveAttribute('aria-current', 'step');
 }
+
+/**
+ * Picks the Activities step's period, which it starts without: the list of activities and
+ * the way on come once one is picked.
+ */
+export function pickPeriod(page: Page, label = 'All time') {
+  return page.getByRole('button', { name: label, exact: true }).click();
+}

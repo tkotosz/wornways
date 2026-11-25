@@ -4,7 +4,7 @@ import path from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
 import { offlineMap } from './offline-map.ts';
 import { pickSource } from './sources.ts';
-import { expectSection, openSection, openStep } from './steps.ts';
+import { expectSection, openSection, openStep, pickPeriod } from './steps.ts';
 
 const fixtures = new URL('../../../packages/engine/tests/import/fixtures/', import.meta.url);
 const fixture = (name: string) => new URL(name, fixtures).pathname;
@@ -195,6 +195,7 @@ test('ticks and unticks every activity shown with the header box', async ({ page
   await page.goto('/');
   await addFiles(page, 'morning-ride.fit', 'trail-run.tcx', 'strava-export.zip');
   await page.getByRole('button', { name: 'Continue' }).click();
+  await pickPeriod(page);
   const count = page.getByTestId('chosen-count');
   const selectAll = page.getByRole('checkbox', { name: 'Select all shown' });
 
@@ -234,6 +235,7 @@ test('keeps the activity list in place while ticking and filtering', async ({ pa
   await page.goto('/');
   await addFiles(page, 'strava-export.zip', 'morning-ride.fit', 'trail-run.tcx');
   await page.getByRole('button', { name: 'Continue' }).click();
+  await pickPeriod(page);
   const count = page.getByTestId('chosen-count');
   await expect(count).toContainText('5 of 5 activities selected');
   // The list is never emptied and drawn again, which would scroll the page to the top.
@@ -257,6 +259,7 @@ test('chooses activities with filters and by hand', async ({ page }) => {
   await page.goto('/');
   await addFiles(page, 'strava-export.zip', 'morning-ride.fit');
   await page.getByRole('button', { name: 'Continue' }).click();
+  await pickPeriod(page);
 
   // "All" is picked at first: every sport, virtual rides too.
   const chosen = page.getByTestId('chosen');
@@ -304,6 +307,7 @@ test('keeps the distance slider scale steady until other filters change', async 
   await page.goto('/');
   await addFiles(page, 'morning-ride.fit', 'strava-export.zip');
   await page.getByRole('button', { name: 'Continue' }).click();
+  await pickPeriod(page);
 
   const minimum = page.getByRole('textbox', { name: 'Minimum (km)' });
   const maximum = page.getByRole('textbox', { name: 'Maximum (km)' });
@@ -392,6 +396,7 @@ test('makes a video of activities within the chosen distance range', async ({ pa
   });
   await expect(page.getByTestId('activity-count')).toContainText('5 activities');
   await page.getByRole('button', { name: 'Continue' }).click();
+  await pickPeriod(page);
   const count = page.getByTestId('chosen-count');
   const minimum = page.getByRole('textbox', { name: 'Minimum (km)' });
   const maximum = page.getByRole('textbox', { name: 'Maximum (km)' });
@@ -431,6 +436,7 @@ test('keeps the video while the choice stays the same', async ({ page, context }
   await page.goto('/');
   await addFiles(page, 'morning-ride.fit', 'trail-run.tcx');
   await page.getByRole('button', { name: 'Continue' }).click(); // to Activities
+  await pickPeriod(page);
   await page.getByRole('button', { name: 'Continue' }).click(); // to Design
   await openStep(page, 'Export');
   await page.getByRole('button', { name: 'Make video' }).click();
@@ -473,6 +479,7 @@ test('previews and exports trimmed routes and leaves out routes too short to sho
   });
   await expect(page.getByTestId('activity-count')).toContainText('2 activities');
   await page.getByRole('button', { name: 'Continue' }).click(); // to Activities
+  await pickPeriod(page);
   await page.getByRole('button', { name: 'Continue' }).click(); // to Design
   await openSection(page, 'Playback');
   const length = page.getByRole('slider', { name: 'Video length' });
@@ -520,6 +527,7 @@ test('offers heart rate and cadence for an activity that recorded them', async (
   await page.goto('/');
   await addFiles(page, 'heart-rate-ride.gpx');
   await page.getByRole('button', { name: 'Continue' }).click(); // to Activities
+  await pickPeriod(page);
   await page.getByRole('button', { name: 'Continue' }).click(); // to Design
   await openSection(page, 'Overlay');
   await expectSection(page, 'Overlay');
@@ -546,6 +554,7 @@ test('shares the video where the browser can share files', async ({ page, contex
   await page.goto('/');
   await addFiles(page, 'morning-ride.fit');
   await page.getByRole('button', { name: 'Continue' }).click(); // to Activities
+  await pickPeriod(page);
   await page.getByRole('button', { name: 'Continue' }).click(); // to Design
   await openStep(page, 'Export');
   await page.getByRole('button', { name: 'Make video' }).click();
@@ -598,6 +607,7 @@ test('sets a start place as typed, from the current location or on the map', asy
   await page.goto('/');
   await addFiles(page, 'morning-ride.fit', 'trail-run.tcx');
   await page.getByRole('button', { name: 'Continue' }).click();
+  await pickPeriod(page);
   await page.getByLabel('Starts near a place').check();
 
   // Without a place the filter waits, and the next step does too. (No location permission
@@ -638,6 +648,7 @@ test('starts the end place at the start place, then keeps both filters apart', a
   await page.goto('/');
   await addFiles(page, 'morning-ride.fit', 'trail-run.tcx');
   await page.getByRole('button', { name: 'Continue' }).click();
+  await pickPeriod(page);
   await page.getByLabel('Starts near a place').check();
   const start = page.getByTestId('start-near');
   await start.getByRole('button', { name: /^1 1 start ·/ }).click();
@@ -669,6 +680,7 @@ test('starts a place at the current location when the browser allows it', async 
   await page.goto('/');
   await addFiles(page, 'morning-ride.fit', 'trail-run.tcx');
   await page.getByRole('button', { name: 'Continue' }).click();
+  await pickPeriod(page);
   await page.getByLabel('Starts near a place').check();
 
   await expect(page.getByLabel('Start place')).toHaveValue('51.50500, -0.02140');
@@ -684,6 +696,7 @@ test('sets up the video and its text, and keeps both for the next visit', async 
   await page.goto('/');
   await addFiles(page, 'morning-ride.fit', 'trail-run.tcx');
   await page.getByRole('button', { name: 'Continue' }).click(); // to Activities
+  await pickPeriod(page);
   await page.getByRole('button', { name: 'Continue' }).click(); // to Design, its Frame
   await expectSection(page, 'Frame');
   await openSection(page, 'Playback');
@@ -792,6 +805,7 @@ test('sets up the video and its text, and keeps both for the next visit', async 
   await expect(page.getByTestId('made')).toContainText('12.5 s');
 
   await page.reload();
+  await pickPeriod(page); // the period is picked again on a new visit
   await openStep(page, 'Design');
   await expect(chip('Square 1:1')).toHaveAttribute('aria-pressed', 'true');
   await openSection(page, 'Playback');
@@ -816,6 +830,7 @@ test('offers Highlight for a single activity, and the other presets for several'
   await page.goto('/');
   await addFiles(page, 'morning-ride.fit', 'trail-run.tcx');
   await page.getByRole('button', { name: 'Continue' }).click(); // to Activities
+  await pickPeriod(page);
   await trailRun(page).click();
   await page.getByRole('button', { name: 'Continue' }).click(); // to Design
   await openSection(page, 'Playback');

@@ -302,13 +302,17 @@ watch(settings, () => {
 });
 watch([library, source], () => (video.value = null));
 
-/** Whether a step can be opened: later steps need the chosen source ready, and a choice. */
+/**
+ * Whether a step can be opened: later steps need the chosen source ready, and a choice: a
+ * period picked and activities ticked.
+ */
 function reachable(id: Step): boolean {
   if (id === 'import') return true;
   if (!usable.value) return false;
   return (
     id === 'activities' ||
-    (chosenIds.value.length > 0 &&
+    (choice.value.period !== null &&
+      chosenIds.value.length > 0 &&
       !awaitingPlace.value &&
       !stravaBusy.value &&
       !rwgps.busy.value &&

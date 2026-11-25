@@ -1,6 +1,6 @@
 import { expect, test, type Page, type WebSocketRoute } from '@playwright/test';
 import { backToSources, pickSource } from './sources.ts';
-import { expectSection, openSection } from './steps.ts';
+import { expectSection, openSection, pickPeriod } from './steps.ts';
 
 const olderYear = new Date().getFullYear() - 1;
 const csrf = 'strava-test-state';
@@ -261,6 +261,7 @@ test.describe('Strava on a phone', () => {
       ),
     ).toBe(true);
     await page.reload();
+    await pickPeriod(page);
     await expect(page.getByTestId('chosen')).toContainText('Balaton loop');
     await expect(page.getByTestId('chosen')).not.toContainText('Strava test ride');
 

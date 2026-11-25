@@ -33,7 +33,11 @@ export type NearChoice = {
 };
 
 export type Choice = {
-  period: Period;
+  /**
+   * The period; null until the person picks one, so that which activities the video shows
+   * is always a choice made, not a default.
+   */
+  period: Period | null;
   /** The custom period's first and last day, YYYY-MM-DD; empty when not set. */
   customFrom: string;
   customTo: string;
@@ -51,7 +55,7 @@ export type Choice = {
 };
 
 export const NO_CHOICE: Choice = {
-  period: 'all',
+  period: null,
   customFrom: '',
   customTo: '',
   sports: null,
@@ -74,6 +78,7 @@ const month = (year: number, monthIndex: number) => {
 export function periodBounds(choice: Choice, today: Date): { from?: string; to?: string } {
   const year = today.getFullYear();
   switch (choice.period) {
+    case null:
     case 'all':
       return {};
     case 'today':

@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { offlineMap } from './offline-map.ts';
 import { pickSource } from './sources.ts';
-import { openSection } from './steps.ts';
+import { openSection, pickPeriod } from './steps.ts';
 
 test('offers the elevation profile for a single activity with elevation', async ({
   page,
@@ -19,6 +19,7 @@ test('offers the elevation profile for a single activity with elevation', async 
     );
   await expect(page.getByTestId('activity-count')).toHaveText('1 activity on this device');
   await page.getByRole('button', { name: 'Continue' }).click(); // to Activities
+  await pickPeriod(page);
   await page.getByRole('button', { name: 'Continue' }).click(); // to Design
   await openSection(page, 'Overlay');
 
@@ -53,6 +54,7 @@ test('leaves the elevation profile out where there is no elevation', async ({ pa
   });
   await expect(page.getByTestId('activity-count')).toHaveText('1 activity on this device');
   await page.getByRole('button', { name: 'Continue' }).click(); // to Activities
+  await pickPeriod(page);
   await page.getByRole('button', { name: 'Continue' }).click(); // to Design
   await openSection(page, 'Overlay');
   await expect(page.getByTestId('group-metrics')).toBeVisible();
@@ -74,6 +76,7 @@ test('offers the elevation profile for several activities, off until switched on
     .setInputFiles([fixture('morning-ride.gpx'), fixture('trail-run.tcx')]);
   await expect(page.getByTestId('activity-count')).toHaveText('2 activities on this device');
   await page.getByRole('button', { name: 'Continue' }).click(); // to Activities
+  await pickPeriod(page);
   await page.getByRole('button', { name: 'Continue' }).click(); // to Design
   await openSection(page, 'Overlay');
 

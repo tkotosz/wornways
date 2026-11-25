@@ -1,6 +1,7 @@
 <script setup lang="ts">
-// Step 2: choose the activities the video shows, with filters and by ticking them. Nothing
-// is deleted here.
+// Step 2: choose the activities the video shows, with filters and by ticking them. It starts
+// with no period picked, and the list and the other filters come once one is: which
+// activities a video shows is always chosen, not left to a default. Nothing is deleted here.
 import { computed } from 'vue';
 import { placeMissing, type Choice } from '../choice.ts';
 import ActivityFilters from '../components/ActivityFilters.vue';
@@ -72,7 +73,7 @@ const ticked = computed(() => rows.value.filter((a) => !choice.value.excluded.in
     </p>
 
     <ActivityGrid
-      v-if="rows.length"
+      v-if="rows.length && choice.period !== null"
       :excluded="choice.excluded"
       :rows="rows"
       :strava="strava"
@@ -84,7 +85,9 @@ const ticked = computed(() => rows.value.filter((a) => !choice.value.excluded.in
 
     <StepNav
       step="activities"
-      :next-disabled="!!busy || matching || ticked.length === 0 || placeMissing(choice)"
+      :next-disabled="
+        choice.period === null || !!busy || matching || ticked.length === 0 || placeMissing(choice)
+      "
       @back="emit('back')"
       @next="emit('next')"
     />

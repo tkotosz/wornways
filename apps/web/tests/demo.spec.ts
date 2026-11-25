@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { offlineMap } from './offline-map.ts';
 import { backToSources, pickSource } from './sources.ts';
-import { openSection, openStep } from './steps.ts';
+import { openSection, openStep, pickPeriod } from './steps.ts';
 
 const ride = new URL(
   '../../../packages/engine/tests/import/fixtures/morning-ride.fit',
@@ -13,6 +13,7 @@ async function startDemo(page: Page): Promise<void> {
   await pickSource(page, 'demo');
   await expect(page.getByTestId('demo-count')).toHaveText('25 made-up activities');
   await page.getByRole('button', { name: 'Continue' }).click();
+  await pickPeriod(page);
 }
 
 test('tries the demo, makes a video of it, and stores nothing on this device', async ({
@@ -148,4 +149,22 @@ test('loads the demo only when it is picked, not with the app', async ({ page })
   await pickSource(page, 'demo');
   await expect(page.getByTestId('demo-count')).toHaveText('25 made-up activities');
   expect(demoRequests.length).toBeGreaterThan(0);
+});
+
+test('asks for a period before it shows the activities', async ({ page }) => {
+  page.setDefaultTimeout(15_000);
+  await page.goto('/');
+  await pickSource(page, 'demo');
+  await page.getByRole('button', { name: 'Continue' }).click();
+  // Nothing is picked for the person: no period, no list, no way on, no later steps.
+  await expect(page.getByText('Which activities? Pick a period.')).toBeVisible();
+  await expect(page.getByTestId('chosen')).toHaveCount(0);
+  await expect(page.getByText('Sports')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Continue to Design' })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Design', exact: true })).toBeDisabled();
+
+  await pickPeriod(page, 'Last month');
+  await pickPeriod(page, 'All time');
+  await expect(page.getByTestId('chosen-count')).toContainText('25 of 25');
+  await expect(page.getByRole('button', { name: 'Continue to Design' })).toBeEnabled();
 });

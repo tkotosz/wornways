@@ -82,9 +82,12 @@ list.
    delete buttons; picking the demo loads them. The choice is remembered for the next
    visit (without one, the list shows); a person whose chosen source is ready (files on
    the device, a service connected) starts at step 2.
-2. **Activities.** The filters (the "Which activities" settings): period with shortcuts
-   and a calendar for custom days, sports (offered only when the period has them, with
-   "All"), and two place filters, "Starts near a place" and "Ends near a place". Each
+2. **Activities.** Which activities the video shows is always a choice made, not a
+   default: with files or the demo the step starts with no period picked ("Which
+   activities? Pick a period."), and the other filters, the list and the way on come once
+   one is (Strava and Ride with GPS, which list a period at a time, start on this month).
+   The filters (the "Which activities" settings): period with shortcuts and a calendar for
+   custom days, sports (offered only when the period has them, with "All"), and two place filters, "Starts near a place" and "Ends near a place". Each
    opens its own panel, where the place is set in one field: a place clicked on the map
    shown under it (MapLibre with OpenFreeMap's dark style, with zoom buttons, the circle
    of how near counts, and the places activities start, or end, at most often), typed or
