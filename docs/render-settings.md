@@ -24,8 +24,8 @@ never longer than the video length setting.
 ## Presets
 
 A preset is a named recipe for the timing: `--preset <name>` fills in the settings below,
-and a setting given with it wins over its value. The web app offers the same presets on
-its Playback step (Highlight for a single activity, the others for several); changing the
+and a setting given with it wins over its value. The web app offers the same presets in its
+Playback section (Highlight for a single activity, the others for several); changing the
 video's length or a value under Fine-tune playback makes the preset Custom.
 Single- and multi-activity replays remember their timing and camera settings independently.
 Use **Reset playback to defaults** under Fine-tune playback for the same starting settings as
@@ -102,7 +102,7 @@ the end card plays 15 s of replay, 3 s on the finished picture, then the end car
 | --------------------- | --------------- | -------- | ------- |
 | Trim start and finish | `--trim-radius` | 0–2000 m | off     |
 
-In the web app, the slider is under Appearance. It hides at least this radius around the
+In the web app, the slider is in the Map section. It hides at least this radius around the
 start and finish of each selected activity. The preview and export keep the longest
 continuous section outside the hidden circles.
 
@@ -127,7 +127,7 @@ Trimmed exports default to the filename `replay.mp4`.
 | Frame size        | `--size`                                         | `WxH`, presets: story 1080x1920, square 1080x1080, landscape 1920x1080 | story                                     |
 | Frames per second | `--fps`                                          | 24, 30, 60                                                             | 30                                        |
 
-In Appearance, choose a frame preset or enter a custom size such as `640x480`. Both
+In the Frame section, choose a frame preset or enter a custom size such as `640x480`. Both
 dimensions must be positive even numbers. Available encoder sizes depend on the device.
 
 The elevation profile is the climb along the bottom of the frame, between the side margins
@@ -244,7 +244,7 @@ values are chips under the switch, numbered in the order picked, with a link bac
 automatic choice.
 
 The recap preset turns it on; any other video of several activities can. In the web app a
-Custom playback made from Recap keeps it on, and the switch on the Appearance step always
+Custom playback made from Recap keeps it on, and the switch in the Ending section always
 decides over the preset.
 
 | Setting          | CLI flag                             | Values                                                              | Default                                    |

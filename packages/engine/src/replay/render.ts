@@ -1,8 +1,14 @@
 import { drawBasemap, type Basemap, type MapLabel, type Tile } from '../map/basemap.ts';
 import { levelsFor, mapLevelViews, type CameraPath, type LevelWindow } from './camera.ts';
 import { drawElevationProfile, elevationProfile } from './elevation-profile.ts';
-import { drawEndCard, endCardFrames } from './end-card.ts';
-import { drawTotalsCard, totalsCardFrames, type Totals, type TotalsField } from './totals-card.ts';
+import { END_CARD_S, drawEndCard, endCardFrames } from './end-card.ts';
+import {
+  TOTALS_CARD_S,
+  drawTotalsCard,
+  totalsCardFrames,
+  type Totals,
+  type TotalsField,
+} from './totals-card.ts';
 import { drawWatermark } from './mark.ts';
 import { averagePace, isOnFoot, topSpeed } from './pace.ts';
 import { dateRange } from './plans.ts';
@@ -238,6 +244,12 @@ export type Renderer = {
    * if every frame before it had been drawn. Used to show a single moment, such as the end.
    */
   skipTo(index: number): void;
+  /**
+   * Draws a card as it stands once finished, over the frame drawn last (the replay's last
+   * frame), for a still of the video's ending: the totals card with every value counted up,
+   * or the end card with its mark and name.
+   */
+  drawFinishedCard(card: 'totals' | 'end'): void;
 };
 
 type Prepared = Projected & {
@@ -1279,6 +1291,19 @@ export function createRenderer(
         : [1, 0, 0];
       drawScene(index, zoom, tx, ty);
       drawOverlay(t, zoom, tx, ty);
+    },
+    drawFinishedCard(card: 'totals' | 'end'): void {
+      const base = copyFrame();
+      if (card === 'totals')
+        drawTotalsCard(ctx, base, TOTALS_CARD_S, totals(), {
+          width: W,
+          height: H,
+          fontFamily,
+          title: options.title ?? '',
+          countLabel: [singular, plural],
+          fields: options.totalsFields,
+        });
+      else drawEndCard(ctx, base, END_CARD_S, { width: W, height: H, fontFamily });
     },
     skipTo(index: number): void {
       // The end card is drawn over the replay's last frame, so it cannot be skipped to.

@@ -4,6 +4,7 @@ import path from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
 import { offlineMap } from './offline-map.ts';
 import { pickSource } from './sources.ts';
+import { openSection, openStep } from './steps.ts';
 
 const fixtures = new URL('../../../packages/engine/tests/import/fixtures/', import.meta.url);
 const fixture = (name: string) => new URL(name, fixtures).pathname;
@@ -367,7 +368,7 @@ test('accepts month and year bounds and validates custom frame sizes', async ({
   await to.press('Enter');
   await expect(page.getByTestId('chosen-count')).toContainText('1 of 1 activity');
 
-  await page.getByRole('button', { name: 'Appearance', exact: true }).click();
+  await openStep(page, 'Video'); // opens on Frame
   await page.getByRole('button', { name: 'Custom size' }).click();
   const size = page.getByRole('textbox', { name: 'Frame size in pixels' });
   await size.fill('641x480');
@@ -376,7 +377,7 @@ test('accepts month and year bounds and validates custom frame sizes', async ({
   await size.fill('640x480');
   await size.press('Enter');
   await expect(page.getByTestId('preview')).toContainText('640 × 480 · 30 fps');
-  await page.getByRole('button', { name: 'Continue' }).click();
+  await openStep(page, 'Export');
   await expect(page.getByTestId('video-summary')).toHaveText('640 × 480 · 15 s + end card');
 });
 
@@ -403,9 +404,8 @@ test('makes a video of activities within the chosen distance range', async ({ pa
   await expect(page.getByRole('alert')).toHaveText('No activities match the distance range.');
   await maximum.fill('40');
   await expect(count).toContainText('3 of 3 activities');
-  await page.getByRole('button', { name: 'Continue' }).click(); // to Playback
-  await page.getByRole('button', { name: 'Continue' }).click(); // to Appearance
-  await page.getByRole('button', { name: 'Continue' }).click(); // to Export
+  await page.getByRole('button', { name: 'Continue' }).click(); // to Video
+  await openStep(page, 'Export');
 
   await expect(page.getByText('A replay of 3 activities')).toBeVisible();
   await expect(page.getByTestId('video-summary')).toHaveText('1080 × 1920 · 30 s + end card');
@@ -431,13 +431,14 @@ test('keeps the video while the choice stays the same', async ({ page, context }
   await page.goto('/');
   await addFiles(page, 'morning-ride.fit', 'trail-run.tcx');
   await page.getByRole('button', { name: 'Continue' }).click(); // to Activities
-  await page.getByRole('button', { name: 'Continue' }).click(); // to Playback
-  await page.getByRole('button', { name: 'Continue' }).click(); // to Appearance
-  await page.getByRole('button', { name: 'Continue' }).click(); // to Export
+  await page.getByRole('button', { name: 'Continue' }).click(); // to Video
+  await openStep(page, 'Export');
   await page.getByRole('button', { name: 'Make video' }).click();
   await expect(page.getByTestId('result')).toBeVisible({ timeout: 150_000 });
 
+  // Back opens the Video step's last section, Ending, whose Continue comes back.
   await page.getByRole('button', { name: '← Back' }).click();
+  await expect(page.getByRole('heading', { name: 'How should it end?' })).toBeVisible();
   await page.getByRole('button', { name: 'Continue' }).click();
   await expect(page.getByTestId('result')).toBeVisible();
   // With a video made, the next thing to do is to download it.
@@ -471,12 +472,13 @@ test('previews and exports trimmed routes and leaves out routes too short to sho
     buffer: Buffer.from(shortRoute),
   });
   await expect(page.getByTestId('activity-count')).toContainText('2 activities');
-  await page.getByRole('button', { name: 'Continue' }).click();
-  await page.getByRole('button', { name: 'Continue' }).click();
+  await page.getByRole('button', { name: 'Continue' }).click(); // to Activities
+  await page.getByRole('button', { name: 'Continue' }).click(); // to Video
+  await openSection(page, 'Playback');
   const length = page.getByRole('slider', { name: 'Video length' });
   await length.fill('5');
   await length.dispatchEvent('change');
-  await page.getByRole('button', { name: 'Continue' }).click();
+  await page.getByRole('button', { name: 'Continue' }).click(); // to Map
   const trim = page.getByRole('slider', { name: 'Trim start and finish' });
   await expect(trim).toHaveAttribute('aria-valuetext', 'Off');
   const preview = page.getByRole('img', { name: 'Preview: the last frame of the video' });
@@ -486,7 +488,7 @@ test('previews and exports trimmed routes and leaves out routes too short to sho
   await expect(trim).toHaveAttribute('aria-valuetext', '500 m');
   await expect(preview).toBeVisible();
   await expect(preview).not.toHaveAttribute('src', original);
-  await page.getByRole('button', { name: 'Continue' }).click();
+  await openStep(page, 'Export');
   await expect(page.getByText('1 activity omitted after trimming.')).toBeVisible();
   const make = page.getByRole('button', { name: 'Make video' });
   await make.click();
@@ -497,10 +499,11 @@ test('previews and exports trimmed routes and leaves out routes too short to sho
   );
 
   await page.getByRole('button', { name: '← Back' }).click();
+  await openSection(page, 'Map');
   await expect(trim).toHaveValue('500');
   await trim.press('ArrowRight');
   await expect(trim).toHaveAttribute('aria-valuetext', '550 m');
-  await page.getByRole('button', { name: 'Continue' }).click();
+  await openStep(page, 'Export');
   await expect(page.getByRole('link', { name: 'Download' })).toHaveCount(0);
   await expect(make).toBeEnabled();
 
@@ -516,8 +519,10 @@ test('offers heart rate and cadence for an activity that recorded them', async (
   page.setDefaultTimeout(15_000);
   await page.goto('/');
   await addFiles(page, 'heart-rate-ride.gpx');
-  for (let i = 0; i < 3; i++) await page.getByRole('button', { name: 'Continue' }).click();
-  await expect(page.getByRole('heading', { name: 'Make it yours' })).toBeVisible();
+  await page.getByRole('button', { name: 'Continue' }).click(); // to Activities
+  await page.getByRole('button', { name: 'Continue' }).click(); // to Video
+  await openSection(page, 'Overlay');
+  await expect(page.getByRole('heading', { name: 'What goes on the video?' })).toBeVisible();
   const metrics = page.getByTestId('group-metrics');
   for (const name of ['Heart rate', 'Max heart rate', 'Cadence'])
     await expect(metrics.getByRole('button', { name, exact: true })).toHaveAttribute(
@@ -540,7 +545,9 @@ test('shares the video where the browser can share files', async ({ page, contex
   }`);
   await page.goto('/');
   await addFiles(page, 'morning-ride.fit');
-  for (let i = 0; i < 4; i++) await page.getByRole('button', { name: 'Continue' }).click();
+  await page.getByRole('button', { name: 'Continue' }).click(); // to Activities
+  await page.getByRole('button', { name: 'Continue' }).click(); // to Video
+  await openStep(page, 'Export');
   await page.getByRole('button', { name: 'Make video' }).click();
   await expect(page.getByTestId('result')).toBeVisible({ timeout: 150_000 });
 
@@ -675,12 +682,14 @@ test('sets up the video and its text, and keeps both for the next visit', async 
   await page.goto('/');
   await addFiles(page, 'morning-ride.fit', 'trail-run.tcx');
   await page.getByRole('button', { name: 'Continue' }).click(); // to Activities
+  await page.getByRole('button', { name: 'Continue' }).click(); // to Video, its Frame
+  await expect(page.getByRole('heading', { name: 'Where will you post it?' })).toBeVisible();
   await page.getByRole('button', { name: 'Continue' }).click(); // to Playback
   const chip = (name: string) => page.getByRole('button', { name, exact: true });
   const slider = (name: string) => page.getByRole('slider', { name });
   const preset = (name: string) => page.getByRole('radio', { name: new RegExp(`^${name}`) });
 
-  // The Playback step: the first preset, All at once, at first, with a summary telling
+  // Playback: the first preset, All at once, at first, with a summary telling
   // what it plays. Recap: 30 s, less 0.4 s before and 0.3 s after the activities.
   const pacing = page.getByTestId('pacing');
   const summary = page.getByTestId('replay-summary');
@@ -718,14 +727,10 @@ test('sets up the video and its text, and keeps both for the next visit', async 
   await slider('Video length').fill('10');
   await slider('Video length').dispatchEvent('change');
   await expect(summary).toHaveText('10 seconds · Custom playback');
-  // The end pause keeps the finished picture on screen longer; it is added to the video.
-  await slider('End pause').fill('2.5');
-  await slider('End pause').dispatchEvent('change');
-  await expect(summary).toHaveText('10 seconds · Custom playback');
 
-  // The Appearance step: the title starts as the automatic one, with its position and size.
-  await page.getByRole('button', { name: 'Continue' }).click();
-  await expect(page.getByRole('heading', { name: 'Make it yours' })).toBeVisible();
+  // Overlay: the title starts as the automatic one, with its position and size.
+  await openSection(page, 'Overlay');
+  await expect(page.getByRole('heading', { name: 'What goes on the video?' })).toBeVisible();
   const title = page.getByRole('textbox', { name: 'Title' });
   await expect(title).toHaveValue('27 Apr – 2 May 2026');
   await title.fill('Spring');
@@ -747,13 +752,21 @@ test('sets up the video and its text, and keeps both for the next visit', async 
     ).toHaveAttribute('aria-pressed', 'false');
   await slider('Size').first().fill('150');
   await slider('Size').first().dispatchEvent('change');
-  // The end card is on unless switched off; off, the video is the replay alone.
+  await expect(page.getByRole('switch', { name: 'Show watermark' })).toBeChecked();
+
+  // Ending: the end pause keeps the finished picture longer, added to the video. The end
+  // card is on unless switched off; off, the video ends with the replay and the pause.
+  await page.getByRole('button', { name: 'Continue' }).click(); // to Ending
+  await slider('End pause').fill('2.5');
+  await slider('End pause').dispatchEvent('change');
   const endCard = page.getByRole('switch', { name: 'Show end card' });
   await expect(endCard).toBeChecked();
   await endCard.click();
-  await expect(page.getByRole('switch', { name: 'Show watermark' })).toBeChecked();
+  await openSection(page, 'Playback');
+  await expect(summary).toHaveText('10 seconds · Custom playback');
 
-  // The live preview shows the finished picture in the frame, which is picked here too.
+  // The live preview shows the finished picture in the frame, picked in Frame.
+  await openSection(page, 'Frame');
   const picture = page.getByRole('img', { name: 'Preview: the last frame of the video' });
   const pictureSize = () =>
     picture.evaluate((img) => {
@@ -769,7 +782,7 @@ test('sets up the video and its text, and keeps both for the next visit', async 
   await expect.poll(pictureSize).toBe('480x480');
 
   // The Export step: only the video.
-  await page.getByRole('button', { name: 'Continue' }).click();
+  await openStep(page, 'Export');
   await expect(page.getByTestId('video-summary')).toHaveText('1080 × 1080 · 10 s + 2.5 s pause');
   await page.getByRole('button', { name: 'Make video' }).click();
   const result = page.getByTestId('result');
@@ -777,18 +790,21 @@ test('sets up the video and its text, and keeps both for the next visit', async 
   await expect(page.getByTestId('made')).toContainText('12.5 s');
 
   await page.reload();
-  await page.getByRole('button', { name: 'Playback', exact: true }).click();
+  await openStep(page, 'Video');
+  await expect(chip('Square 1:1')).toHaveAttribute('aria-pressed', 'true');
+  await openSection(page, 'Playback');
   await expect(summary).toHaveText('10 seconds · Custom playback');
   await page.getByRole('button', { name: /Fine-tune playback/ }).click();
   await expect(chip('All')).toHaveAttribute('aria-pressed', 'true');
   await expect(chip('Real pace')).toHaveAttribute('aria-pressed', 'true');
-  await page.getByRole('button', { name: 'Appearance', exact: true }).click();
-  await expect(chip('Square 1:1')).toHaveAttribute('aria-pressed', 'true');
+  await openSection(page, 'Overlay');
   await expect(page.getByRole('textbox', { name: 'Title' })).toHaveValue('Spring');
-  await expect(page.getByRole('switch', { name: 'Show end card' })).not.toBeChecked();
   await expect(
     page.getByTestId('group-title').getByRole('button', { name: 'Bottom middle' }),
   ).toHaveAttribute('aria-pressed', 'true');
+  await openSection(page, 'Ending');
+  await expect(page.getByRole('switch', { name: 'Show end card' })).not.toBeChecked();
+  await expect(slider('End pause')).toHaveValue('2.5');
 });
 
 test('offers Highlight for a single activity, and the other presets for several', async ({
@@ -799,7 +815,8 @@ test('offers Highlight for a single activity, and the other presets for several'
   await addFiles(page, 'morning-ride.fit', 'trail-run.tcx');
   await page.getByRole('button', { name: 'Continue' }).click(); // to Activities
   await trailRun(page).click();
-  await page.getByRole('button', { name: 'Continue' }).click(); // to Playback
+  await page.getByRole('button', { name: 'Continue' }).click(); // to Video
+  await openSection(page, 'Playback');
   const presets = page.getByRole('radio');
   const preset = (name: string) => page.getByRole('radio', { name: new RegExp(`^${name}`) });
 
@@ -819,12 +836,13 @@ test('offers Highlight for a single activity, and the other presets for several'
   await expect(follows).toHaveAttribute('aria-pressed', 'true');
   await page.getByRole('button', { name: /Fine-tune playback/ }).click();
   await page.getByRole('button', { name: 'Continue' }).click();
-  await expect(page.getByRole('heading', { name: 'Make it yours' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'How should the map look?' })).toBeVisible();
 
   // Several: the presets for several, with their own default.
   await page.getByRole('button', { name: 'Activities', exact: true }).click();
   await trailRun(page).click();
-  await page.getByRole('button', { name: 'Playback', exact: true }).click();
+  await openStep(page, 'Video');
+  await openSection(page, 'Playback');
   await expect(presets).toHaveCount(3);
   await expect(preset('All at once')).toHaveAttribute('aria-checked', 'true');
   await page.getByRole('button', { name: /Fine-tune playback/ }).click();

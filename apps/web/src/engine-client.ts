@@ -7,6 +7,7 @@ import type {
   ImportReport,
   MatchReport,
   PlanReport,
+  PosterScene,
   Progress,
   Reply,
   Request,
@@ -258,15 +259,25 @@ export class EngineClient {
     };
   }
 
-  /** Draws the last frame of the video, small, as a preview; `cancel` stops it. */
-  makePoster(settings: SettingsInput): { result: Promise<Blob>; cancel: () => void } {
+  /**
+   * Draws a still of the video, small, as a preview: its last frame, or its ending (see
+   * `PosterScene`); `cancel` stops it.
+   */
+  makePoster(
+    settings: SettingsInput,
+    scene: PosterScene = 'replay',
+  ): { result: Promise<Blob>; cancel: () => void } {
     const id = this.nextId++;
-    const result = this.send({ type: 'make-poster', id, settings, source: this.source }).then(
-      (reply) => {
-        if (reply.type === 'poster-made') return reply.image;
-        throw this.errorFor(reply);
-      },
-    );
+    const result = this.send({
+      type: 'make-poster',
+      id,
+      settings,
+      source: this.source,
+      scene,
+    }).then((reply) => {
+      if (reply.type === 'poster-made') return reply.image;
+      throw this.errorFor(reply);
+    });
     return {
       result,
       cancel: () => this.worker.postMessage({ type: 'cancel', id } satisfies Request),

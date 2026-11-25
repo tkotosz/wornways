@@ -103,7 +103,7 @@ test('uses Ride with GPS trips as the source, fetching tracks only when needed',
   await expect.poll(() => fetched.length).toBe(5);
   expect(fetched).not.toContain(25);
   await page.getByRole('button', { name: 'Continue' }).click();
-  await expect(page.getByTestId('replay-summary')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Where will you post it?' })).toBeVisible();
   expect(fetched).not.toContain(25);
 
   // A reload opens Ride with GPS again, and the fetched tracks come from this device.
@@ -111,7 +111,7 @@ test('uses Ride with GPS trips as the source, fetching tracks only when needed',
   await page.reload();
   await expect(page.getByTestId('source')).toContainText('Ride with GPS');
   await page.getByRole('button', { name: 'Continue' }).click();
-  await expect(page.getByTestId('replay-summary')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Where will you post it?' })).toBeVisible();
   expect(fetched.length).toBe(before);
 
   // The Source step shows which trips' tracks are kept here; deleting one only removes the copy.
@@ -131,7 +131,7 @@ test('uses Ride with GPS trips as the source, fetching tracks only when needed',
   const beforeContinue = fetched.length;
   await page.getByRole('button', { name: 'Continue' }).click();
   await page.getByRole('button', { name: 'Continue' }).click();
-  await expect(page.getByTestId('replay-summary')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Where will you post it?' })).toBeVisible();
   expect(fetched.length).toBeGreaterThan(beforeContinue);
 
   // Disconnecting stays with Ride with GPS, ready to connect again.
@@ -171,7 +171,7 @@ test('shows the download in a dialog that can be canceled', async ({ page }) => 
   await expect.poll(() => fetched.length).toBeGreaterThanOrEqual(5);
   const before = new Set(fetched);
   await page.getByRole('button', { name: 'Continue' }).click();
-  await expect(page.getByTestId('replay-summary')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Where will you post it?' })).toBeVisible();
   expect(fetched.filter((id) => before.has(id)).length).toBe(before.size);
   expect(new Set(fetched).size).toBe(fetched.length);
 });

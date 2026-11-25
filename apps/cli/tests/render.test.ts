@@ -423,6 +423,29 @@ describe('the totals card', () => {
     return Buffer.from(ctx.getImageData(0, 0, 270, 480).data);
   }
 
+  it('draws the finished totals card or end card over the last frame, for a still', () => {
+    const second = route();
+    second.id = 'second';
+    second.startTime += 86_400_000;
+    const still = (card?: 'totals' | 'end') => {
+      const renderer = createRenderer(
+        [route(), second],
+        chronologicalTimeline([5_000, 5_000], { duration: 1 }),
+        (w, h) => createCanvas(w, h) as unknown as CanvasLike,
+        { width: 270, height: 480, fps: 10, totalsCard: true, endCard: true },
+      );
+      for (let f = 0; f < renderer.replayFrames; f++) renderer.renderFrame(f);
+      if (card) renderer.drawFinishedCard(card);
+      const ctx = renderer.canvas.getContext('2d') as Context2DLike;
+      return Buffer.from(ctx.getImageData(0, 0, 270, 480).data);
+    };
+    const last = still();
+    // The totals card is the last frame of the video with the totals card and no end card.
+    expect(still('totals').equals(lastTotalsFrame())).toBe(true);
+    expect(still('totals').equals(last)).toBe(false);
+    expect(still('end').equals(last)).toBe(false);
+  });
+
   it('shows every value unless told otherwise, and only the values picked when told', () => {
     const automatic = lastTotalsFrame();
     expect(lastTotalsFrame(['count', 'distance', 'moving', 'elevation']).equals(automatic)).toBe(

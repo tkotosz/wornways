@@ -21,17 +21,30 @@ function dropDraft(): void {
 </script>
 
 <script setup lang="ts">
-// The live preview of the video: its finished last frame, small, redrawn shortly after the
-// settings change, with the frame's shape, size and length. Play makes a draft of the whole
-// video, small and at a low frame rate, and plays it in place of the picture, with a bar to
-// move to any moment. It stays in view beside the settings on wide screens and sits above
-// them on phones.
+// The live preview of the video: a still of it, small, redrawn shortly after the settings
+// change, with the frame's shape, size and length. The still is the finished last frame, or
+// for the ending the finished totals card or end card. Play makes a draft of the whole video,
+// small and at a low frame rate, and plays it in place of the picture, with a bar to move to
+// any moment. Where things are arranged on the still (`editing`), it opens on the still and
+// Edit goes back to it from the draft. It stays in view beside the settings on wide screens
+// and sits above them on phones.
 import { parseSettings, type SettingsInput } from '@wornways/engine';
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { Canceled, type EngineClient } from '../engine-client.ts';
-import type { Progress } from '../messages.ts';
+import type { PosterScene, Progress } from '../messages.ts';
 
-const props = defineProps<{ engine: EngineClient; settings: SettingsInput; seconds?: number }>();
+const props = withDefaults(
+  defineProps<{
+    engine: EngineClient;
+    settings: SettingsInput;
+    seconds?: number;
+    /** What the still shows: the last frame, or the ending. */
+    scene?: PosterScene;
+    /** Things are arranged on the still: it shows until Play, and Edit goes back to it. */
+    editing?: boolean;
+  }>(),
+  { seconds: undefined, scene: 'replay', editing: false },
+);
 
 /** Waits this long after a change, so dragging a slider draws once, not at every step. */
 const PAUSE_MS = 400;
@@ -44,7 +57,15 @@ let timer: ReturnType<typeof setTimeout> | undefined;
 
 const key = computed(() => JSON.stringify(props.settings));
 /** The draft of these settings, when one is made. */
-const shownDraft = computed(() => (draft.value?.key === key.value ? draft.value : null));
+/** While editing: whether the draft plays instead of the still. */
+const playing = ref(false);
+watch(
+  () => props.editing,
+  () => (playing.value = false),
+);
+const shownDraft = computed(() =>
+  draft.value?.key === key.value && (!props.editing || playing.value) ? draft.value : null,
+);
 const draftUrl = computed(() => shownDraft.value?.url ?? '');
 /** The draft being made: how far it is, and how to stop it. */
 const drafting = ref<{ progress: Progress; cancel: () => void } | null>(null);
@@ -69,6 +90,9 @@ function stopDraft(): void {
 }
 
 async function play(): Promise<void> {
+  playing.value = true;
+  // A draft of these settings is already made: it plays again.
+  if (draft.value?.key === key.value) return;
   stopDraft();
   draftError.value = '';
   const settingsKey = key.value;
@@ -118,7 +142,7 @@ const shape = computed(() => {
 });
 
 async function draw(): Promise<void> {
-  const task = props.engine.makePoster(props.settings);
+  const task = props.engine.makePoster(props.settings, props.scene);
   cancel = task.cancel;
   try {
     const image = await task.result;
@@ -137,17 +161,18 @@ async function draw(): Promise<void> {
 }
 
 watch(
-  [() => JSON.stringify(props.settings), () => props.settings['trim-radius']],
-  ([, radius], previous) => {
+  [() => JSON.stringify(props.settings), () => props.settings['trim-radius'], () => props.scene],
+  ([, radius, scene], previous) => {
     clearTimeout(timer);
     cancel?.();
     cancel = null;
-    if (radius !== previous?.[1] && url.value) {
+    if ((radius !== previous?.[1] || scene !== previous?.[2]) && url.value) {
       URL.revokeObjectURL(url.value);
       url.value = '';
     }
     // A draft shows the settings it was made with; a change goes back to the picture.
     if (draft.value && draft.value.key !== key.value) dropDraft();
+    playing.value = false;
     stopDraft();
     draftError.value = '';
     error.value = '';
@@ -186,11 +211,22 @@ onBeforeUnmount(() => {
         muted
         playsinline
       />
-      <img v-else-if="url" :src="url" alt="Preview: the last frame of the video" />
+      <img
+        v-else-if="url"
+        :src="url"
+        :alt="
+          scene === 'ending'
+            ? 'Preview: the ending of the video'
+            : 'Preview: the last frame of the video'
+        "
+      />
+      <button v-if="editing && draftUrl" type="button" class="edit" @click="playing = false">
+        Edit
+      </button>
       <button
         v-if="url && !draftUrl && !drafting && !busy"
         type="button"
-        class="play"
+        :class="['play', { corner: editing }]"
         aria-label="Play preview"
         @click="play"
       >
@@ -217,7 +253,8 @@ onBeforeUnmount(() => {
       {{ shownDraft.fps }} fps. The video is made in full on Export.
     </p>
     <p v-else-if="url && !drafting" class="caption muted">
-      The finished picture. Press play to see it move.
+      {{ scene === 'ending' ? 'How the video ends.' : 'The finished picture.' }} Press play to see
+      it move.
     </p>
   </div>
 </template>
@@ -286,6 +323,21 @@ onBeforeUnmount(() => {
 }
 
 /* A round button in the middle of the picture. */
+/* Back from the draft to the still, in a corner clear of the video's controls. */
+.edit {
+  position: absolute;
+  top: 0.6rem;
+  right: 0.6rem;
+  padding: 0.35rem 0.9rem;
+  border: 0;
+  border-radius: 999px;
+  color: #1a110b;
+  background: var(--accent);
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
 .play {
   position: absolute;
   inset: 50% auto auto 50%;
@@ -301,6 +353,16 @@ onBeforeUnmount(() => {
   box-shadow: 0 0 0 6px rgba(255, 138, 42, 0.25);
   font-size: 1.2rem;
   transform: translate(-50%, -50%);
+}
+
+/* Where things are arranged on the picture, Play keeps out of the way, in a corner. */
+.play.corner {
+  inset: auto 0.6rem 0.6rem auto;
+  width: 2.6rem;
+  height: 2.6rem;
+  box-shadow: 0 0 0 4px rgba(255, 138, 42, 0.25);
+  font-size: 0.95rem;
+  transform: none;
 }
 
 /* What the draft is doing, with a bar of how far it is. No transition: nothing on the page

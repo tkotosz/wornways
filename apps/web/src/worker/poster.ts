@@ -1,4 +1,5 @@
-// The preview of a video: its last frame, the finished picture, drawn at a small size.
+// The preview of a video: its last frame, the finished picture, or its ending, drawn at a
+// small size.
 
 import {
   createTileLoader,
@@ -10,6 +11,7 @@ import {
   type TileLoader,
   type Track,
 } from '@wornways/engine';
+import type { PosterScene } from '../messages.ts';
 import { loadFont } from './font.ts';
 import { cacheStorageTileCache } from './tile-cache.ts';
 import { Canceled, VideoProblem, problemText } from './video.ts';
@@ -26,12 +28,17 @@ export function previewSize(frame: { width: number; height: number }) {
   return { width: even(frame.width * scale), height: even(frame.height * scale) };
 }
 
-/** Draws the last frame of the video the settings describe, at preview size, as a PNG. */
+/**
+ * Draws a still of the video the settings describe, at preview size, as a PNG: its last
+ * frame, or for the ending the finished totals card over it when the video has one, else the
+ * finished end card, else the last frame.
+ */
 export async function makePoster(
   library: Track[],
   input: SettingsInput,
   signal: AbortSignal,
   loadTiles: TileLoader = createTileLoader({ cache: cacheStorageTileCache }),
+  scene: PosterScene = 'replay',
 ): Promise<Blob> {
   const settings = parseSettings(input);
   const selection = selectTracks(library, settings);
@@ -54,5 +61,10 @@ export async function makePoster(
   renderer.skipTo(last);
   if (signal.aborted) throw new Canceled();
   renderer.renderFrame(last);
+  if (scene === 'ending') {
+    // The totals card is for several activities only, as in the video.
+    if (settings.totalsCard && selection.tracks.length > 1) renderer.drawFinishedCard('totals');
+    else if (settings.endCard) renderer.drawFinishedCard('end');
+  }
   return (renderer.canvas as unknown as OffscreenCanvas).convertToBlob({ type: 'image/png' });
 }

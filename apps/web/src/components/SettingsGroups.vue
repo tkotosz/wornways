@@ -44,8 +44,10 @@ const GROUP_TITLES: Record<Panel, string> = {
   title: 'Title',
   metrics: 'Metrics',
   elevation: 'Elevation',
+  watermark: 'Watermark',
+  pause: 'End pause',
   totals: 'Totals card',
-  brand: 'Branding',
+  'end-card': 'End card',
 };
 
 const groups = computed(() =>

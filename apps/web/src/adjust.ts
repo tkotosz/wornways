@@ -22,8 +22,32 @@ export type Adjustments = Record<string, string | boolean>;
  */
 export const SHOW_TITLE = 'show-title';
 
-/** The panels of Fine-tune playback, on the Playback step. */
+/** The panels of Fine-tune playback, in the Playback section. */
 export const PLAYBACK_PANELS: Panel[] = ['timing', 'camera'];
+
+/**
+ * The sections of the Video step, in the order things are decided: where the video will be
+ * posted, how the routes play, the map, what is drawn over the replay, and what comes after
+ * it. Frame and Playback have controls of their own; the others are panels.
+ */
+export type Section = 'frame' | 'playback' | 'map' | 'overlay' | 'ending';
+export const SECTIONS: { id: Section; label: string; heading: string; panels: Panel[] }[] = [
+  { id: 'frame', label: 'Frame', heading: 'Where will you post it?', panels: [] },
+  { id: 'playback', label: 'Playback', heading: 'How should your routes play?', panels: [] },
+  { id: 'map', label: 'Map', heading: 'How should the map look?', panels: ['map', 'privacy'] },
+  {
+    id: 'overlay',
+    label: 'Overlay',
+    heading: 'What goes on the video?',
+    panels: ['title', 'metrics', 'elevation', 'watermark'],
+  },
+  {
+    id: 'ending',
+    label: 'Ending',
+    heading: 'How should it end?',
+    panels: ['pause', 'totals', 'end-card'],
+  },
+];
 
 /** The preset picked, or Custom: the settings as set under Fine-tune. */
 export type PresetChoice = Preset | 'custom';
@@ -35,8 +59,10 @@ export const countOf = (activities: number): ActivityCount =>
 
 /** Where the preset is kept: a single activity and several remember their own. */
 const presetKey = (count: ActivityCount) => (count === 'one' ? 'preset-one' : 'preset');
+// The end pause is set in the Ending section, outside the playback a preset decides.
 const PLAYBACK_SETTINGS = SETTINGS.filter(
-  ({ group, name }) => (group === 'timing' && name !== 'preset') || name === 'camera',
+  ({ group, name }) =>
+    (group === 'timing' && name !== 'preset' && name !== 'end-pause') || name === 'camera',
 ).map(({ name }) => name);
 const adjustmentKey = (name: string, count: ActivityCount) =>
   count === 'one' && PLAYBACK_SETTINGS.includes(name) ? `one-${name}` : name;
@@ -81,7 +107,7 @@ const presetPlayback = (preset: PresetChoice): Adjustments =>
 
 /**
  * The preset's values of other settings, such as the totals card: where they start, until
- * the person sets them on the Appearance step.
+ * the person sets them in the Video step.
  */
 const presetStarting = (preset: PresetChoice): Adjustments =>
   Object.fromEntries(
@@ -89,7 +115,7 @@ const presetStarting = (preset: PresetChoice): Adjustments =>
   );
 
 /**
- * Where a setting of the Appearance step starts until it is set: the current preset's value,
+ * Where a setting outside playback starts until it is set: the current preset's value,
  * or the elevation profile's, which the engine leaves to the video (on for one activity,
  * off for several); undefined: its default.
  */
@@ -166,16 +192,6 @@ export function fineTuned(
   return Object.fromEntries(tuned);
 }
 
-/** The panels of the Appearance step, after its Frame panel. */
-export const APPEARANCE_PANELS: Panel[] = [
-  'privacy',
-  'title',
-  'metrics',
-  'elevation',
-  'map',
-  'totals',
-  'brand',
-];
 /** Every group the two steps offer. Which activities are chosen in the step before them. */
 const ADJUST_GROUPS: SettingGroup[] = ['timing', 'privacy', 'look', 'title', 'metrics', 'brand'];
 
@@ -283,22 +299,34 @@ export const settingHint = (setting: string, count: ActivityCount) =>
 
 export const sliderStep = (setting: string) => STEPS[setting] ?? 1;
 
-/** A panel of settings on the Video and Text steps. */
+/** A panel of settings in the Video step's sections. */
 export type Panel =
-  'timing' | 'camera' | 'privacy' | 'map' | 'title' | 'metrics' | 'elevation' | 'totals' | 'brand';
+  | 'timing'
+  | 'camera'
+  | 'privacy'
+  | 'map'
+  | 'title'
+  | 'metrics'
+  | 'elevation'
+  | 'watermark'
+  | 'pause'
+  | 'totals'
+  | 'end-card';
 
 /** The settings of each panel on the screens, in order: mostly the settings table's groups. */
 const PANELS: Record<Panel, string[]> = {
   // The video's length has a control of its own above Fine-tune playback.
-  timing: ['group', 'share', 'group-pace', 'overlap', 'pace', 'end-pause'],
+  timing: ['group', 'share', 'group-pace', 'overlap', 'pace'],
   camera: ['camera'],
   privacy: ['trim-radius'],
   map: ['map'],
   title: ['title', 'title-position', 'title-size'],
   metrics: ['metrics', 'metrics-fields', 'metrics-position', 'metrics-size'],
   elevation: ['elevation-profile'],
+  watermark: ['watermark'],
+  pause: ['end-pause'],
   totals: ['totals-card', 'totals-fields'],
-  brand: ['end-card', 'watermark'],
+  'end-card': ['end-card'],
 };
 
 /**
@@ -312,13 +340,13 @@ export function panelOffered(panel: Panel, plan: PlanReport | null | undefined):
   return true;
 }
 
-/** The frame rates offered on the Appearance step, from the settings table. */
+/** The frame rates offered in the Frame section, from the settings table. */
 export const FRAME_RATES: readonly string[] = (() => {
   const kind = SETTINGS.find((s) => s.name === 'fps')!.kind;
   return kind.type === 'choice' ? kind.choices : ['30'];
 })();
 
-/** The frame sizes offered on the Appearance step, by name. */
+/** The frame sizes offered in the Frame section, by name. */
 export const SIZE_LABELS: Record<string, string> = {
   story: 'Story 9:16',
   square: 'Square 1:1',

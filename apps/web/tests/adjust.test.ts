@@ -13,6 +13,7 @@ import {
   valueOf,
   withPreset,
   fromEarlierVersions,
+  SECTIONS,
 } from '../src/adjust.ts';
 
 const definition = (name: string) => SETTINGS.find((s) => s.name === name)!;
@@ -57,17 +58,39 @@ describe('adjustSettings', () => {
 });
 
 describe('the settings offered', () => {
+  it('puts every panel in one section, in the order things are decided', () => {
+    expect(SECTIONS.map((s) => s.id)).toEqual(['frame', 'playback', 'map', 'overlay', 'ending']);
+    expect(SECTIONS.find((s) => s.id === 'overlay')!.panels).toEqual([
+      'title',
+      'metrics',
+      'elevation',
+      'watermark',
+    ]);
+    expect(SECTIONS.find((s) => s.id === 'ending')!.panels).toEqual([
+      'pause',
+      'totals',
+      'end-card',
+    ]);
+    const panels = SECTIONS.flatMap((s) => s.panels);
+    expect(new Set(panels).size).toBe(panels.length);
+  });
+
+  it('keeps the end pause out of the playback a preset decides', () => {
+    // Resetting playback leaves it, and one activity and several share it.
+    const paused = { preset: 'recap', 'end-pause': '3' };
+    expect(resetPlayback(paused, 'several')).toEqual({ 'end-pause': '3' });
+    expect(adjustSettings(paused, 'several')['end-pause']).toBe('3');
+    expect(adjustSettings(paused, 'one')['end-pause']).toBe('3');
+    expect(playbackAdjustments(paused, 'several')['end-pause']).toBeUndefined();
+  });
+
   it('offers the settings of a panel in order', () => {
     const names = (panel: Parameters<typeof offered>[0]) => offered(panel).map((s) => s.name);
 
-    expect(names('timing')).toEqual([
-      'group',
-      'share',
-      'group-pace',
-      'overlap',
-      'pace',
-      'end-pause',
-    ]);
+    expect(names('timing')).toEqual(['group', 'share', 'group-pace', 'overlap', 'pace']);
+    expect(names('pause')).toEqual(['end-pause']);
+    expect(names('watermark')).toEqual(['watermark']);
+    expect(names('end-card')).toEqual(['end-card']);
     expect(names('camera')).toEqual(['camera']);
     expect(names('map')).toEqual(['map']);
     expect(names('totals')).toEqual(['totals-card', 'totals-fields']);

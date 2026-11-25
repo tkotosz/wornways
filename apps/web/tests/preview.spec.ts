@@ -1,8 +1,9 @@
 import { expect, test } from '@playwright/test';
 import { offlineMap } from './offline-map.ts';
 import { pickSource } from './sources.ts';
+import { openSection } from './steps.ts';
 
-test('plays a draft of the video in the preview, on Playback and Appearance', async ({
+test('plays a draft of the video in the preview, and edits on a still', async ({
   page,
   context,
 }) => {
@@ -13,7 +14,7 @@ test('plays a draft of the video in the preview, on Playback and Appearance', as
   await expect(page.getByTestId('demo-count')).toHaveText('25 made-up activities');
   await page.getByRole('button', { name: 'Continue' }).click(); // to Activities
   await expect(page.getByTestId('chosen-count')).toContainText('25 of 25 activities selected');
-  await page.getByRole('button', { name: 'Continue' }).click(); // to Playback
+  await page.getByRole('button', { name: 'Continue' }).click(); // to Video
 
   // The still picture first; Play makes the draft and plays it in its place.
   const preview = page.getByTestId('preview');
@@ -44,11 +45,34 @@ test('plays a draft of the video in the preview, on Playback and Appearance', as
     'Playing a quick draft at 270 × 480 and 15 fps',
   );
 
-  // The draft stays on the next step while the settings are the same.
-  await page.getByRole('button', { name: 'Continue' }).click(); // to Appearance
-  await expect(page.getByTestId('preview').getByTestId('preview-video')).toBeVisible();
+  // The draft stays in the next sections while the settings are the same.
+  await page.getByRole('button', { name: 'Continue' }).click(); // to Playback
+  await expect(preview.getByTestId('preview-video')).toBeVisible();
+  await openSection(page, 'Map');
+  await expect(preview.getByTestId('preview-video')).toBeVisible();
+
+  // Overlay is arranged on a still: Play shows the draft already made, Edit goes back.
+  await openSection(page, 'Overlay');
+  await expect(preview.getByTestId('preview-video')).toHaveCount(0);
+  await expect(
+    preview.getByRole('img', { name: 'Preview: the last frame of the video' }),
+  ).toBeVisible();
+  await preview.getByRole('button', { name: 'Play preview' }).click();
+  await expect(preview.getByTestId('preview-video')).toBeVisible();
+  await expect(preview.getByRole('status')).toHaveCount(0);
+  await preview.getByRole('button', { name: 'Edit', exact: true }).click();
+  await expect(preview.getByTestId('preview-video')).toHaveCount(0);
+  await expect(preview.getByRole('button', { name: 'Play preview' })).toBeVisible();
+
+  // Ending: a still of how the video ends, the end card here.
+  await openSection(page, 'Ending');
+  await expect(
+    preview.getByRole('img', { name: 'Preview: the ending of the video' }),
+  ).toBeVisible();
 
   // A change goes back to the picture, until Play is pressed again.
+  await openSection(page, 'Frame');
+  await expect(preview.getByTestId('preview-video')).toBeVisible();
   await page.getByRole('button', { name: '60 fps' }).click();
   await expect(page.getByTestId('preview').getByTestId('preview-video')).toHaveCount(0);
   await expect(
@@ -63,7 +87,7 @@ test('a draft being made can be canceled', async ({ page, context }) => {
   await pickSource(page, 'demo');
   await expect(page.getByTestId('demo-count')).toHaveText('25 made-up activities');
   await page.getByRole('button', { name: 'Continue' }).click();
-  await page.getByRole('button', { name: 'Continue' }).click(); // to Playback
+  await page.getByRole('button', { name: 'Continue' }).click(); // to Video
 
   const preview = page.getByTestId('preview');
   await preview.getByRole('button', { name: 'Play preview' }).click();

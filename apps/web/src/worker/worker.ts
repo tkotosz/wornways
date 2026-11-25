@@ -220,6 +220,7 @@ async function answer(request: Exclude<Request, { type: 'cancel' }>, signal: Abo
         request.settings,
         renderSignal,
         remote?.loadTiles,
+        request.scene,
       );
       renderSignal.throwIfAborted();
       return reply({ type: 'poster-made', id, image });

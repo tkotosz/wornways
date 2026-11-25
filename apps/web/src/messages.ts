@@ -67,7 +67,14 @@ export type Request =
   /** The video; a draft is small and at a low frame rate, for the preview to play. */
   | { type: 'make-video'; id: number; settings: SettingsInput; source: Source; draft?: boolean }
   /** The last frame of the video the settings describe, small, as a preview. */
-  | { type: 'make-poster'; id: number; settings: SettingsInput; source: Source }
+  /** A still of the video: its last frame, or how it ends (the finished totals or end card). */
+  | {
+      type: 'make-poster';
+      id: number;
+      settings: SettingsInput;
+      source: Source;
+      scene: PosterScene;
+    }
   /** How the video the settings describe will be paced, without drawing it. */
   | { type: 'plan'; id: number; settings: SettingsInput; source: Source }
   /** Stops the request with the given id; that request then replies "canceled". */
@@ -183,3 +190,6 @@ export type VideoReport = {
   /** Why the map could not be drawn; null when it was, or when the settings leave it out. */
   mapError: string | null;
 };
+
+/** What a still shows: the replay's last frame, or the video's ending after it. */
+export type PosterScene = 'replay' | 'ending';

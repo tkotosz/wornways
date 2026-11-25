@@ -25,25 +25,24 @@ always go back to an earlier step; nothing is lost by moving between steps.
 ┌──────────────────────────────────────────────────────────────────────────┐
 │ wornways                                 Your files stay on this device │
 ├──────────────────────────────────────────────────────────────────────────┤
-│   (✓ Import) (✓ Activities) (3 Playback) (4 Appearance) (5 Export)       │
+│        (✓ Source) (✓ Activities) (3 Video) (4 Export)                    │
 ├──────────────────────────────────────────────────────────────────────────┤
 │ How should your routes play?                                             │
-│                                                                          │
-│ PLAYBACK STYLE                                                           │
-│ ┌────────────────────┐ ┌────────────────────┐ ┌────────────────────┐     │
-│ │ ═══            ✓   │ │ ≡                  │ │ ≡                  │     │
-│ │ Recap              │ │ All at once        │ │ Multiday trip      │     │
-│ └────────────────────┘ └────────────────────┘ └────────────────────┘     │
-│ Video length  ──────────────●───────────────────────────  30 seconds     │
-│ ▶ YOUR REPLAY  30 seconds · Recap                                        │
-│   This video: 12 months (312 activities), 2.3 s each.                    │
-│ Fine-tune playback   Optional: grouping, pace and camera            ⌄    │
+│ (Frame) [Playback] (Map) (Overlay) (Ending)                              │
+│ ┌─────────────┐  PLAYBACK STYLE                                          │
+│ │             │  ┌────────────────┐ ┌────────────────┐ ┌──────────────┐  │
+│ │   preview   │  │ ═══        ✓   │ │ ≡              │ │ ≡            │  │
+│ │      ▶      │  │ Recap          │ │ All at once    │ │ Multiday trip│  │
+│ │             │  └────────────────┘ └────────────────┘ └──────────────┘  │
+│ │             │  Video length ─────────●──────────────────  30 seconds   │
+│ └─────────────┘  ▶ YOUR REPLAY  30 seconds · Recap                       │
+│                  Fine-tune playback   Optional: grouping, pace and camera│
 │ [← Back]                                                  [Continue →]   │
 └──────────────────────────────────────────────────────────────────────────┘
 ```
 
 The step bar shows a pill per step, numbered, with a tick on the steps behind the current
-one, which is outlined in orange. On a phone it shows "Step 3 of 5", the step's name and a
+one, which is outlined in orange. On a phone it shows "Step 3 of 4", the step's name and a
 bar with a segment per step; each segment opens its step. Each step is one column on a
 phone.
 
@@ -83,33 +82,39 @@ phone.
    matching activities in the same grid, all ticked at first, with their count and total
    distance; the ticked ones are what the video shows, and unticked ones stay unticked
    when the filters change. Nothing can be deleted here.
-3. **Playback.** How the routes play, as a preset: All at once (picked at first), Recap or
-   Multiday trip for several activities; Highlight (a 15-second clip of the activity)
-   for a single one. Beside them on wide screens, above them on phones, the same preview
-   as on Appearance, which can play the video. Each remembers its own choice. Each preset is a card with a small
-   looping drawing of how activities move in it. Under the cards, the video's length,
-   then a summary of the replay ("30 seconds · Recap" and a line telling what it plays,
-   e.g. "12 months (312 activities), 2.3 s each" or "a race of all 24 activities, each
-   at its real pace"), then **Fine-tune playback**, folded at first: grouping, time
-   share, group pace, overlap, drawing pace, end pause and the camera, built from the settings
-   table, starting from the preset's values. Changing the length or one of the preset's
-   values makes it Custom ("Custom playback"), and no card is picked; picking a card
-   goes back to that preset.
-4. **Appearance.** A live preview of the video's last frame, the finished picture, small,
-   with the frame's shape, size, frame rate and length, redrawn shortly after each
-   change; its Play button makes a quick draft of the video and plays it (see Preview). Beside it on wide screens, under
-   it on phones: the frame (aspect ratio: Story, Square or Landscape, for where the
-   video will be posted; frame rate: 24, 30 or 60 fps), the title (on or off, starting
-   as the automatic one; switched off, a title written stays for switching it on
-   again), its position and size, the metrics (on or off, which ones in the order
-   picked, their position and size), the elevation profile (when an activity recorded
-   elevation; on for a single activity, off for several), the street map, the totals
-   card (for several activities only; on for Recap), and the branding: the end card after
-   the replay and the small watermark at the bottom left, on the map credit's line (each
-   on or off). A position is the top, middle or bottom row, left, middle or right; text in
-   the middle gets a soft dark band behind it. The settings of steps 3 and 4 are
-   remembered for the next visit.
-5. **Export.** A stage in the video's shape, which shows the finished picture with a "Make
+3. **Video.** The video itself, in sections, with a section bar under the heading, in
+   the order things are decided. Continue goes to the next section, and from the last to
+   Export; Back goes to the section before, and from the first to Activities; the bar
+   opens any section, since every setting has a default. The section open last is kept
+   while the app is open. Beside the sections on wide screens, above them on phones, one
+   live preview stays while the sections change (see Preview). The settings of this step
+   are remembered for the next visit.
+   - **Frame:** the aspect ratio (Story, Square or Landscape, for where the video will be
+     posted, or a custom size) and the frame rate (24, 30 or 60 fps). It comes first
+     because the shape decides how everything else looks.
+   - **Playback:** how the routes play, as a preset: All at once (picked at first), Recap
+     or Multiday trip for several activities; Highlight (a 15-second clip of the
+     activity) for a single one. Each remembers its own choice. Each preset is a card with
+     a small looping drawing of how activities move in it. Under the cards, the video's
+     length, then a summary of the replay ("30 seconds · Recap" and a line telling what it
+     plays, e.g. "12 months (312 activities), 2.3 s each" or "a race of all 24
+     activities, each at its real pace"), then **Fine-tune playback**, folded at first:
+     grouping, time share, group pace, overlap, drawing pace and the camera, built from
+     the settings table, starting from the preset's values. Changing the length or one of
+     the preset's values makes it Custom ("Custom playback"), and no card is picked;
+     picking a card goes back to that preset.
+   - **Map:** the street map, and the replay privacy that hides each route's start and
+     finish.
+   - **Overlay:** what is drawn over the replay: the title (on or off, starting as the
+     automatic one; switched off, a title written stays for switching it on again), its
+     position and size, the metrics (on or off, which ones in the order picked, their
+     position and size), the elevation profile (when an activity recorded elevation; on
+     for a single activity, off for several) and the small watermark at the bottom left,
+     on the map credit's line. A position is the top, middle or bottom row, left, middle
+     or right; text in the middle gets a soft dark band behind it.
+   - **Ending:** what comes after the replay: the end pause on the finished picture, the
+     totals card (for several activities only; on for Recap) and the end card.
+4. **Export.** A stage in the video's shape, which shows the finished picture with a "Make
    video" button in the middle; while the video is made, its progress and a way to
    cancel; then the video itself, playing. Download then appears in the bottom bar where
    Continue is on the other steps, and beside it Share, which hands the video to another
@@ -216,7 +221,7 @@ for exporting an account or a single activity from Strava or Garmin.
 - A reload opens Ride with GPS again when it is the chosen source, with the tab's filters
   and selection; choosing files, Strava or the demo keeps the connection. When the person
   comes back from connecting one service, that one is the chosen source; the other one's
-  connection stays. The look of the video (steps 3 and 4) is the same one files use.
+  connection stays. The look of the video (the Video step) is the same one files use.
 - Trips get the id `rwgps-<trip id>`, and Ride with GPS's activity types (`cycling:road`,
   `running:trail`, ...) are mapped to the same sport names as files. There is no webhook:
   changes on Ride with GPS show up the next time the list is read.
@@ -260,13 +265,20 @@ for exporting an account or a single activity from Strava or Garmin.
   still being drawn. Measured on a desktop: about 0.3 s for one activity, 0.5–1.1 s for a
   month or a year, 4.5 s for about 770 activities at once; the earlier picture stays
   until the new one is ready.
+- The still is the replay's last frame, except in the Ending section: there it is how the
+  video ends, the totals card with every value counted up when the video has one, else
+  the end card once drawn, else the last frame.
 - Play, in the middle of the picture, makes a draft of the whole video, end card
   included, and plays it in its place, with the player's bar to move to any moment. The
   draft is the real video made small: at the preview's size, 15 frames a second and a
   low bitrate, by the same code as Export. While it is made, the picture shows how far it
   is, with Cancel. Any change of settings goes back to the picture until Play is pressed
-  again; the draft stays while the settings stay the same, also from one step to the
-  other. The engine draws frames forward only, so a video is what lets a person move back
+  again; the draft stays while the settings stay the same, also from one section or step
+  to the other.
+- In the Overlay and Ending sections, where things are arranged on the picture, the
+  preview opens on the still. Play shows the draft (made then, or the one already made for
+  these settings) and its corner button Edit goes back to the still. Nothing is drawn or
+  played in the background: a draft is made only when Play is pressed. The engine draws frames forward only, so a video is what lets a person move back
   and forth. Measured in headless Chromium without a GPU: under 3 s for the 25 demo
   activities at once.
 

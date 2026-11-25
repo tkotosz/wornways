@@ -10,6 +10,7 @@ import {
   loadAdjustments,
   saveAdjustments,
   type Adjustments,
+  type Section,
 } from './adjust.ts';
 import {
   NO_CHOICE,
@@ -26,10 +27,9 @@ import { install, installOffer, showsAppleInstallHelp } from './install.ts';
 import type { MadeVideo } from './made-video.ts';
 import type { ActivitySummary, MatchReport, PlanReport, Source } from './messages.ts';
 import ActivitiesStep from './steps/ActivitiesStep.vue';
-import AppearanceStep from './steps/AppearanceStep.vue';
 import ExportStep from './steps/ExportStep.vue';
 import ImportStep from './steps/ImportStep.vue';
-import PlaybackStep from './steps/PlaybackStep.vue';
+import VideoStep from './steps/VideoStep.vue';
 import { useDemo } from './use-demo.ts';
 import { useMatches } from './use-matches.ts';
 import { useRideWithGps } from './use-ridewithgps.ts';
@@ -37,14 +37,15 @@ import { useStrava } from './use-strava.ts';
 
 const props = defineProps<{ engine: EngineClient }>();
 
-type Step = 'import' | 'activities' | 'playback' | 'appearance' | 'export';
+type Step = 'import' | 'activities' | 'video' | 'export';
 const steps: { id: Step; label: string }[] = [
   { id: 'import', label: 'Source' },
   { id: 'activities', label: 'Activities' },
-  { id: 'playback', label: 'Playback' },
-  { id: 'appearance', label: 'Appearance' },
+  { id: 'video', label: 'Video' },
   { id: 'export', label: 'Export' },
 ];
+/** The Video step's open section, kept while the app is open, like the step. */
+const section = ref<Section>('frame');
 const stepIndex = computed(() => steps.findIndex((s) => s.id === step.value));
 
 const unsupported = missingSupport();
@@ -582,28 +583,19 @@ onMounted(() => {
         :notice="source === 'rwgps' ? rwgps.notice.value : stravaNotice"
         :can-retry="strava && (!stravaReady || sourceRows.length === 0)"
         @back="navigate('import')"
-        @next="navigate('playback')"
+        @next="navigate('video')"
         @change-source="changeSource()"
         @retry="retryStrava()"
       />
-      <PlaybackStep
-        v-else-if="step === 'playback'"
+      <VideoStep
+        v-else-if="step === 'video'"
         v-model="adjustments"
+        v-model:section="section"
         :engine="engine"
         :settings="settings"
         :activities="chosenIds.length"
         :plan="plan"
         @back="step = 'activities'"
-        @next="step = 'appearance'"
-      />
-      <AppearanceStep
-        v-else-if="step === 'appearance'"
-        v-model="adjustments"
-        :engine="engine"
-        :settings="settings"
-        :activities="chosenIds.length"
-        :plan="plan"
-        @back="step = 'playback'"
         @next="step = 'export'"
       />
       <ExportStep
@@ -613,7 +605,10 @@ onMounted(() => {
         :settings="settings"
         :plan="plan"
         :plan-error="planError"
-        @back="step = 'appearance'"
+        @back="
+          section = 'ending';
+          step = 'video';
+        "
       />
     </template>
   </main>

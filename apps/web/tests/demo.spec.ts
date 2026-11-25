@@ -1,6 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { offlineMap } from './offline-map.ts';
 import { pickSource } from './sources.ts';
+import { openSection, openStep } from './steps.ts';
 
 const ride = new URL(
   '../../../packages/engine/tests/import/fixtures/morning-ride.fit',
@@ -33,9 +34,8 @@ test('tries the demo, makes a video of it, and stores nothing on this device', a
   await page.getByRole('checkbox', { name: 'Select all shown' }).click();
   await page.getByTestId('chosen').getByText('Easy run').click();
   await expect(count).toContainText('1 of 25 activities selected');
-  await page.getByRole('button', { name: 'Continue' }).click(); // to Playback
-  await page.getByRole('button', { name: 'Continue' }).click(); // to Appearance
-  await page.getByRole('button', { name: 'Continue' }).click(); // to Export
+  await page.getByRole('button', { name: 'Continue' }).click(); // to Video
+  await openStep(page, 'Export');
   await page.getByRole('button', { name: 'Make video' }).click();
   await expect(page.getByTestId('result')).toBeVisible({ timeout: 150_000 });
   await expect(page.getByText('could not be loaded')).toHaveCount(0);
@@ -110,11 +110,12 @@ test('follows the guide to a highlight of the long ride', async ({ page }) => {
   await expect(ride).toContainText('104 km');
   await ride.click();
   await expect(page.getByTestId('chosen-count')).toContainText('1 of 25 activities selected');
-  await page.getByRole('button', { name: 'Continue' }).click();
+  await page.getByRole('button', { name: 'Continue' }).click(); // to Video
+  await openSection(page, 'Playback');
   await expect(page.getByTestId('replay-summary')).toContainText('Highlight');
 
   // The demo's routes carry heights, so the climb can be shown.
-  await page.getByRole('button', { name: 'Continue' }).click(); // to Appearance
+  await openSection(page, 'Overlay');
   await expect(
     page.getByTestId('group-metrics').getByRole('button', { name: 'Elevation' }),
   ).toBeVisible();

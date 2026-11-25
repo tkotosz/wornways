@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { offlineMap } from './offline-map.ts';
 import { pickSource } from './sources.ts';
+import { openSection } from './steps.ts';
 
 test('offers the elevation profile for a single activity with elevation', async ({
   page,
@@ -18,8 +19,8 @@ test('offers the elevation profile for a single activity with elevation', async 
     );
   await expect(page.getByTestId('activity-count')).toHaveText('1 activity on this device');
   await page.getByRole('button', { name: 'Continue' }).click(); // to Activities
-  await page.getByRole('button', { name: 'Continue' }).click(); // to Playback
-  await page.getByRole('button', { name: 'Continue' }).click(); // to Appearance
+  await page.getByRole('button', { name: 'Continue' }).click(); // to Video
+  await openSection(page, 'Overlay');
 
   const panel = page.getByTestId('group-elevation');
   const profile = panel.getByRole('switch', { name: 'Elevation profile' });
@@ -52,8 +53,8 @@ test('leaves the elevation profile out where there is no elevation', async ({ pa
   });
   await expect(page.getByTestId('activity-count')).toHaveText('1 activity on this device');
   await page.getByRole('button', { name: 'Continue' }).click(); // to Activities
-  await page.getByRole('button', { name: 'Continue' }).click(); // to Playback
-  await page.getByRole('button', { name: 'Continue' }).click(); // to Appearance
+  await page.getByRole('button', { name: 'Continue' }).click(); // to Video
+  await openSection(page, 'Overlay');
   await expect(page.getByTestId('group-metrics')).toBeVisible();
   await expect(page.getByTestId('group-elevation')).toHaveCount(0);
 });
@@ -73,8 +74,8 @@ test('offers the elevation profile for several activities, off until switched on
     .setInputFiles([fixture('morning-ride.gpx'), fixture('trail-run.tcx')]);
   await expect(page.getByTestId('activity-count')).toHaveText('2 activities on this device');
   await page.getByRole('button', { name: 'Continue' }).click(); // to Activities
-  await page.getByRole('button', { name: 'Continue' }).click(); // to Playback
-  await page.getByRole('button', { name: 'Continue' }).click(); // to Appearance
+  await page.getByRole('button', { name: 'Continue' }).click(); // to Video
+  await openSection(page, 'Overlay');
 
   const profile = page
     .getByTestId('group-elevation')
