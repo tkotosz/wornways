@@ -32,7 +32,7 @@ async function grip(page: Page, index: number) {
   return { x: box.x + box.width / 2, y: box.y + 6 };
 }
 
-test('moves a widget on the still, snapping it to the middle, and draws it there', async ({
+test('moves a widget on the still at once, snapping it to the middle, without a redraw', async ({
   page,
   context,
 }) => {
@@ -43,7 +43,7 @@ test('moves a widget on the still, snapping it to the middle, and draws it there
   const before = await still.getAttribute('src');
   const frame = (await page.getByTestId('preview').locator('.frame').boundingBox())!;
 
-  // The title, dragged to near the middle of the frame, snaps to it.
+  // The title, dragged to near the middle of the frame, follows the pointer and snaps to it.
   const start = await grip(page, 0);
   const box = (await outline(page, 0).boundingBox())!;
   await drag(
@@ -52,16 +52,18 @@ test('moves a widget on the still, snapping it to the middle, and draws it there
     frame.x + frame.width / 2 - (box.x + box.width / 2) + 3,
     frame.y + frame.height / 2 - (box.y + box.height / 2) - 2,
   );
+  const middle = { x: frame.x + frame.width / 2, y: frame.y + frame.height / 2 };
+  const center = async () => {
+    const now = (await outline(page, 0).boundingBox())!;
+    return { x: now.x + now.width / 2, y: now.y + now.height / 2 };
+  };
+  expect(Math.abs((await center()).y - middle.y)).toBeLessThan(1);
   await page.mouse.up();
-  await expect(still).not.toHaveAttribute('src', before!);
-  await expect
-    .poll(async () => {
-      const moved = (await outline(page, 0).boundingBox())!;
-      return Math.abs(moved.y + moved.height / 2 - (frame.y + frame.height / 2)) < 1;
-    })
-    .toBe(true);
-  const moved = (await outline(page, 0).boundingBox())!;
-  expect(Math.abs(moved.x + moved.width / 2 - (frame.x + frame.width / 2))).toBeLessThan(1);
+  expect(Math.abs((await center()).x - middle.x)).toBeLessThan(1);
+  expect(Math.abs((await center()).y - middle.y)).toBeLessThan(1);
+  // The still is not drawn again: the widgets are drawn over it by the page.
+  await page.waitForTimeout(800);
+  await expect(still).toHaveAttribute('src', before!);
 });
 
 test('removes a widget with its × or by dropping it on the bin', async ({ page, context }) => {

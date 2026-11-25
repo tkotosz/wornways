@@ -40,6 +40,8 @@ export async function makePoster(
   signal: AbortSignal,
   loadTiles: TileLoader = createTileLoader({ cache: cacheStorageTileCache }),
   scene: PosterScene = 'replay',
+  /** Leave the widgets off the picture, for an editor that draws them over it itself. */
+  bare = false,
 ): Promise<Poster> {
   const settings = parseSettings(input);
   const selection = selectTracks(library, settings);
@@ -54,6 +56,7 @@ export async function makePoster(
     size,
     // The replay's last frame: the finished picture, not the end card after it.
     lastFrameOnly: true,
+    hideWidgets: bare,
   });
   if (signal.aborted) throw new Canceled();
 
@@ -71,5 +74,11 @@ export async function makePoster(
   const image = await (renderer.canvas as unknown as OffscreenCanvas).convertToBlob({
     type: 'image/png',
   });
-  return { image, boxes, widgets: renderer.widgets, values: [...renderer.finalValues] };
+  return {
+    image,
+    boxes,
+    widgets: renderer.widgets,
+    values: [...renderer.finalValues],
+    profile: renderer.profileShape(120),
+  };
 }

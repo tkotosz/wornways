@@ -28,11 +28,11 @@ function dropDraft(): void {
 // any moment. Where things are arranged on the still (`editing`), it opens on the still and
 // Edit goes back to it from the draft. It stays in view beside the settings on wide screens
 // and sits above them on phones, where only the picture shows. While editing, the `layer`
-// slot is drawn over the still, with where its widgets were drawn; `placed` asks for the next
-// change to be drawn at once rather than after the usual pause, for a widget let go after
-// dragging it. Each still of the last frame is told (`drawn`): the widgets on it and the
+// slot is drawn over the still, with the frame's size. With `bare`, the still is drawn
+// without its widgets, for an editor in the slot that draws them itself: a change to the
+// widgets then draws nothing again. Each still of the last frame is told (`drawn`): the widgets on it and the
 // values the video can show.
-import { parseSettings, type OverlayBoxes, type SettingsInput } from '@wornways/engine';
+import { parseSettings, type SettingsInput } from '@wornways/engine';
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { Canceled, type EngineClient } from '../engine-client.ts';
 import type { Poster, PosterScene, Progress } from '../messages.ts';
@@ -48,8 +48,10 @@ const props = withDefaults(
     editing?: boolean;
     /** Play steps aside, as while a widget is picked on the still, to leave it to the edit. */
     hidePlay?: boolean;
+    /** Draw the still without its widgets (see above). */
+    bare?: boolean;
   }>(),
-  { seconds: undefined, scene: 'replay', editing: false, hidePlay: false },
+  { seconds: undefined, scene: 'replay', editing: false, hidePlay: false, bare: false },
 );
 const emit = defineEmits<{ drawn: [poster: Poster] }>();
 
@@ -57,16 +59,21 @@ const emit = defineEmits<{ drawn: [poster: Poster] }>();
 const PAUSE_MS = 400;
 
 const url = ref('');
-/** Where the still's widgets and watermark were drawn. */
-const boxes = ref<OverlayBoxes>({ widgets: [] });
-/** Whether the next change is drawn without the pause (see `placed`). */
-let drawAtOnce = false;
-const placed = () => (drawAtOnce = true);
 const busy = ref(false);
 const error = ref('');
 let cancel: (() => void) | null = null;
 let timer: ReturnType<typeof setTimeout> | undefined;
 
+/**
+ * What the still depends on: the settings, but for a still drawn without its widgets, not the
+ * widgets' places and sizes, only whether they show calories, which the worker then fetches
+ * where a service gives them on request.
+ */
+const drawnKey = computed(() => {
+  if (!props.bare) return JSON.stringify(props.settings);
+  const { widgets, ...rest } = props.settings;
+  return JSON.stringify({ ...rest, calories: String(widgets ?? '').includes('calories') });
+});
 const key = computed(() => JSON.stringify(props.settings));
 /** The draft of these settings, when one is made. */
 /** While editing: whether the draft plays instead of the still. */
@@ -154,15 +161,14 @@ const shape = computed(() => {
 });
 
 async function draw(): Promise<void> {
-  const task = props.engine.makePoster(props.settings, props.scene);
+  const task = props.engine.makePoster(props.settings, props.scene, props.bare);
   cancel = task.cancel;
   try {
     const poster = await task.result;
-    const { image, boxes: drawn } = poster;
+    const { image } = poster;
     if (cancel !== task.cancel) return;
     if (url.value) URL.revokeObjectURL(url.value);
     url.value = URL.createObjectURL(image);
-    boxes.value = drawn;
     if (props.scene === 'replay') emit('drawn', poster);
     busy.value = false;
   } catch (caught) {
@@ -176,12 +182,16 @@ async function draw(): Promise<void> {
 }
 
 watch(
-  [() => JSON.stringify(props.settings), () => props.settings['trim-radius'], () => props.scene],
-  ([, radius, scene], previous) => {
+  [() => drawnKey.value, () => props.settings['trim-radius'], () => props.scene, () => props.bare],
+  ([, radius, scene, bare], previous) => {
     clearTimeout(timer);
     cancel?.();
     cancel = null;
-    if ((radius !== previous?.[1] || scene !== previous?.[2]) && url.value) {
+    // Another picture altogether: the old one would show the widgets twice, or none.
+    if (
+      (radius !== previous?.[1] || scene !== previous?.[2] || bare !== previous?.[3]) &&
+      url.value
+    ) {
       URL.revokeObjectURL(url.value);
       url.value = '';
     }
@@ -192,8 +202,7 @@ watch(
     draftError.value = '';
     error.value = '';
     busy.value = true;
-    timer = setTimeout(() => void draw(), drawAtOnce ? 0 : PAUSE_MS);
-    drawAtOnce = false;
+    timer = setTimeout(() => void draw(), PAUSE_MS);
   },
   { immediate: true },
 );
@@ -240,10 +249,8 @@ onBeforeUnmount(() => {
         <slot
           v-if="editing && url && !draftUrl && scene === 'replay'"
           name="layer"
-          :boxes="boxes"
-          :still="url"
           :ratio="frame.width / frame.height"
-          :placed="placed"
+          :size="{ width: frame.width, height: frame.height }"
         />
         <button v-if="editing && draftUrl" type="button" class="edit" @click="playing = false">
           Edit

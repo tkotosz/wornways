@@ -267,6 +267,7 @@ export class EngineClient {
   makePoster(
     settings: SettingsInput,
     scene: PosterScene = 'replay',
+    bare = false,
   ): { result: Promise<Poster>; cancel: () => void } {
     const id = this.nextId++;
     const result = this.send({
@@ -275,6 +276,7 @@ export class EngineClient {
       settings,
       source: this.source,
       scene,
+      bare,
     }).then((reply) => {
       if (reply.type === 'poster-made') {
         const { type: _, id: __, ...poster } = reply;

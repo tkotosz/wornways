@@ -77,6 +77,8 @@ export type Request =
       settings: SettingsInput;
       source: Source;
       scene: PosterScene;
+      /** The picture without its widgets, for an editor that draws them itself. */
+      bare: boolean;
     }
   /** How the video the settings describe will be paced, without drawing it. */
   | { type: 'plan'; id: number; settings: SettingsInput; source: Source }
@@ -161,6 +163,8 @@ export type Poster = {
   widgets: Widget[];
   /** Each value this video can show, as it stands at the end. */
   values: [Metric, MetricValue][];
+  /** The climb profile's shape, heights from 0 to 1; null without recorded elevation. */
+  profile: number[] | null;
 };
 
 export type PlanReport = {

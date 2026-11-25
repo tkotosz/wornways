@@ -1,82 +1,88 @@
 <script setup lang="ts">
-// Arranging the widgets on the still of the video's last frame, as stickers are arranged in a
-// story editor. Each widget has an outline over where the engine drew it (the boxes it
-// reports with the still). A tap picks one: its outline, × to remove it and a corner handle.
-// Dragging moves it, centered on where it is let go: a copy of it, cut from the still,
-// follows the finger, and stays where it was let go until the picture drawn for it arrives
-// (a widget can be picked up again from there); it snaps to the frame's center lines,
-// with a line shown, and while it is dragged a bin shows at the bottom, where letting go
-// removes it. Two fingers, or the corner handle, resize it. A tap on a picked text widget
-// asks for its text (`edit`). The picture is redrawn as soon as a widget is let go
-// (`placed`); its outline stays where it was let go until the new picture arrives. The
-// keyboard moves a picked widget with the arrow keys, resizes it with + and -, and removes
-// it with Delete. On a story-shaped frame, while a widget moves, guides show the parts the
-// platforms' own controls cover.
-import { WIDGET_SIZE, type FrameBox, type Widget } from '@wornways/engine';
-import { computed, ref, watch } from 'vue';
+// Arranging the widgets over the still of the video's last frame, as stickers are arranged in
+// a story editor. The still is drawn without them; the page draws them over it, at the sizes
+// the engine draws them in the video (text, a value with its words, the elevation chart), so
+// they move under the finger at once and nothing is drawn again while they are arranged.
+//
+// A tap picks a widget: an outline, × to remove it and a corner handle. Dragging moves it,
+// centered on where it is let go; it snaps to the frame's center lines, with a line shown,
+// and while it is dragged a bin shows at the bottom, where letting go removes it. Two
+// fingers, or the corner handle, resize it. A tap on a picked text widget asks for its text
+// (`edit`). The keyboard moves a picked widget with the arrow keys, resizes it with + and -,
+// and removes it with Delete. On a story-shaped frame, while a widget moves, guides show the
+// parts the platforms' own controls cover.
+import { WIDGET_SIZE, type Metric, type MetricValue, type Widget } from '@wornways/engine';
+import { computed, ref } from 'vue';
 import { widgetLabel } from '../adjust.ts';
 
 const props = defineProps<{
   widgets: Widget[];
-  /** Where the still drew each widget, in the same order; null for one not drawn. */
-  boxes: (FrameBox | null)[];
-  /** The still's picture, cut from for a widget being moved (see `ghost`). */
-  still: string;
-  /** The frame's width over its height. */
-  ratio: number;
+  /** Each value as it stands at the end, which the still shows. */
+  values: Map<Metric, MetricValue>;
+  /** The video's title, which a text widget without its own text shows. */
+  title: string;
+  /** The climb profile's shape, heights from 0 to 1, for the elevation chart. */
+  profile: number[] | null;
+  /** The video's frame, in pixels: the widgets are sized as the engine sizes them in it. */
+  size: { width: number; height: number };
 }>();
 /** The picked widget's index; null when none is. */
 const selected = defineModel<number | null>('selected', { required: true });
 const emit = defineEmits<{
   /** The widgets after a change: moved, resized or removed. */
   change: [widgets: Widget[]];
-  /** A widget was let go: the next change should be drawn at once. */
-  placed: [];
   /** A picked text widget was tapped: its text is asked for. */
   edit: [index: number];
 }>();
 
-/**
- * Outlines show where the still drew each widget; after a widget is added or removed they
- * wait for the new picture, as the old one no longer matches the list.
- */
-const stale = ref(false);
-/** The widget being moved or resized, with its box as it follows the pointer. */
-const moving = ref<{ index: number; box: FrameBox; snapX: boolean; snapY: boolean } | null>(null);
-/** Widgets let go where the still has not drawn them yet: their boxes until it does. */
-const pending = ref<Map<number, FrameBox>>(new Map());
+/** The widget being moved or resized, where it is now: its point and size. */
+const moving = ref<{ index: number; x: number; y: number; size: number } | null>(null);
+const snap = ref({ x: false, y: false });
 /** Whether the widget being dragged is over the bin. */
 const overBin = ref(false);
-watch(
-  () => props.boxes,
-  () => {
-    moving.value = null;
-    pending.value = new Map();
-    stale.value = false;
-  },
+
+/** Each widget as it shows: moving, or where it is. */
+const shown = computed(() =>
+  props.widgets.map((widget, index) =>
+    moving.value?.index === index ? { ...widget, ...moving.value } : widget,
+  ),
 );
 
-/** Where a widget shows: following the pointer, let go and waiting to be drawn, or drawn. */
-const shownBox = (index: number): FrameBox | null | undefined =>
-  moving.value?.index === index
-    ? moving.value.box
-    : (pending.value.get(index) ?? props.boxes[index]);
-
-/** The outline of each widget, where it shows. */
-const outlines = computed(() =>
-  props.widgets.flatMap((widget, index) => {
-    const box = shownBox(index);
-    return box && !stale.value ? [{ widget, index, box }] : [];
-  }),
+/**
+ * A frame pixel of the engine's in width units of the picture (cqw): its sizes are for a
+ * frame whose shorter side is 1080 pixels, scaled to the frame's.
+ */
+const unit = computed(
+  () => (Math.min(props.size.width, props.size.height) / 1080 / props.size.width) * 100,
 );
 
-/** How near to the middle, in fractions of the frame, a widget's center snaps to it. */
-const SNAP = 0.025;
+/** The text a widget shows, or nothing for the chart. */
+function textOf(widget: Widget): { value: string; label: string } | null {
+  if (widget.kind === 'text') return { value: widget.text ?? props.title, label: '' };
+  if (widget.kind === 'metric')
+    return props.values.get(widget.metric) ?? { value: '…', label: widgetLabel(widget) };
+  return null;
+}
+
+/** The chart's outline over its box, 100 wide and 100 high, as the engine draws it. */
+const chartPath = computed(() => {
+  const shape = props.profile;
+  if (!shape || shape.length < 2) return '';
+  const points = shape.map(
+    (v, k) => `${((k / (shape.length - 1)) * 100).toFixed(2)},${(100 - (14 + 86 * v)).toFixed(2)}`,
+  );
+  return `M0,100 L${points.join(' L')} L100,100 Z`;
+});
+
+/** How near the middle, in percent of the frame, a widget's center snaps to it. */
+const SNAP = 2.5;
 const layer = ref<HTMLElement | null>(null);
 
-/** The widgets with one changed; `placed` first when it was let go after dragging. */
-function update(index: number, changed: Partial<Widget>, letGo = true): void {
-  if (letGo) emit('placed');
+const round = (n: number) => Math.round(n * 10) / 10;
+const sizeIn = (size: number) =>
+  Math.round(Math.min(WIDGET_SIZE.max, Math.max(WIDGET_SIZE.min, size)));
+
+function update(index: number, changed: Partial<Widget>): void {
   emit(
     'change',
     props.widgets.map((widget, k) =>
@@ -86,7 +92,6 @@ function update(index: number, changed: Partial<Widget>, letGo = true): void {
 }
 
 function remove(index: number): void {
-  stale.value = true;
   selected.value = null;
   emit(
     'change',
@@ -94,11 +99,7 @@ function remove(index: number): void {
   );
 }
 
-const round = (n: number) => Math.round(n * 10) / 10;
-const sizeIn = (size: number) =>
-  Math.round(Math.min(WIDGET_SIZE.max, Math.max(WIDGET_SIZE.min, size)));
-
-/** The pointers down on the layer, for two-finger resizing. */
+/** The fingers down, for two-finger resizing. */
 const pointers = new Map<number, { x: number; y: number }>();
 /** Whether a widget is held: a finger down now joins it, as the second of two. */
 let holding = false;
@@ -108,38 +109,31 @@ function start(event: PointerEvent, index: number, resize: boolean): void {
   if (event.button !== 0 || !layer.value) return;
   event.preventDefault();
   event.stopPropagation();
+  const surface = layer.value;
   // A second finger while one is down: the drag under way turns into resizing.
   if (holding) {
     pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
-    layer.value.setPointerCapture(event.pointerId);
+    surface.setPointerCapture(event.pointerId);
     return;
   }
   // A new hold: no finger is left from one before, whatever the browser told of it.
   pointers.clear();
-  const area = layer.value.getBoundingClientRect();
-  // From where the widget shows, also when let go there and not yet drawn again.
-  const box = shownBox(index);
-  if (!box) return;
   holding = true;
   const widget = props.widgets[index]!;
   const wasPicked = selected.value === index;
   selected.value = index;
+  const area = surface.getBoundingClientRect();
   pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
   const [x0, y0] = [event.clientX, event.clientY];
-  const center = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+  const centerPx = {
+    x: area.left + (widget.x / 100) * area.width,
+    y: area.top + (widget.y / 100) * area.height,
+  };
   let moved = false;
-  /** The distance between two fingers, or from the box's center to the pointer. */
+  /** The distance between two fingers, or from the widget's center to the finger, at first. */
   let reach = 0;
-
-  const scaled = (scale: number): FrameBox => ({
-    x: center.x - (box.width * scale) / 2,
-    y: center.y - (box.height * scale) / 2,
-    width: box.width * scale,
-    height: box.height * scale,
-  });
   const distance = (a: { x: number; y: number }, b: { x: number; y: number }) =>
     Math.hypot(a.x - b.x, a.y - b.y);
-  const centerPx = { x: area.left + center.x * area.width, y: area.top + center.y * area.height };
 
   const move = (e: PointerEvent) => {
     if (!pointers.has(e.pointerId)) return;
@@ -150,28 +144,25 @@ function start(event: PointerEvent, index: number, resize: boolean): void {
       const now = distance(a!, b!);
       reach ||= now;
       moved = true;
-      const scale = sizeIn((widget.size * now) / reach) / widget.size;
-      moving.value = { index, box: scaled(scale), snapX: false, snapY: false };
+      overBin.value = false;
+      moving.value = {
+        index,
+        x: widget.x,
+        y: widget.y,
+        size: sizeIn((widget.size * now) / reach),
+      };
       return;
     }
-    const dx = (e.clientX - x0) / area.width;
-    const dy = (e.clientY - y0) / area.height;
     if (!moved && Math.hypot(e.clientX - x0, e.clientY - y0) < 4) return;
     moved = true;
-    let cx = Math.min(1, Math.max(0, center.x + dx));
-    let cy = Math.min(1, Math.max(0, center.y + dy));
-    const snapX = Math.abs(cx - 0.5) < SNAP;
-    const snapY = Math.abs(cy - 0.5) < SNAP;
-    if (snapX) cx = 0.5;
-    if (snapY) cy = 0.5;
+    let x = Math.min(100, Math.max(0, widget.x + ((e.clientX - x0) / area.width) * 100));
+    let y = Math.min(100, Math.max(0, widget.y + ((e.clientY - y0) / area.height) * 100));
+    snap.value = { x: Math.abs(x - 50) < SNAP, y: Math.abs(y - 50) < SNAP };
+    if (snap.value.x) x = 50;
+    if (snap.value.y) y = 50;
     overBin.value =
       Math.abs(e.clientX - (area.left + area.width / 2)) < 32 && area.bottom - e.clientY < 64;
-    moving.value = {
-      index,
-      box: { ...box, x: cx - box.width / 2, y: cy - box.height / 2 },
-      snapX,
-      snapY,
-    };
+    moving.value = { index, x, y, size: widget.size };
   };
   const end = (e: PointerEvent) => {
     if (!holding) return;
@@ -183,28 +174,20 @@ function start(event: PointerEvent, index: number, resize: boolean): void {
     surface.removeEventListener('pointerup', end);
     surface.removeEventListener('pointercancel', end);
     surface.removeEventListener('lostpointercapture', end);
-    const bin = overBin.value;
-    overBin.value = false;
-    if (bin) return remove(index);
     const now = moving.value;
+    const bin = overBin.value;
     moving.value = null;
+    overBin.value = false;
+    snap.value = { x: false, y: false };
+    if (bin) return remove(index);
     if (!moved || !now) {
       if (wasPicked && widget.kind === 'text') emit('edit', index);
       return;
     }
-    // It shows where it was let go until the picture drawn for it arrives.
-    pending.value = new Map(pending.value).set(index, now.box);
-    const scale = now.box.width / box.width;
-    if (Math.abs(scale - 1) > 0.001) update(index, { size: sizeIn(widget.size * scale) });
-    else
-      update(index, {
-        x: round((now.box.x + now.box.width / 2) * 100),
-        y: round((now.box.y + now.box.height / 2) * 100),
-      });
+    update(index, { x: round(now.x), y: round(now.y), size: now.size });
   };
-  // Every move of the finger comes to the layer, which stays while the outlines under the
-  // finger change, and the hold ends however the browser lets the finger go.
-  const surface = layer.value;
+  // Every move of the finger comes to the layer, and the hold ends however the browser lets
+  // the finger go.
   surface.setPointerCapture(event.pointerId);
   surface.addEventListener('pointermove', move);
   surface.addEventListener('pointerup', end);
@@ -235,46 +218,29 @@ function key(event: KeyboardEvent, index: number): void {
     event.preventDefault();
     const x = Math.min(100, Math.max(0, widget.x + by[0]));
     const y = Math.min(100, Math.max(0, widget.y + by[1]));
-    update(index, { x, y }, false);
+    update(index, { x, y });
   } else if (event.key === '+' || event.key === '-') {
     event.preventDefault();
-    update(index, { size: sizeIn(widget.size + (event.key === '+' ? 10 : -10)) }, false);
+    update(index, { size: sizeIn(widget.size + (event.key === '+' ? 10 : -10)) });
   } else if (event.key === 'Delete' || event.key === 'Backspace') {
     event.preventDefault();
     remove(index);
   }
 }
 
-/**
- * The still placed in a widget's moving box so that the part it drew the widget in fills
- * it: the copy that follows the finger, at the widget's new size while it is resized.
- */
-function ghost(index: number) {
-  const drawn = props.boxes[index]!;
-  return {
-    width: `${100 / drawn.width}%`,
-    height: `${100 / drawn.height}%`,
-    left: `${(-drawn.x / drawn.width) * 100}%`,
-    top: `${(-drawn.y / drawn.height) * 100}%`,
-  };
-}
-
-/** A box as CSS for its outline, in percent of the frame. */
-const place = (box: FrameBox) => ({
-  left: `${box.x * 100}%`,
-  top: `${box.y * 100}%`,
-  width: `${box.width * 100}%`,
-  height: `${box.height * 100}%`,
-});
-
 /** Story-shaped frames (taller than 4:5) get the platforms' guides. */
-const story = computed(() => props.ratio < 0.8);
+const story = computed(() => props.size.width / props.size.height < 0.8);
 </script>
 
 <template>
-  <!-- Pressing the picture outside the widgets lets the picked one go. -->
   <!-- The browser's own long-press menu would take a held widget away. -->
-  <div ref="layer" class="layer" @pointerdown.self="secondFinger" @contextmenu.prevent>
+  <div
+    ref="layer"
+    class="layer"
+    :style="{ '--unit': unit }"
+    @pointerdown.self="secondFinger"
+    @contextmenu.prevent
+  >
     <!-- While a widget moves: what Instagram's own controls cover on a Reel or Story, as
          Meta's ads guide gives it: 14% at the top, 35% at the bottom, 6% at each side. -->
     <div v-if="story && moving" class="guides" aria-hidden="true">
@@ -283,54 +249,75 @@ const story = computed(() => props.ratio < 0.8);
       <span class="zone left" />
       <span class="zone right" />
     </div>
-    <span v-if="moving?.snapX" class="line across" aria-hidden="true" />
-    <span v-if="moving?.snapY" class="line down" aria-hidden="true" />
+    <span v-if="snap.x" class="line across" aria-hidden="true" />
+    <span v-if="snap.y" class="line down" aria-hidden="true" />
     <span
-      v-if="moving && moving.box.width === boxes[moving.index]?.width"
+      v-if="moving && moving.size === widgets[moving.index]?.size"
       class="bin"
       :class="{ over: overBin }"
       aria-hidden="true"
     >
       <svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13" /></svg>
     </span>
+
     <div
-      v-for="o in outlines"
-      :key="o.index"
+      v-for="(widget, index) in shown"
+      :key="index"
       class="widget"
-      :class="{ selected: selected === o.index, moving: moving?.index === o.index, gone: overBin }"
-      :style="place(o.box)"
+      :class="{
+        selected: selected === index,
+        moving: moving?.index === index,
+        gone: moving?.index === index && overBin,
+      }"
+      :style="{ left: `${widget.x}%`, top: `${widget.y}%`, '--size': widget.size / 100 }"
       role="button"
       tabindex="0"
-      :aria-label="`${widgetLabel(o.widget)} on the picture: drag to move it; arrow keys move it, plus and minus resize it, Delete removes it`"
-      :aria-pressed="selected === o.index"
-      :data-testid="`widget-${o.index}`"
-      @pointerdown="start($event, o.index, false)"
-      @focus="selected = o.index"
-      @keydown="key($event, o.index)"
+      :aria-label="`${widgetLabel(widget)} on the picture: drag to move it; arrow keys move it, plus and minus resize it, Delete removes it`"
+      :aria-pressed="selected === index"
+      :data-testid="`widget-${index}`"
+      @pointerdown="start($event, index, false)"
+      @focus="selected = index"
+      @keydown="key($event, index)"
     >
-      <span
-        v-if="(moving?.index === o.index || pending.has(o.index)) && still && boxes[o.index]"
-        class="ghost"
-        aria-hidden="true"
-      >
-        <img :src="still" alt="" :style="ghost(o.index)" />
+      <!-- What the engine draws for it, at its size. -->
+      <span v-if="widget.kind === 'text'" class="text">{{ textOf(widget)!.value }}</span>
+      <span v-else-if="widget.kind === 'metric'" class="metric">
+        <span class="value">{{ textOf(widget)!.value }}</span>
+        <span v-if="textOf(widget)!.label" class="words">{{ textOf(widget)!.label }}</span>
       </span>
-      <span class="name" aria-hidden="true">{{ widgetLabel(o.widget) }}</span>
-      <template v-if="selected === o.index && !moving">
+      <svg v-else class="chart" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+        <defs>
+          <linearGradient id="chart-fill" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="rgb(255 138 42 / 55%)" />
+            <stop offset="1" stop-color="rgb(255 138 42 / 12%)" />
+          </linearGradient>
+        </defs>
+        <path :d="chartPath" fill="url(#chart-fill)" />
+        <path
+          :d="chartPath"
+          fill="none"
+          stroke="#ff8a2a"
+          stroke-width="1.5"
+          vector-effect="non-scaling-stroke"
+        />
+      </svg>
+
+      <span class="name" aria-hidden="true">{{ widgetLabel(widget) }}</span>
+      <template v-if="selected === index && !moving">
         <button
           type="button"
           class="remove"
-          :aria-label="`Remove ${widgetLabel(o.widget).toLowerCase()}`"
+          :aria-label="`Remove ${widgetLabel(widget).toLowerCase()}`"
           @pointerdown.stop
-          @click.stop="remove(o.index)"
+          @click.stop="remove(index)"
         >
           ×
         </button>
         <span
           class="handle"
-          :data-testid="`resize-${o.index}`"
+          :data-testid="`resize-${index}`"
           aria-hidden="true"
-          @pointerdown="start($event, o.index, true)"
+          @pointerdown="start($event, index, true)"
         />
       </template>
     </div>
@@ -338,9 +325,11 @@ const story = computed(() => props.ratio < 0.8);
 </template>
 
 <style scoped>
+/* Over the still; its width is the unit the widgets are sized in. */
 .layer {
   position: absolute;
   inset: 0;
+  container-type: size;
   /* Its own stacking: the widgets' touch margins sit under the widgets, over the picture. */
   isolation: isolate;
   touch-action: none;
@@ -348,16 +337,16 @@ const story = computed(() => props.ratio < 0.8);
   -webkit-touch-callout: none;
 }
 
-/* An outline around each widget, faint until it is picked. */
+/* A widget centered on its point, with a faint outline until it is picked. */
 .widget {
   position: absolute;
-  box-sizing: content-box;
-  margin: -4px;
-  padding: 3px;
+  padding: 2px 4px;
   border: 1px dashed rgba(255, 255, 255, 0.35);
   border-radius: 4px;
   cursor: grab;
   touch-action: none;
+  transform: translate(-50%, -50%);
+  white-space: nowrap;
 }
 
 /* A larger place to touch than the widget itself, for fingers: more across than down, as
@@ -370,23 +359,9 @@ const story = computed(() => props.ratio < 0.8);
   inset: -3px -10px;
 }
 
-/* The picked widget, and the one moving, above the others. */
 .widget.selected,
 .widget.moving {
   z-index: 1;
-}
-
-/* The copy of the widget that follows the finger, cut from the still. */
-.ghost {
-  position: absolute;
-  inset: 3px;
-  overflow: hidden;
-  pointer-events: none;
-}
-
-.ghost img {
-  position: absolute;
-  max-width: none;
 }
 
 .widget.selected,
@@ -394,18 +369,55 @@ const story = computed(() => props.ratio < 0.8);
 .widget:focus-visible {
   border: 1px solid var(--accent);
   outline: none;
-  background: rgba(255, 138, 42, 0.08);
 }
 
 .widget.moving {
   cursor: grabbing;
 }
 
-.widget.moving.gone {
+.widget.gone {
   opacity: 0.4;
 }
 
-/* The widget's name on a tab above its outline. */
+/* The engine's sizes, for a frame 1080 pixels on its shorter side (see `unit`), with the
+   soft shadow it draws around letters. */
+.text,
+.metric {
+  display: block;
+  color: rgba(255, 255, 255, 0.92);
+  font-weight: 600;
+  letter-spacing: normal;
+  text-align: center;
+  text-shadow: 0 calc(var(--unit) * 2 * var(--size) * 1cqw)
+    calc(var(--unit) * 10 * var(--size) * 1cqw) rgba(0, 0, 0, 0.75);
+}
+
+.text {
+  font-size: calc(var(--unit) * 44 * var(--size) * 1cqw);
+  line-height: 1.27;
+}
+
+.metric .value {
+  display: block;
+  font-size: calc(var(--unit) * 52 * var(--size) * 1cqw);
+  line-height: 1.1;
+}
+
+.metric .words {
+  display: block;
+  color: rgba(255, 255, 255, 0.66);
+  font-size: calc(var(--unit) * 24 * var(--size) * 1cqw);
+  font-weight: 400;
+  line-height: 1.3;
+}
+
+.chart {
+  display: block;
+  width: min(100cqw, calc(86cqw * var(--size)));
+  height: calc(var(--unit) * 80 * var(--size) * 1cqw);
+}
+
+/* The widget's name on a tab above its outline, when picked. */
 .name {
   position: absolute;
   bottom: 100%;
@@ -417,7 +429,6 @@ const story = computed(() => props.ratio < 0.8);
   font-size: 0.6rem;
   font-weight: 700;
   line-height: 1.4;
-  white-space: nowrap;
   opacity: 0;
   pointer-events: none;
 }
@@ -470,6 +481,7 @@ const story = computed(() => props.ratio < 0.8);
   position: absolute;
   bottom: 4%;
   left: 50%;
+  z-index: 2;
   display: grid;
   place-items: center;
   width: 44px;

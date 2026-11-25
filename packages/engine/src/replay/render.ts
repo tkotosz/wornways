@@ -235,6 +235,11 @@ export type RenderOptions = {
    * `metricsPosition` puts them, the profile along the bottom.
    */
   widgets?: Widget[];
+  /**
+   * Lay the widgets out and report where they go, but leave them off the picture: for an
+   * editor that draws them over the still itself, so they move without a redraw.
+   */
+  hideWidgets?: boolean;
   /** Where the metrics start, without `widgets`; default bottom-left. */
   metricsPosition?: Placement;
   /** Where the title sits; default top-center. */
@@ -304,6 +309,11 @@ export type Renderer = {
   readonly widgets: Widget[];
   /** Each value this video can show, as it stands at the end of the replay. */
   readonly finalValues: Map<Metric, MetricValue>;
+  /**
+   * The climb profile's shape, for drawing it elsewhere: `samples` heights from 0 (its
+   * lowest) to 1 (its highest); null when no activity recorded elevation.
+   */
+  profileShape(samples: number): number[] | null;
 };
 
 /** Where an activity stands, for the values: as drawn so far, or at the end. */
@@ -1214,7 +1224,7 @@ export function createRenderer(
     });
     widgets.forEach((widget, k) => {
       const box = layout[k];
-      if (box) drawWidget(widget, box, values, t);
+      if (box && !options.hideWidgets) drawWidget(widget, box, values, t);
     });
     boxes = { widgets: layout.map((box) => (box ? frameBox(box) : null)) };
     if (options.watermark) {
@@ -1372,6 +1382,12 @@ export function createRenderer(
     overlayBoxes: () => boxes,
     widgets,
     finalValues,
+    profileShape(samples: number) {
+      const shape = hasElevation ? elevationProfile(tracks, samples) : null;
+      if (!shape) return null;
+      const span = shape.high - shape.low || 1;
+      return [...shape.elevation].map((meters) => (meters - shape.low) / span);
+    },
     skipTo(index: number): void {
       // The end card is drawn over the replay's last frame, so it cannot be skipped to.
       if (index < nextFrame || index >= replayFrames)

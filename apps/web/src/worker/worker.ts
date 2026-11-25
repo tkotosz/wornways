@@ -221,6 +221,7 @@ async function answer(request: Exclude<Request, { type: 'cancel' }>, signal: Abo
         renderSignal,
         remote?.loadTiles,
         request.scene,
+        request.bare,
       );
       renderSignal.throwIfAborted();
       return reply({ type: 'poster-made', id, ...poster });

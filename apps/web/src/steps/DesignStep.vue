@@ -82,10 +82,21 @@ function openSetting(name: string, label: string): void {
 }
 
 // Overlay: the widgets, arranged on the still (WidgetEditor) and listed under it.
-/** What the last still of the replay drew: its widgets and the values the video can show. */
-const drawn = ref<{ widgets: Widget[]; values: Map<Metric, MetricValue> } | null>(null);
+/**
+ * What the last still of the replay told: its widgets, the values the video can show and the
+ * climb profile's shape, for drawing the widgets over the bare still.
+ */
+const drawn = ref<{
+  widgets: Widget[];
+  values: Map<Metric, MetricValue>;
+  profile: number[] | null;
+} | null>(null);
 function onDrawn(poster: Poster): void {
-  drawn.value = { widgets: poster.widgets, values: new Map(poster.values) };
+  drawn.value = {
+    widgets: poster.widgets,
+    values: new Map(poster.values),
+    profile: poster.profile,
+  };
 }
 /** The widgets as set, else the ones the still drew from the title and metrics settings. */
 const widgets = computed<Widget[]>(() => {
@@ -174,18 +185,19 @@ function removeWidget(index: number): void {
           :scene="section === 'ending' ? 'ending' : 'replay'"
           :editing="section === 'overlay' || section === 'ending'"
           :hide-play="section === 'overlay'"
+          :bare="section === 'overlay'"
           @drawn="onDrawn"
         >
-          <template #layer="{ boxes, still, ratio, placed }">
+          <template #layer="{ size }">
             <WidgetEditor
               v-if="section === 'overlay'"
               v-model:selected="selectedWidget"
               :widgets="widgets"
-              :boxes="boxes.widgets"
-              :still="still"
-              :ratio="ratio"
+              :values="values"
+              :title="title"
+              :profile="drawn?.profile ?? null"
+              :size="size"
               @change="setWidgets"
-              @placed="placed"
               @edit="openWidget"
             />
           </template>
@@ -296,18 +308,19 @@ function removeWidget(index: number): void {
             :scene="section === 'ending' ? 'ending' : 'replay'"
             :editing="section === 'overlay' || section === 'ending'"
             :hide-play="section === 'overlay'"
+            :bare="section === 'overlay'"
             @drawn="onDrawn"
           >
-            <template #layer="{ boxes, still, ratio, placed }">
+            <template #layer="{ size }">
               <WidgetEditor
                 v-if="section === 'overlay'"
                 v-model:selected="selectedWidget"
                 :widgets="widgets"
-                :boxes="boxes.widgets"
-                :still="still"
-                :ratio="ratio"
+                :values="values"
+                :title="title"
+                :profile="drawn?.profile ?? null"
+                :size="size"
                 @change="setWidgets"
-                @placed="placed"
                 @edit="openWidget"
               />
             </template>

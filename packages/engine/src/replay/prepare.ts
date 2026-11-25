@@ -57,6 +57,8 @@ export type PrepareOptions = {
    * `renderer.skipTo` and `renderer.renderFrame` of `renderer.replayFrames - 1`.
    */
   lastFrameOnly?: boolean;
+  /** Leave the widgets off the picture (see `RenderOptions.hideWidgets`). */
+  hideWidgets?: boolean;
 };
 
 /** Nouns for the counter and the verb for activities under way, by the one sport shown. */
@@ -171,6 +173,7 @@ export async function prepareReplay(
     titleScale: settings.titleSize / 100,
     metricsScale: settings.metricsSize / 100,
     widgets: settings.widgets ?? undefined,
+    hideWidgets: options.hideWidgets,
     endPause: settings.endPause,
     endCard: settings.endCard,
     totalsCard: settings.totalsCard,
