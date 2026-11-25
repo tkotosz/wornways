@@ -4,8 +4,9 @@
 // the engine draws them in the video (text, a value with its words, the elevation chart), so
 // they move under the finger at once and nothing is drawn again while they are arranged.
 //
-// A tap picks a widget, the one nearest the finger within its reach, so a fingertip need not
-// land on a small widget exactly: an outline, × to remove it and a corner handle. Dragging moves it,
+// A tap picks a widget: the one under the finger, else the nearest within a finger's reach, so
+// a fingertip need not land on a small widget exactly. A picked one has an outline, × to
+// remove it (a tap on it; a drag that starts there moves the widget) and a corner handle. Dragging moves it,
 // centered on where it is let go; it snaps to the frame's center lines, with a line shown,
 // and while it is dragged a bin shows at the bottom, where letting go removes it. Two
 // fingers, or the corner handle, resize it. A tap on a picked text widget asks for its text
@@ -13,7 +14,7 @@
 // and removes it with Delete. On a story-shaped frame, while a widget moves, guides show the
 // parts the platforms' own controls cover.
 import { WIDGET_SIZE, type Metric, type MetricValue, type Widget } from '@wornways/engine';
-import { computed, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { widgetLabel } from '../adjust.ts';
 
 const props = defineProps<{
@@ -79,6 +80,43 @@ const chartPath = computed(() => {
 const SNAP = 2.5;
 const layer = ref<HTMLElement | null>(null);
 
+// TEMPORARY: with ?debug in the address, a log of the last touches over the picture, to find
+// why some drags do not start on a phone. Removed once found.
+const debug = new URLSearchParams(location.search).has('debug');
+const log = ref<string[]>([]);
+let moves = 0;
+function note(line: string): void {
+  if (!debug) return;
+  log.value = [...log.value.slice(-11), `${(performance.now() / 1000).toFixed(1)} ${line}`];
+}
+onMounted(() => {
+  if (!debug || !layer.value) return;
+  const surface = layer.value;
+  const describe = (e: Event) => {
+    const t = e.target as HTMLElement;
+    return t.dataset?.widget !== undefined ? `w${t.dataset.widget}` : t.className || t.tagName;
+  };
+  for (const type of ['pointerdown', 'pointerup', 'pointercancel', 'lostpointercapture']) {
+    surface.addEventListener(
+      type,
+      (e) => {
+        const p = e as PointerEvent;
+        note(
+          `${type} ${p.pointerType}#${p.pointerId} on ${describe(e)} hold=${holding} pick=${selected.value} moves=${moves}`,
+        );
+        if (type === 'pointerdown') moves = 0;
+      },
+      true,
+    );
+  }
+  surface.addEventListener('pointermove', () => moves++, true);
+  for (const type of ['touchstart', 'touchcancel']) {
+    surface.addEventListener(type, (e) => note(`${type} on ${describe(e)}`), true);
+  }
+  window.addEventListener('scroll', () => note(`scroll ${Math.round(scrollY)}`));
+  window.addEventListener('resize', () => note(`resize ${innerWidth}x${innerHeight}`));
+});
+
 const round = (n: number) => Math.round(n * 10) / 10;
 const sizeIn = (size: number) =>
   Math.round(Math.min(WIDGET_SIZE.max, Math.max(WIDGET_SIZE.min, size)));
@@ -107,10 +145,14 @@ let holding = false;
 
 /** Starts dragging a widget, or with `resize` its corner handle. */
 function start(event: PointerEvent, index: number, resize: boolean): void {
-  if (event.button !== 0 || !layer.value) return;
+  if (event.button !== 0 || !layer.value) {
+    note(`start ignored: button=${event.button}`);
+    return;
+  }
   event.preventDefault();
   event.stopPropagation();
   const surface = layer.value;
+  note(`start w${index}${resize ? ' resize' : ''} holding=${holding}`);
   // A second finger while one is down: the drag under way turns into resizing.
   if (holding) {
     pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
@@ -122,6 +164,8 @@ function start(event: PointerEvent, index: number, resize: boolean): void {
   holding = true;
   const widget = props.widgets[index]!;
   const wasPicked = selected.value === index;
+  /** Whether the finger came down on the widget's ×: a tap there removes it. */
+  const onRemove = !!(event.target as HTMLElement).closest('.remove');
   selected.value = index;
   const area = surface.getBoundingClientRect();
   pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
@@ -175,6 +219,7 @@ function start(event: PointerEvent, index: number, resize: boolean): void {
     surface.removeEventListener('pointerup', end);
     surface.removeEventListener('pointercancel', end);
     surface.removeEventListener('lostpointercapture', end);
+    note(`end ${e.type} moved=${moved}`);
     const now = moving.value;
     const bin = overBin.value;
     moving.value = null;
@@ -182,7 +227,8 @@ function start(event: PointerEvent, index: number, resize: boolean): void {
     snap.value = { x: false, y: false };
     if (bin) return remove(index);
     if (!moved || !now) {
-      if (wasPicked && widget.kind === 'text') emit('edit', index);
+      if (onRemove) remove(index);
+      else if (wasPicked && widget.kind === 'text') emit('edit', index);
       return;
     }
     update(index, { x: round(now.x), y: round(now.y), size: now.size });
@@ -210,7 +256,10 @@ function touch(event: PointerEvent): void {
     layer.value?.setPointerCapture(event.pointerId);
     return;
   }
-  const near = nearestWidget(event.clientX, event.clientY);
+  // On a widget, or its × or corner: that one; beside them: the nearest within reach.
+  const on = (event.target as HTMLElement).closest<HTMLElement>('[data-widget]');
+  const near = on ? Number(on.dataset.widget) : nearestWidget(event.clientX, event.clientY);
+  note(`→ ${on ? 'on' : 'nearest'} ${near}`);
   if (near === null) selected.value = null;
   else start(event, near, false);
 }
@@ -272,6 +321,8 @@ const story = computed(() => props.size.width / props.size.height < 0.8);
     @pointerdown="touch"
     @contextmenu.prevent
   >
+    <!-- TEMPORARY: the touch log, with ?debug in the address. -->
+    <pre v-if="debug" class="debug">{{ log.join('\n') }}</pre>
     <!-- While a widget moves: what Instagram's own controls cover on a Reel or Story, as
          Meta's ads guide gives it: 14% at the top, 35% at the bottom, 6% at each side. -->
     <div v-if="story && moving" class="guides" aria-hidden="true">
@@ -339,8 +390,7 @@ const story = computed(() => props.size.width / props.size.height < 0.8);
           type="button"
           class="remove"
           :aria-label="`Remove ${widgetLabel(widget).toLowerCase()}`"
-          @pointerdown.stop
-          @click.stop="remove(index)"
+          @click.stop="$event.detail === 0 && remove(index)"
         >
           ×
         </button>
@@ -364,6 +414,24 @@ const story = computed(() => props.size.width / props.size.height < 0.8);
   touch-action: none;
   user-select: none;
   -webkit-touch-callout: none;
+}
+
+/* TEMPORARY: the touch log. */
+.debug {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 5;
+  max-width: 100%;
+  margin: 0;
+  padding: 2px 4px;
+  overflow: hidden;
+  color: #9f9;
+  background: rgba(0, 0, 0, 0.75);
+  font-size: 8px;
+  line-height: 1.25;
+  white-space: pre-wrap;
+  pointer-events: none;
 }
 
 /* A widget centered on its point, with a faint outline until it is picked. */
@@ -460,8 +528,8 @@ const story = computed(() => props.size.width / props.size.height < 0.8);
 /* × on the top right corner, the resize handle on the bottom right, larger than they look. */
 .remove {
   position: absolute;
-  top: -11px;
-  right: -11px;
+  top: -20px;
+  right: -20px;
   display: grid;
   place-items: center;
   width: 22px;
@@ -480,7 +548,7 @@ const story = computed(() => props.size.width / props.size.height < 0.8);
 .handle::after {
   content: '';
   position: absolute;
-  inset: -10px;
+  inset: -4px;
 }
 
 .handle {
