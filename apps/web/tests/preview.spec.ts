@@ -53,13 +53,16 @@ test('plays a draft of the video in the preview, and edits on a still', async ({
   await openSection(page, 'Map');
   await expect(preview.getByTestId('preview-video')).toBeVisible();
 
-  // Overlay is arranged on a still alone, with no Play over it.
+  // Overlay is arranged on a still; Play shows the draft already made, Edit goes back.
   await openSection(page, 'Overlay');
   await expect(preview.getByTestId('preview-video')).toHaveCount(0);
   await expect(
     preview.getByRole('img', { name: 'Preview: the last frame of the video' }),
   ).toBeVisible();
-  await expect(preview.getByRole('button', { name: 'Play preview' })).toHaveCount(0);
+  await preview.getByRole('button', { name: 'Play preview' }).click();
+  await expect(preview.getByTestId('preview-video')).toBeVisible();
+  await preview.getByRole('button', { name: 'Edit', exact: true }).click();
+  await expect(preview.getByTestId('preview-video')).toHaveCount(0);
 
   // Ending also opens on a still: Play shows the draft already made, Edit goes back.
   await openSection(page, 'Ending');

@@ -139,14 +139,17 @@ test('moves, resizes and removes a picked widget with the keyboard', async ({ pa
   await expect(page.getByRole('button', { name: /^Date: / })).toHaveCount(0);
 });
 
-test('arranges the widgets on the still alone, and adds one clear of the middle', async ({
+test('adds a widget clear of Play, and Play steps aside while a widget is picked', async ({
   page,
   context,
 }) => {
   page.setDefaultTimeout(15_000);
   await offlineMap(context);
   await openOverlay(page);
-  await expect(page.getByRole('button', { name: 'Play preview' })).toHaveCount(0);
+  const play = page.getByRole('button', { name: 'Play preview' });
+  await expect(play).toBeVisible();
+  await outline(page, 0).click({ position: { x: 10, y: 6 } });
+  await expect(play).toHaveCount(0);
 
   await page.getByRole('button', { name: 'Add a widget' }).click();
   await page
