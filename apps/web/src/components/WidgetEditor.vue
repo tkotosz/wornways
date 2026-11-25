@@ -4,7 +4,8 @@
 // the engine draws them in the video (text, a value with its words, the elevation chart), so
 // they move under the finger at once and nothing is drawn again while they are arranged.
 //
-// A tap picks a widget: an outline, × to remove it and a corner handle. Dragging moves it,
+// A tap picks a widget, the one nearest the finger within its reach, so a fingertip need not
+// land on a small widget exactly: an outline, × to remove it and a corner handle. Dragging moves it,
 // centered on where it is let go; it snaps to the frame's center lines, with a line shown,
 // and while it is dragged a bin shows at the bottom, where letting go removes it. Two
 // fingers, or the corner handle, resize it. A tap on a picked text widget asks for its text
@@ -195,12 +196,42 @@ function start(event: PointerEvent, index: number, resize: boolean): void {
   surface.addEventListener('lostpointercapture', end);
 }
 
-/** A second finger on the picture while a widget is held resizes it; else a tap lets go. */
-function secondFinger(event: PointerEvent): void {
+/** How far from a widget, in pixels, a finger still takes it: a fingertip is wide. */
+const REACH = 28;
+
+/**
+ * A touch anywhere on the picture: a second finger while a widget is held resizes it;
+ * otherwise it takes the widget nearest to it within a finger's reach (the picked one
+ * first), and a touch far from every widget lets the picked one go.
+ */
+function touch(event: PointerEvent): void {
   if (holding) {
     pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
     layer.value?.setPointerCapture(event.pointerId);
-  } else selected.value = null;
+    return;
+  }
+  const near = nearestWidget(event.clientX, event.clientY);
+  if (near === null) selected.value = null;
+  else start(event, near, false);
+}
+
+/** The widget nearest to a point on the screen within a finger's reach; null if none is. */
+function nearestWidget(x: number, y: number): number | null {
+  const elements = layer.value?.querySelectorAll<HTMLElement>('[data-widget]') ?? [];
+  let best: { index: number; gap: number } | null = null;
+  for (const element of elements) {
+    const index = Number(element.dataset.widget);
+    const box = element.getBoundingClientRect();
+    // How far the point is outside the widget's box; 0 inside it.
+    const gap = Math.hypot(
+      Math.max(box.left - x, 0, x - box.right),
+      Math.max(box.top - y, 0, y - box.bottom),
+    );
+    // The picked widget wins a near tie, so it can be taken again among close neighbors.
+    const weighted = gap - (index === selected.value ? 6 : 0);
+    if (gap <= REACH && (!best || weighted < best.gap)) best = { index, gap: weighted };
+  }
+  return best?.index ?? null;
 }
 
 /** Arrow keys move the picked widget by 1% of the frame (Shift: 5%), + and - resize it. */
@@ -238,7 +269,7 @@ const story = computed(() => props.size.width / props.size.height < 0.8);
     ref="layer"
     class="layer"
     :style="{ '--unit': unit }"
-    @pointerdown.self="secondFinger"
+    @pointerdown="touch"
     @contextmenu.prevent
   >
     <!-- While a widget moves: what Instagram's own controls cover on a Reel or Story, as
@@ -275,7 +306,7 @@ const story = computed(() => props.size.width / props.size.height < 0.8);
       :aria-label="`${widgetLabel(widget)} on the picture: drag to move it; arrow keys move it, plus and minus resize it, Delete removes it`"
       :aria-pressed="selected === index"
       :data-testid="`widget-${index}`"
-      @pointerdown="start($event, index, false)"
+      :data-widget="index"
       @focus="selected = index"
       @keydown="key($event, index)"
     >
@@ -330,8 +361,6 @@ const story = computed(() => props.size.width / props.size.height < 0.8);
   position: absolute;
   inset: 0;
   container-type: size;
-  /* Its own stacking: the widgets' touch margins sit under the widgets, over the picture. */
-  isolation: isolate;
   touch-action: none;
   user-select: none;
   -webkit-touch-callout: none;
@@ -347,16 +376,6 @@ const story = computed(() => props.size.width / props.size.height < 0.8);
   touch-action: none;
   transform: translate(-50%, -50%);
   white-space: nowrap;
-}
-
-/* A larger place to touch than the widget itself, for fingers: more across than down, as
-   widgets often sit one above another. Under the other widgets, so it never takes a touch
-   meant for one of them. */
-.widget::before {
-  content: '';
-  position: absolute;
-  z-index: -1;
-  inset: -3px -10px;
 }
 
 .widget.selected,
