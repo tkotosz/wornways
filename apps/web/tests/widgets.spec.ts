@@ -163,3 +163,15 @@ test('adds a widget clear of Play, and Play steps aside while a widget is picked
     added.y + added.height < middle.y - 28;
   expect(clear).toBe(true);
 });
+
+test("keeps the browser's long-press menu off the picture", async ({ page, context }) => {
+  page.setDefaultTimeout(15_000);
+  await offlineMap(context);
+  await openOverlay(page);
+  const prevented = await outline(page, 1).evaluate((widget) => {
+    const event = new MouseEvent('contextmenu', { bubbles: true, cancelable: true });
+    widget.dispatchEvent(event);
+    return event.defaultPrevented;
+  });
+  expect(prevented).toBe(true);
+});

@@ -3,7 +3,8 @@
 // story editor. Each widget has an outline over where the engine drew it (the boxes it
 // reports with the still). A tap picks one: its outline, × to remove it and a corner handle.
 // Dragging moves it, centered on where it is let go: a copy of it, cut from the still,
-// follows the finger, and stays where it was let go until the picture drawn for it arrives; it snaps to the frame's center lines,
+// follows the finger, and stays where it was let go until the picture drawn for it arrives
+// (a widget can be picked up again from there); it snaps to the frame's center lines,
 // with a line shown, and while it is dragged a bin shows at the bottom, where letting go
 // removes it. Two fingers, or the corner handle, resize it. A tap on a picked text widget
 // asks for its text (`edit`). The picture is redrawn as soon as a widget is let go
@@ -42,20 +43,29 @@ const emit = defineEmits<{
 const stale = ref(false);
 /** The widget being moved or resized, with its box as it follows the pointer. */
 const moving = ref<{ index: number; box: FrameBox; snapX: boolean; snapY: boolean } | null>(null);
+/** Widgets let go where the still has not drawn them yet: their boxes until it does. */
+const pending = ref<Map<number, FrameBox>>(new Map());
 /** Whether the widget being dragged is over the bin. */
 const overBin = ref(false);
 watch(
   () => props.boxes,
   () => {
     moving.value = null;
+    pending.value = new Map();
     stale.value = false;
   },
 );
 
-/** The outline of each widget: as it follows the pointer, else where it was drawn. */
+/** Where a widget shows: following the pointer, let go and waiting to be drawn, or drawn. */
+const shownBox = (index: number): FrameBox | null | undefined =>
+  moving.value?.index === index
+    ? moving.value.box
+    : (pending.value.get(index) ?? props.boxes[index]);
+
+/** The outline of each widget, where it shows. */
 const outlines = computed(() =>
   props.widgets.flatMap((widget, index) => {
-    const box = moving.value?.index === index ? moving.value.box : props.boxes[index];
+    const box = shownBox(index);
     return box && !stale.value ? [{ widget, index, box }] : [];
   }),
 );
@@ -90,6 +100,8 @@ const sizeIn = (size: number) =>
 
 /** The pointers down on the layer, for two-finger resizing. */
 const pointers = new Map<number, { x: number; y: number }>();
+/** Whether a widget is held: a finger down now joins it, as the second of two. */
+let holding = false;
 
 /** Starts dragging a widget, or with `resize` its corner handle. */
 function start(event: PointerEvent, index: number, resize: boolean): void {
@@ -97,13 +109,17 @@ function start(event: PointerEvent, index: number, resize: boolean): void {
   event.preventDefault();
   event.stopPropagation();
   // A second finger while one is down: the drag under way turns into resizing.
-  if (pointers.size > 0) {
+  if (holding) {
     pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
     return;
   }
+  // A new hold: no finger is left from one before, whatever the browser told of it.
+  pointers.clear();
   const area = layer.value.getBoundingClientRect();
-  const box = props.boxes[index];
+  // From where the widget shows, also when let go there and not yet drawn again.
+  const box = shownBox(index);
   if (!box) return;
+  holding = true;
   const widget = props.widgets[index]!;
   const wasPicked = selected.value === index;
   selected.value = index;
@@ -158,7 +174,9 @@ function start(event: PointerEvent, index: number, resize: boolean): void {
   };
   const end = (e: PointerEvent) => {
     pointers.delete(e.pointerId);
-    if (pointers.size > 0) return;
+    if (pointers.size > 0 && e.type !== 'pointercancel') return;
+    holding = false;
+    pointers.clear();
     window.removeEventListener('pointermove', move);
     window.removeEventListener('pointerup', end);
     window.removeEventListener('pointercancel', end);
@@ -166,11 +184,13 @@ function start(event: PointerEvent, index: number, resize: boolean): void {
     overBin.value = false;
     if (bin) return remove(index);
     const now = moving.value;
+    moving.value = null;
     if (!moved || !now) {
-      moving.value = null;
       if (wasPicked && widget.kind === 'text') emit('edit', index);
       return;
     }
+    // It shows where it was let go until the picture drawn for it arrives.
+    pending.value = new Map(pending.value).set(index, now.box);
     const scale = now.box.width / box.width;
     if (Math.abs(scale - 1) > 0.001) update(index, { size: sizeIn(widget.size * scale) });
     else
@@ -184,9 +204,9 @@ function start(event: PointerEvent, index: number, resize: boolean): void {
   window.addEventListener('pointercancel', end);
 }
 
-/** A second finger on the picture while a widget is held resizes it. */
+/** A second finger on the picture while a widget is held resizes it; else a tap lets go. */
 function secondFinger(event: PointerEvent): void {
-  if (pointers.size === 1) pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+  if (holding) pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
   else selected.value = null;
 }
 
@@ -243,7 +263,8 @@ const story = computed(() => props.ratio < 0.8);
 
 <template>
   <!-- Pressing the picture outside the widgets lets the picked one go. -->
-  <div ref="layer" class="layer" @pointerdown.self="secondFinger">
+  <!-- The browser's own long-press menu would take a held widget away. -->
+  <div ref="layer" class="layer" @pointerdown.self="secondFinger" @contextmenu.prevent>
     <!-- What Instagram's own controls cover on a Reel or Story, as Meta's ads guide gives it:
          14% at the top, 35% at the bottom, 6% at each side. -->
     <div v-if="story && (selected !== null || moving)" class="guides" aria-hidden="true">
@@ -278,7 +299,7 @@ const story = computed(() => props.ratio < 0.8);
       @keydown="key($event, o.index)"
     >
       <span
-        v-if="moving?.index === o.index && still && boxes[o.index]"
+        v-if="(moving?.index === o.index || pending.has(o.index)) && still && boxes[o.index]"
         class="ghost"
         aria-hidden="true"
       >
@@ -311,6 +332,8 @@ const story = computed(() => props.ratio < 0.8);
   position: absolute;
   inset: 0;
   touch-action: none;
+  user-select: none;
+  -webkit-touch-callout: none;
 }
 
 /* An outline around each widget, faint until it is picked. */
