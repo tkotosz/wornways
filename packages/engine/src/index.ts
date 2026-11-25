@@ -1,4 +1,13 @@
-export { STRIDE, pointCount, type ParsedActivity, type Track } from './track/types.ts';
+export {
+  SENSOR_CHANNELS,
+  STRIDE,
+  pointCount,
+  type ParsedActivity,
+  type SensorChannel,
+  type Sensors,
+  type Track,
+} from './track/types.ts';
+export { recorded, sensorsFrom } from './track/sensors.ts';
 export { formatFromFilename, parseActivity, type ActivityFormat } from './import/parse.ts';
 export { parseActivitiesIndex, parseCsv, sportSlug, type IndexEntry } from './import/index-csv.ts';
 export {

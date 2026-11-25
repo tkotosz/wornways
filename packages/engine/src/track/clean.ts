@@ -1,4 +1,5 @@
 import { distanceM, longitudeDelta, metresPerDegree } from './geo.ts';
+import { pickSensors, sliceSensors } from './sensors.ts';
 import { STRIDE, type Track } from './types.ts';
 
 // Cleaning rules based on third-party MIT-licensed code (see THIRD_PARTY_NOTICES.md).
@@ -83,8 +84,9 @@ export function trimEdgeJumps(
   const points = p.slice(a * STRIDE, b * STRIDE);
   const t0 = points[3];
   for (let i = 3; i < points.length; i += STRIDE) points[i] -= t0;
+  const sensors = sliceSensors(track.sensors, a, b);
   return {
-    track: { ...track, startTime: track.startTime + t0 * 1000, points },
+    track: { ...track, startTime: track.startTime + t0 * 1000, points, sensors },
     start: a,
     end: n - b,
   };
@@ -136,6 +138,8 @@ export function cleanTrack(track: Track, options: CleanOptions = {}): Track | nu
 
   // Thin to roughly `spacing` metres, always keeping the first and last point.
   const out: number[] = [];
+  /** The source index of each point kept, for the sensor values. */
+  const kept: number[] = [];
   let t = 0;
   let lastLon = NaN;
   let lastLat = NaN;
@@ -147,8 +151,13 @@ export function cleanTrack(track: Track, options: CleanOptions = {}): Track | nu
     lastLon = p[src];
     lastLat = p[src + 1];
     out.push(lastLon, lastLat, p[src + 2], t);
+    kept.push(keep[k]);
   }
-  return { ...track, points: new Float64Array(out) };
+  return {
+    ...track,
+    points: new Float64Array(out),
+    sensors: pickSensors(track.sensors, kept),
+  };
 }
 
 export function trackLengthM(track: Pick<Track, 'points'>): number {

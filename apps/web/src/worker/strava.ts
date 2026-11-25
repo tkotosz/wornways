@@ -1,15 +1,9 @@
-import {
-  sportSlug,
-  STRIDE,
-  type LatLon,
-  type SettingsInput,
-  type Track,
-  type TrackEnd,
-} from '@wornways/engine';
+import { sportSlug, type SettingsInput, type Track, type TrackEnd } from '@wornways/engine';
 import type { ActivitySummary, MatchReport, Progress } from '../messages.ts';
 import { clearStravaAccess, type StravaGrant } from '../strava-auth.ts';
 import { RemoteActivities, type RemoteActivity } from './remote-activities.ts';
 import { StravaCache } from './strava-cache.ts';
+import { coordinates, trackFromStreams, type Streams } from './strava-track.ts';
 import { sessionTileLoader } from './tile-cache.ts';
 
 const API = '/api/strava/activities';
@@ -51,21 +45,8 @@ async function routeVersion(data: Summary): Promise<string> {
   return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 
-type Streams = {
-  latlng?: { data: [number, number][] };
-  time?: { data: number[] };
-  altitude?: { data: number[] };
-};
-
 export class StravaError extends Error {}
 export class StravaExpired extends StravaError {}
-
-function coordinates(values: number[] | null | undefined): LatLon | undefined {
-  if (values?.length !== 2) return;
-  const [lat, lon] = values;
-  if (Number.isFinite(lat) && Number.isFinite(lon) && Math.abs(lat!) <= 90 && Math.abs(lon!) <= 180)
-    return { lat: lat!, lon: lon! };
-}
 
 async function summary(data: Summary): Promise<StravaActivity | null> {
   const id = data.id_str ?? (Number.isSafeInteger(data.id) ? String(data.id) : '');
@@ -82,31 +63,6 @@ async function summary(data: Summary): Promise<StravaActivity | null> {
     start: coordinates(data.start_latlng),
     end: coordinates(data.end_latlng),
     version: await routeVersion(data),
-  };
-}
-
-function trackFromStreams(activity: ActivitySummary, streams: Streams): Track | null {
-  const positions = streams.latlng?.data;
-  const times = streams.time?.data;
-  const elevations = streams.altitude?.data;
-  if (!positions || !times || positions.length !== times.length) return null;
-  const points = new Float64Array(positions.length * STRIDE);
-  let size = 0;
-  for (const [index, coordinate] of positions.entries()) {
-    const point = coordinates(coordinate);
-    if (!point || !Number.isFinite(times[index])) continue;
-    const { lat, lon } = point;
-    points[size++] = lon;
-    points[size++] = lat;
-    points[size++] = Number.isFinite(elevations?.[index]) ? elevations![index]! : NaN;
-    points[size++] = times[index]!;
-  }
-  if (size < 2 * STRIDE) return null;
-  const offset = points[3]!;
-  for (let i = 3; i < size; i += STRIDE) points[i] = points[i]! - offset;
-  return {
-    ...activity,
-    points: points.subarray(0, size),
   };
 }
 

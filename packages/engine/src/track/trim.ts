@@ -1,5 +1,6 @@
 import { distanceM, longitudeDelta, mercatorY, metresPerDegree } from './geo.ts';
 import { trackEnd, trackStart, type LatLon } from './places.ts';
+import { cutSensors } from './sensors.ts';
 import { STRIDE, type Track } from './types.ts';
 
 type Zone = { lon: number; y: number; scaleX: number; scaleY: number; radius: number };
@@ -142,5 +143,11 @@ export function trimEndpoints(track: Track, radius: number, original: Track = tr
   const elapsedSeconds =
     track.elapsedSeconds === undefined ? undefined : Math.max(0, track.elapsedSeconds - hidden);
   // Retain the activity's original grouping date while the visible clock starts at zero.
-  return { ...track, points, ...(elapsedSeconds === undefined ? {} : { elapsedSeconds }) };
+  const sensors = cutSensors(track.sensors, from, first, past, to);
+  return {
+    ...track,
+    points,
+    sensors,
+    ...(elapsedSeconds === undefined ? {} : { elapsedSeconds }),
+  };
 }

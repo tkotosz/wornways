@@ -13,6 +13,12 @@ describe('totalsEntries', () => {
     days: 4,
     longest: 112_300,
     topSpeed: 15,
+    heartRate: 141.6,
+    maxHeartRate: 178,
+    power: 212.4,
+    cadence: 84.6,
+    temperature: 21.2,
+    calories: 6120,
     onFoot: false,
     dates: '18–22 Apr 2026',
   };
@@ -50,6 +56,39 @@ describe('totalsEntries', () => {
     expect(totalsEntries(runs, 1, rides, ['top-speed'])).toEqual([
       { field: 'top-speed', value: '3:20', label: 'min/km best pace' },
     ]);
+  });
+
+  it('shows the sensor averages, the highest heart rate and the calories', () => {
+    const sensorValues = [
+      'heart-rate',
+      'max-heart-rate',
+      'power',
+      'cadence',
+      'temperature',
+      'calories',
+    ] as const;
+    expect(totalsEntries(totals, 1, rides, [...sensorValues])).toEqual([
+      { field: 'heart-rate', value: '142', label: 'bpm average' },
+      { field: 'max-heart-rate', value: '178', label: 'bpm max' },
+      { field: 'power', value: '212', label: 'W average' },
+      { field: 'cadence', value: '85', label: 'rpm average' },
+      { field: 'temperature', value: '21', label: '°C average' },
+      { field: 'calories', value: '6,120', label: 'kcal' },
+    ]);
+    // On foot, one leg's strides become steps per minute.
+    expect(totalsEntries({ ...totals, onFoot: true }, 1, rides, ['cadence'])).toEqual([
+      { field: 'cadence', value: '169', label: 'spm average' },
+    ]);
+    const none = {
+      ...totals,
+      heartRate: null,
+      maxHeartRate: null,
+      power: null,
+      cadence: null,
+      temperature: null,
+      calories: null,
+    };
+    expect(totalsEntries(none, 1, rides, [...sensorValues])).toEqual([]);
   });
 
   it('shows the values picked, in the order picked', () => {

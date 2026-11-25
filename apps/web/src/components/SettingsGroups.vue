@@ -8,6 +8,7 @@ import {
   defaultMetrics,
   type Metric,
   type SettingDefinition,
+  type SensorChannel,
   type TotalsField,
 } from '@wornways/engine';
 import { computed } from 'vue';
@@ -107,6 +108,7 @@ const offeredMetrics = computed(() =>
     if (m === 'count' || m === 'days' || m === 'longest') return kind.value !== 'single';
     if (m === 'start') return kind.value === 'single';
     if (m === 'elevation' || m === 'descent' || m === 'highest') return props.plan?.hasElevation;
+    if (isSensorValue(m)) return hasSensorValue(m);
     return true;
   }),
 );
@@ -118,6 +120,23 @@ const pickedMetrics = computed<Metric[]>(() => {
   return picked.filter((m) => offeredMetrics.value.includes(m));
 });
 
+/** The values that need a sensor channel, or calories, that some selected activity recorded. */
+const SENSOR_VALUES: Record<string, SensorChannel | 'calories'> = {
+  'heart-rate': 'heartRate',
+  'max-heart-rate': 'heartRate',
+  power: 'power',
+  cadence: 'cadence',
+  temperature: 'temperature',
+  calories: 'calories',
+};
+const isSensorValue = (value: string) => Object.hasOwn(SENSOR_VALUES, value);
+const hasSensorValue = (value: string) => {
+  const needs = SENSOR_VALUES[value];
+  return needs === 'calories'
+    ? !!props.plan?.hasCalories
+    : !!props.plan?.sensors.includes(needs as SensorChannel);
+};
+
 /** A metric's chip: its name, or a few words where the name alone would be unclear. */
 const METRIC_LABELS: Partial<Record<Metric, string>> = {
   moving: 'Moving time',
@@ -126,6 +145,8 @@ const METRIC_LABELS: Partial<Record<Metric, string>> = {
   highest: 'Highest point',
   days: 'Days out',
   longest: 'Longest activity',
+  'heart-rate': 'Heart rate',
+  'max-heart-rate': 'Max heart rate',
 };
 const metricLabel = (metric: Metric) =>
   METRIC_LABELS[metric] ?? metric.charAt(0).toUpperCase() + metric.slice(1);
@@ -150,10 +171,20 @@ const TOTALS_LABELS: Record<TotalsField, string> = {
   date: 'Dates',
   days: 'Days out',
   longest: 'Longest activity',
+  'heart-rate': 'Average heart rate',
+  'max-heart-rate': 'Max heart rate',
+  power: 'Average power',
+  cadence: 'Average cadence',
+  temperature: 'Average temperature',
+  calories: 'Calories',
 };
 const ELEVATION_TOTALS: TotalsField[] = ['elevation', 'descent', 'highest'];
 const offeredTotals = computed(() =>
-  TOTALS_FIELDS.filter((field) => !ELEVATION_TOTALS.includes(field) || props.plan?.hasElevation),
+  TOTALS_FIELDS.filter((field) => {
+    if (ELEVATION_TOTALS.includes(field)) return props.plan?.hasElevation;
+    if (isSensorValue(field)) return hasSensorValue(field);
+    return true;
+  }),
 );
 const pickedTotals = computed<TotalsField[]>(() => {
   const set = adjustments.value['totals-fields'];

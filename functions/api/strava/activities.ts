@@ -9,7 +9,7 @@ function upstreamPath(query: URLSearchParams): string | null {
   if (activity !== null) {
     if (query.size !== 1 || !/^[1-9]\d{0,18}$/.test(activity) || BigInt(activity) > 2n ** 63n - 1n)
       return null;
-    return `/activities/${activity}/streams?keys=latlng,time,altitude&key_by_type=true`;
+    return `/activities/${activity}/streams?keys=latlng,time,altitude,heartrate,cadence,watts,temp&key_by_type=true`;
   }
   const after = query.get('after');
   const before = query.get('before');

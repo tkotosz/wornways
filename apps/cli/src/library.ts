@@ -1,7 +1,10 @@
 // The activity library on disk: activities imported once and read again by every render.
 //
-// <home>/library/activities.json   id, name, sport and start of every activity
+// <home>/library/activities.json   id, name, sport and start of every activity, and the
+//                                   sensor channels and calories of those that have them
 // <home>/library/points/<id>.f64   the activity's points as raw 64-bit floats
+// <home>/library/sensors/<id>.f32  its sensor channels as raw 32-bit floats, one channel
+//                                   after another in the order the list names them
 //
 // <home> is $WORNWAYS_HOME, else ~/.wornways. Points are stored raw rather than as JSON
 // numbers: reading 770 activities takes 0.06 s this way and 2 s as JSON. They are written
@@ -13,13 +16,20 @@ import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { setTimeout as delay } from 'node:timers/promises';
 import {
+  SENSOR_CHANNELS,
+  STRIDE,
   importFiles,
   type ImportProgress,
   type RandomAccessFile,
+  type SensorChannel,
+  type Sensors,
   type Track,
 } from '@wornways/engine';
 
-type StoredActivity = Pick<Track, 'id' | 'name' | 'sport' | 'startTime'>;
+type StoredActivity = Pick<Track, 'id' | 'name' | 'sport' | 'startTime' | 'calories'> & {
+  /** The channels in the sensors file, in order; absent when it has none. */
+  sensors?: SensorChannel[];
+};
 
 /** The library folder: `$WORNWAYS_HOME/library`, else `~/.wornways/library`. */
 export function libraryFolder(): string {
@@ -69,11 +79,21 @@ export class Library {
       if (!isMissing(error)) throw error;
     }
     const activities = new Map<string, Track>();
-    for (const activity of stored) {
+    for (const { sensors: channels, ...activity } of stored) {
       const bytes = await readFile(this.pointsFile(activity.id));
       // A copy, so that the points start at an offset a Float64Array can use.
       const points = new Float64Array(new Uint8Array(bytes).buffer);
-      activities.set(activity.id, { ...activity, points });
+      const track: Track = { ...activity, points };
+      if (channels?.length) {
+        const values = new Float32Array(
+          new Uint8Array(await readFile(this.sensorsFile(activity.id))).buffer,
+        );
+        const n = points.length / STRIDE;
+        const sensors: Sensors = {};
+        channels.forEach((channel, k) => (sensors[channel] = values.slice(k * n, (k + 1) * n)));
+        track.sensors = sensors;
+      }
+      activities.set(activity.id, track);
     }
     return activities;
   }
@@ -127,6 +147,14 @@ export class Library {
         this.pointsFile(activity.id),
         new Uint8Array(points.buffer, points.byteOffset, points.byteLength),
       );
+      const channels = sensorChannels(activity);
+      if (channels.length) {
+        await mkdir(path.join(this.folder, 'sensors'), { recursive: true });
+        const n = points.length / STRIDE;
+        const values = new Float32Array(channels.length * n);
+        channels.forEach((channel, k) => values.set(activity.sensors![channel]!, k * n));
+        await replaceFile(this.sensorsFile(activity.id), new Uint8Array(values.buffer));
+      } else await rm(this.sensorsFile(activity.id), { force: true });
       current.set(activity.id, activity);
     }
     await this.writeList(current);
@@ -136,7 +164,10 @@ export class Library {
     await this.write(async (current) => {
       for (const id of ids) current.delete(id);
       await this.writeList(current);
-      for (const id of ids) await rm(this.pointsFile(id), { force: true });
+      for (const id of ids) {
+        await rm(this.pointsFile(id), { force: true });
+        await rm(this.sensorsFile(id), { force: true });
+      }
     });
   }
 
@@ -145,6 +176,7 @@ export class Library {
       current.clear();
       await this.writeList(current);
       await rm(path.join(this.folder, 'points'), { recursive: true, force: true });
+      await rm(path.join(this.folder, 'sensors'), { recursive: true, force: true });
     });
   }
 
@@ -174,13 +206,33 @@ export class Library {
     return path.join(this.folder, 'points', `${encodeURIComponent(id)}.f64`);
   }
 
+  private sensorsFile(id: string): string {
+    return path.join(this.folder, 'sensors', `${encodeURIComponent(id)}.f32`);
+  }
+
   /** Writes the list through a temporary file, so a crash never leaves half a list. */
   private async writeList(activities: Map<string, Track>): Promise<void> {
     const list: StoredActivity[] = [...activities.values()]
       .sort((a, b) => b.startTime - a.startTime)
-      .map(({ id, name, sport, startTime }) => ({ id, name, sport, startTime }));
+      .map((activity) => {
+        const { id, name, sport, startTime, calories } = activity;
+        const sensors = sensorChannels(activity);
+        return {
+          id,
+          name,
+          sport,
+          startTime,
+          ...(calories === undefined ? {} : { calories }),
+          ...(sensors.length ? { sensors } : {}),
+        };
+      });
     const file = path.join(this.folder, 'activities.json');
     await replaceFile(file, JSON.stringify(list));
     this.activities = activities;
   }
+}
+
+/** The sensor channels an activity has values for, in a fixed order. */
+function sensorChannels(activity: Track): SensorChannel[] {
+  return SENSOR_CHANNELS.filter((channel) => activity.sensors?.[channel]);
 }

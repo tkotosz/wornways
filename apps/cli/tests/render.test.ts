@@ -288,6 +288,42 @@ describe('the metrics card', () => {
     expect(lastFrame({ metrics: ['days', 'longest'] }).bottomLeft).toBe(0);
   });
 
+  it('shows the sensor values and calories of an activity that recorded them, and only then', () => {
+    const sensorMetrics: Metric[] = [
+      'heart-rate',
+      'max-heart-rate',
+      'power',
+      'cadence',
+      'temperature',
+      'calories',
+    ];
+    const drawn = (track: Track, metric: Metric) => {
+      const renderer = createRenderer(
+        [track],
+        chronologicalTimeline([1_190], { duration: 1 }),
+        (w, h) => createCanvas(w, h) as unknown as CanvasLike,
+        { width, height, fps: 10, overlay: 'single', metrics: [metric] },
+      );
+      for (let f = 0; f < renderer.frameCount; f++) renderer.renderFrame(f);
+      return textPixels(renderer.canvas, 0, height * 0.8, width / 2, height);
+    };
+    const count = route().points.length / STRIDE;
+    const recordedRide: Track = {
+      ...route(),
+      sensors: {
+        heartRate: new Float32Array(count).fill(140),
+        power: new Float32Array(count).fill(200),
+        cadence: new Float32Array(count).fill(85),
+        temperature: new Float32Array(count).fill(20),
+      },
+      calories: 420,
+    };
+    for (const metric of sensorMetrics) {
+      expect(drawn(recordedRide, metric), metric).toBeGreaterThan(20);
+      expect(drawn(route(), metric), metric).toBe(0);
+    }
+  });
+
   it('shows the start time for a single activity only, and the top speed for any', () => {
     const inTurn = chronologicalTimeline([1_190, 1_190], { duration: 1 });
     expect(lastFrame({ metrics: ['start'] }).bottomLeft).toBeGreaterThan(20);
