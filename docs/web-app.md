@@ -87,8 +87,8 @@ list.
    activities? Pick a period."), and the other filters, the list and the way on come once
    one is (Strava and Ride with GPS, which list a period at a time, start on this month).
    The filters (the "Which activities" settings): period with shortcuts and a calendar for
-   custom days, sports (offered only when the period has them, with "All"), and two place filters, "Starts near a place" and "Ends near a place". Each
-   opens its own panel, where the place is set in one field: a place clicked on the map
+   custom days, sports (offered only when the period has them, with "All"), and two place
+   filters, "Starts near a place" and "Ends near a place". Each opens its own panel, where the place is set in one field: a place clicked on the map
    shown under it (MapLibre with OpenFreeMap's dark style, with zoom buttons, the circle
    of how near counts, and the places activities start, or end, at most often), typed or
    pasted coordinates, or the browser's current location, which is tried first when the
