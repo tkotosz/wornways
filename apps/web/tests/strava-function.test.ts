@@ -167,6 +167,35 @@ describe('the Strava Pages Functions', () => {
     expect(rejected.headers.get('X-Wornways-Strava-Reason')).toBe('strava-rejected');
   });
 
+  it('passes on only the calories of a detailed activity', async () => {
+    const { env } = setup();
+    const { cookie } = await signedIn();
+    const upstream = vi
+      .fn()
+      .mockResolvedValueOnce(
+        Response.json({ id: 1, calories: 812.4, description: 'Private notes', name: 'A ride' }),
+      )
+      .mockResolvedValueOnce(Response.json({ id: 1, calories: 0 }))
+      .mockResolvedValueOnce(new Response(null, { status: 404 }));
+    vi.stubGlobal('fetch', upstream);
+    const load = (query: string) =>
+      activities({
+        request: new Request(origin + '/api/strava/activities' + query, {
+          headers: { Cookie: cookie, 'X-Wornways-Strava-Session': sessionId },
+        }),
+        env,
+      });
+    expect((await load('?calories=1%2F2')).status).toBe(400);
+    expect((await load(`?calories=${athlete}&page=1`)).status).toBe(400);
+    expect(upstream).not.toHaveBeenCalled();
+
+    expect(await (await load(`?calories=${athlete}`)).json()).toEqual({ calories: 812.4 });
+    expect(upstream.mock.calls[0]?.[0]).toBe(`https://www.strava.com/api/v3/activities/${athlete}`);
+    // Strava writes 0 when it has no estimate.
+    expect(await (await load(`?calories=${athlete}`)).json()).toEqual({ calories: null });
+    expect((await load(`?calories=${athlete}`)).status).toBe(404);
+  });
+
   it('revokes the cookie token on disconnect and leaves a newer session alone', async () => {
     const { env } = setup();
     const { cookie } = await signedIn();

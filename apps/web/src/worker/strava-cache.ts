@@ -71,11 +71,18 @@ export class StravaCache<T> {
   }
 
   private async trackPath(id: string): Promise<string> {
-    const digest = await this.digest('track:' + id);
-    const hash = Array.from(new Uint8Array(digest), (byte) =>
-      byte.toString(16).padStart(2, '0'),
-    ).join('');
-    return 'tracks/' + hash;
+    return 'tracks/' + (await this.hashOf('track:' + id));
+  }
+
+  private async caloriesPath(id: string): Promise<string> {
+    return 'calories/' + (await this.hashOf('calories:' + id));
+  }
+
+  private async hashOf(purpose: string): Promise<string> {
+    const digest = await this.digest(purpose);
+    return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join(
+      '',
+    );
   }
 
   private async read(
@@ -131,9 +138,10 @@ export class StravaCache<T> {
   }
 
   async clearTrack(id: string): Promise<void> {
-    await this.use(async (cache) =>
-      cache.delete('/wornways-strava-cache/' + (await this.trackPath(id))),
-    );
+    await this.use(async (cache) => {
+      await cache.delete('/wornways-strava-cache/' + (await this.trackPath(id)));
+      await cache.delete('/wornways-strava-cache/' + (await this.caloriesPath(id)));
+    });
     await this.index((list) => list.filter((row) => row.id !== id));
   }
 
@@ -193,5 +201,29 @@ export class StravaCache<T> {
       await this.write(cache, await this.trackPath(track.id), version, record.buffer);
     });
     await this.index((list) => [...list.filter((row) => row.id !== summary.id), summary]);
+  }
+
+  /**
+   * The calories kept for this version of an activity: a number, null when Strava has none,
+   * undefined when they were never fetched.
+   */
+  calories(id: string, version: string): Promise<number | null | undefined> {
+    return this.use(async (cache) => {
+      const data = await this.read(cache, await this.caloriesPath(id), version);
+      if (!data) return undefined;
+      const value: unknown = JSON.parse(new TextDecoder().decode(data));
+      return typeof value === 'number' || value === null ? value : undefined;
+    });
+  }
+
+  async saveCalories(id: string, version: string, calories: number | null): Promise<void> {
+    await this.use(async (cache) =>
+      this.write(
+        cache,
+        await this.caloriesPath(id),
+        version,
+        encoder.encode(JSON.stringify(calories)).buffer,
+      ),
+    );
   }
 }

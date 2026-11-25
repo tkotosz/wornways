@@ -202,14 +202,22 @@ Heart rate, power, cadence, temperature and calories show only when an activity 
 them. Averages are over time, so a stretch with many points weighs no more than one with few;
 cadence leaves out stretches at zero, such as coasting, and is steps per minute on foot
 (rotations per minute otherwise). Calories so far count each activity's share as it plays.
-The values come from FIT files (all five), TCX files (heart rate, cadence, power, calories),
-GPX files (heart rate, cadence and temperature from Garmin's track point extension, and power
-where an app adds it), Strava (heart rate, cadence, power, temperature; no calories, which
-would need one more request per activity) and Ride with GPS (heart rate, cadence, power,
-temperature). Strava and Ride with GPS tracks downloaded before these values were kept show
-none until they are downloaded again. Unless picked, the
-video shows what suits it (one activity: time, distance, date; a race: time, count,
-distance; in turn: date, count, distance) and the totals card its first four values.
+The values come from:
+
+- FIT files: all five.
+- TCX files: heart rate, cadence, power and calories.
+- GPX files: heart rate, cadence and temperature from Garmin's track point extension, and
+  power where an app adds it.
+- Strava: heart rate, cadence, power and temperature with the track. Calories take one more
+  request per activity, so they are fetched only for a video that shows them, and kept.
+- Ride with GPS: heart rate, cadence, power and temperature.
+
+Strava and Ride with GPS tracks downloaded before these values were kept show none until they
+are downloaded again.
+
+Unless picked, the video shows what suits it (one activity: time, distance, date; a race:
+time, count, distance; in turn: date, count, distance) and the totals card its first four
+values.
 
 | Setting   | CLI flag                     | Values                                                                                | Default              |
 | --------- | ---------------------------- | ------------------------------------------------------------------------------------- | -------------------- |

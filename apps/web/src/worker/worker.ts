@@ -1,7 +1,7 @@
 // The worker: does all the heavy work so the page never freezes. It keeps the library of
 // activities and answers the page's requests (see messages.ts).
 
-import { parseSettings, SettingsError } from '@wornways/engine';
+import { parseSettings, SettingsError, type RenderSettings } from '@wornways/engine';
 import type { ActivitySummary, Reply, Request } from '../messages.ts';
 import { DemoUnavailable, openDemo } from './demo.ts';
 import { Library } from './library.ts';
@@ -182,6 +182,9 @@ async function answer(request: Exclude<Request, { type: 'cancel' }>, signal: Abo
     const settings = parseSettings(request.settings);
     const selected = await remote.selected(settings.activities ?? []);
     renderSignal.throwIfAborted();
+    // Strava's calories cost a request per activity: fetched only when the video shows them.
+    if (remote === session && session && showsCalories(settings))
+      return session.withCalories(selected, renderSignal);
     return selected;
   };
   switch (request.type) {
@@ -206,7 +209,11 @@ async function answer(request: Exclude<Request, { type: 'cancel' }>, signal: Abo
         places: (await library()).places(request.settings, request.end),
       });
     case 'plan':
-      return reply({ type: 'planned', id, plan: planVideo(await tracks(), request.settings) });
+      return reply({
+        type: 'planned',
+        id,
+        plan: planVideo(await tracks(), request.settings, source === 'strava'),
+      });
     case 'make-poster': {
       const image = await makePoster(
         await tracks(),
@@ -258,3 +265,11 @@ async function handle(request: Request): Promise<void> {
 }
 
 self.onmessage = (event: MessageEvent<Request>) => void handle(event.data);
+
+/** Whether the video shows calories: over the replay, or on the totals card. */
+function showsCalories(settings: RenderSettings): boolean {
+  return (
+    (settings.metrics && !!settings.metricsFields?.includes('calories')) ||
+    (settings.totalsCard && !!settings.totalsFields?.includes('calories'))
+  );
+}

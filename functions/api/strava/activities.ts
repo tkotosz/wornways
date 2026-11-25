@@ -4,12 +4,20 @@ import { stravaReady, type StravaEnv } from '../../../cloudflare/strava-session.
 const API = 'https://www.strava.com/api/v3';
 const headers = { 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' };
 
+/** Whether `id` is a Strava activity id: a positive 64-bit integer. */
+const activityId = (id: string) => /^[1-9]\d{0,18}$/.test(id) && BigInt(id) <= 2n ** 63n - 1n;
+
 function upstreamPath(query: URLSearchParams): string | null {
   const activity = query.get('activity');
   if (activity !== null) {
-    if (query.size !== 1 || !/^[1-9]\d{0,18}$/.test(activity) || BigInt(activity) > 2n ** 63n - 1n)
-      return null;
+    if (query.size !== 1 || !activityId(activity)) return null;
     return `/activities/${activity}/streams?keys=latlng,time,altitude,heartrate,cadence,watts,temp&key_by_type=true`;
+  }
+  // The detailed activity, for its calories only: one more request, made when a video shows them.
+  const calories = query.get('calories');
+  if (calories !== null) {
+    if (query.size !== 1 || !activityId(calories)) return null;
+    return `/activities/${calories}`;
   }
   const after = query.get('after');
   const before = query.get('before');
@@ -81,6 +89,7 @@ export async function onRequest({
   if (!path) return new Response(null, { status: 400, headers });
 
   const track = url.searchParams.has('activity');
+  const calories = url.searchParams.has('calories');
   try {
     const options = {
       headers: { Authorization: `Bearer ${session.token}`, 'Cache-Control': 'no-store' },
@@ -94,7 +103,10 @@ export async function onRequest({
       // Tells the browser that Strava, not this site's session check, refused the token.
       const reason = status === 401 ? { 'X-Wornways-Strava-Reason': 'strava-rejected' } : {};
       return new Response(null, {
-        status: status === 401 || status === 429 || (track && status === 404) ? status : 502,
+        status:
+          status === 401 || status === 429 || ((track || calories) && status === 404)
+            ? status
+            : 502,
         headers: { ...headers, ...reason },
       });
     }
@@ -103,6 +115,14 @@ export async function onRequest({
       return new Response(response.body, {
         headers: { ...headers, 'Content-Type': 'application/json' },
       });
+
+    if (calories) {
+      // Only the calories leave this function, not the rest of the activity.
+      const detail = (await response.json()) as { calories?: unknown };
+      const kcal =
+        typeof detail.calories === 'number' && detail.calories > 0 ? detail.calories : null;
+      return Response.json({ calories: kcal }, { headers });
+    }
 
     const rows = (await response.json()) as Summary[];
     return Response.json(rows.map(replaySummary), { headers });
