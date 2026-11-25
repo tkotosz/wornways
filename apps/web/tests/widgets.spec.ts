@@ -180,3 +180,28 @@ test("keeps the browser's long-press menu off the picture", async ({ page, conte
   });
   expect(prevented).toBe(true);
 });
+
+test('lines a moving widget up with the edges of the others, with a line', async ({
+  page,
+  context,
+}) => {
+  page.setDefaultTimeout(15_000);
+  await offlineMap(context);
+  await openOverlay(page);
+  // The title, dragged down so its edges come 4 px off the date's.
+  const title = (await outline(page, 0).boundingBox())!;
+  const date = (await outline(page, 1).boundingBox())!;
+  const start = await grip(page, 0);
+  await drag(page, start, date.x + 4 - title.x, 120);
+  await expect(page.locator('.line.across')).toBeVisible();
+  await page.mouse.up();
+  // In line with the date: its left edge, its middle or its right edge, the nearest.
+  const moved = (await outline(page, 0).boundingBox())!;
+  const lines = (box: { x: number; width: number }) => [
+    box.x,
+    box.x + box.width / 2,
+    box.x + box.width,
+  ];
+  const gaps = lines(moved).flatMap((edge) => lines(date).map((line) => Math.abs(edge - line)));
+  expect(Math.min(...gaps)).toBeLessThan(1);
+});

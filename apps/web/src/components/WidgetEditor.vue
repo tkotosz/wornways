@@ -6,10 +6,10 @@
 //
 // A tap picks a widget: the one under the finger, else the nearest within a finger's reach, so
 // a fingertip need not land on a small widget exactly. A picked one has an outline and a
-// corner handle. Dragging moves it,
-// centered on where it is let go; it snaps to the frame's center lines, with a line shown,
-// and while it is dragged a bin shows at the bottom, where letting go removes it. Two
-// fingers, or the corner handle, resize it. A tap on a picked text widget asks for its text
+// corner handle. Dragging moves it, centered on where it is let go; it snaps to the frame's
+// center lines and in line with the other widgets' edges and middles, with a line shown, and
+// while it is dragged a bin shows at the bottom, where letting go removes it. Two fingers, or
+// the corner handle, resize it. A tap on a picked text widget asks for its text
 // (`edit`). The keyboard moves a picked widget with the arrow keys, resizes it with + and -,
 // and removes it with Delete. On a story-shaped frame, while a widget moves, guides show the
 // parts the platforms' own controls cover.
@@ -39,7 +39,8 @@ const emit = defineEmits<{
 
 /** The widget being moved or resized, where it is now: its point and size. */
 const moving = ref<{ index: number; x: number; y: number; size: number } | null>(null);
-const snap = ref({ x: false, y: false });
+/** The lines the moving widget snapped to, in percent of the frame; null for none. */
+const snap = ref<{ x: number | null; y: number | null }>({ x: null, y: null });
 /** Whether the widget being dragged is over the bin. */
 const overBin = ref(false);
 
@@ -76,8 +77,32 @@ const chartPath = computed(() => {
   return `M0,100 L${points.join(' L')} L100,100 Z`;
 });
 
-/** How near the middle, in percent of the frame, a widget's center snaps to it. */
-const SNAP = 2.5;
+/** How near a line, in pixels on the screen, a widget's edge or middle snaps to it. */
+const SNAP_PX = 7;
+
+/** A widget's outline on the screen, in percent of the frame: its edges and its middle. */
+type Edges = { x: [number, number, number]; y: [number, number, number] };
+
+/**
+ * Where the moving widget snaps, along one direction: of its edges and middle (`own`, as
+ * offsets from its point), the one nearest a line within `reach`; the shift that puts it on
+ * the line, and the line. Lines: the frame's middle, and the other widgets' edges and middles.
+ */
+function snapTo(
+  at: number,
+  own: [number, number, number],
+  lines: number[],
+  reach: number,
+): { shift: number; line: number } | null {
+  let best: { shift: number; line: number } | null = null;
+  for (const line of lines)
+    for (const offset of own) {
+      const shift = line - (at + offset);
+      if (Math.abs(shift) <= reach && (!best || Math.abs(shift) < Math.abs(best.shift)))
+        best = { shift, line };
+    }
+  return best;
+}
 const layer = ref<HTMLElement | null>(null);
 
 const round = (n: number) => Math.round(n * 10) / 10;
@@ -131,6 +156,27 @@ function start(event: PointerEvent, index: number, resize: boolean): void {
     x: area.left + (widget.x / 100) * area.width,
     y: area.top + (widget.y / 100) * area.height,
   };
+  // The widget's own edges as offsets from its point, and the other widgets' edges and
+  // middles, which it lines up with, in percent of the frame.
+  const edgesOf = (element: Element): Edges => {
+    const box = element.getBoundingClientRect();
+    const x = (px: number) => ((px - area.left) / area.width) * 100;
+    const y = (px: number) => ((px - area.top) / area.height) * 100;
+    return {
+      x: [x(box.left), x((box.left + box.right) / 2), x(box.right)],
+      y: [y(box.top), y((box.top + box.bottom) / 2), y(box.bottom)],
+    };
+  };
+  const elements = [...surface.querySelectorAll<HTMLElement>('[data-widget]')];
+  const mine = elements.find((element) => Number(element.dataset.widget) === index);
+  const own = mine ? edgesOf(mine) : { x: [0, 0, 0], y: [0, 0, 0] };
+  const ownX = own.x.map((edge) => edge - widget.x) as [number, number, number];
+  const ownY = own.y.map((edge) => edge - widget.y) as [number, number, number];
+  const others = elements.filter((element) => element !== mine).map(edgesOf);
+  const linesX = others.flatMap((edges) => edges.x);
+  const linesY = others.flatMap((edges) => edges.y);
+  const reachX = (SNAP_PX / area.width) * 100;
+  const reachY = (SNAP_PX / area.height) * 100;
   let moved = false;
   /** The distance between two fingers, or from the widget's center to the finger, at first. */
   let reach = 0;
@@ -159,9 +205,12 @@ function start(event: PointerEvent, index: number, resize: boolean): void {
     moved = true;
     let x = Math.min(100, Math.max(0, widget.x + ((e.clientX - x0) / area.width) * 100));
     let y = Math.min(100, Math.max(0, widget.y + ((e.clientY - y0) / area.height) * 100));
-    snap.value = { x: Math.abs(x - 50) < SNAP, y: Math.abs(y - 50) < SNAP };
-    if (snap.value.x) x = 50;
-    if (snap.value.y) y = 50;
+    // Onto the frame's middle first, else in line with another widget's edge or middle.
+    const across = snapTo(x, [0, 0, 0], [50], reachX) ?? snapTo(x, ownX, linesX, reachX);
+    const down = snapTo(y, [0, 0, 0], [50], reachY) ?? snapTo(y, ownY, linesY, reachY);
+    if (across) x += across.shift;
+    if (down) y += down.shift;
+    snap.value = { x: across?.line ?? null, y: down?.line ?? null };
     overBin.value =
       Math.abs(e.clientX - (area.left + area.width / 2)) < 32 && area.bottom - e.clientY < 64;
     moving.value = { index, x, y, size: widget.size };
@@ -180,7 +229,7 @@ function start(event: PointerEvent, index: number, resize: boolean): void {
     const bin = overBin.value;
     moving.value = null;
     overBin.value = false;
-    snap.value = { x: false, y: false };
+    snap.value = { x: null, y: null };
     if (bin) return remove(index);
     if (!moved || !now) {
       if (wasPicked && widget.kind === 'text') emit('edit', index);
@@ -283,8 +332,18 @@ const story = computed(() => props.size.width / props.size.height < 0.8);
       <span class="zone left" />
       <span class="zone right" />
     </div>
-    <span v-if="snap.x" class="line across" aria-hidden="true" />
-    <span v-if="snap.y" class="line down" aria-hidden="true" />
+    <span
+      v-if="snap.x !== null"
+      class="line across"
+      :style="{ left: `${snap.x}%` }"
+      aria-hidden="true"
+    />
+    <span
+      v-if="snap.y !== null"
+      class="line down"
+      :style="{ top: `${snap.y}%` }"
+      aria-hidden="true"
+    />
     <span
       v-if="moving && moving.size === widgets[moving.index]?.size"
       class="bin"
@@ -513,12 +572,10 @@ const story = computed(() => props.size.width / props.size.height < 0.8);
 .line.across {
   top: 0;
   bottom: 0;
-  left: 50%;
   width: 1px;
 }
 
 .line.down {
-  top: 50%;
   right: 0;
   left: 0;
   height: 1px;
