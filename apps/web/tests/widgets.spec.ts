@@ -66,16 +66,19 @@ test('moves a widget on the still at once, snapping it to the middle, without a 
   await expect(still).toHaveAttribute('src', before!);
 });
 
-test('removes a widget with its × or by dropping it on the bin', async ({ page, context }) => {
+test('removes a widget from its settings or by dropping it on the bin', async ({
+  page,
+  context,
+}) => {
   page.setDefaultTimeout(15_000);
   await offlineMap(context);
   await openOverlay(page);
   const rows = page.getByRole('button', { name: /^(Text|Date|Count|Distance):/ });
   await expect(rows).toHaveCount(4);
 
-  // Picked, a widget shows its × .
-  await outline(page, 0).click({ position: { x: 10, y: 6 } });
-  await page.getByRole('button', { name: 'Remove text' }).click();
+  // From its row, in its settings.
+  await page.getByRole('button', { name: /^Text: / }).click();
+  await page.getByRole('button', { name: 'Remove from the picture' }).click();
   await expect(rows).toHaveCount(3);
   await expect(page.getByRole('button', { name: /^Text: / })).toHaveCount(0);
 
@@ -173,23 +176,4 @@ test("keeps the browser's long-press menu off the picture", async ({ page, conte
     return event.defaultPrevented;
   });
   expect(prevented).toBe(true);
-});
-
-test('moves a picked widget from a drag that starts on its ×, and removes it on a tap', async ({
-  page,
-  context,
-}) => {
-  page.setDefaultTimeout(15_000);
-  await offlineMap(context);
-  await openOverlay(page);
-  await outline(page, 1).click({ position: { x: 10, y: 6 } });
-  const before = (await outline(page, 1).boundingBox())!;
-  const remove = (await page.getByRole('button', { name: 'Remove date' }).boundingBox())!;
-  await drag(page, { x: remove.x + remove.width / 2, y: remove.y + remove.height / 2 }, 0, -40);
-  await page.mouse.up();
-  const after = (await outline(page, 1).boundingBox())!;
-  expect(Math.round(after.y - before.y)).toBe(-40);
-  await expect(page.getByRole('button', { name: /^Date: / })).toBeVisible();
-  await page.getByRole('button', { name: 'Remove date' }).click();
-  await expect(page.getByRole('button', { name: /^Date: / })).toHaveCount(0);
 });

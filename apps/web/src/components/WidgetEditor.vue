@@ -5,8 +5,8 @@
 // they move under the finger at once and nothing is drawn again while they are arranged.
 //
 // A tap picks a widget: the one under the finger, else the nearest within a finger's reach, so
-// a fingertip need not land on a small widget exactly. A picked one has an outline, × to
-// remove it (a tap on it; a drag that starts there moves the widget) and a corner handle. Dragging moves it,
+// a fingertip need not land on a small widget exactly. A picked one has an outline and a
+// corner handle. Dragging moves it,
 // centered on where it is let go; it snaps to the frame's center lines, with a line shown,
 // and while it is dragged a bin shows at the bottom, where letting go removes it. Two
 // fingers, or the corner handle, resize it. A tap on a picked text widget asks for its text
@@ -164,8 +164,6 @@ function start(event: PointerEvent, index: number, resize: boolean): void {
   holding = true;
   const widget = props.widgets[index]!;
   const wasPicked = selected.value === index;
-  /** Whether the finger came down on the widget's ×: a tap there removes it. */
-  const onRemove = !!(event.target as HTMLElement).closest('.remove');
   selected.value = index;
   const area = surface.getBoundingClientRect();
   pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
@@ -227,8 +225,7 @@ function start(event: PointerEvent, index: number, resize: boolean): void {
     snap.value = { x: false, y: false };
     if (bin) return remove(index);
     if (!moved || !now) {
-      if (onRemove) remove(index);
-      else if (wasPicked && widget.kind === 'text') emit('edit', index);
+      if (wasPicked && widget.kind === 'text') emit('edit', index);
       return;
     }
     update(index, { x: round(now.x), y: round(now.y), size: now.size });
@@ -256,7 +253,7 @@ function touch(event: PointerEvent): void {
     layer.value?.setPointerCapture(event.pointerId);
     return;
   }
-  // On a widget, or its × or corner: that one; beside them: the nearest within reach.
+  // On a widget, or its corner: that one; beside them: the nearest within reach.
   const on = (event.target as HTMLElement).closest<HTMLElement>('[data-widget]');
   const near = on ? Number(on.dataset.widget) : nearestWidget(event.clientX, event.clientY);
   note(`→ ${on ? 'on' : 'nearest'} ${near}`);
@@ -386,14 +383,6 @@ const story = computed(() => props.size.width / props.size.height < 0.8);
 
       <span class="name" aria-hidden="true">{{ widgetLabel(widget) }}</span>
       <template v-if="selected === index && !moving">
-        <button
-          type="button"
-          class="remove"
-          :aria-label="`Remove ${widgetLabel(widget).toLowerCase()}`"
-          @click.stop="$event.detail === 0 && remove(index)"
-        >
-          ×
-        </button>
         <span
           class="handle"
           :data-testid="`resize-${index}`"
@@ -525,26 +514,7 @@ const story = computed(() => props.size.width / props.size.height < 0.8);
   opacity: 1;
 }
 
-/* × on the top right corner, the resize handle on the bottom right, larger than they look. */
-.remove {
-  position: absolute;
-  top: -20px;
-  right: -20px;
-  display: grid;
-  place-items: center;
-  width: 22px;
-  height: 22px;
-  padding: 0;
-  border: 0;
-  border-radius: 50%;
-  color: #111;
-  background: #fff;
-  font-size: 0.85rem;
-  font-weight: 800;
-  line-height: 1;
-}
-
-.remove::after,
+/* The resize handle on the bottom right, larger to touch than it looks. */
 .handle::after {
   content: '';
   position: absolute;

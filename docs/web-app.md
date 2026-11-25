@@ -154,21 +154,21 @@ list.
      is drawn again only for what is under them (and once when calories are first shown,
      which a service may give only on request). There is no Play over it. A tap picks one,
      the widget nearest the finger within about 28 pixels, so a fingertip need not land on a
-     small widget exactly: its name on a tab, × to remove it and a corner handle; a tap on
-     the picture outside the widgets lets it go. Dragging moves it; it snaps to the frame's
-     center lines, with a line shown, and while it is dragged a bin shows at the bottom,
-     where letting it go removes it. Two fingers, or the corner handle, resize it (50 to
-     250%). A tap on a picked text widget opens its text. The arrow keys move a picked
-     widget by 1% of the frame (5% with Shift), + and - resize it and Delete removes it. On
-     a story-shaped frame, while a widget moves, hatched guides marked "Covered on
-     Instagram" show what Instagram's own controls cover (Meta's ads guide: 14% at the top,
-     35% at the bottom, 6% at each side). Under the picture, "+ Add a widget" opens the
-     palette: Text, the elevation chart, and each value this video can show as a tile with
-     its own number (calories a service gives on request are offered before they are known);
-     a value already on the picture is dimmed, and a new widget comes in a free spot clear
-     of the middle. Then a row per widget with what it shows, which opens its settings: its
-     text (or back to the title), its size and "Remove from the picture". The small
-     watermark at the bottom left, on the map credit's line, stays a switch.
+     small widget exactly: its name on a tab and a corner handle; a tap on the picture
+     outside the widgets lets it go. Dragging moves it; it snaps to the frame's center
+     lines, with a line shown, and while it is dragged a bin shows at the bottom, where
+     letting it go removes it. Two fingers, or the corner handle, resize it (50 to 250%). A
+     tap on a picked text widget opens its text. The arrow keys move a picked widget by 1%
+     of the frame (5% with Shift), + and - resize it and Delete removes it. On a
+     story-shaped frame, while a widget moves, hatched guides marked "Covered on Instagram"
+     show what Instagram's own controls cover (Meta's ads guide: 14% at the top, 35% at the
+     bottom, 6% at each side). Under the picture, "+ Add a widget" opens the palette: Text,
+     the elevation chart, and each value this video can show as a tile with its own number
+     (calories a service gives on request are offered before they are known); a value
+     already on the picture is dimmed, and a new widget comes in a free spot clear of the
+     middle. Then a row per widget with what it shows, which opens its settings: its text
+     (or back to the title), its size and "Remove from the picture". The small watermark at
+     the bottom left, on the map credit's line, stays a switch.
    - **Ending:** what comes after the replay: the end pause on the finished picture, the
      totals card (for several activities only; on for Recap) and the end card.
 4. **Export.** A stage in the video's shape, which shows the finished picture with a "Make
