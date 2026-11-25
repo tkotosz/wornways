@@ -244,7 +244,7 @@ onBeforeUnmount(() => {
         <button
           v-if="url && !draftUrl && !drafting && !busy"
           type="button"
-          :class="['play', { corner: editing }]"
+          class="play"
           aria-label="Play preview"
           @click="play"
         >
@@ -369,16 +369,6 @@ onBeforeUnmount(() => {
   box-shadow: 0 0 0 6px rgba(255, 138, 42, 0.25);
   font-size: 1.2rem;
   transform: translate(-50%, -50%);
-}
-
-/* Where things are arranged on the picture, Play keeps out of the way, in a corner. */
-.play.corner {
-  inset: auto 0.6rem 0.6rem auto;
-  width: 2.6rem;
-  height: 2.6rem;
-  box-shadow: 0 0 0 4px rgba(255, 138, 42, 0.25);
-  font-size: 0.95rem;
-  transform: none;
 }
 
 /* What the draft is doing, with a bar of how far it is. No transition: nothing on the page
