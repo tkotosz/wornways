@@ -18,12 +18,6 @@ import type { PlanReport } from './messages.ts';
 /** What the person changed in the Video and Overlay steps, by setting name; the rest keeps its default. */
 export type Adjustments = Record<string, string | boolean>;
 
-/**
- * Whether the title is shown, kept apart from the title's text so that a title written
- * comes back when it is switched on again. Not a setting of its own: off means no title.
- */
-export const SHOW_TITLE = 'show-title';
-
 /** The panels of Fine-tune playback, in the Playback section. */
 export const PLAYBACK_PANELS: Panel[] = ['timing', 'camera'];
 
@@ -116,19 +110,15 @@ const presetStarting = (preset: PresetChoice): Adjustments =>
   );
 
 /**
- * Where a setting outside playback starts until it is set: the current preset's value,
- * or the elevation profile's, which the engine leaves to the video (on for one activity,
- * off for several); undefined: its default.
+ * Where a setting outside playback starts until it is set: the current preset's value;
+ * undefined: its default.
  */
 export function startingValue(
   adjustments: Adjustments,
   count: ActivityCount,
   name: string,
 ): string | boolean | undefined {
-  const fromPreset = presetStarting(presetOf(adjustments, count))[name];
-  if (fromPreset !== undefined) return fromPreset;
-  if (name === 'elevation-profile') return count === 'one';
-  return undefined;
+  return presetStarting(presetOf(adjustments, count))[name];
 }
 
 /** The settings shown under Fine-tune, with the current preset's values applied. */
@@ -194,7 +184,7 @@ export function fineTuned(
 }
 
 /** Every group the two steps offer. Which activities are chosen in the step before them. */
-const ADJUST_GROUPS: SettingGroup[] = ['timing', 'privacy', 'look', 'title', 'metrics', 'brand'];
+const ADJUST_GROUPS: SettingGroup[] = ['timing', 'privacy', 'look', 'brand'];
 
 /** Shorter labels for the screen than the settings table's. */
 const LABELS: Record<string, string> = {
@@ -247,10 +237,6 @@ const HINTS: Record<string, string> = {
     'How long the finished picture stays on screen at the end, before the totals and the ' +
     'end card. Added to the video’s length.',
   'trim-radius': 'Hide the route within this radius of each activity’s start and finish.',
-  'metrics-fields': 'In the order picked; the first is shown large.',
-  'elevation-profile':
-    'The climb profile along the bottom of the video, with a dot that follows the activity. ' +
-    'For several activities, they are laid end to end; off unless switched on.',
   'totals-card':
     'After the replay, a few seconds of totals: activities, kilometers, hours moving and ' +
     'meters climbed. On for Recap.',
@@ -352,8 +338,6 @@ export function adjustSettings(adjustments: Adjustments, count: ActivityCount): 
     if (ADJUST_GROUPS.includes(setting.group)) settings[setting.name] = value;
   }
   if (preset !== 'custom') settings['preset'] = preset;
-  // The title switched off is an empty title; the text written stays for switching it on.
-  if (adjustments[SHOW_TITLE] === false) settings['title'] = '';
   return settings;
 }
 
@@ -361,32 +345,24 @@ const STORAGE_KEY = 'wornways-adjustments';
 
 /** The adjustments made on an earlier visit; none when there are none or storage is off. */
 export function loadAdjustments(): Adjustments {
+  let stored: unknown = {};
   try {
-    const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '{}') as unknown;
-    return stored && typeof stored === 'object' ? fromEarlierVersions(stored as Adjustments) : {};
+    stored = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '{}');
   } catch {
-    return {};
+    // Unreadable, or no storage: a fresh start.
   }
+  return fromEarlierVersions(stored && typeof stored === 'object' ? (stored as Adjustments) : {});
 }
-/** Marks adjustments saved by the app with its five steps. */
-const SAVED_WITH = 'saved-with';
-const FIVE_STEPS = 'five-steps';
-const SEPARATE_PLAYBACK = 'separate-playback';
-
 /**
- * Older drafts share playback settings across selection sizes. Copy those values into
- * both sets to preserve how each one plays.
+ * Marks the adjustments saved by this version of the app. Adjustments saved by an earlier one
+ * are not carried over: the app starts afresh instead, as its settings have changed.
  */
+const SAVED_WITH = 'saved-with';
+const THIS_VERSION = 'widgets';
+
+/** The adjustments as stored, when this version saved them; else a fresh start. */
 export function fromEarlierVersions(adjustments: Adjustments): Adjustments {
-  if (adjustments[SAVED_WITH] === SEPARATE_PLAYBACK) return adjustments;
-  const migrated: Adjustments = { ...adjustments, [SAVED_WITH]: SEPARATE_PLAYBACK };
-  if (adjustments[SAVED_WITH] !== FIVE_STEPS) {
-    delete migrated['preset-one'];
-    delete migrated.preset;
-  }
-  for (const name of PLAYBACK_SETTINGS)
-    if (adjustments[name] !== undefined) migrated[adjustmentKey(name, 'one')] = adjustments[name];
-  return migrated;
+  return adjustments[SAVED_WITH] === THIS_VERSION ? adjustments : { [SAVED_WITH]: THIS_VERSION };
 }
 export function saveAdjustments(adjustments: Adjustments): void {
   try {

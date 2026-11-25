@@ -168,12 +168,6 @@ export async function prepareReplay(
     countLabel: words.count,
     movingLabel: words.moving,
     overlay: single ? 'single' : undefined,
-    metrics: settings.metrics ? (settings.metricsFields ?? undefined) : [],
-    metricsPosition: settings.metricsPosition,
-    // Text already scales with the frame size; these are the settings on top.
-    titlePosition: settings.titlePosition,
-    titleScale: settings.titleSize / 100,
-    metricsScale: settings.metricsSize / 100,
     widgets: settings.widgets ?? undefined,
     hideWidgets: options.hideWidgets,
     endPause: settings.endPause,
@@ -182,8 +176,6 @@ export async function prepareReplay(
     totalsWidgets: settings.totalsWidgets ?? undefined,
     hideTotalsWidgets: options.hideTotalsWidgets,
     watermark: settings.watermark,
-    // Left to the video: on for a single activity, off for several.
-    elevationProfile: settings.elevationProfile ?? tracks.length === 1,
     onlyFrame,
   });
   return { renderer, plan, title, width, height, fps, camera, cameraMode, map };

@@ -29,25 +29,23 @@ describe('adjustSettings', () => {
     });
   });
 
-  it('passes on the title and the values from the Text step', () => {
+  it('passes on the widgets, over the replay and on the totals card', () => {
+    expect(
+      adjustSettings({ widgets: 'distance@20,88', 'totals-widgets': 'text@50,40' }, 'several'),
+    ).toEqual({
+      preset: 'all-at-once',
+      widgets: 'distance@20,88',
+      'totals-widgets': 'text@50,40',
+    });
+  });
+
+  it('leaves out settings of earlier versions', () => {
     expect(
       adjustSettings(
         { title: '', 'title-position': 'bottom-right', 'metrics-size': '120' },
         'several',
       ),
-    ).toEqual({
-      preset: 'all-at-once',
-      title: '',
-      'title-position': 'bottom-right',
-      'metrics-size': '120',
-    });
-  });
-
-  it('gives no title when the title is switched off, and keeps its text for later', () => {
-    expect(adjustSettings({ title: 'Spring', 'show-title': false }, 'several')).toMatchObject({
-      title: '',
-    });
-    expect(adjustSettings({ title: 'Spring' }, 'several')).toMatchObject({ title: 'Spring' });
+    ).toEqual({ preset: 'all-at-once' });
   });
 
   it('leaves out settings chosen elsewhere', () => {
@@ -223,19 +221,14 @@ describe('presets', () => {
     });
   });
 
-  it('starts settings saved by earlier versions again from the first preset', () => {
-    expect(
-      fromEarlierVersions({ preset: 'custom', 'preset-one': 'custom', camera: 'fixed' }),
-    ).toEqual({
-      camera: 'fixed',
-      'one-camera': 'fixed',
-      'saved-with': 'separate-playback',
+  it('starts afresh from settings saved by an earlier version, and keeps its own', () => {
+    expect(fromEarlierVersions({ preset: 'custom', camera: 'fixed' })).toEqual({
+      'saved-with': 'widgets',
     });
-    const now = { preset: 'custom', camera: 'fixed', 'saved-with': 'five-steps' };
-    expect(fromEarlierVersions(now)).toEqual({
-      ...now,
-      'one-camera': 'fixed',
-      'saved-with': 'separate-playback',
+    expect(fromEarlierVersions({ camera: 'fixed', 'saved-with': 'separate-playback' })).toEqual({
+      'saved-with': 'widgets',
     });
+    const now = { preset: 'custom', camera: 'fixed', 'saved-with': 'widgets' };
+    expect(fromEarlierVersions(now)).toEqual(now);
   });
 });

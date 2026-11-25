@@ -119,28 +119,15 @@ Trimmed exports default to the filename `replay.mp4`.
 
 ### Look
 
-| Setting           | CLI flag                                         | Values                                                                 | Default                                   |
-| ----------------- | ------------------------------------------------ | ---------------------------------------------------------------------- | ----------------------------------------- |
-| Camera            | `--camera`                                       | `zoom`, `fixed` or `follow`                                            | `zoom`                                    |
-| Street map        | `--map` / `--no-map`                             | on/off                                                                 | on                                        |
-| Elevation profile | `--elevation-profile` / `--no-elevation-profile` | on/off                                                                 | on for a single activity, off for several |
-| Frame size        | `--size`                                         | `WxH`, presets: story 1080x1920, square 1080x1080, landscape 1920x1080 | story                                     |
-| Frames per second | `--fps`                                          | 24, 30, 60                                                             | 30                                        |
+| Setting           | CLI flag             | Values                                                                 | Default |
+| ----------------- | -------------------- | ---------------------------------------------------------------------- | ------- |
+| Camera            | `--camera`           | `zoom`, `fixed` or `follow`                                            | `zoom`  |
+| Street map        | `--map` / `--no-map` | on/off                                                                 | on      |
+| Frame size        | `--size`             | `WxH`, presets: story 1080x1920, square 1080x1080, landscape 1920x1080 | story   |
+| Frames per second | `--fps`              | 24, 30, 60                                                             | 30      |
 
 In the Frame section, choose a frame preset or enter a custom size such as `640x480`. Both
 dimensions must be positive even numbers. Available encoder sizes depend on the device.
-
-The elevation profile is the climb along the bottom of the frame, between the side margins
-and just above the map credit, over the distance from start to finish. It is on by default
-for a single activity and off for several, where switching it on lays the activities end to
-end in date order on one height scale (a trip's days side by side), with a thin tick where
-one ends and the next begins. Each activity's part is orange as far as it has been drawn,
-the rest faint, and a glowing dot moves along the line with each activity being drawn; with
-several activities a dot fades once its activity finishes, as the route's head does. An
-activity without recorded elevation is bridged by a straight line between the heights
-around it; with no elevation at all there is no profile. A profile that rises less than
-60 m is drawn against a 60 m range, so flat looks flat. The metrics card and the title,
-when they sit at the bottom, go above it.
 
 The follow camera tracks the moving end of the route and pulls back to show the whole
 replay at the end. Each activity gets a zoom suited to its pace, and the camera widens
@@ -155,41 +142,36 @@ activity to the next every few frames.
 What is drawn over the replay is a list of widgets, each centered on a point of the frame
 (percent across and down) at a size (50 to 250%, 100 when left out), drawn in order:
 
-| Setting | CLI flag    | Values                                                | Default                                                |
-| ------- | ----------- | ----------------------------------------------------- | ------------------------------------------------------ |
-| Widgets | `--widgets` | `name@x,y,size` items separated by `;`; `""` for none | made from the title, metrics card and profile settings |
+| Setting | CLI flag    | Values                                                | Default                                                                             |
+| ------- | ----------- | ----------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| Title   | `--title`   | text, empty for none                                  | made from the selection                                                             |
+| Widgets | `--widgets` | `name@x,y,size` items separated by `;`; `""` for none | the title, the values that suit the video, and for one activity the elevation chart |
 
 A name is `text` (with its own text as `text:"Mallorca"`, else the title), any value of the
-metrics card below (its number with a few words under it), or `elevation-chart`. For
-example `text@50,6;distance@25,85,120;count@60,85;elevation-chart@50,94`.
+table below (its number with a few words under it), or `elevation-chart`. For example
+`text@50,6;distance@25,85,120;count@60,85;elevation-chart@50,94`. The title is also the one
+on the totals card.
 
-Without `--widgets`, the title, metrics card and elevation profile settings below say what
-is drawn: the title where its position puts it, the first value large where the card's
-position puts it and the others smaller in a row under it, and the elevation chart along
-the bottom.
+Without `--widgets`, a video starts with the title at the top in the middle; the values
+that suit it at the bottom left, the first large and the others smaller in a row under it
+(one activity: time, distance, date; a race: time, count, distance; in turn: date, count,
+distance); and for a single activity with recorded elevation, the elevation chart along the
+bottom, with the values above it.
 
-### Title
+The elevation chart is the climb over the distance from start to finish. For several
+activities it lays them end to end in date order on one height scale (a trip's days side by
+side), with a thin tick where one ends and the next begins. Each activity's part is orange
+as far as it has been drawn, the rest faint, and a glowing dot moves along the line with
+each activity being drawn; with several activities a dot fades once its activity finishes,
+as the route's head does. An activity without recorded elevation is bridged by a straight
+line between the heights around it; with no elevation at all there is no chart. A climb of
+less than 60 m is drawn against a 60 m range, so flat looks flat.
 
-| Setting        | CLI flag           | Values                                                                                                           | Default                 |
-| -------------- | ------------------ | ---------------------------------------------------------------------------------------------------------------- | ----------------------- |
-| Title          | `--title`          | text, empty for none                                                                                             | made from the selection |
-| Title position | `--title-position` | `top-`, `middle-` or `bottom-` with `left`, `center` or `right`, e.g. `middle-center`, or a point, e.g. `50%,8%` | `top-center`            |
-| Title size     | `--title-size`     | 50–200%                                                                                                          | 100%                    |
+### Values
 
-Where the title would meet the metrics card at a named position (the same edge, and the same
-side or either in the middle), the two stack, the title first.
-
-A point is a place on the frame, in percent of its width across and of its height down. The
-block lines up with it by the third of the frame the point falls in: across, its left edge,
-its middle or its right edge; down, its top, its middle or its bottom. So `7%,5%` puts the
-top-left corner of the title near the top-left corner of the frame, and `50%,50%` centers it.
-A block placed at a point stays there, also over another block. The metrics card takes points the same way.
-
-### Metrics card
-
-The values shown over the map: the first one large, the others on a line under it that
-wraps when the frame is too narrow. A single-activity video shows live values as the
-activity plays; a video of several activities shows running totals.
+What a value widget can show. A single-activity video shows live values as the activity
+plays; a video of several activities shows running totals. A value the video cannot show is
+left out.
 
 | Value            | One activity                       | Race (all at once)           | In turn (groups)             | Totals card                    |
 | ---------------- | ---------------------------------- | ---------------------------- | ---------------------------- | ------------------------------ |
@@ -239,24 +221,13 @@ The values come from:
 Strava and Ride with GPS tracks downloaded before these values were kept show none until they
 are downloaded again.
 
-Unless picked, the video shows what suits it (one activity: time, distance, date; a race:
-time, count, distance; in turn: date, count, distance) and the totals card its first four
-values.
-
-| Setting   | CLI flag                     | Values                                                                                                           | Default              |
-| --------- | ---------------------------- | ---------------------------------------------------------------------------------------------------------------- | -------------------- |
-| Show card | `--metrics` / `--no-metrics` | on/off                                                                                                           | on                   |
-| Values    | `--metrics-fields`           | comma-separated, in the order shown: any value of the table above                                                | what suits the video |
-| Position  | `--metrics-position`         | `top-`, `middle-` or `bottom-` with `left`, `center` or `right`, e.g. `middle-center`, or a point, e.g. `7%,88%` | `bottom-left`        |
-| Card size | `--metrics-size`             | 50–200%                                                                                                          | 100%                 |
-
 ### Totals card
 
 For a video of several activities: after the replay, 3.4 s more, before the end card. The
 finished map dims, the video's title comes in with a short orange rule under it, and the
 totals count up, by default the activities (named after the one sport shown, such as
-rides), the kilometers, the hours moving and the meters climbed. Each total is the value the
-metrics card shows at the end of the replay.
+rides), the kilometers, the hours moving and the meters climbed. Each total is the value a
+value widget shows at the end of the replay (see Values).
 
 What it shows is a list of widgets, written as the widgets over the replay are (see
 Widgets): text, which without its own text shows the title, and totals for every activity,
@@ -293,8 +264,8 @@ last frame, not the card; its playable draft has the card.
 
 The watermark: the small mark and name, a little faint, at the bottom left on the map
 credit's line, as far from the edge as the credit is on the right, on every frame of the
-replay. Nothing else is drawn on that line, so it never meets the title, the metrics card
-or the credit.
+replay. The widgets a video starts with stay above that line, so they do not meet it or the
+credit.
 
 | Setting        | CLI flag                         | Values | Default |
 | -------------- | -------------------------------- | ------ | ------- |
@@ -309,8 +280,6 @@ or the credit.
 
 ## Left out on purpose
 
-- A choice of layouts for the metrics card: the line under the large value wraps on its
-  own, which covers narrow frames and large text.
 - Acceleration through the video (later groups played faster than earlier ones): groups
   keep a steady pace, so grouping, time share and overlap say all there is to it.
 - Day numbers ("Day 1, Day 2…") for trips: a day grouping labels days with their dates.

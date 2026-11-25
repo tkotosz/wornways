@@ -9,7 +9,7 @@
 // `text:"Mallorca"@50,8;distance@20,88,120;elevation-chart@50,93`. A text widget without
 // its own text shows the video's title.
 
-import type { Metric, Placement } from './render.ts';
+import type { Metric } from './render.ts';
 
 export type Widget = { x: number; y: number; size: number } & (
   | { kind: 'text'; text: string | null }
@@ -112,22 +112,13 @@ export function widgetsText(widgets: Widget[]): string {
 export type Measure = (widget: Widget) => { width: number; height: number };
 
 /**
- * The widgets a video starts with when none are set: what the title, the metrics card and
- * the elevation profile settings describe. The title where its position puts it; the first
- * metric large and the others smaller in a row under it, where the card's position puts
- * them; the elevation chart along the bottom. Where the title and the values would meet,
- * they stack, the title first. `measure` gives each widget's size on the finished picture.
+ * The widgets a video starts with when none are set: the title at the top, in the middle; the
+ * values at the bottom left, the first large and the others smaller in a row under it; the
+ * elevation chart along the bottom, with the values above it. `metrics` are the values in
+ * order; `measure` gives each widget's size on the finished picture.
  */
 export function startingWidgets(
-  options: {
-    title: boolean;
-    titlePosition: Placement;
-    titleSize: number;
-    metrics: Metric[];
-    metricsPosition: Placement;
-    metricsSize: number;
-    elevationChart: boolean;
-  },
+  options: { title: boolean; metrics: Metric[]; elevationChart: boolean },
   measure: Measure,
 ): Widget[] {
   const margin = 7;
@@ -138,101 +129,37 @@ export function startingWidgets(
   /** The lowest the bottom row's text may reach: above the chart when it shows. */
   const floor = options.elevationChart ? chart.y - (chartSize.height * 100) / 2 - 2.5 : 93;
 
-  /** Where a block `width` wide (percent) starts across, on the side a position names. */
-  const leftEdge = (place: Placement, width: number) => {
-    if (typeof place !== 'string') return place.x - width / 2;
-    if (place.endsWith('left')) return margin;
-    if (place.endsWith('right')) return 100 - margin - width;
-    return 50 - width / 2;
-  };
-  const rowOf = (place: Placement) =>
-    typeof place !== 'string'
-      ? 'free'
-      : place.startsWith('top')
-        ? 'top'
-        : place.startsWith('middle')
-          ? 'middle'
-          : 'bottom';
-
-  // The title, as one block.
-  const title: Widget | null = options.title
-    ? { kind: 'text', text: null, x: 0, y: 0, size: options.titleSize }
-    : null;
-  const titleBox = title ? measure(title) : { width: 0, height: 0 };
-  const titleW = titleBox.width * 100;
-  const titleH = titleBox.height * 100;
-
-  // The values: the first large, the others in a row under it, as one block.
-  const [first, ...rest] = options.metrics;
-  const large: Widget | null = first
-    ? { kind: 'metric', metric: first, x: 0, y: 0, size: options.metricsSize * 1.15 }
-    : null;
-  const small: Widget[] = rest.map((metric) => ({
-    kind: 'metric',
-    metric,
-    x: 0,
-    y: 0,
-    size: options.metricsSize * 0.8,
-  }));
-  const gap = 3;
-  const largeBox = large ? measure(large) : { width: 0, height: 0 };
-  const smallBoxes = small.map(measure);
-  const rowW = smallBoxes.reduce((sum, box) => sum + box.width * 100, 0) + gap * (small.length - 1);
-  const rowH = Math.max(0, ...smallBoxes.map((box) => box.height * 100));
-  const between = small.length ? 0.8 : 0;
-  const blockW = Math.max(largeBox.width * 100, rowW);
-  const blockH = largeBox.height * 100 + between + rowH;
-
-  const titleRow = rowOf(options.titlePosition);
-  const cardRow = rowOf(options.metricsPosition);
-  const stacked = !!title && !!large && titleRow !== 'free' && titleRow === cardRow;
-
-  /** The top of a block `height` tall in a row, or around a free point. */
-  const topOf = (place: Placement, height: number) => {
-    if (typeof place !== 'string') return place.y - height / 2;
-    const row = rowOf(place);
-    if (row === 'top') return top;
-    if (row === 'middle') return 50 - height / 2;
-    return floor - height;
-  };
-
-  let titleTop = title ? topOf(options.titlePosition, titleH) : 0;
-  let cardTop = large ? topOf(options.metricsPosition, blockH) : 0;
-  if (stacked) {
-    const both = titleH + 1.5 + blockH;
-    const start = topOf(options.titlePosition, both);
-    titleTop = start;
-    cardTop = start + titleH + 1.5;
-  }
-
   const widgets: Widget[] = [];
-  if (title) {
-    const left = leftEdge(options.titlePosition, titleW);
-    widgets.push({ ...title, x: left + titleW / 2, y: titleTop + titleH / 2 });
+  if (options.title) {
+    const title: Widget = { kind: 'text', text: null, x: 50, y: 0, size: 100 };
+    title.y = top + (measure(title).height * 100) / 2;
+    widgets.push(title);
   }
-  if (large) {
-    const left = leftEdge(options.metricsPosition, blockW);
-    // The large value and the row start at the block's left edge on the left, end at its
-    // right edge on the right, and are centered in the middle.
-    const side =
-      typeof options.metricsPosition === 'string' && options.metricsPosition.endsWith('left')
-        ? 'left'
-        : typeof options.metricsPosition === 'string' && options.metricsPosition.endsWith('right')
-          ? 'right'
-          : 'center';
-    const along = (width: number) =>
-      side === 'left'
-        ? left
-        : side === 'right'
-          ? left + blockW - width
-          : left + (blockW - width) / 2;
-    const largeW = largeBox.width * 100;
+
+  // The values: the first large, the others in a row under it, as one block from the left.
+  const [first, ...rest] = options.metrics;
+  if (first) {
+    const large: Widget = { kind: 'metric', metric: first, x: 0, y: 0, size: 100 * 1.15 };
+    const small: Widget[] = rest.map((metric) => ({
+      kind: 'metric',
+      metric,
+      x: 0,
+      y: 0,
+      size: 100 * 0.8,
+    }));
+    const gap = 3;
+    const largeBox = measure(large);
+    const smallBoxes = small.map(measure);
+    const rowH = Math.max(0, ...smallBoxes.map((box) => box.height * 100));
+    const between = small.length ? 0.8 : 0;
+    const blockH = largeBox.height * 100 + between + rowH;
+    const cardTop = floor - blockH;
     widgets.push({
       ...large,
-      x: along(largeW) + largeW / 2,
+      x: margin + (largeBox.width * 100) / 2,
       y: cardTop + (largeBox.height * 100) / 2,
     });
-    let x = along(rowW);
+    let x = margin;
     const rowTop = cardTop + largeBox.height * 100 + between;
     small.forEach((widget, k) => {
       const width = smallBoxes[k]!.width * 100;

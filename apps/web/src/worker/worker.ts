@@ -1,7 +1,7 @@
 // The worker: does all the heavy work so the page never freezes. It keeps the library of
 // activities and answers the page's requests (see messages.ts).
 
-import { parseSettings, SettingsError, type RenderSettings } from '@wornways/engine';
+import { parseSettings, SettingsError, type RenderSettings, type Widget } from '@wornways/engine';
 import type { ActivitySummary, Reply, Request } from '../messages.ts';
 import { DemoUnavailable, openDemo } from './demo.ts';
 import { Library } from './library.ts';
@@ -269,15 +269,11 @@ async function handle(request: Request): Promise<void> {
 self.onmessage = (event: MessageEvent<Request>) => void handle(event.data);
 
 /**
- * Whether the video shows calories: in a widget over the replay (or, without widgets set, in
- * the metrics the widgets start from), or on the totals card.
+ * Whether the video shows calories: in a widget over the replay, or on the totals card. The
+ * widgets a video starts with show none.
  */
 function showsCalories(settings: RenderSettings): boolean {
-  const overReplay = settings.widgets
-    ? settings.widgets.some((widget) => widget.kind === 'metric' && widget.metric === 'calories')
-    : settings.metrics && !!settings.metricsFields?.includes('calories');
-  const onCard = (settings.totalsWidgets ?? []).some(
-    (widget) => widget.kind === 'metric' && widget.metric === 'calories',
-  );
-  return overReplay || (settings.totalsCard && onCard);
+  const calories = (widgets: Widget[] | null) =>
+    (widgets ?? []).some((widget) => widget.kind === 'metric' && widget.metric === 'calories');
+  return calories(settings.widgets) || (settings.totalsCard && calories(settings.totalsWidgets));
 }

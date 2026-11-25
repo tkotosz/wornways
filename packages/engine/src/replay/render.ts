@@ -132,54 +132,6 @@ export const METRICS: readonly Metric[] = [
   'calories',
 ];
 
-/** Where on the frame a block of text sits: an edge, then the side or the middle. */
-export type Position =
-  | 'top-left'
-  | 'top-center'
-  | 'top-right'
-  | 'middle-left'
-  | 'middle-center'
-  | 'middle-right'
-  | 'bottom-left'
-  | 'bottom-center'
-  | 'bottom-right';
-/** Every position, row by row: the top, the middle and the bottom of the frame. */
-export const POSITIONS: readonly Position[] = [
-  'top-left',
-  'top-center',
-  'top-right',
-  'middle-left',
-  'middle-center',
-  'middle-right',
-  'bottom-left',
-  'bottom-center',
-  'bottom-right',
-];
-
-/** A point of the frame: percent of its width across and of its height down, 0 to 100. */
-export type FramePoint = { x: number; y: number };
-
-/**
- * Where a block of text sits: one of the nine named positions, where blocks in the same
- * place stack, or a point of the frame. A block placed at a point lines up with it by the
- * third of the frame the point falls in: across, its left edge, its middle or its right
- * edge; down, its top, its middle or its bottom. It stays where it was put, also over
- * another block.
- */
-export type Placement = Position | FramePoint;
-
-/** Reads a point written as "x%,y%" ("50%,8%"; the percent signs may be left out). */
-export function parseFramePoint(text: string): FramePoint | null {
-  const match = /^\s*(\d+(?:\.\d+)?)%?\s*,\s*(\d+(?:\.\d+)?)%?\s*$/.exec(text);
-  if (!match) return null;
-  const [x, y] = [Number(match[1]), Number(match[2])];
-  return x <= 100 && y <= 100 ? { x, y } : null;
-}
-
-/** A point written the way `parseFramePoint` reads it, to one decimal: "50%,8.5%". */
-export const framePointText = (point: FramePoint) =>
-  `${Number(point.x.toFixed(1))}%,${Number(point.y.toFixed(1))}%`;
-
 /** A box of the frame, in fractions of its width and height, 0 to 1. */
 export type FrameBox = { x: number; y: number; width: number; height: number };
 
@@ -225,17 +177,9 @@ export type RenderOptions = {
   /** "single": one activity with its own elapsed time and distance as live stats. */
   overlay?: 'auto' | 'single';
   /**
-   * The values of the metrics card in order, the first one large; empty: no card. A value
-   * the video cannot show is left out: pace exists for a single activity only, count for
-   * several activities only, the date not when all play at once, elevation only when
-   * recorded. Default: what suits the video (see `defaultMetrics`).
-   */
-  metrics?: Metric[];
-  /**
-   * What is drawn over the replay (see widgets.ts). Without it, the widgets the title, the
-   * metrics and the elevation profile options describe: the title where `titlePosition`
-   * puts it, the first metric large and the others smaller under it where
-   * `metricsPosition` puts them, the profile along the bottom.
+   * What is drawn over the replay (see widgets.ts). Without it, the title at the top, the
+   * values that suit the video at the bottom left (see `defaultMetrics`; a value the video
+   * cannot show is left out), and for a single activity the elevation chart along the bottom.
    */
   widgets?: Widget[];
   /**
@@ -243,14 +187,6 @@ export type RenderOptions = {
    * editor that draws them over the still itself, so they move without a redraw.
    */
   hideWidgets?: boolean;
-  /** Where the metrics start, without `widgets`; default bottom-left. */
-  metricsPosition?: Placement;
-  /** Where the title sits; default top-center. */
-  titlePosition?: Placement;
-  /** Scales the title; default 1. */
-  titleScale?: number;
-  /** Scales the metrics card; default 1. */
-  metricsScale?: number;
   /**
    * The one frame of the replay that will be drawn, after `skipTo` it: the zoom levels it
    * does not show are not set up, and drawing any other frame is an error.
@@ -274,12 +210,6 @@ export type RenderOptions = {
   hideTotalsWidgets?: boolean;
   /** Draw the small Wornways mark on the map credit's line. Default false. */
   watermark?: boolean;
-  /**
-   * The activities' climb profile along the bottom, end to end, with a dot moving along
-   * each one being drawn; left out when none has elevation. Text at the bottom goes above
-   * it. Default false.
-   */
-  elevationProfile?: boolean;
   fontFamily?: string;
   /** BCP 47 locale for the date counter. */
   locale?: string;
@@ -722,18 +652,14 @@ export function createRenderer(
 
   /** Each value as it stands at the end of the replay, for laying widgets out. */
   const finalValues = metricValues(timeline.duration, finished());
-  /** The widgets set, else the ones the title, metrics and profile settings describe. */
+  /** The widgets set, else the ones a video starts with. */
   const widgets: Widget[] =
     options.widgets ??
     startingWidgets(
       {
         title: !!options.title,
-        titlePosition: options.titlePosition ?? 'top-center',
-        titleSize: clamp((options.titleScale ?? 1) * 100, WIDGET_SIZE.min, WIDGET_SIZE.max),
-        metrics: (options.metrics ?? defaultMetrics(kind)).filter((m) => finalValues.has(m)),
-        metricsPosition: options.metricsPosition ?? 'bottom-left',
-        metricsSize: clamp((options.metricsScale ?? 1) * 100, 70, 200),
-        elevationChart: !!options.elevationProfile && hasElevation,
+        metrics: defaultMetrics(kind).filter((m) => finalValues.has(m)),
+        elevationChart: kind === 'single' && hasElevation,
       },
       (widget) => {
         const { width, height } = widgetPixels(widget, finalValues);

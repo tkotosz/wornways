@@ -142,10 +142,9 @@ list.
    - **Overlay:** what is drawn over the replay, as widgets arranged on the still the way
      stickers are in a story editor: text (at first the title), one value each (a metric:
      its number large with a few words under it, "1,147 km" over "distance"), and the
-     elevation chart (when an activity recorded elevation). A video starts with the widgets
-     the title, metrics and elevation profile settings describe: the title at the top, the
-     first value large at the bottom left with the others smaller in a row under it, and,
-     for a single activity, the chart along the bottom. Each widget is centered on its point
+     elevation chart (when an activity recorded elevation). A video starts with the title at
+     the top, the values that suit it at the bottom left (the first large, the others
+     smaller in a row under it), and, for a single activity, the chart along the bottom. Each widget is centered on its point
      of the frame, so it keeps its place while its value changes during the replay; text has
      a soft shadow around its letters, so it reads on a busy map without darkening the
      frame. In Overlay the still is drawn without the widgets (the engine lays them out and

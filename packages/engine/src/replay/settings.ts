@@ -10,7 +10,7 @@ import { END_CARD_S } from './end-card.ts';
 import { TOTALS_CARD_S, TOTALS_FIELDS } from './totals-card.ts';
 import { PRESETS, PRESET_NAMES, type Preset } from './presets.ts';
 import type { Grouping } from './plans.ts';
-import { METRICS, POSITIONS, parseFramePoint, type Metric, type Placement } from './render.ts';
+import { METRICS } from './render.ts';
 import { parseWidgets, type Widget } from './widgets.ts';
 
 export type RenderSettings = {
@@ -58,35 +58,17 @@ export type RenderSettings = {
   // Look
   camera: 'zoom' | 'fixed' | 'follow';
   map: boolean;
-  /**
-   * Whether the video shows the activities' climb profile along the bottom; null: on for a
-   * single activity, off for several.
-   */
-  elevationProfile: boolean | null;
   width: number;
   height: number;
   fps: number;
 
-  // Title
-  /** null: a title made from the selection; empty: no title. */
-  title: string | null;
-  titlePosition: Placement;
-  /** Size of the title in percent of the normal size. */
-  titleSize: number;
-
-  // Metrics card
-  /** Whether the values over the map are shown. */
-  metrics: boolean;
-  /** The values in order, the first one large; null: what suits the video. */
-  metricsFields: Metric[] | null;
-  metricsPosition: Placement;
-  /** Size of the metrics card in percent of the normal size. */
-  metricsSize: number;
-
+  // What is drawn
   /**
-   * What is drawn over the replay; null: the widgets the title, metrics and elevation
-   * profile settings describe.
+   * The video's title, which a text widget without its own text shows, over the replay and
+   * on the totals card; null: a title made from the selection; empty: no title.
    */
+  title: string | null;
+  /** What is drawn over the replay; null: the widgets a video starts with. */
   widgets: Widget[] | null;
 
   /** Whether a video of several activities shows their totals after the replay. */
@@ -107,8 +89,8 @@ export type NearPlace = { place: LatLon; radius: number };
 export type SettingKind =
   | { type: 'switch' }
   | { type: 'number'; min: number; max: number; unit: string }
-  /** One of `choices`; with `points`, also a point of the frame, "x%,y%". */
-  | { type: 'choice'; choices: readonly string[]; points?: boolean }
+  /** One of `choices`. */
+  | { type: 'choice'; choices: readonly string[] }
   /** Free text; `valueName` names the value in help, e.g. "id". */
   | { type: 'text'; valueName: string }
   /** A comma-separated list; with `choices`, of those values only. `valueName` names an item in help. */
@@ -120,8 +102,7 @@ export type SettingKind =
   /** A frame size: WxH or the name of a preset. */
   | { type: 'size' };
 
-export type SettingGroup =
-  'activities' | 'timing' | 'privacy' | 'look' | 'title' | 'metrics' | 'brand';
+export type SettingGroup = 'activities' | 'timing' | 'privacy' | 'look' | 'title' | 'brand';
 
 export const GROUP_LABELS: Record<SettingGroup, string> = {
   activities: 'Which activities',
@@ -129,7 +110,6 @@ export const GROUP_LABELS: Record<SettingGroup, string> = {
   privacy: 'Replay privacy',
   look: 'Look',
   title: 'Title',
-  metrics: 'Metrics card',
   brand: 'Branding',
 };
 
@@ -364,17 +344,6 @@ export const SETTINGS: readonly SettingDefinition[] = [
     help: 'Draw the street map under the routes.',
   },
   {
-    name: 'elevation-profile',
-    label: 'Elevation profile',
-    group: 'look',
-    kind: { type: 'switch' },
-    default: null,
-    automatic: 'on for a single activity, off for several',
-    help:
-      'The climb profile along the bottom: the activities end to end, with a dot moving ' +
-      'along each one being drawn. Only with recorded elevation.',
-  },
-  {
     name: 'size',
     label: 'Frame size',
     group: 'look',
@@ -400,69 +369,6 @@ export const SETTINGS: readonly SettingDefinition[] = [
     automatic: 'made from the selection',
     help: 'Title of the video; "" for none.',
   },
-  {
-    name: 'title-position',
-    label: 'Title position',
-    group: 'title',
-    kind: { type: 'choice', choices: POSITIONS, points: true },
-    default: 'top-center',
-    help:
-      'Where the title sits: a row (top, middle or bottom) and a side, or a point of the frame ' +
-      'in percent across and down, e.g. 50%,8%. Where it would meet the metrics card at a ' +
-      'named position, the two stack, the title first. At a point it lines up by the third ' +
-      'of the frame the point is in: its left edge, middle or right edge; its top, middle or ' +
-      'bottom.',
-  },
-  {
-    name: 'title-size',
-    label: 'Title size',
-    group: 'title',
-    kind: { type: 'number', min: 50, max: 200, unit: '%' },
-    default: '100',
-    help: 'Size of the title, in percent of the normal size.',
-  },
-
-  {
-    name: 'metrics',
-    label: 'Show card',
-    group: 'metrics',
-    kind: { type: 'switch' },
-    default: true,
-    help: 'Show the metrics card: the values over the map.',
-  },
-  {
-    name: 'metrics-fields',
-    label: 'Values',
-    group: 'metrics',
-    kind: { type: 'list', choices: METRICS },
-    default: null,
-    automatic: 'what suits the video',
-    help:
-      `Values to show, the first one large: ${METRICS.join(', ')}. A value the video ` +
-      'cannot show is left out: start is for a single activity; count, days and longest ' +
-      'for several activities; elevation, descent and highest need recorded elevation. ' +
-      'Pace and top speed are in minutes per kilometer when every activity is on foot, else ' +
-      'km/h; top speed is the fastest over 10 s. Heart rate, power, cadence, temperature and ' +
-      'calories need an activity that recorded them; cadence is steps per minute on foot.',
-  },
-  {
-    name: 'metrics-position',
-    label: 'Position',
-    group: 'metrics',
-    kind: { type: 'choice', choices: POSITIONS, points: true },
-    default: 'bottom-left',
-    help:
-      'Where the metrics card sits: a row (top, middle or bottom) and a side, or a point of ' +
-      'the frame in percent across and down, e.g. 7%,88%, lined up as the title is.',
-  },
-  {
-    name: 'metrics-size',
-    label: 'Card size',
-    group: 'metrics',
-    kind: { type: 'number', min: 50, max: 200, unit: '%' },
-    default: '100',
-    help: 'Size of the metrics card, in percent of the normal size.',
-  },
 
   {
     name: 'widgets',
@@ -470,14 +376,20 @@ export const SETTINGS: readonly SettingDefinition[] = [
     group: 'look',
     kind: { type: 'text', valueName: 'widgets' },
     default: null,
-    automatic: 'the title, the metrics and the elevation profile as set',
+    automatic:
+      'the title at the top, the values that suit the video at the bottom left, and for a ' +
+      'single activity the elevation chart along the bottom',
     help:
       'What is drawn over the replay, each widget centered on a point in percent across and ' +
       'down, with a size in percent (50 to 250, 100 when left out), separated by ";": ' +
-      'text:"Your text"@x,y,size (text@x,y for the title), a value such as distance@x,y,size ' +
-      '(any value of --metrics-fields), or elevation-chart@x,y,size. Later widgets are drawn ' +
-      'over earlier ones. "" draws none. Without it, the title, the metrics card and the ' +
-      'elevation profile settings say what is drawn.',
+      'text:"Your text"@x,y,size (text@x,y for the title), a value such as distance@x,y,size, ' +
+      'or elevation-chart@x,y,size. Later widgets are drawn over earlier ones; "" draws none. ' +
+      `The values: ${METRICS.join(', ')}. A value the video cannot show is left out: start is ` +
+      'for a single activity; count, days and longest for several activities; elevation, ' +
+      'descent and highest need recorded elevation. Pace and top speed are in minutes per ' +
+      'kilometer when every activity is on foot, else km/h; top speed is the fastest over ' +
+      '10 s. Heart rate, power, cadence, temperature and calories need an activity that ' +
+      'recorded them; cadence is steps per minute on foot.',
   },
   {
     name: 'totals-card',
@@ -629,13 +541,6 @@ export function parseSettings(input: SettingsInput): RenderSettings {
     if (typeof value !== 'boolean') throw new SettingsError(name, 'is a switch and takes no value');
     return value;
   };
-  /** A switch with no fixed default: on, off, or null to leave it to the video. */
-  const optionalFlag = (name: string): boolean | null => {
-    const value = valueOf(name);
-    if (value === null) return null;
-    if (typeof value !== 'boolean') throw new SettingsError(name, 'is a switch and takes no value');
-    return value;
-  };
   const number = (name: string): number => {
     const kind = definition(name).kind;
     if (kind.type !== 'number') throw new Error(`"${name}" is not a number setting`);
@@ -661,20 +566,6 @@ export function parseSettings(input: SettingsInput): RenderSettings {
     } catch (error) {
       throw new SettingsError(name, error instanceof Error ? error.message : String(error));
     }
-  };
-  /** A named position, or a point of the frame. */
-  const placement = (name: string): Placement => {
-    const kind = definition(name).kind;
-    if (kind.type !== 'choice' || !kind.points)
-      throw new Error(`"${name}" is not a placement setting`);
-    const value = text(name) ?? '';
-    if (kind.choices.includes(value)) return value as Placement;
-    const point = parseFramePoint(value);
-    if (point) return point;
-    throw new SettingsError(
-      name,
-      `expects ${kind.choices.join(' or ')}, or a point such as 50%,8%, got "${value}"`,
-    );
   };
   const choice = <T extends string>(name: string): T => {
     const kind = definition(name).kind;
@@ -723,23 +614,6 @@ export function parseSettings(input: SettingsInput): RenderSettings {
   if (minDistanceKm !== null && maxDistanceKm !== null && minDistanceKm > maxDistanceKm)
     throw new SettingsError('max-distance', 'is below the minimum distance');
 
-  /** A list of fixed values in the order given, each once; null when the list is not given. */
-  const choiceList = <T extends string>(name: string): T[] | null => {
-    const kind = definition(name).kind;
-    if (kind.type !== 'list' || !kind.choices)
-      throw new Error(`"${name}" is not a list of choices`);
-    const listText = text(name);
-    if (listText === null) return null;
-    const values = listText.split(',').map((value) => value.trim().toLowerCase());
-    const unknown = values.find((value) => !kind.choices!.includes(value));
-    if (listText.trim() === '' || unknown !== undefined)
-      throw new SettingsError(
-        name,
-        `expects values from ${kind.choices.join(', ')}, got "${unknown ?? listText}"`,
-      );
-    return [...new Set(values)] as T[];
-  };
-
   /** A place filter: its place and radius, or null when no place is given. */
   const near = (place: string, radius: string): NearPlace | null => {
     const placeText = text(place);
@@ -769,17 +643,10 @@ export function parseSettings(input: SettingsInput): RenderSettings {
     trimRadius: number('trim-radius'),
     camera: choice<RenderSettings['camera']>('camera'),
     map: flag('map'),
-    elevationProfile: optionalFlag('elevation-profile'),
     title: text('title'),
-    titlePosition: placement('title-position'),
-    titleSize: number('title-size'),
     width,
     height,
     fps: Number(choice('fps')),
-    metrics: flag('metrics'),
-    metricsFields: choiceList<Metric>('metrics-fields'),
-    metricsPosition: placement('metrics-position'),
-    metricsSize: number('metrics-size'),
     widgets: widgetList('widgets', METRICS, true),
     totalsCard: flag('totals-card'),
     totalsWidgets: widgetList('totals-widgets', TOTALS_FIELDS, false),

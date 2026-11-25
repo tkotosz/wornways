@@ -33,18 +33,11 @@ describe('parseSettings', () => {
       trimRadius: 0,
       camera: 'zoom',
       map: true,
-      elevationProfile: null,
       title: null,
       width: 1080,
       height: 1920,
       fps: 30,
-      metrics: true,
-      metricsFields: null,
-      metricsPosition: 'bottom-left',
-      titlePosition: 'top-center',
       widgets: null,
-      titleSize: 100,
-      metricsSize: 100,
       totalsCard: false,
       totalsWidgets: null,
       endCard: true,
@@ -144,33 +137,15 @@ describe('parseSettings', () => {
     [{ fps: '25' }, 'fps: expects 24 or 30 or 60, got "25"'],
     [{ speed: '2000' }, 'speed: is not a setting'],
     [{ activity: ' , ' }, 'activity: expects activity ids separated by commas'],
+    [{ 'metrics-fields': 'time' }, 'metrics-fields: is not a setting'],
+    [{ 'title-position': 'top-left' }, 'title-position: is not a setting'],
+    [{ 'elevation-profile': true }, 'elevation-profile: is not a setting'],
     [
-      { 'metrics-fields': 'time,speed' },
-      'metrics-fields: expects values from time, moving, distance, pace, top-speed, elevation, descent, highest, date, start, count, days, longest, heart-rate, max-heart-rate, power, cadence, temperature, calories, got "speed"',
+      { widgets: 'speed@50,50' },
+      'widgets: "speed" is not a widget: text, elevation-chart or one of time, moving, distance, pace, top-speed, elevation, descent, highest, date, start, count, days, longest, heart-rate, max-heart-rate, power, cadence, temperature, calories at character 12',
     ],
-    [
-      { 'metrics-position': 'center' },
-      'metrics-position: expects top-left or top-center or top-right or middle-left or middle-center or middle-right or bottom-left or bottom-center or bottom-right, or a point such as 50%,8%, got "center"',
-    ],
-    [
-      { 'title-position': '120%,8%' },
-      'title-position: expects top-left or top-center or top-right or middle-left or middle-center or middle-right or bottom-left or bottom-center or bottom-right, or a point such as 50%,8%, got "120%,8%"',
-    ],
-    [{ 'metrics-size': '300' }, 'metrics-size: expects a number from 50 to 200, got "300"'],
   ])('rejects %j', (input, message) => {
     expect(errorOf(input)).toBe(message);
-  });
-
-  it('reads a position as a name or as a point of the frame, in percent', () => {
-    expect(parseSettings({ 'title-position': 'bottom-right' }).titlePosition).toBe('bottom-right');
-    expect(parseSettings({ 'title-position': '50%,8.5%' }).titlePosition).toEqual({
-      x: 50,
-      y: 8.5,
-    });
-    expect(parseSettings({ 'metrics-position': ' 7, 88 ' }).metricsPosition).toEqual({
-      x: 7,
-      y: 88,
-    });
   });
 
   it('reads a list of activity ids', () => {
@@ -186,13 +161,6 @@ describe('parseSettings', () => {
       minDistanceKm: null,
       maxDistanceKm: 0,
     });
-  });
-
-  it('reads the metrics card values in the order given', () => {
-    const settings = parseSettings({ 'metrics-fields': 'Distance, time,distance', metrics: false });
-
-    expect(settings.metricsFields).toEqual(['distance', 'time']);
-    expect(settings.metrics).toBe(false);
   });
 
   it('takes a radius of up to 20 km around a place', () => {
