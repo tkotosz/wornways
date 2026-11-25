@@ -9,31 +9,23 @@
 // Wide screens: the section bar on top, the preview beside the settings; the page scrolls.
 // Phones: a full editor screen that does not scroll, as photo and video editors are laid
 // out: the step bar on top; the preview takes most of the screen; under it, the open
-// section's settings, one group at a time in a panel of fixed height; the sections along the
-// bottom.
+// section's settings as a list in a panel of fixed height, each row opening its setting in a
+// sheet; the sections along the bottom.
 import type { SettingsInput } from '@wornways/engine';
 import { computed, onBeforeUnmount, ref } from 'vue';
-import {
-  PANEL_TABS,
-  PLAYBACK_PARTS,
-  SECTIONS,
-  countOf,
-  panelOffered,
-  type Adjustments,
-  type PlaybackPart,
-  type Section,
-} from '../adjust.ts';
+import { SECTIONS, countOf, type Adjustments, type Section } from '../adjust.ts';
 import FramePanel from '../components/FramePanel.vue';
 import OverlayEditor from '../components/OverlayEditor.vue';
 import PlaybackPanel from '../components/PlaybackPanel.vue';
 import PosterPreview from '../components/PosterPreview.vue';
+import SettingSheet from '../components/SettingSheet.vue';
 import SettingsGroups from '../components/SettingsGroups.vue';
 import StepBar from '../components/StepBar.vue';
 import StepNav from '../components/StepNav.vue';
 import type { EngineClient } from '../engine-client.ts';
 import type { PlanReport } from '../messages.ts';
 
-const props = defineProps<{
+defineProps<{
   engine: EngineClient;
   /** The settings of the whole video, for the preview. */
   settings: SettingsInput;
@@ -53,36 +45,30 @@ const onWidth = (event: MediaQueryListEvent) => (phone.value = event.matches);
 phoneQuery.addEventListener('change', onWidth);
 onBeforeUnmount(() => phoneQuery.removeEventListener('change', onWidth));
 
-/** The phone's settings panel, which scrolls by itself. */
+/** The phone's list of settings, which scrolls by itself. */
 const controls = ref<HTMLElement | null>(null);
 
 function open(id: Section): void {
   section.value = id;
+  sheet.value = null;
   window.scrollTo({ top: 0 });
   controls.value?.scrollTo({ top: 0 });
 }
 
-// In Overlay, the title and the metrics card are also arranged on the still (OverlayEditor);
-// on phones, picking one there opens its tab.
-// Phones: each section's settings in groups, a tab each: Playback in its parts, Frame in
-// one, the others by panel (those this video has).
-type Tab = { id: string; label: string };
-const tabs = computed<Tab[]>(() => {
-  if (section.value === 'frame') return [{ id: 'frame', label: 'Frame' }];
-  if (section.value === 'playback') return PLAYBACK_PARTS;
-  return current.value.panels
-    .filter((panel) => panelOffered(panel, props.plan))
-    .map((panel) => ({ id: panel, label: PANEL_TABS[panel] }));
-});
-/** The tab open in each section, kept while moving between sections. */
-const openTabs = ref<Partial<Record<Section, string>>>({});
-const tab = computed(
-  () => tabs.value.find((t) => t.id === openTabs.value[section.value]) ?? tabs.value[0]!,
-);
+// Phones: the section's settings as a list, a row each with its value; a row opens its
+// setting alone in a sheet over the list.
+const sheet = ref<{ name: string; label: string } | null>(null);
+function openSetting(name: string, label: string): void {
+  sheet.value = { name, label };
+}
 
-function openTab(id: string): void {
-  openTabs.value = { ...openTabs.value, [section.value]: id };
-  controls.value?.scrollTo({ top: 0 });
+/**
+ * In Overlay, the title and the metrics card are also arranged on the still (OverlayEditor);
+ * on phones, picking one there brings its settings into view in the list.
+ */
+function showGroup(group: string): void {
+  const heading = controls.value?.querySelector<HTMLElement>(`[data-group="${group}"]`);
+  if (heading) controls.value?.scrollTo({ top: heading.offsetTop, behavior: 'smooth' });
 }
 </script>
 
@@ -109,43 +95,57 @@ function openTab(id: string): void {
             :boxes="boxes"
             :ratio="ratio"
             @placed="placed"
-            @select="openTab"
+            @select="showGroup"
           />
         </template>
       </PosterPreview>
     </div>
 
-    <div class="tools">
-      <nav v-if="tabs.length > 1" class="tabs" :aria-label="`${current.label} settings`">
-        <button
-          v-for="t in tabs"
-          :key="t.id"
-          type="button"
-          :aria-current="t.id === tab.id ? 'true' : undefined"
-          @click="openTab(t.id)"
-        >
-          {{ t.label }}
-        </button>
-      </nav>
-      <div ref="controls" class="controls">
-        <FramePanel v-if="section === 'frame'" v-model="adjustments" compact />
-        <PlaybackPanel
-          v-else-if="section === 'playback'"
-          v-model="adjustments"
-          :activities="activities"
-          :plan="plan"
-          :part="tab.id as PlaybackPart"
-        />
-        <SettingsGroups
-          v-else
-          v-model="adjustments"
-          :groups="[current.panels.find((p) => p === tab.id) ?? current.panels[0]!]"
-          :count="countOf(activities)"
-          :plan="plan"
-          compact
-        />
-      </div>
+    <div ref="controls" class="tools" :aria-label="`${current.label} settings`" role="region">
+      <FramePanel
+        v-if="section === 'frame'"
+        v-model="adjustments"
+        view="rows"
+        @open="openSetting"
+      />
+      <PlaybackPanel
+        v-else-if="section === 'playback'"
+        v-model="adjustments"
+        :activities="activities"
+        :plan="plan"
+        view="rows"
+        @open="openSetting"
+      />
+      <SettingsGroups
+        v-else
+        v-model="adjustments"
+        :groups="current.panels"
+        :count="countOf(activities)"
+        :plan="plan"
+        view="rows"
+        @open="openSetting"
+      />
     </div>
+
+    <!-- The setting being changed, on its own. -->
+    <SettingSheet v-if="sheet" :title="sheet.label" @close="sheet = null">
+      <FramePanel v-if="section === 'frame'" v-model="adjustments" :only="sheet.name" />
+      <PlaybackPanel
+        v-else-if="section === 'playback'"
+        v-model="adjustments"
+        :activities="activities"
+        :plan="plan"
+        :only="sheet.name"
+      />
+      <SettingsGroups
+        v-else
+        v-model="adjustments"
+        :groups="current.panels"
+        :count="countOf(activities)"
+        :plan="plan"
+        :only="sheet.name"
+      />
+    </SettingSheet>
 
     <nav class="sections" aria-label="Sections">
       <button
@@ -300,41 +300,14 @@ function openTab(id: string): void {
 
 /* The open section's settings, in a panel of fixed height so the picture does not jump. */
 .tools {
+  position: relative;
   flex: none;
-  border-top: 1px solid var(--line);
-  background: var(--panel);
-}
-
-.tabs {
-  display: flex;
-  gap: 1.1rem;
-  padding: 0.5rem 1rem 0;
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-
-.tabs button {
-  flex: none;
-  padding: 0.2rem 0 0.45rem;
-  border: 0;
-  border-bottom: 2px solid transparent;
-  color: var(--muted);
-  background: none;
-  font: inherit;
-  font-size: 0.85rem;
-}
-
-.tabs button[aria-current] {
-  border-color: var(--accent);
-  color: var(--text);
-  font-weight: 600;
-}
-
-.controls {
-  height: 10.5rem;
-  padding: 0.7rem 1rem;
+  height: 12rem;
+  padding: 0.2rem 1rem 0.8rem;
   overflow-y: auto;
   overscroll-behavior: contain;
+  border-top: 1px solid var(--line);
+  background: var(--panel);
 }
 
 /* The sections along the bottom, where the thumb is. */

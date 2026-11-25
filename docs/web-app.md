@@ -96,15 +96,16 @@ actions, when there are some. Each step is one column on a phone.
    the step is a full editor screen that does not scroll, laid out like photo and video
    editors: the slim step bar on top, in place of the app's header; the preview alone,
    with no lines around it, as large as the room allows; under it the open section's
-   settings in a panel of fixed height, so the picture does not jump, with a tab for each
-   group (Playback: Style, Length, Timing, Camera; Map: Map, Privacy; Overlay: Title,
-   Metrics, Elevation, Watermark; Ending: Pause, Totals, End card) and each setting on a
-   compact row beside its label, its explanation behind an i: choices as chips on a row
-   that scrolls sideways (the presets too, with the picked one's line under them),
-   numbers as a slider with the exact value, a position as the nine squares with its name
-   beside them; the values to show open in a dialog; the five sections along the bottom,
-   with a drawing each. The settings of this
-   step are remembered for the next visit.
+   settings in a panel of fixed height, so the picture does not jump, as a list: a row
+   per setting with its value at the right ("Grouping · Day ›"), under a heading per group
+   where the section has several. A switch turns in place, and a group switched off keeps
+   only its switch. Any other row opens its setting alone in a sheet from the bottom, with
+   the top of the picture still in view and changes drawn on it as they are made: a
+   choice as an option per row, with its explanation; a number as a slider with the exact
+   value; a position as the nine squares with its name; the values to show as chips picked
+   in order; the presets as their cards. Done, Escape or a tap above the sheet closes it.
+   The five sections along the bottom, with a drawing each. The settings of this step are
+   remembered for the next visit.
    - **Frame:** the aspect ratio (Story, Square or Landscape, for where the video will be
      posted, or a custom size) and the frame rate (24, 30 or 60 fps). It comes first
      because the shape decides how everything else looks.

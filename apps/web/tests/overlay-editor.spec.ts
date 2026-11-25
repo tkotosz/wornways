@@ -74,7 +74,7 @@ test('moves and resizes the metrics card with the keyboard', async ({ page, cont
   await offlineMap(context);
   await openOverlay(page);
   const metrics = page.getByTestId('group-metrics');
-  const card = page.getByRole('button', { name: /^Metrics: drag to move it/ });
+  const card = page.getByRole('button', { name: /^Metrics on the picture/ });
 
   await card.focus();
   await page.keyboard.press('Shift+ArrowUp');
@@ -86,23 +86,17 @@ test('moves and resizes the metrics card with the keyboard', async ({ page, cont
 test.describe('on a phone', () => {
   test.use({ viewport: { width: 390, height: 780 }, isMobile: true, hasTouch: true });
 
-  test('picking a block on the still opens its settings', async ({ page, context }) => {
+  test('picking a block on the still brings its settings into view', async ({ page, context }) => {
     page.setDefaultTimeout(15_000);
     await offlineMap(context);
     await openOverlay(page);
-    const tabs = page.getByRole('navigation', { name: 'Overlay settings' });
-    await expect(tabs.getByRole('button', { name: 'Title' })).toHaveAttribute(
-      'aria-current',
-      'true',
-    );
+    const metricsSize = page.getByRole('button', { name: /^Size: / }).last();
+    await expect(metricsSize).not.toBeInViewport();
     await page.getByTestId('edit-metrics').dispatchEvent('pointerdown', {
       button: 0,
       pointerId: 1,
       isPrimary: true,
     });
-    await expect(tabs.getByRole('button', { name: 'Metrics' })).toHaveAttribute(
-      'aria-current',
-      'true',
-    );
+    await expect(page.getByRole('heading', { name: 'Metrics' })).toBeInViewport();
   });
 });

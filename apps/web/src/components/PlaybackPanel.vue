@@ -17,7 +17,6 @@ import {
   valueOf,
   withPreset,
   type Adjustments,
-  type PlaybackPart,
   type PresetChoice,
 } from '../adjust.ts';
 import ExactNumber from './ExactNumber.vue';
@@ -30,12 +29,15 @@ const props = defineProps<{
   activities: number;
   plan: PlanReport | null;
   /**
-   * Phones: one part at a time, compact: the presets on a sideways row, the length, or one
-   * of Fine-tune's groups. Without it, all of them, with Fine-tune folded.
+   * Phones: `rows` lists the style, the length and Fine-tune's settings, a row each, and
+   * `open` asks for one to be shown alone (`only`: "style", "length" or a setting's name),
+   * in a sheet. Without either, all of them, with Fine-tune folded.
    */
-  part?: PlaybackPart;
+  view?: 'rows';
+  only?: string;
 }>();
 const adjustments = defineModel<Adjustments>({ required: true });
+const emit = defineEmits<{ open: [name: string, label: string] }>();
 
 /** One activity gets its own presets; several get the others. */
 const count = computed(() => countOf(props.activities));
@@ -68,9 +70,56 @@ const fineTuneOpen = ref(false);
 </script>
 
 <template>
-  <div class="settings" :class="{ compact: part }">
-    <h2 v-if="!part" class="kicker">Playback style</h2>
-    <div v-if="!part || part === 'style'" class="presets" role="radiogroup" aria-label="Preset">
+  <!-- Phones: the list, a row per setting with its value. -->
+  <div v-if="view === 'rows'" class="setting-rows">
+    <button
+      type="button"
+      class="setting-row"
+      :aria-label="`Style: ${PRESET_LABELS[preset]}`"
+      aria-haspopup="dialog"
+      @click="emit('open', 'style', 'Style')"
+    >
+      <span>Style</span>
+      <span class="value">{{ PRESET_LABELS[preset] }}</span>
+    </button>
+    <button
+      type="button"
+      class="setting-row"
+      :aria-label="`Length: ${duration} s`"
+      aria-haspopup="dialog"
+      @click="emit('open', 'length', 'Length')"
+    >
+      <span>Length</span>
+      <span class="value">{{ duration }} s</span>
+    </button>
+    <SettingsGroups
+      v-model="tuned"
+      :groups="PLAYBACK_PANELS"
+      :count="count"
+      view="rows"
+      @open="(name, label) => emit('open', name, label)"
+    />
+    <button
+      type="button"
+      class="link reset"
+      @click="adjustments = resetPlayback(adjustments, count)"
+    >
+      Reset playback to defaults
+    </button>
+  </div>
+
+  <!-- One of Fine-tune's settings alone, in a sheet. -->
+  <SettingsGroups
+    v-else-if="only && only !== 'style' && only !== 'length'"
+    v-model="tuned"
+    :groups="PLAYBACK_PANELS"
+    :count="count"
+    :only="only"
+  />
+
+  <div v-else class="settings">
+    <h2 v-if="!only" class="kicker">Playback style</h2>
+    <div v-if="!only || only === 'style'" class="presets" role="radiogroup" aria-label="Preset">
       <button
         v-for="name in presetChoices(count)"
         :key="name"
@@ -83,50 +132,13 @@ const fineTuneOpen = ref(false);
         <PresetDrawing class="drawing" :preset="name" />
         <span class="text">
           <strong>{{ PRESET_LABELS[name] }}</strong>
-          <span v-if="!part" class="muted">{{ PRESET_LINES[name] }}</span>
+          <span class="muted">{{ PRESET_LINES[name] }}</span>
         </span>
         <span v-if="preset === name" class="check" aria-hidden="true">✓</span>
       </button>
     </div>
 
-    <!-- Phones: the picked preset's line under the row of small cards. -->
-    <p v-if="part === 'style'" class="muted small" data-testid="preset-line">
-      {{
-        preset === 'custom'
-          ? 'Your own timing and camera, set under Timing and Camera.'
-          : PRESET_LINES[preset]
-      }}
-    </p>
-
-    <!-- Phones: the length as a row like the other settings, with what the video plays. -->
-    <template v-if="part === 'length'">
-      <div class="length-row">
-        <span id="label-length" class="label">Length</span>
-        <div class="slider" role="group" aria-labelledby="label-length">
-          <input
-            type="range"
-            :min="durationRange.min"
-            :max="durationRange.max"
-            step="1"
-            :value="durationShown ?? duration"
-            aria-label="Video length"
-            @input="durationShown = Number(($event.target as HTMLInputElement).value)"
-            @change="setDuration(Number(($event.target as HTMLInputElement).value))"
-          />
-          <ExactNumber
-            label="Exact video length in seconds"
-            :min="durationRange.min"
-            :max="durationRange.max"
-            :value="durationShown ?? duration"
-            unit="s"
-            @change="setDuration"
-          />
-        </div>
-      </div>
-      <PacingLine v-if="plan" class="muted small" :plan="plan" />
-    </template>
-
-    <div v-if="!part" class="length">
+    <div v-if="!only || only === 'length'" class="length">
       <div class="length-head">
         <div>
           <strong>Video length</strong>
@@ -159,7 +171,7 @@ const fineTuneOpen = ref(false);
       />
     </div>
 
-    <div v-if="!part" class="summary" role="status">
+    <div class="summary" role="status">
       <span class="icon" aria-hidden="true">▶</span>
       <div>
         <span class="caption">Your replay</span>
@@ -171,20 +183,7 @@ const fineTuneOpen = ref(false);
       </div>
     </div>
 
-    <!-- Phones: Fine-tune's groups are tabs of their own. -->
-    <template v-if="part === 'timing' || part === 'camera'">
-      <SettingsGroups v-model="tuned" :groups="[part]" :count="count" compact />
-      <button
-        v-if="part === 'timing'"
-        type="button"
-        class="link reset"
-        @click="adjustments = resetPlayback(adjustments, count)"
-      >
-        Reset playback to defaults
-      </button>
-    </template>
-
-    <div v-if="!part" class="fine-tune">
+    <div v-if="!only" class="fine-tune">
       <button
         type="button"
         class="fine-tune-toggle"
@@ -409,70 +408,8 @@ const fineTuneOpen = ref(false);
   }
 }
 
-/* Phones, one part at a time: no boxes; the presets as chips like the other choices, on a
-   row that scrolls sideways, the picked one's line under them; the length as a row like the other settings. */
-.compact .presets {
-  display: flex;
-  gap: 0.5rem;
-  margin-bottom: 0.6rem;
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-
-.compact .preset {
-  flex: none;
-  padding: 0.35rem 0.85rem;
-  border-radius: 999px;
-  box-shadow: none;
-  color: var(--muted);
-  background: transparent;
-}
-
-.compact .preset[aria-checked='true'] {
-  color: var(--text);
-  background: rgba(255, 138, 42, 0.12);
-}
-
-.compact .drawing,
-.compact .check {
-  display: none;
-}
-
-.compact .text {
-  padding-right: 0;
-  white-space: nowrap;
-}
-
-.compact .text strong {
-  font-weight: 400;
-}
-
-.length-row {
-  display: grid;
-  grid-template-columns: 6.5rem minmax(0, 1fr);
-  gap: 0.75rem;
-  align-items: center;
-  margin-bottom: 0.6rem;
-}
-
-.length-row .label {
-  color: var(--muted);
-  font-size: 0.85rem;
-}
-
-.length-row .slider {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-}
-
-.length-row input[type='range'] {
-  flex: 1;
-  min-width: 0;
-}
-
 .reset {
   align-self: flex-start;
-  margin-top: 0.6rem;
+  margin-top: 0.8rem;
 }
 </style>

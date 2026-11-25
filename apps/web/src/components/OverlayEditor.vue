@@ -250,7 +250,7 @@ const story = computed(() => props.ratio < 0.8);
       :style="place(moving?.block === b.id ? moving.box : b.box)"
       role="button"
       tabindex="0"
-      :aria-label="`${b.label}: drag to move it; arrow keys move it, plus and minus resize it`"
+      :aria-label="`${b.label} on the picture: drag to move it; arrow keys move it, plus and minus resize it`"
       :aria-pressed="selected === b.id"
       :data-testid="`edit-${b.id}`"
       @pointerdown="start($event, b.id, b.box, false)"

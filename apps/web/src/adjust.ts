@@ -22,30 +22,6 @@ export type Adjustments = Record<string, string | boolean>;
  */
 export const SHOW_TITLE = 'show-title';
 
-/** On phones, the Playback section in parts, one at a time: its tabs. */
-export type PlaybackPart = 'style' | 'length' | 'timing' | 'camera';
-export const PLAYBACK_PARTS: { id: PlaybackPart; label: string }[] = [
-  { id: 'style', label: 'Style' },
-  { id: 'length', label: 'Length' },
-  { id: 'timing', label: 'Timing' },
-  { id: 'camera', label: 'Camera' },
-];
-
-/** On phones, the tab of each panel in its section. */
-export const PANEL_TABS: Record<Panel, string> = {
-  timing: 'Timing',
-  camera: 'Camera',
-  privacy: 'Privacy',
-  map: 'Map',
-  title: 'Title',
-  metrics: 'Metrics',
-  elevation: 'Elevation',
-  watermark: 'Watermark',
-  pause: 'Pause',
-  totals: 'Totals',
-  'end-card': 'End card',
-};
-
 /** The panels of Fine-tune playback, in the Playback section. */
 export const PLAYBACK_PANELS: Panel[] = ['timing', 'camera'];
 
