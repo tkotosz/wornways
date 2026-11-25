@@ -88,7 +88,7 @@ test('opens any section of the Design step from its bar, and leaves the step fro
 test.describe('the Design step on a phone', () => {
   test.use({ viewport: { width: 390, height: 780 }, isMobile: true, hasTouch: true });
 
-  test('is an editor screen: the preview, a list of settings and the sections below', async ({
+  test('is an editor screen: the preview, a strip of settings and the sections below', async ({
     page,
     context,
   }) => {
@@ -113,14 +113,16 @@ test.describe('the Design step on a phone', () => {
     // The preview above the settings, the sections along the bottom, nothing to scroll.
     const previewBox = (await preview.boundingBox())!;
     const sectionsBox = (await sections.boundingBox())!;
-    expect(previewBox.height).toBeGreaterThan(780 * 0.45);
+    expect(previewBox.height).toBeGreaterThan(780 * 0.6);
+    // The settings are one strip of chips, side by side.
+    const fps = page.getByRole('button', { name: 'Frame rate: 30 fps' });
+    expect((await fps.boundingBox())!.y).toBeCloseTo((await shape.boundingBox())!.y, 0);
     expect(sectionsBox.y + sectionsBox.height).toBeCloseTo(780, 0);
     const pageScrolls = () =>
       page.evaluate(() => document.documentElement.scrollHeight > window.innerHeight);
     expect(await pageScrolls()).toBe(false);
 
-    // The settings are a list with their values; a row opens its setting in a sheet, where
-    // a change shows in the list at once.
+    // A chip opens its setting in a sheet, where a change shows on the chip at once.
     await shape.click();
     const sheet = page.getByRole('dialog', { name: 'Shape' });
     await sheet.getByRole('button', { name: 'Square 1:1' }).click();

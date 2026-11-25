@@ -113,10 +113,10 @@ list.
    it sits beside the settings and the page scrolls. On phones the step is a full editor
    screen that does not scroll, laid out like photo and video editors: the slim step bar on
    top, in place of the app's header; the preview alone, with no lines around it, as large
-   as the room allows; under it the open section's settings in a panel of fixed height, so
-   the picture does not jump, as a list: a row per setting with its value at the right
-   ("Grouping · Day ›"), under a heading per group where the section has several. A switch
-   turns in place, and a group switched off keeps only its switch. Any other row opens its
+   as the room allows; under it the open section's settings as one strip of chips that
+   scrolls sideways, a chip per setting with its name small over its value ("Grouping" over
+   "Day"), so the picture keeps most of the screen. A switch turns in place on its chip, and
+   a group switched off keeps only its switch. Any other chip opens its
    setting alone in a sheet from the bottom, with the top of the picture still in view and
    changes drawn on it as they are made: a choice as an option per row, with its
    explanation; a number as a slider with the exact value; a position as the nine squares

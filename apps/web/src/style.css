@@ -196,3 +196,65 @@ button.link {
 .setting-row .value::after {
   content: ' ›';
 }
+
+/* Phones, in the Design step: the same rows as one strip of chips under the picture, which
+   scrolls sideways: a chip each, its name small over its value. A chip opens its setting; a
+   switch turns in place. The group titles are left out. */
+.setting-strip {
+  display: flex;
+  gap: 0.5rem;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+}
+
+.setting-strip::-webkit-scrollbar {
+  display: none;
+}
+
+.setting-strip .setting-rows {
+  display: contents;
+}
+
+.setting-strip .setting-rows-title {
+  display: none;
+}
+
+.setting-strip .setting-row,
+.setting-strip .reset {
+  flex: none;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 0.1rem;
+  min-height: 3.1rem;
+  margin: 0;
+  padding: 0.35rem 0.8rem 0.4rem;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel);
+}
+
+.setting-strip .setting-row > span:first-child {
+  color: var(--muted);
+  font-size: 0.7rem;
+}
+
+.setting-strip .setting-row .value {
+  max-width: 11rem;
+  color: var(--text);
+  font-weight: 600;
+}
+
+.setting-strip .setting-row .value::after {
+  content: none;
+}
+
+.setting-strip .setting-row .switch {
+  padding: 0;
+}
+
+.setting-strip .reset {
+  color: var(--muted);
+  text-decoration: none;
+}

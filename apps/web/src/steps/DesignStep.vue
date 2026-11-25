@@ -9,8 +9,8 @@
 // Wide screens: the section bar on top, the preview beside the settings; the page scrolls.
 // Phones: a full editor screen that does not scroll, as photo and video editors are laid
 // out: the step bar on top; the preview takes most of the screen; under it, the open
-// section's settings as a list in a panel of fixed height, each row opening its setting in a
-// sheet; the sections along the bottom.
+// section's settings as one strip of chips that scrolls sideways, each opening its setting in
+// a sheet (Overlay has its tools on the picture instead); the sections along the bottom.
 import {
   METRICS,
   parseWidgets,
@@ -65,18 +65,18 @@ function chosen(): void {
   choosing.value = false;
 }
 
-/** The phone's list of settings, which scrolls by itself. */
+/** The phone's strip of settings, which scrolls by itself, sideways. */
 const controls = ref<HTMLElement | null>(null);
 
 function open(id: Section): void {
   section.value = id;
   sheet.value = null;
   window.scrollTo({ top: 0 });
-  controls.value?.scrollTo({ top: 0 });
+  controls.value?.scrollTo({ left: 0 });
 }
 
-// Phones: the section's settings as a list, a row each with its value; a row opens its
-// setting alone in a sheet over the list.
+// Phones: the section's settings as a strip of chips, each with its value; a chip opens its
+// setting alone in a sheet.
 const sheet = ref<{ name: string; label: string } | null>(null);
 function openSetting(name: string, label: string): void {
   sheet.value = { name, label };
@@ -252,7 +252,7 @@ function useTool(tool: 'text' | 'values' | 'chart' | 'mark'): void {
       <div
         v-if="section !== 'overlay'"
         ref="controls"
-        class="tools"
+        class="tools setting-strip"
         :aria-label="`${current.label} settings`"
         role="region"
       >
@@ -520,16 +520,10 @@ function useTool(tool: 'text' | 'values' | 'chart' | 'mark'): void {
   padding: 0.75rem;
 }
 
-/* The open section's settings, in a panel of fixed height so the picture does not jump. */
+/* The open section's settings: one strip of chips, under the picture. */
 .tools {
-  position: relative;
   flex: none;
-  height: 12rem;
-  padding: 0.2rem 1rem 0.8rem;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  border-top: 1px solid var(--line);
-  background: var(--panel);
+  padding: 0.1rem 0.75rem 0.6rem;
 }
 
 /* The sections along the bottom, where the thumb is. */
