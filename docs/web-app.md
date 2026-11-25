@@ -82,22 +82,23 @@ list.
    delete buttons; picking the demo loads them. The choice is remembered for the next
    visit (without one, the list shows); a person whose chosen source is ready (files on
    the device, a service connected) starts at step 2.
-2. **Activities.** Which activities the video shows is always a choice made, not a
-   default: with files or the demo the step starts with no period picked ("Which
-   activities? Pick a period."), and the other filters, the list and the way on come once
-   one is (Strava and Ride with GPS, which list a period at a time, start on this month).
-   The filters (the "Which activities" settings): period with shortcuts and a calendar for
-   custom days, sports (offered only when the period has them, with "All"), and two place
-   filters, "Starts near a place" and "Ends near a place". Each opens its own panel, where the place is set in one field: a place clicked on the map
-   shown under it (MapLibre with OpenFreeMap's dark style, with zoom buttons, the circle
-   of how near counts, and the places activities start, or end, at most often), typed or
-   pasted coordinates, or the browser's current location, which is tried first when the
-   browser allows it; a slider sets how near counts. The second filter turned on starts
-   at the first one's place, so the same place for both takes one pick. A filter without
-   a place waits for one. The location never leaves the device. Under the filters, the
-   matching activities in the same grid, all ticked at first, with their count and total
-   distance; the ticked ones are what the video shows, and unticked ones stay unticked
-   when the filters change. Nothing can be deleted here.
+2. **Activities.** Which activities the video shows is always a choice made, not a default:
+   with files or the demo the step starts with no period picked ("Which activities? Pick a
+   period."), and the other filters, the list and the way on come once one is (Strava and
+   Ride with GPS, which list a period at a time, start on this month). The filters (the
+   "Which activities" settings): period with shortcuts and a calendar for custom days,
+   sports (offered only when the period has them, with "All"), and two place filters,
+   "Starts near a place" and "Ends near a place". Each opens its own panel, where the place
+   is set in one field: a place clicked on the map shown under it (MapLibre with
+   OpenFreeMap's dark style, with zoom buttons, the circle of how near counts, and the
+   places activities start, or end, at most often), typed or pasted coordinates, or the
+   browser's current location, which is tried first when the browser allows it; a slider
+   sets how near counts. The second filter turned on starts at the first one's place, so the
+   same place for both takes one pick. A filter without a place waits for one. The location
+   never leaves the device. Under the filters, the matching activities in the same grid, all
+   ticked at first, with their count and total distance; the ticked ones are what the video
+   shows, and unticked ones stay unticked when the filters change. Nothing can be deleted
+   here.
 3. **Design.** How the video plays and looks, in sections, with a section bar under the
    step bar, in the order things are decided; the bar shows where the person is, so the
    step has no title of its own. The bar opens any section, in any order, since every
