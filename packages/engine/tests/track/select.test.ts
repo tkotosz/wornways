@@ -163,6 +163,34 @@ describe('selectTracks', () => {
     expect(selectTracks([short], parseSettings({})).problem).toBe('nothing-usable');
   });
 
+  it('keeps the recorded duration, a long stop included, though cleaning shortens it', () => {
+    // 6 km in 20 min, with half an hour standing still halfway.
+    const stop = activity({ id: 'stop', day: 4 });
+    const half = pointCount(stop) >> 1;
+    for (let i = half; i < pointCount(stop); i++) stop.points[i * STRIDE + 3] += 1800;
+    const [track] = selectTracks([stop], parseSettings({})).tracks;
+
+    expect(track!.elapsedSeconds).toBe(2000 + 1800);
+    expect(track!.points.at(-1)).toBeLessThan(2100);
+    // The privacy trim hides the ends at 3 m/s: the time in total loses that riding time.
+    const [trimmed] = selectTracks([stop], parseSettings({ 'trim-radius': '500' })).tracks;
+    const hiddenSeconds = (6000 - trackLengthM(trimmed!)) / 3;
+    expect(trimmed!.elapsedSeconds).toBeCloseTo(3800 - hiddenSeconds, -1);
+  });
+
+  it('keeps the recorded clock when even pace rewrites it', () => {
+    const [timed] = selectTracks(library, parseSettings({ activity: 'early' })).tracks;
+    const [even] = selectTracks(
+      library,
+      parseSettings({ activity: 'early', pace: 'distance' }),
+    ).tracks;
+
+    expect(timed!.recorded).toBeUndefined();
+    expect(Array.from(even!.recorded!)).toEqual(
+      Array.from({ length: pointCount(timed!) }, (_, i) => timed!.points[i * STRIDE + 3]),
+    );
+  });
+
   it('trims each route by the same radius and keeps the untrimmed activities for matching', () => {
     const short = activity({ id: 'short', day: 7, lengthM: 900 });
     const setting = parseSettings({ 'trim-radius': '500' });

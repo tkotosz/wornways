@@ -63,7 +63,7 @@ describe('parseSettings', () => {
     ]);
     expect(parseSettings({ 'totals-fields': 'date,pace' }).totalsFields).toEqual(['date', 'pace']);
     expect(() => parseSettings({ 'totals-fields': 'speed' })).toThrow(
-      'expects values from count, distance, time, elevation, pace, date, got "speed"',
+      'expects values from count, distance, moving, time, elevation, descent, highest, pace, top-speed, date, days, longest, got "speed"',
     );
     expect(() => parseSettings({ 'totals-fields': '' })).toThrow('expects values from');
   });
@@ -143,7 +143,7 @@ describe('parseSettings', () => {
     [{ activity: ' , ' }, 'activity: expects activity ids separated by commas'],
     [
       { 'metrics-fields': 'time,speed' },
-      'metrics-fields: expects values from time, distance, pace, elevation, date, count, got "speed"',
+      'metrics-fields: expects values from time, moving, distance, pace, top-speed, elevation, descent, highest, date, start, count, days, longest, got "speed"',
     ],
     [
       { 'metrics-position': 'center' },

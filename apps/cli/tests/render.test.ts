@@ -279,6 +279,23 @@ describe('the metrics card', () => {
     expect(severalLastFrame(race, ['date'])).toBeGreaterThan(20);
   });
 
+  it('shows the moving time, the descent, the highest point, the days and the longest', () => {
+    const inTurn = chronologicalTimeline([1_190, 1_190], { duration: 1 });
+    for (const metric of ['moving', 'descent', 'highest', 'days', 'longest'] as Metric[])
+      expect(severalLastFrame(inTurn, [metric]), metric).toBeGreaterThan(20);
+    // One activity: its moving time, but no days or longest, which would only repeat it.
+    expect(lastFrame({ metrics: ['moving'] }).bottomLeft).toBeGreaterThan(20);
+    expect(lastFrame({ metrics: ['days', 'longest'] }).bottomLeft).toBe(0);
+  });
+
+  it('shows the start time for a single activity only, and the top speed for any', () => {
+    const inTurn = chronologicalTimeline([1_190, 1_190], { duration: 1 });
+    expect(lastFrame({ metrics: ['start'] }).bottomLeft).toBeGreaterThan(20);
+    expect(severalLastFrame(inTurn, ['start'])).toBe(0);
+    expect(lastFrame({ metrics: ['top-speed'] }).bottomLeft).toBeGreaterThan(20);
+    expect(severalLastFrame(inTurn, ['top-speed'])).toBeGreaterThan(20);
+  });
+
   it('is left out when it has no values', () => {
     const frame = lastFrame({ metrics: [] });
 
@@ -372,7 +389,7 @@ describe('the totals card', () => {
 
   it('shows every value unless told otherwise, and only the values picked when told', () => {
     const automatic = lastTotalsFrame();
-    expect(lastTotalsFrame(['count', 'distance', 'time', 'elevation']).equals(automatic)).toBe(
+    expect(lastTotalsFrame(['count', 'distance', 'moving', 'elevation']).equals(automatic)).toBe(
       true,
     );
     expect(lastTotalsFrame(['distance']).equals(automatic)).toBe(false);

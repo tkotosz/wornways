@@ -104,8 +104,9 @@ const kind = computed(() => {
 const offeredMetrics = computed(() =>
   METRICS.filter((m) => {
     if (!kind.value) return false;
-    if (m === 'count') return kind.value !== 'single';
-    if (m === 'elevation') return props.plan?.hasElevation;
+    if (m === 'count' || m === 'days' || m === 'longest') return kind.value !== 'single';
+    if (m === 'start') return kind.value === 'single';
+    if (m === 'elevation' || m === 'descent' || m === 'highest') return props.plan?.hasElevation;
     return true;
   }),
 );
@@ -117,6 +118,18 @@ const pickedMetrics = computed<Metric[]>(() => {
   return picked.filter((m) => offeredMetrics.value.includes(m));
 });
 
+/** A metric's chip: its name, or a few words where the name alone would be unclear. */
+const METRIC_LABELS: Partial<Record<Metric, string>> = {
+  moving: 'Moving time',
+  'top-speed': 'Top speed',
+  start: 'Start time',
+  highest: 'Highest point',
+  days: 'Days out',
+  longest: 'Longest activity',
+};
+const metricLabel = (metric: Metric) =>
+  METRIC_LABELS[metric] ?? metric.charAt(0).toUpperCase() + metric.slice(1);
+
 function toggleMetric(metric: Metric): void {
   const picked = pickedMetrics.value;
   const next = picked.includes(metric) ? picked.filter((m) => m !== metric) : [...picked, metric];
@@ -127,13 +140,20 @@ function toggleMetric(metric: Metric): void {
 const TOTALS_LABELS: Record<TotalsField, string> = {
   count: 'Activities',
   distance: 'Kilometers',
-  time: 'Hours moving',
+  moving: 'Hours moving',
+  time: 'Hours in total',
   elevation: 'Meters climbed',
+  descent: 'Meters descended',
+  highest: 'Highest point',
   pace: 'Average pace',
+  'top-speed': 'Top speed',
   date: 'Dates',
+  days: 'Days out',
+  longest: 'Longest activity',
 };
+const ELEVATION_TOTALS: TotalsField[] = ['elevation', 'descent', 'highest'];
 const offeredTotals = computed(() =>
-  TOTALS_FIELDS.filter((field) => field !== 'elevation' || props.plan?.hasElevation),
+  TOTALS_FIELDS.filter((field) => !ELEVATION_TOTALS.includes(field) || props.plan?.hasElevation),
 );
 const pickedTotals = computed<TotalsField[]>(() => {
   const set = adjustments.value['totals-fields'];
@@ -268,7 +288,7 @@ function toggleTotal(field: TotalsField): void {
                   <span v-if="pickedMetrics.includes(metric)" class="order">{{
                     pickedMetrics.indexOf(metric) + 1
                   }}</span>
-                  {{ metric.charAt(0).toUpperCase() + metric.slice(1) }}
+                  {{ metricLabel(metric) }}
                 </button>
                 <button
                   v-if="plan && adjustments['metrics-fields'] !== undefined"

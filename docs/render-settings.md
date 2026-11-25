@@ -167,54 +167,65 @@ The values shown over the map: the first one large, the others on a line under i
 wraps when the frame is too narrow. A single-activity video shows live values as the
 activity plays; a video of several activities shows running totals.
 
-| Value       | One activity          | Race (all at once)           | In turn (groups)            | Totals card                  |
-| ----------- | --------------------- | ---------------------------- | --------------------------- | ---------------------------- |
-| `time`      | its time so far       | the race clock               | the activities' time so far | hours moving                 |
-| `distance`  | kilometers so far     | kilometers so far            | kilometers so far           | kilometers                   |
-| `pace`      | average so far        | average so far               | average so far              | average while moving         |
-| `elevation` | meters climbed so far | meters climbed so far        | meters climbed so far       | meters climbed               |
-| `date`      | its day               | the days the activities span | the playing group's dates   | the days the activities span |
-| `count`     | not offered           | how many are still moving    | activities so far           | activities                   |
+| Value       | One activity                       | Race (all at once)           | In turn (groups)             | Totals card                    |
+| ----------- | ---------------------------------- | ---------------------------- | ---------------------------- | ------------------------------ |
+| `time`      | its time so far                    | the race clock               | the activities' time so far  | hours in total, stops included |
+| `moving`    | its moving time so far             | moving time so far           | moving time so far           | hours moving                   |
+| `distance`  | kilometers so far                  | kilometers so far            | kilometers so far            | kilometers                     |
+| `pace`      | average so far                     | average so far               | average so far               | average while moving           |
+| `top-speed` | top speed so far                   | top speed so far             | top speed so far             | top speed of any activity      |
+| `elevation` | meters climbed so far              | meters climbed so far        | meters climbed so far        | meters climbed                 |
+| `descent`   | meters descended so far            | meters descended so far      | meters descended so far      | meters descended               |
+| `highest`   | highest point so far               | highest point so far         | highest point so far         | highest point                  |
+| `date`      | its day                            | the days the activities span | the playing group's dates    | the days the activities span   |
+| `start`     | its start time, e.g. "06:42 start" | not offered                  | not offered                  | not offered                    |
+| `count`     | not offered                        | how many are still moving    | activities so far            | activities                     |
+| `days`      | not offered                        | days with an activity        | days with an activity so far | days with an activity          |
+| `longest`   | not offered                        | longest so far               | longest activity so far      | longest activity               |
 
-Pace is minutes per kilometer when every activity is on foot (run, walk, hike), otherwise
+The time over the video follows the replay, where long pauses are shortened; the totals
+card's time in total keeps every stop as recorded. Moving time counts the stretches covered at
+0.5 m/s or faster, so stops do not count; it and the top speed go by the recorded clock, also
+with even drawing pace. Top
+speed is the fastest average over 10 seconds, so a single point the GPS put too far away
+hardly counts. The start time is in the time zone of the device making the video. Pace and
+top speed are minutes per kilometer when every activity is on foot (run, walk, hike), otherwise
 kilometers per hour. Elevation shows only when an activity recorded it. Unless picked, the
 video shows what suits it (one activity: time, distance, date; a race: time, count,
 distance; in turn: date, count, distance) and the totals card its first four values.
 
-| Setting   | CLI flag                     | Values                                                                                        | Default              |
-| --------- | ---------------------------- | --------------------------------------------------------------------------------------------- | -------------------- |
-| Show card | `--metrics` / `--no-metrics` | on/off                                                                                        | on                   |
-| Values    | `--metrics-fields`           | comma-separated, in the order shown: `time`, `distance`, `pace`, `elevation`, `date`, `count` | what suits the video |
-| Position  | `--metrics-position`         | `top-`, `middle-` or `bottom-` with `left`, `center` or `right`, e.g. `middle-center`         | `bottom-left`        |
-| Card size | `--metrics-size`             | 50–200%                                                                                       | 100%                 |
+| Setting   | CLI flag                     | Values                                                                                | Default              |
+| --------- | ---------------------------- | ------------------------------------------------------------------------------------- | -------------------- |
+| Show card | `--metrics` / `--no-metrics` | on/off                                                                                | on                   |
+| Values    | `--metrics-fields`           | comma-separated, in the order shown: any value of the table above                     | what suits the video |
+| Position  | `--metrics-position`         | `top-`, `middle-` or `bottom-` with `left`, `center` or `right`, e.g. `middle-center` | `bottom-left`        |
+| Card size | `--metrics-size`             | 50–200%                                                                               | 100%                 |
 
 ### Totals card
 
 For a video of several activities: after the replay, 3.4 s more, before the end card. The
 finished map dims, the video's title comes in with a short orange rule under it, and the
-totals count up: the activities (named after the one sport shown, such as rides), the
-kilometers, the hours moving and the meters climbed (left out when no activity recorded
-elevation), unless other values are picked. Two columns on a story or square frame, one row on a wide one. Distance and
-climb are the ones the metrics card shows at the end; hours moving add up the time between
-points covered at 0.5 m/s or faster, so stops do not count.
+totals count up, by default the activities (named after the one sport shown, such as
+rides), the kilometers, the hours moving and the meters climbed. Each total is the value the
+metrics card shows at the end of the replay.
 
-Its values can be picked and ordered: any of the activities (`count`), kilometers
-(`distance`), hours moving (`time`), meters climbed (`elevation`), the average pace or speed
-while moving (`pace`) and the days the activities span (`date`), the names the metrics card
-uses for the same values (see the table above). Unless picked, it shows the first four in
-that order. The pace and the dates appear without counting up, and the dates take a row of
-their own. Elevation is left out when no activity recorded it, whatever is picked. In the
-web app the values are chips under the switch, numbered in the order picked, with a link
-back to the automatic choice.
+Its values can be picked and ordered from the metrics card's values (see the table above),
+as totals for every activity. Unless picked, it shows activities, kilometers, hours moving and
+meters climbed (`count`, `distance`, `moving`, `elevation`). The pace and the dates appear
+without counting up, and the dates take a row of their own. The climb, the descent and the
+highest point are left out when no activity recorded elevation, whatever is picked. Up to two
+values sit in a row on a story or square frame, up to four on a wide one. In the web app the
+values are chips under the switch, numbered in the order picked, with a link back to the
+automatic choice.
 
 The recap preset turns it on; any other video of several activities can. In the web app a
 Custom playback made from Recap keeps it on, and the switch on the Appearance step always
 decides over the preset.
 
-| Setting          | CLI flag                             | Values                                                                                        | Default                                  |
-| ---------------- | ------------------------------------ | --------------------------------------------------------------------------------------------- | ---------------------------------------- |
-| Show totals card | `--totals-card` / `--no-totals-card` | on/off                                                                                        | off; on with `recap`                     |
-| Values           | `--totals-fields`                    | comma-separated, in the order shown: `count`, `distance`, `time`, `elevation`, `pace`, `date` | `count`, `distance`, `time`, `elevation` |
+| Setting          | CLI flag                             | Values                                                              | Default                                    |
+| ---------------- | ------------------------------------ | ------------------------------------------------------------------- | ------------------------------------------ |
+| Show totals card | `--totals-card` / `--no-totals-card` | on/off                                                              | off; on with `recap`                       |
+| Values           | `--totals-fields`                    | comma-separated, in the order shown: any value of the metrics table | `count`, `distance`, `moving`, `elevation` |
 
 ### Branding
 

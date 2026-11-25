@@ -23,3 +23,15 @@ export function averagePace(
     unit: '/km',
   };
 }
+
+/**
+ * A top speed of `metersPerSecond`: on foot as the pace it means ("3:10" and "/km"),
+ * otherwise in kilometers per hour ("54.2" and "km/h").
+ */
+export function topSpeed(
+  onFoot: boolean,
+  metersPerSecond: number,
+): { value: string; unit: '/km' | 'km/h' } {
+  // The average over an hour at that speed.
+  return averagePace(onFoot, 3600, metersPerSecond * 3600);
+}

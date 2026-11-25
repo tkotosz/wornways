@@ -137,6 +137,10 @@ export function trimEndpoints(track: Track, radius: number, original: Track = tr
   points.set(pointAt(p, to), points.length - STRIDE);
   const elapsed = points[3];
   for (let i = 3; i < points.length; i += STRIDE) points[i] -= elapsed;
+  // The time in total loses the seconds hidden at either end, as the distance does.
+  const hidden = elapsed + (p[last * STRIDE + 3] - elapsed - points[points.length - 1]);
+  const elapsedSeconds =
+    track.elapsedSeconds === undefined ? undefined : Math.max(0, track.elapsedSeconds - hidden);
   // Retain the activity's original grouping date while the visible clock starts at zero.
-  return { ...track, points };
+  return { ...track, points, ...(elapsedSeconds === undefined ? {} : { elapsedSeconds }) };
 }

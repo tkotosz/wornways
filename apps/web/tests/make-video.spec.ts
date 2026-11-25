@@ -724,7 +724,7 @@ test('sets up the video and its text, and keeps both for the next visit', async 
   await page.getByTestId('group-title').getByRole('button', { name: 'Bottom middle' }).click();
   await expect(page.getByTestId('group-metrics')).toContainText('Show metrics');
   // A race offers every metric, the dates and the pace too, though not picked at first.
-  for (const name of ['Date', 'Pace'])
+  for (const name of ['Date', 'Pace', 'Top speed', 'Moving time', 'Days out', 'Longest activity'])
     await expect(
       page.getByTestId('group-metrics').getByRole('button', { name, exact: true }),
     ).toHaveAttribute('aria-pressed', 'false');

@@ -2,15 +2,9 @@ import { drawBasemap, type Basemap, type MapLabel, type Tile } from '../map/base
 import { levelsFor, mapLevelViews, type CameraPath, type LevelWindow } from './camera.ts';
 import { drawElevationProfile, elevationProfile } from './elevation-profile.ts';
 import { drawEndCard, endCardFrames } from './end-card.ts';
-import {
-  drawTotalsCard,
-  movingSeconds,
-  totalsCardFrames,
-  type Totals,
-  type TotalsField,
-} from './totals-card.ts';
+import { drawTotalsCard, totalsCardFrames, type Totals, type TotalsField } from './totals-card.ts';
 import { drawWatermark } from './mark.ts';
-import { averagePace, isOnFoot } from './pace.ts';
+import { averagePace, isOnFoot, topSpeed } from './pace.ts';
 import { dateRange } from './plans.ts';
 import { composeHeat, createHeatRamp, decodeHeat, heatStyle, saturationFromHeat } from './heat.ts';
 import { projectTrack, type Projected } from './project.ts';
@@ -76,14 +70,40 @@ export interface CanvasLike {
 export type CanvasFactory = (width: number, height: number) => CanvasLike;
 
 /** A value the metrics card can show. */
-export type Metric = 'time' | 'distance' | 'pace' | 'elevation' | 'date' | 'count';
+/**
+ * A value the metrics card can show: the time so far (stops included) or moving, the
+ * distance, the average pace, the top speed so far, the meters climbed or descended, the
+ * highest point so far, the date, the start time (one activity), how many activities, the
+ * days with an activity, or the longest activity so far.
+ */
+export type Metric =
+  | 'time'
+  | 'moving'
+  | 'distance'
+  | 'pace'
+  | 'top-speed'
+  | 'elevation'
+  | 'descent'
+  | 'highest'
+  | 'date'
+  | 'start'
+  | 'count'
+  | 'days'
+  | 'longest';
 export const METRICS: readonly Metric[] = [
   'time',
+  'moving',
   'distance',
   'pace',
+  'top-speed',
   'elevation',
+  'descent',
+  'highest',
   'date',
+  'start',
   'count',
+  'days',
+  'longest',
 ];
 
 /** Where on the frame a block of text sits: an edge, then the side or the middle. */
@@ -218,6 +238,14 @@ type Prepared = Projected & {
   metres: number;
   /** Metres climbed so far. */
   climbed: number;
+  /** Metres descended so far. */
+  descended: number;
+  /** The highest elevation reached so far. */
+  highest: number;
+  /** Seconds moving so far. */
+  moved: number;
+  /** The top speed so far, in meters per second. */
+  topSpeed: number;
   started: boolean;
   done: boolean;
   /** Video time at which the track finished drawing. */
@@ -329,6 +357,12 @@ export function createRenderer(
   const starts = tracks.map((track) => track.startTime);
   /** The days the activities span: "18–22 Apr 2026", or one day. */
   const datesSpanned = dateRange(Math.min(...starts), Math.max(...starts));
+  /** The time of day an activity started, e.g. "06:42", in this device's time zone. */
+  const timeFormat = new Intl.DateTimeFormat(options.locale ?? 'en-GB', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  });
   const dateFormat = new Intl.DateTimeFormat(options.locale ?? 'en-GB', {
     day: 'numeric',
     month: 'short',
@@ -366,6 +400,10 @@ export function createRenderer(
     headY: 0,
     metres: 0,
     climbed: 0,
+    descended: 0,
+    highest: 0,
+    moved: 0,
+    topSpeed: 0,
     started: false,
     done: false,
     doneAt: Infinity,
@@ -661,14 +699,23 @@ export function createRenderer(
         const f = (progress - tr.u[i]) / (tr.u[i + 1] - tr.u[i]);
         tr.headX = tr.xy[i * 2] + f * (tr.xy[i * 2 + 2] - tr.xy[i * 2]);
         tr.headY = tr.xy[i * 2 + 1] + f * (tr.xy[i * 2 + 3] - tr.xy[i * 2 + 1]);
-        tr.metres = tr.dist[i] + f * (tr.dist[i + 1] - tr.dist[i]);
-        tr.climbed = tr.climb[i] + f * (tr.climb[i + 1] - tr.climb[i]);
+        const between = (values: Float64Array) => values[i] + f * (values[i + 1] - values[i]);
+        tr.metres = between(tr.dist);
+        tr.climbed = between(tr.climb);
+        tr.descended = between(tr.descent);
+        tr.highest = between(tr.top);
+        tr.moved = between(tr.moving);
+        tr.topSpeed = between(tr.fastest);
         piece.push(tr.headX, tr.headY);
       } else {
         tr.headX = tr.xy[i * 2];
         tr.headY = tr.xy[i * 2 + 1];
         tr.metres = tr.dist[i];
         tr.climbed = tr.climb[i];
+        tr.descended = tr.descent[i];
+        tr.highest = tr.top[i];
+        tr.moved = tr.moving[i];
+        tr.topSpeed = tr.fastest[i];
         tr.done = true;
         tr.doneAt = t;
       }
@@ -738,6 +785,12 @@ export function createRenderer(
     let moving = 0;
     let metres = 0;
     let climbed = 0;
+    let descended = 0;
+    let highest = -Infinity;
+    let moved = 0;
+    let longest = 0;
+    let fastest = 0;
+    const days = new Set<string>();
     let date = prepared[0].date;
     for (const tr of prepared) {
       if (!tr.done) moving++;
@@ -745,6 +798,12 @@ export function createRenderer(
       started++;
       metres += tr.metres;
       climbed += tr.climbed;
+      descended += tr.descended;
+      if (tr.hasElevation) highest = Math.max(highest, tr.highest);
+      moved += tr.moved;
+      longest = Math.max(longest, tr.metres);
+      fastest = Math.max(fastest, tr.topSpeed);
+      days.add(tr.date);
       date = tr.date;
     }
     const lastSecond = (track: Track) => track.points[track.points.length - 1];
@@ -759,6 +818,7 @@ export function createRenderer(
       texts.set('distance', `${(metres / 1000).toFixed(1)} km`);
       texts.set('pace', paceText(onFoot, elapsed, metres));
       texts.set('date', prepared[0].date);
+      texts.set('start', `${timeFormat.format(tracks[0].startTime)} start`);
     } else if (timeline.clock) {
       // All at once: one shared clock, and how many are still out.
       texts.set('time', clockText(Math.floor(timeline.clock(t))));
@@ -776,7 +836,18 @@ export function createRenderer(
       texts.set('count', `${started} ${started === 1 ? singular : plural}`);
       texts.set('distance', `${wholeNumber(metres / 1000)} km`);
     }
-    if (hasElevation) texts.set('elevation', `↑${wholeNumber(climbed)} m`);
+    texts.set('moving', `${clockText(Math.floor(moved))} moving`);
+    const top = topSpeed(onFoot, fastest);
+    texts.set('top-speed', top.unit === '/km' ? `best ${top.value} /km` : `max ${top.value} km/h`);
+    if (kind !== 'single') {
+      texts.set('days', `${days.size} ${days.size === 1 ? 'day' : 'days'} out`);
+      texts.set('longest', `longest ${wholeNumber(longest / 1000)} km`);
+    }
+    if (hasElevation) {
+      texts.set('elevation', `↑${wholeNumber(climbed)} m`);
+      texts.set('descent', `↓${wholeNumber(descended)} m`);
+      if (Number.isFinite(highest)) texts.set('highest', `top ${wholeNumber(highest)} m`);
+    }
     return texts;
   }
 
@@ -1027,17 +1098,37 @@ export function createRenderer(
   const totals = (): Totals => {
     let meters = 0;
     let climbed = 0;
+    let descended = 0;
+    let highest = -Infinity;
+    let moving = 0;
+    let longest = 0;
+    let fastest = 0;
     for (const tr of prepared) {
-      meters += tr.dist[tr.count - 1];
-      climbed += tr.climb[tr.count - 1];
+      const last = tr.count - 1;
+      fastest = Math.max(fastest, tr.fastest[last]);
+      meters += tr.dist[last];
+      climbed += tr.climb[last];
+      descended += tr.descent[last];
+      if (tr.hasElevation) highest = Math.max(highest, tr.top[last]);
+      moving += tr.moving[last];
+      longest = Math.max(longest, tr.dist[last]);
     }
     return {
       activities: tracks.length,
       meters,
-      movingSeconds: tracks.reduce((sum, track) => sum + movingSeconds(track), 0),
+      movingSeconds: moving,
+      totalSeconds: tracks.reduce(
+        (sum, track) => sum + (track.elapsedSeconds ?? track.points[track.points.length - 1]),
+        0,
+      ),
       climbed: hasElevation ? climbed : null,
+      descended: hasElevation ? descended : null,
+      highest: hasElevation ? highest : null,
       onFoot,
       dates: datesSpanned,
+      days: new Set(prepared.map((tr) => tr.date)).size,
+      longest,
+      topSpeed: fastest,
     };
   };
   let totalsShown: Totals | null = null;
