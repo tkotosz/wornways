@@ -67,7 +67,7 @@ async function drawPoster(): Promise<void> {
   const task = props.engine.makePoster(props.settings);
   cancelPoster = task.cancel;
   try {
-    const image = await task.result;
+    const { image } = await task.result;
     if (left || cancelPoster !== task.cancel) return;
     poster.value = URL.createObjectURL(image);
   } catch {

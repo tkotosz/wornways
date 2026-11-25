@@ -5,6 +5,7 @@
 import type {
   FrequentPlace,
   Grouping,
+  OverlayBoxes,
   SensorChannel,
   SettingsInput,
   TrackEnd,
@@ -66,7 +67,6 @@ export type Request =
   | { type: 'places'; id: number; settings: SettingsInput; end: TrackEnd; source: Source }
   /** The video; a draft is small and at a low frame rate, for the preview to play. */
   | { type: 'make-video'; id: number; settings: SettingsInput; source: Source; draft?: boolean }
-  /** The last frame of the video the settings describe, small, as a preview. */
   /** A still of the video: its last frame, or how it ends (the finished totals or end card). */
   | {
       type: 'make-poster';
@@ -87,7 +87,8 @@ export type Reply =
   | { type: 'places'; id: number; places: FrequentPlace[] }
   | { type: 'progress'; id: number; progress: Progress }
   | { type: 'video-made'; id: number; video: ArrayBuffer; report: VideoReport }
-  | { type: 'poster-made'; id: number; image: Blob }
+  /** The still, and for the last frame where its title, metrics and the rest were drawn. */
+  | { type: 'poster-made'; id: number; image: Blob; boxes: OverlayBoxes }
   | { type: 'planned'; id: number; plan: PlanReport }
   | { type: 'strava-started' | 'strava-ended' | 'strava-closed' | 'strava-kept'; id: number }
   | { type: 'strava-listed'; id: number; activities: ActivitySummary[] }

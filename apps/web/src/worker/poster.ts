@@ -7,6 +7,7 @@ import {
   prepareReplay,
   selectTracks,
   type CanvasLike,
+  type OverlayBoxes,
   type SettingsInput,
   type TileLoader,
   type Track,
@@ -31,7 +32,8 @@ export function previewSize(frame: { width: number; height: number }) {
 /**
  * Draws a still of the video the settings describe, at preview size, as a PNG: its last
  * frame, or for the ending the finished totals card over it when the video has one, else the
- * finished end card, else the last frame.
+ * finished end card, else the last frame. With the last frame come the boxes its title,
+ * metrics card, profile and watermark were drawn in, for editing them on the still.
  */
 export async function makePoster(
   library: Track[],
@@ -39,7 +41,7 @@ export async function makePoster(
   signal: AbortSignal,
   loadTiles: TileLoader = createTileLoader({ cache: cacheStorageTileCache }),
   scene: PosterScene = 'replay',
-): Promise<Blob> {
+): Promise<{ image: Blob; boxes: OverlayBoxes }> {
   const settings = parseSettings(input);
   const selection = selectTracks(library, settings);
   if (selection.problem) throw new VideoProblem(problemText(selection.problem, settings));
@@ -61,10 +63,14 @@ export async function makePoster(
   renderer.skipTo(last);
   if (signal.aborted) throw new Canceled();
   renderer.renderFrame(last);
+  const boxes = scene === 'replay' ? renderer.overlayBoxes() : {};
   if (scene === 'ending') {
     // The totals card is for several activities only, as in the video.
     if (settings.totalsCard && selection.tracks.length > 1) renderer.drawFinishedCard('totals');
     else if (settings.endCard) renderer.drawFinishedCard('end');
   }
-  return (renderer.canvas as unknown as OffscreenCanvas).convertToBlob({ type: 'image/png' });
+  const image = await (renderer.canvas as unknown as OffscreenCanvas).convertToBlob({
+    type: 'image/png',
+  });
+  return { image, boxes };
 }

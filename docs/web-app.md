@@ -127,7 +127,20 @@ actions, when there are some. Each step is one column on a phone.
      position and size), the elevation profile (when an activity recorded elevation; on
      for a single activity, off for several) and the small watermark at the bottom left,
      on the map credit's line. A position is the top, middle or bottom row, left, middle
-     or right; text in the middle gets a soft dark band behind it.
+     or right, or a point of the frame; text in the middle or at a point gets a soft dark
+     band behind it. The title and the metrics card are also arranged on the still: each
+     has an outline over where it was drawn (the boxes the engine reports with the still),
+     with its name on a tab when picked. Dragging an outline moves the block; it lets go
+     at a point, lined up by the third of the frame it falls in, and near a named position
+     both ways (the side margins or the middle across; the top, the middle or the bottom
+     down) it snaps to it, with a line for each side it snapped to. The handle on a picked
+     block's corner resizes it, in steps of 5%. While dragging, the outline follows the
+     pointer; the still is drawn again as soon as the block is let go, without the usual
+     pause. The arrow keys move a picked block by 1% of the frame (5% with Shift), and +
+     and - resize it. On a phone, picking a block opens its tab. On a story-shaped frame,
+     while a block is picked, hatched guides show what Instagram's own controls cover
+     (Meta's ads guide: 14% at the top, 35% at the bottom, 6% at each side). A position
+     set by dragging shows as "Placed on the picture" beside the nine squares.
    - **Ending:** what comes after the replay: the end pause on the finished picture, the
      totals card (for several activities only; on for Recap) and the end card.
 4. **Export.** A stage in the video's shape, which shows the finished picture with a "Make

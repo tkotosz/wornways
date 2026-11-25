@@ -41,6 +41,7 @@ function valueName(setting: SettingDefinition): string {
     case 'number':
       return { m: '<meters>', s: '<seconds>', '%': '<percent>' }[kind.unit] ?? '<n>';
     case 'choice':
+      if (kind.points) return '<name|x%,y%>';
       return kind.choices.every((c) => /^\d+$/.test(c)) ? '<n>' : '<name>';
     case 'text':
       return `<${kind.valueName}>`;

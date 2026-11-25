@@ -24,6 +24,7 @@ import {
   type Section,
 } from '../adjust.ts';
 import FramePanel from '../components/FramePanel.vue';
+import OverlayEditor from '../components/OverlayEditor.vue';
 import PlaybackPanel from '../components/PlaybackPanel.vue';
 import PosterPreview from '../components/PosterPreview.vue';
 import SettingsGroups from '../components/SettingsGroups.vue';
@@ -61,6 +62,8 @@ function open(id: Section): void {
   controls.value?.scrollTo({ top: 0 });
 }
 
+// In Overlay, the title and the metrics card are also arranged on the still (OverlayEditor);
+// on phones, picking one there opens its tab.
 // Phones: each section's settings in groups, a tab each: Playback in its parts, Frame in
 // one, the others by panel (those this video has).
 type Tab = { id: string; label: string };
@@ -98,7 +101,18 @@ function openTab(id: string): void {
         :seconds="plan?.seconds"
         :scene="section === 'ending' ? 'ending' : 'replay'"
         :editing="section === 'overlay' || section === 'ending'"
-      />
+      >
+        <template #layer="{ boxes, ratio, placed }">
+          <OverlayEditor
+            v-if="section === 'overlay'"
+            v-model="adjustments"
+            :boxes="boxes"
+            :ratio="ratio"
+            @placed="placed"
+            @select="openTab"
+          />
+        </template>
+      </PosterPreview>
     </div>
 
     <div class="tools">
@@ -192,7 +206,17 @@ function openTab(id: string): void {
           :seconds="plan?.seconds"
           :scene="section === 'ending' ? 'ending' : 'replay'"
           :editing="section === 'overlay' || section === 'ending'"
-        />
+        >
+          <template #layer="{ boxes, ratio, placed }">
+            <OverlayEditor
+              v-if="section === 'overlay'"
+              v-model="adjustments"
+              :boxes="boxes"
+              :ratio="ratio"
+              @placed="placed"
+            />
+          </template>
+        </PosterPreview>
       </div>
       <div class="settings">
         <FramePanel v-if="section === 'frame'" v-model="adjustments" />

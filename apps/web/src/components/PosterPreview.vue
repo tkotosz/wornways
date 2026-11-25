@@ -27,8 +27,11 @@ function dropDraft(): void {
 // small and at a low frame rate, and plays it in place of the picture, with a bar to move to
 // any moment. Where things are arranged on the still (`editing`), it opens on the still and
 // Edit goes back to it from the draft. It stays in view beside the settings on wide screens
-// and sits above them on phones, where only the picture shows.
-import { parseSettings, type SettingsInput } from '@wornways/engine';
+// and sits above them on phones, where only the picture shows. While editing, the `layer`
+// slot is drawn over the still, with where its blocks were drawn; `placed` asks for the next
+// change to be drawn at once rather than after the usual pause, for a block let go after
+// dragging it.
+import { parseSettings, type OverlayBoxes, type SettingsInput } from '@wornways/engine';
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { Canceled, type EngineClient } from '../engine-client.ts';
 import type { PosterScene, Progress } from '../messages.ts';
@@ -50,6 +53,11 @@ const props = withDefaults(
 const PAUSE_MS = 400;
 
 const url = ref('');
+/** Where the still's title, metrics and the rest were drawn. */
+const boxes = ref<OverlayBoxes>({});
+/** Whether the next change is drawn without the pause (see `placed`). */
+let drawAtOnce = false;
+const placed = () => (drawAtOnce = true);
 const busy = ref(false);
 const error = ref('');
 let cancel: (() => void) | null = null;
@@ -145,10 +153,11 @@ async function draw(): Promise<void> {
   const task = props.engine.makePoster(props.settings, props.scene);
   cancel = task.cancel;
   try {
-    const image = await task.result;
+    const { image, boxes: drawn } = await task.result;
     if (cancel !== task.cancel) return;
     if (url.value) URL.revokeObjectURL(url.value);
     url.value = URL.createObjectURL(image);
+    boxes.value = drawn;
     busy.value = false;
   } catch (caught) {
     // A newer drawing took over; it clears "busy" when it is done.
@@ -177,7 +186,8 @@ watch(
     draftError.value = '';
     error.value = '';
     busy.value = true;
-    timer = setTimeout(() => void draw(), PAUSE_MS);
+    timer = setTimeout(() => void draw(), drawAtOnce ? 0 : PAUSE_MS);
+    drawAtOnce = false;
   },
   { immediate: true },
 );
@@ -220,6 +230,13 @@ onBeforeUnmount(() => {
               ? 'Preview: the ending of the video'
               : 'Preview: the last frame of the video'
           "
+        />
+        <slot
+          v-if="editing && url && !draftUrl && scene === 'replay'"
+          name="layer"
+          :boxes="boxes"
+          :ratio="frame.width / frame.height"
+          :placed="placed"
         />
         <button v-if="editing && draftUrl" type="button" class="edit" @click="playing = false">
           Edit

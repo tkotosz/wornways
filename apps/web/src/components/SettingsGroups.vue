@@ -278,9 +278,13 @@ function toggleTotal(field: TotalsField): void {
                     }}
                   </button>
                 </div>
-                <!-- The picked position in words beside the squares. -->
+                <!-- The picked position in words beside the squares, or that it was dragged. -->
                 <span v-if="setting.name.endsWith('-position')" class="position-name muted">
-                  {{ choiceLabel(setting.name, String(value(setting))) }}
+                  {{
+                    setting.kind.choices.includes(String(value(setting)))
+                      ? choiceLabel(setting.name, String(value(setting)))
+                      : 'Placed on the picture'
+                  }}
                 </span>
               </div>
 

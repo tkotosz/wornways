@@ -1,7 +1,7 @@
 // The page's way to talk to the worker: each method sends one request and returns a
 // promise for its reply.
 
-import type { FrequentPlace, SettingsInput, TrackEnd } from '@wornways/engine';
+import type { FrequentPlace, OverlayBoxes, SettingsInput, TrackEnd } from '@wornways/engine';
 import type {
   ActivitySummary,
   ImportReport,
@@ -261,12 +261,12 @@ export class EngineClient {
 
   /**
    * Draws a still of the video, small, as a preview: its last frame, or its ending (see
-   * `PosterScene`); `cancel` stops it.
+   * `PosterScene`), with where the last frame's blocks were drawn; `cancel` stops it.
    */
   makePoster(
     settings: SettingsInput,
     scene: PosterScene = 'replay',
-  ): { result: Promise<Blob>; cancel: () => void } {
+  ): { result: Promise<{ image: Blob; boxes: OverlayBoxes }>; cancel: () => void } {
     const id = this.nextId++;
     const result = this.send({
       type: 'make-poster',
@@ -275,7 +275,7 @@ export class EngineClient {
       source: this.source,
       scene,
     }).then((reply) => {
-      if (reply.type === 'poster-made') return reply.image;
+      if (reply.type === 'poster-made') return { image: reply.image, boxes: reply.boxes };
       throw this.errorFor(reply);
     });
     return {

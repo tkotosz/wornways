@@ -148,6 +148,41 @@ export const POSITIONS: readonly Position[] = [
   'bottom-right',
 ];
 
+/** A point of the frame: percent of its width across and of its height down, 0 to 100. */
+export type FramePoint = { x: number; y: number };
+
+/**
+ * Where a block of text sits: one of the nine named positions, where blocks in the same
+ * place stack, or a point of the frame. A block placed at a point lines up with it by the
+ * third of the frame the point falls in: across, its left edge, its middle or its right
+ * edge; down, its top, its middle or its bottom. It stays where it was put, also over
+ * another block.
+ */
+export type Placement = Position | FramePoint;
+
+/** Reads a point written as "x%,y%" ("50%,8%"; the percent signs may be left out). */
+export function parseFramePoint(text: string): FramePoint | null {
+  const match = /^\s*(\d+(?:\.\d+)?)%?\s*,\s*(\d+(?:\.\d+)?)%?\s*$/.exec(text);
+  if (!match) return null;
+  const [x, y] = [Number(match[1]), Number(match[2])];
+  return x <= 100 && y <= 100 ? { x, y } : null;
+}
+
+/** A point written the way `parseFramePoint` reads it, to one decimal: "50%,8.5%". */
+export const framePointText = (point: FramePoint) =>
+  `${Number(point.x.toFixed(1))}%,${Number(point.y.toFixed(1))}%`;
+
+/** A box of the frame, in fractions of its width and height, 0 to 1. */
+export type FrameBox = { x: number; y: number; width: number; height: number };
+
+/** Where the last frame drew each block over the replay; a block not drawn is left out. */
+export type OverlayBoxes = {
+  title?: FrameBox;
+  metrics?: FrameBox;
+  elevation?: FrameBox;
+  watermark?: FrameBox;
+};
+
 export type RenderOptions = {
   width: number;
   height: number;
@@ -188,9 +223,9 @@ export type RenderOptions = {
    */
   metrics?: Metric[];
   /** Where the metrics card sits; default bottom-left. */
-  metricsPosition?: Position;
+  metricsPosition?: Placement;
   /** Where the title sits; default top-center. */
-  titlePosition?: Position;
+  titlePosition?: Placement;
   /** Scales the title; default 1. */
   titleScale?: number;
   /** Scales the metrics card; default 1. */
@@ -250,6 +285,8 @@ export type Renderer = {
    * or the end card with its mark and name.
    */
   drawFinishedCard(card: 'totals' | 'end'): void;
+  /** Where the replay frame drawn last put the title, the metrics card, the profile and the mark. */
+  overlayBoxes(): OverlayBoxes;
 };
 
 type Prepared = Projected & {
@@ -322,12 +359,38 @@ const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v
 const clockText = (s: number) =>
   `${Math.floor(s / 3600)}:${String(Math.floor((s % 3600) / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
 const smoothstep = (f: number) => f * f * (3 - 2 * f);
-/** The horizontal part of a position: the side it is on, or the middle. */
-const sideOf = (position: Position) =>
-  position.endsWith('left') ? 'left' : position.endsWith('right') ? 'right' : 'center';
-/** The vertical part of a position: the frame's top, middle or bottom. */
-const rowOf = (position: Position) =>
-  position.startsWith('top') ? 'top' : position.startsWith('middle') ? 'middle' : 'bottom';
+/** The third of the frame a point's percent falls in: the first, the middle or the last. */
+const thirdOf = (percent: number) =>
+  percent < 100 / 3 ? 'start' : percent > 200 / 3 ? 'end' : 'middle';
+/**
+ * The horizontal part of a placement: the side it is on, or the middle. A point lines up
+ * by the third it falls in.
+ */
+const sideOf = (place: Placement) => {
+  if (typeof place !== 'string') {
+    const third = thirdOf(place.x);
+    return third === 'start' ? 'left' : third === 'end' ? 'right' : 'center';
+  }
+  return place.endsWith('left') ? 'left' : place.endsWith('right') ? 'right' : 'center';
+};
+/** The vertical part of a placement: the frame's top, middle or bottom; "free" for a point. */
+const rowOf = (place: Placement) =>
+  typeof place !== 'string'
+    ? 'free'
+    : place.startsWith('top')
+      ? 'top'
+      : place.startsWith('middle')
+        ? 'middle'
+        : 'bottom';
+/**
+ * The top of a block `height` tall placed at a point `y` percent down: the point is its
+ * top in the frame's top third, its middle in the middle third, its bottom in the last.
+ */
+const freeTop = (y: number, frameHeight: number, height: number) => {
+  const at = (y / 100) * frameHeight;
+  const third = thirdOf(y);
+  return third === 'start' ? at : third === 'middle' ? at - height / 2 : at - height;
+};
 const wholeNumber = (n: number) => Math.round(n).toLocaleString('en-US');
 
 /** Points of a route closer together than this, in pixels as drawn, add nothing to the line. */
@@ -647,14 +710,25 @@ export function createRenderer(
   const titleRow = rowOf(titleCorner);
   const titleOnTop = titleRow === 'top';
   const titleSide = sideOf(titleCorner);
+  /** Where text placed at a point starts, across: the point. */
+  const cardX = typeof corner === 'string' ? xOf(cardSide) : (corner.x / 100) * W;
+  const titleX = typeof titleCorner === 'string' ? xOf(titleSide) : (titleCorner.x / 100) * W;
   /**
-   * Whether the title and the card would meet: in the same row, on the same side or with
-   * either in the middle. Then they stack, the title first.
+   * Whether the title and the card would meet: at named positions in the same row, on the
+   * same side or with either in the middle. Then they stack, the title first. A block
+   * placed at a point stays there.
    */
   const stacked =
     !!options.title &&
+    cardRow !== 'free' &&
     cardRow === titleRow &&
     (cardSide === titleSide || cardSide === 'center' || titleSide === 'center');
+  // The parts of a block's height, in pixels: the title from its top to its baseline and
+  // below it; the card's large value from its top to its baseline, and below its last line.
+  const titleAscent = 44 * unit * titleScale;
+  const titleDescent = 12 * unit * titleScale;
+  const cardAscent = 60 * unit * metricsScale;
+  const cardDescent = 14 * unit * metricsScale;
   const hasElevation = prepared.some((tr) => tr.hasElevation);
 
   // The climb profile: across the frame between the margins, just above the map credit.
@@ -966,7 +1040,10 @@ export function createRenderer(
 
     const below = lines.length > 0 ? statusGap + (lines.length - 1) * statusStep : 0;
     let headlineY: number;
-    if (cardOnTop) {
+    if (typeof corner !== 'string') {
+      // At a point: lined up with it by the third it falls in.
+      headlineY = freeTop(corner.y, H, cardAscent + below + cardDescent) + cardAscent;
+    } else if (cardOnTop) {
       // Under the title when both are in the same corner.
       const underTitle = stacked ? 78 * unit * titleScale : 0;
       headlineY = H * 0.075 + underTitle;
@@ -977,7 +1054,7 @@ export function createRenderer(
       // Raised when it has more lines, to stay clear of the bottom edge and the profile.
       headlineY = Math.min(H * 0.875, textFloor - below);
     }
-    return { headline, headlineY, lines, bottom: headlineY + below + 14 * unit * metricsScale };
+    return { headline, headlineY, lines, bottom: headlineY + below + cardDescent };
   }
 
   /**
@@ -985,6 +1062,8 @@ export function createRenderer(
    * corner goes under it; at the bottom it goes above a card in the same corner.
    */
   function titleY(card: Card | null): number {
+    if (typeof titleCorner !== 'string')
+      return freeTop(titleCorner.y, H, titleAscent + titleDescent) + titleAscent;
     if (titleOnTop) return H * 0.075;
     if (card && stacked) return card.headlineY - (60 * metricsScale + 30 * titleScale) * unit;
     if (titleRow === 'middle') return H * 0.5 + 16 * unit * titleScale;
@@ -992,17 +1071,18 @@ export function createRenderer(
   }
 
   /**
-   * The rows the title and the card take in the middle of the frame, with room for a shade
-   * around them; null when neither sits in the middle.
+   * The rows the title and the card take in the middle of the frame or at a point, with
+   * room for a shade around them; null when neither does.
    */
   function middleRows(
     card: Card | null,
     title: { y: number; top: number } | null,
   ): { top: number; bottom: number } | null {
     const rows: [number, number][] = [];
-    if (card && cardRow === 'middle')
-      rows.push([card.headlineY - 60 * unit * metricsScale, card.bottom]);
-    if (title && titleRow === 'middle') rows.push([title.top, title.y + 12 * unit * titleScale]);
+    if (card && (cardRow === 'middle' || cardRow === 'free'))
+      rows.push([card.headlineY - cardAscent, card.bottom]);
+    if (title && (titleRow === 'middle' || titleRow === 'free'))
+      rows.push([title.top, title.y + titleDescent]);
     if (rows.length === 0) return null;
     const room = H * 0.06;
     return {
@@ -1016,7 +1096,7 @@ export function createRenderer(
   function drawOverlay(t: number, zoom: number, tx: number, ty: number): void {
     const card = layoutCard(t);
     const title = options.title ? { y: titleY(card), top: 0 } : null;
-    if (title) title.top = title.y - 44 * unit * titleScale;
+    if (title) title.top = title.y - titleAscent;
     /**
      * Where the shade at the bottom starts: higher when the title sits down there, or the
      * card does above the profile.
@@ -1024,8 +1104,11 @@ export function createRenderer(
     let bottomStart =
       title && titleRow === 'bottom' ? Math.min(H * 0.76, title.top - H * 0.06) : H * 0.76;
     if (profile && card && cardRow === 'bottom')
-      bottomStart = Math.min(bottomStart, card.headlineY - 60 * unit * metricsScale - H * 0.06);
-    /** The rows text in the middle of the frame takes, with room around; null when none. */
+      bottomStart = Math.min(bottomStart, card.headlineY - cardAscent - H * 0.06);
+    /**
+     * The rows text in the middle of the frame or at a point takes, with room around; null
+     * when none.
+     */
     const middleBand = middleRows(card, title);
     if (attribution !== undefined) {
       if (bottomStart === H * 0.76) ctx.fillStyle = bottomShade;
@@ -1145,30 +1228,60 @@ export function createRenderer(
       );
 
     ctx.textBaseline = 'alphabetic';
+    boxes = {};
+    /** A box from its edges in pixels, as fractions of the frame. */
+    const frameBox = (x0: number, y0: number, x1: number, y1: number): FrameBox => ({
+      x: x0 / W,
+      y: y0 / H,
+      width: (x1 - x0) / W,
+      height: (y1 - y0) / H,
+    });
+    /** The left edge of text this wide, drawn from `x` with this alignment. */
+    const leftOf = (x: number, width: number, side: 'left' | 'center' | 'right') =>
+      side === 'left' ? x : side === 'right' ? x - width : x - width / 2;
     if (options.title && title) {
       ctx.textAlign = titleSide;
       ctx.font = titleFont;
       ctx.fillStyle = 'rgba(255, 255, 255, 0.92)';
-      ctx.fillText(options.title, xOf(titleSide), title.y);
+      ctx.fillText(options.title, titleX, title.y);
+      const width = ctx.measureText(options.title).width;
+      const left = leftOf(titleX, width, titleSide);
+      boxes.title = frameBox(left, title.top, left + width, title.y + titleDescent);
     }
     if (card) {
-      const x = xOf(cardSide);
+      const x = cardX;
       ctx.textAlign = cardSide;
       ctx.font = headlineFont;
       ctx.fillStyle = 'rgba(255, 255, 255, 0.94)';
       ctx.fillText(card.headline, x, card.headlineY);
+      let width = ctx.measureText(card.headline).width;
       ctx.font = statusFont;
       ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
-      card.lines.forEach((line, i) =>
-        ctx.fillText(line, x, card.headlineY + statusGap + i * statusStep),
-      );
+      card.lines.forEach((line, i) => {
+        ctx.fillText(line, x, card.headlineY + statusGap + i * statusStep);
+        width = Math.max(width, ctx.measureText(line).width);
+      });
+      const left = leftOf(x, width, cardSide);
+      boxes.metrics = frameBox(left, card.headlineY - cardAscent, left + width, card.bottom);
     }
+    if (profile)
+      boxes.elevation = frameBox(
+        profileBox.x,
+        profileBox.y,
+        profileBox.x + profileBox.width,
+        profileBox.y + profileBox.height,
+      );
     if (options.watermark) {
       // At the bottom left, on the map credit's line, as far from the edge as the credit
       // is on the right: the two never meet, whatever the credit's length.
-      drawWatermark(ctx, W * 0.03, H - H * 0.012, unit, fontFamily);
+      const left = W * 0.03;
+      const baseline = H - H * 0.012;
+      const mark = drawWatermark(ctx, left, baseline, unit, fontFamily);
+      boxes.watermark = frameBox(left, baseline - mark.height, left + mark.width, baseline);
     }
   }
+  /** Where `drawOverlay` put each block, for `overlayBoxes`. */
+  let boxes: OverlayBoxes = {};
 
   /** A copy of the replay's last frame, which the totals card is drawn over. */
   let lastReplayFrame: CanvasLike | null = null;
@@ -1305,6 +1418,7 @@ export function createRenderer(
         });
       else drawEndCard(ctx, base, END_CARD_S, { width: W, height: H, fontFamily });
     },
+    overlayBoxes: () => boxes,
     skipTo(index: number): void {
       // The end card is drawn over the replay's last frame, so it cannot be skipped to.
       if (index < nextFrame || index >= replayFrames)

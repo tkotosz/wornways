@@ -562,6 +562,77 @@ describe('the title', () => {
   });
 });
 
+describe('a block placed at a point', () => {
+  const width = 270;
+  const height = 480;
+
+  function lastFrame(options: Partial<RenderOptions>) {
+    const renderer = createRenderer(
+      [route()],
+      chronologicalTimeline([5_000], { duration: 1 }),
+      (w, h) => createCanvas(w, h) as unknown as CanvasLike,
+      { width, height, fps: 10, overlay: 'single', title: 'Morning', metrics: [], ...options },
+    );
+    for (let f = 0; f < renderer.frameCount; f++) renderer.renderFrame(f);
+    return { canvas: renderer.canvas, boxes: renderer.overlayBoxes() };
+  }
+  /** A box in pixels: left, top, right and bottom edges. */
+  const edges = (box: { x: number; y: number; width: number; height: number }) => ({
+    left: box.x * width,
+    top: box.y * height,
+    right: (box.x + box.width) * width,
+    bottom: (box.y + box.height) * height,
+  });
+
+  it('lines up with the point by the third of the frame it falls in', () => {
+    // Left third, top third: the point is the block's top-left corner.
+    const topLeft = edges(lastFrame({ titlePosition: { x: 10, y: 20 } }).boxes.title!);
+    expect(topLeft.left).toBeCloseTo(27, 0);
+    expect(topLeft.top).toBeCloseTo(96, 0);
+    // Middle third both ways: the point is the block's middle.
+    const middle = edges(lastFrame({ titlePosition: { x: 50, y: 50 } }).boxes.title!);
+    expect((middle.left + middle.right) / 2).toBeCloseTo(135, 0);
+    expect((middle.top + middle.bottom) / 2).toBeCloseTo(240, 0);
+    // Last third both ways: the point is the block's bottom-right corner.
+    const bottomRight = edges(
+      lastFrame({ metricsPosition: { x: 90, y: 80 }, metrics: ['time'] }).boxes.metrics!,
+    );
+    expect(bottomRight.right).toBeCloseTo(243, 0);
+    expect(bottomRight.bottom).toBeCloseTo(384, 0);
+  });
+
+  it('is drawn inside the box reported for it, and nowhere else', () => {
+    const { canvas, boxes } = lastFrame({ titlePosition: { x: 30, y: 40 } });
+    const box = edges(boxes.title!);
+    const inside = textPixels(
+      canvas,
+      Math.floor(box.left),
+      Math.floor(box.top),
+      Math.ceil(box.right),
+      Math.ceil(box.bottom),
+    );
+    expect(inside).toBeGreaterThan(20);
+    expect(textPixels(canvas, 0, 0, width, height)).toBe(inside);
+  });
+
+  it('stays where it was put, also where the other block is', () => {
+    const titleAlone = lastFrame({ titlePosition: { x: 10, y: 85 } });
+    const both = lastFrame({ titlePosition: { x: 10, y: 85 }, metrics: ['time'] });
+    expect(both.boxes.title).toEqual(titleAlone.boxes.title);
+  });
+
+  it('reports the boxes of the named positions too, the profile and the watermark', () => {
+    const { boxes } = lastFrame({ metrics: ['time'], watermark: true });
+    const title = edges(boxes.title!);
+    // At the top in the middle.
+    expect((title.left + title.right) / 2).toBeCloseTo(135, 0);
+    expect(title.top).toBeLessThan(height * 0.1);
+    expect(boxes.metrics!.y).toBeGreaterThan(0.8);
+    expect(boxes.watermark!.x).toBeCloseTo(0.03, 2);
+    expect(boxes.elevation).toBeUndefined();
+  });
+});
+
 describe('skipping ahead', () => {
   it('draws the last frame as if every frame before it had been drawn', () => {
     const width = 270;

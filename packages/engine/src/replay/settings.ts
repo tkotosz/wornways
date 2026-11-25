@@ -10,7 +10,7 @@ import { END_CARD_S } from './end-card.ts';
 import { AUTOMATIC_TOTALS, TOTALS_CARD_S, TOTALS_FIELDS, type TotalsField } from './totals-card.ts';
 import { PRESETS, PRESET_NAMES, type Preset } from './presets.ts';
 import type { Grouping } from './plans.ts';
-import { METRICS, POSITIONS, type Metric, type Position } from './render.ts';
+import { METRICS, POSITIONS, parseFramePoint, type Metric, type Placement } from './render.ts';
 
 export type RenderSettings = {
   // Which activities
@@ -69,7 +69,7 @@ export type RenderSettings = {
   // Title
   /** null: a title made from the selection; empty: no title. */
   title: string | null;
-  titlePosition: Position;
+  titlePosition: Placement;
   /** Size of the title in percent of the normal size. */
   titleSize: number;
 
@@ -78,7 +78,7 @@ export type RenderSettings = {
   metrics: boolean;
   /** The values in order, the first one large; null: what suits the video. */
   metricsFields: Metric[] | null;
-  metricsPosition: Position;
+  metricsPosition: Placement;
   /** Size of the metrics card in percent of the normal size. */
   metricsSize: number;
 
@@ -100,7 +100,8 @@ export type NearPlace = { place: LatLon; radius: number };
 export type SettingKind =
   | { type: 'switch' }
   | { type: 'number'; min: number; max: number; unit: string }
-  | { type: 'choice'; choices: readonly string[] }
+  /** One of `choices`; with `points`, also a point of the frame, "x%,y%". */
+  | { type: 'choice'; choices: readonly string[]; points?: boolean }
   /** Free text; `valueName` names the value in help, e.g. "id". */
   | { type: 'text'; valueName: string }
   /** A comma-separated list; with `choices`, of those values only. `valueName` names an item in help. */
@@ -396,11 +397,14 @@ export const SETTINGS: readonly SettingDefinition[] = [
     name: 'title-position',
     label: 'Title position',
     group: 'title',
-    kind: { type: 'choice', choices: POSITIONS },
+    kind: { type: 'choice', choices: POSITIONS, points: true },
     default: 'top-center',
     help:
-      'Where the title sits: a row (top, middle or bottom) and a side. Where it would meet the ' +
-      'metrics card, the two stack, the title first.',
+      'Where the title sits: a row (top, middle or bottom) and a side, or a point of the frame ' +
+      'in percent across and down, e.g. 50%,8%. Where it would meet the metrics card at a ' +
+      'named position, the two stack, the title first. At a point it lines up by the third ' +
+      'of the frame the point is in: its left edge, middle or right edge; its top, middle or ' +
+      'bottom.',
   },
   {
     name: 'title-size',
@@ -438,9 +442,11 @@ export const SETTINGS: readonly SettingDefinition[] = [
     name: 'metrics-position',
     label: 'Position',
     group: 'metrics',
-    kind: { type: 'choice', choices: POSITIONS },
+    kind: { type: 'choice', choices: POSITIONS, points: true },
     default: 'bottom-left',
-    help: 'Where the metrics card sits: a row (top, middle or bottom) and a side.',
+    help:
+      'Where the metrics card sits: a row (top, middle or bottom) and a side, or a point of ' +
+      'the frame in percent across and down, e.g. 7%,88%, lined up as the title is.',
   },
   {
     name: 'metrics-size',
@@ -620,6 +626,20 @@ export function parseSettings(input: SettingsInput): RenderSettings {
       );
     return n;
   };
+  /** A named position, or a point of the frame. */
+  const placement = (name: string): Placement => {
+    const kind = definition(name).kind;
+    if (kind.type !== 'choice' || !kind.points)
+      throw new Error(`"${name}" is not a placement setting`);
+    const value = text(name) ?? '';
+    if (kind.choices.includes(value)) return value as Placement;
+    const point = parseFramePoint(value);
+    if (point) return point;
+    throw new SettingsError(
+      name,
+      `expects ${kind.choices.join(' or ')}, or a point such as 50%,8%, got "${value}"`,
+    );
+  };
   const choice = <T extends string>(name: string): T => {
     const kind = definition(name).kind;
     if (kind.type !== 'choice') throw new Error(`"${name}" is not a choice setting`);
@@ -715,14 +735,14 @@ export function parseSettings(input: SettingsInput): RenderSettings {
     map: flag('map'),
     elevationProfile: optionalFlag('elevation-profile'),
     title: text('title'),
-    titlePosition: choice<Position>('title-position'),
+    titlePosition: placement('title-position'),
     titleSize: number('title-size'),
     width,
     height,
     fps: Number(choice('fps')),
     metrics: flag('metrics'),
     metricsFields: choiceList<Metric>('metrics-fields'),
-    metricsPosition: choice<Position>('metrics-position'),
+    metricsPosition: placement('metrics-position'),
     metricsSize: number('metrics-size'),
     totalsCard: flag('totals-card'),
     totalsFields: choiceList<TotalsField>('totals-fields'),

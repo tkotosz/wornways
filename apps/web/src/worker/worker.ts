@@ -215,7 +215,7 @@ async function answer(request: Exclude<Request, { type: 'cancel' }>, signal: Abo
         plan: planVideo(await tracks(), request.settings, source === 'strava'),
       });
     case 'make-poster': {
-      const image = await makePoster(
+      const { image, boxes } = await makePoster(
         await tracks(),
         request.settings,
         renderSignal,
@@ -223,7 +223,7 @@ async function answer(request: Exclude<Request, { type: 'cancel' }>, signal: Abo
         request.scene,
       );
       renderSignal.throwIfAborted();
-      return reply({ type: 'poster-made', id, image });
+      return reply({ type: 'poster-made', id, image, boxes });
     }
     case 'make-video': {
       const { video, report } = await makeVideo(

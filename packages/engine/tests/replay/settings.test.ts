@@ -147,11 +147,27 @@ describe('parseSettings', () => {
     ],
     [
       { 'metrics-position': 'center' },
-      'metrics-position: expects top-left or top-center or top-right or middle-left or middle-center or middle-right or bottom-left or bottom-center or bottom-right, got "center"',
+      'metrics-position: expects top-left or top-center or top-right or middle-left or middle-center or middle-right or bottom-left or bottom-center or bottom-right, or a point such as 50%,8%, got "center"',
+    ],
+    [
+      { 'title-position': '120%,8%' },
+      'title-position: expects top-left or top-center or top-right or middle-left or middle-center or middle-right or bottom-left or bottom-center or bottom-right, or a point such as 50%,8%, got "120%,8%"',
     ],
     [{ 'metrics-size': '300' }, 'metrics-size: expects a number from 50 to 200, got "300"'],
   ])('rejects %j', (input, message) => {
     expect(errorOf(input)).toBe(message);
+  });
+
+  it('reads a position as a name or as a point of the frame, in percent', () => {
+    expect(parseSettings({ 'title-position': 'bottom-right' }).titlePosition).toBe('bottom-right');
+    expect(parseSettings({ 'title-position': '50%,8.5%' }).titlePosition).toEqual({
+      x: 50,
+      y: 8.5,
+    });
+    expect(parseSettings({ 'metrics-position': ' 7, 88 ' }).metricsPosition).toEqual({
+      x: 7,
+      y: 88,
+    });
   });
 
   it('reads a list of activity ids', () => {

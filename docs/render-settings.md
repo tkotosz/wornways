@@ -152,14 +152,21 @@ activity to the next every few frames.
 
 ### Title
 
-| Setting        | CLI flag           | Values                                                                                | Default                 |
-| -------------- | ------------------ | ------------------------------------------------------------------------------------- | ----------------------- |
-| Title          | `--title`          | text, empty for none                                                                  | made from the selection |
-| Title position | `--title-position` | `top-`, `middle-` or `bottom-` with `left`, `center` or `right`, e.g. `middle-center` | `top-center`            |
-| Title size     | `--title-size`     | 50–200%                                                                               | 100%                    |
+| Setting        | CLI flag           | Values                                                                                                           | Default                 |
+| -------------- | ------------------ | ---------------------------------------------------------------------------------------------------------------- | ----------------------- |
+| Title          | `--title`          | text, empty for none                                                                                             | made from the selection |
+| Title position | `--title-position` | `top-`, `middle-` or `bottom-` with `left`, `center` or `right`, e.g. `middle-center`, or a point, e.g. `50%,8%` | `top-center`            |
+| Title size     | `--title-size`     | 50–200%                                                                                                          | 100%                    |
 
-Where the title would meet the metrics card (the same edge, and the same side or either in the
-middle), the two stack, the title first.
+Where the title would meet the metrics card at a named position (the same edge, and the same
+side or either in the middle), the two stack, the title first.
+
+A point is a place on the frame, in percent of its width across and of its height down. The
+block lines up with it by the third of the frame the point falls in: across, its left edge,
+its middle or its right edge; down, its top, its middle or its bottom. So `7%,5%` puts the
+top-left corner of the title near the top-left corner of the frame, and `50%,50%` centers it.
+A block placed at a point stays there, also over another block, and gets a soft dark band
+behind it, like text in the middle row. The metrics card takes points the same way.
 
 ### Metrics card
 
@@ -219,12 +226,12 @@ Unless picked, the video shows what suits it (one activity: time, distance, date
 time, count, distance; in turn: date, count, distance) and the totals card its first four
 values.
 
-| Setting   | CLI flag                     | Values                                                                                | Default              |
-| --------- | ---------------------------- | ------------------------------------------------------------------------------------- | -------------------- |
-| Show card | `--metrics` / `--no-metrics` | on/off                                                                                | on                   |
-| Values    | `--metrics-fields`           | comma-separated, in the order shown: any value of the table above                     | what suits the video |
-| Position  | `--metrics-position`         | `top-`, `middle-` or `bottom-` with `left`, `center` or `right`, e.g. `middle-center` | `bottom-left`        |
-| Card size | `--metrics-size`             | 50–200%                                                                               | 100%                 |
+| Setting   | CLI flag                     | Values                                                                                                           | Default              |
+| --------- | ---------------------------- | ---------------------------------------------------------------------------------------------------------------- | -------------------- |
+| Show card | `--metrics` / `--no-metrics` | on/off                                                                                                           | on                   |
+| Values    | `--metrics-fields`           | comma-separated, in the order shown: any value of the table above                                                | what suits the video |
+| Position  | `--metrics-position`         | `top-`, `middle-` or `bottom-` with `left`, `center` or `right`, e.g. `middle-center`, or a point, e.g. `7%,88%` | `bottom-left`        |
+| Card size | `--metrics-size`             | 50–200%                                                                                                          | 100%                 |
 
 ### Totals card
 
