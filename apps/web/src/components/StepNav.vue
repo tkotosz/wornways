@@ -11,6 +11,8 @@ import StepBar from './StepBar.vue';
 
 const props = defineProps<{
   step: Step;
+  /** Where the way back leads when it is not the step before, e.g. "Sources". */
+  backLabel?: string;
   backDisabled?: boolean;
   nextDisabled?: boolean;
   /** Whether the slot holds actions now, so phones show the bottom bar for them. */
@@ -19,7 +21,7 @@ const props = defineProps<{
 const emit = defineEmits<{ back: []; next: [] }>();
 
 const index = computed(() => STEPS.findIndex((s) => s.id === props.step));
-const before = computed(() => STEPS[index.value - 1]);
+const before = computed(() => props.backLabel ?? STEPS[index.value - 1]?.label);
 const after = computed(() => STEPS[index.value + 1]);
 </script>
 
@@ -27,6 +29,7 @@ const after = computed(() => STEPS[index.value + 1]);
   <Teleport defer to="#step-nav">
     <StepBar
       :step="step"
+      :back-label="backLabel"
       :back-disabled="backDisabled"
       :next-disabled="nextDisabled"
       @back="emit('back')"
@@ -41,7 +44,7 @@ const after = computed(() => STEPS[index.value + 1]);
       :disabled="backDisabled"
       @click="emit('back')"
     >
-      ← <span class="visually-hidden">Back to </span>{{ before.label }}
+      ← <span class="visually-hidden">Back to </span>{{ before }}
     </button>
     <span v-else class="step-button" />
     <slot />

@@ -46,9 +46,16 @@ same way on every step: the buttons name the step they go to ("← Source", "Des
 always change the step. On wide screens they sit in a bar at the bottom of the step, which
 stays at the bottom of the window while the step is taller, with the step's own actions
 between them (Download and Share on Export). On a phone they sit in a slim bar at the top
-of the window, in place of the pills: the way back at the left, "Step 2 of 4 · Activities"
-in the middle, the way on at the right; the bottom bar then holds only the step's own
-actions, when there are some. Each step is one column on a phone.
+of the window, in place of the header and the pills: the way back at the left, "Step 2 of
+4 · Activities" in the middle, the way on at the right; the bottom bar then holds only the
+step's own actions, when there are some. Each step is one column on a phone.
+
+The list of sources, before one is chosen, is the app's home screen: the header with the
+name, the version and About (and Install app where offered), and no step bar or pills,
+since there is nowhere to go back to and nothing to go on with until a source is picked.
+On a phone it is the only screen with the header; wide screens keep the header on every
+step. A chosen source's screen is step 1, and its way back ("← Sources") leads to the
+list.
 
 1. **Source.** Where the activities come from: files on this device, Strava, Ride with
    GPS (the last two where the site offers them) or the demo. One source is chosen at a
@@ -59,8 +66,8 @@ actions, when there are some. Each step is one column on a phone.
    source is picked, the way on and the later steps are disabled. Ride with GPS's card
    shows its official icon; Strava's brand rules allow only its connect button and
    badges, so its card has a drawing. Picking one shows what it needs, under a "Current
-   source" heading with the source's name, with "Change source" beside it, which clears
-   the choice and lists the sources again (connections stay): for files, a
+   source" heading with the source's name. Its way back ("← Sources") clears the choice
+   and lists the sources again (connections stay): for files, a
    drop zone and file and folder pickers, a report of what the last import added and what
    could not be read (closable), and the library as a grid with a header row (date, name,
    sport, distance) and a delete button per row ("Delete saved activities" removes them

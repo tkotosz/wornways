@@ -1,5 +1,5 @@
 import { expect, test, type Page, type WebSocketRoute } from '@playwright/test';
-import { pickSource } from './sources.ts';
+import { backToSources, pickSource } from './sources.ts';
 import { expectSection, openSection } from './steps.ts';
 
 const olderYear = new Date().getFullYear() - 1;
@@ -195,7 +195,7 @@ async function fakeStrava(
 }
 
 async function connect(page: Page) {
-  // From the list of sources (a first visit, or after "Change source"), Strava is picked first.
+  // From the list of sources (a first visit, or after going back to it), Strava is picked first.
   const sources = page.getByTestId('sources');
   const link = page.getByRole('link', { name: 'Connect with Strava' });
   await expect(sources.or(link)).toBeVisible();
@@ -219,7 +219,7 @@ test.describe('Strava on a phone', () => {
     await pickSource(page, 'files');
     await page.getByTestId('file-input').setInputFiles(fixture.pathname);
     await expect(page.getByTestId('activity-count')).toContainText('3 activities');
-    await page.getByRole('button', { name: 'Change source' }).click();
+    await backToSources(page);
     await connect(page);
     await expect(page.getByRole('status')).toHaveText('No Strava activities in this period.');
     await page.getByRole('button', { name: 'Last year', exact: true }).click();
@@ -250,7 +250,7 @@ test.describe('Strava on a phone', () => {
       await page.getByRole('button', { name: `← Back to ${step}` }).click();
     }
     await expect(page.getByTestId('chosen-source')).toHaveText('Strava');
-    await page.getByRole('button', { name: 'Change source' }).click();
+    await backToSources(page);
     await pickSource(page, 'files');
     // Choosing files keeps the Strava connection and its cached tracks for their two hours.
     await expect(page.getByTestId('result')).toHaveCount(0);
@@ -265,7 +265,7 @@ test.describe('Strava on a phone', () => {
     await expect(page.getByTestId('chosen')).not.toContainText('Strava test ride');
 
     // Strava opens again without signing in, with the track it already had.
-    await page.getByRole('button', { name: 'Change source' }).click();
+    await backToSources(page);
     await expect(page.getByTestId('choose-strava')).toContainText('Connected until');
     await expect(page.getByTestId('choose-strava')).toContainText('1 downloaded');
     // Its screen shows what is kept here without asking Strava; Continue reads the list.
@@ -399,7 +399,7 @@ test('shows the tracks downloaded while Strava is the source', async ({ page }) 
     '1 activity downloaded to this device',
   );
   await expect(page.getByTestId('downloaded')).toContainText('Strava test ride');
-  await page.getByRole('button', { name: 'Change source' }).click();
+  await backToSources(page);
   await expect(page.getByTestId('choose-strava')).toContainText('1 downloaded');
 
   // A track cached before the list of kept tracks existed is listed once it is used again.
@@ -452,12 +452,12 @@ test('keeps Ride with GPS connected and listed while Strava is the source', asyn
   await page.getByRole('button', { name: 'Continue' }).click();
   await expect(page.getByTestId('source')).toContainText('Ride with GPS');
 
-  await page.getByRole('button', { name: 'Change source' }).click();
+  await backToSources(page);
   await connect(page);
   await expect(page.getByTestId('source')).toContainText('Strava');
 
   // Strava is the source; Ride with GPS is still connected and listed with the others.
-  await page.getByRole('button', { name: 'Change source' }).click();
+  await backToSources(page);
   await expect(page.getByTestId('choose-strava')).toContainText('Connected until');
   await expect(page.getByTestId('choose-rwgps')).toContainText('Connected');
 
@@ -468,7 +468,7 @@ test('keeps Ride with GPS connected and listed while Strava is the source', asyn
   await page.reload();
   await expect(page.getByTestId('source')).toContainText('Strava');
 
-  await page.getByRole('button', { name: 'Change source' }).click();
+  await backToSources(page);
   await pickSource(page, 'rwgps');
   await page.getByRole('button', { name: 'Continue' }).click();
   await expect(page.getByTestId('source')).toContainText('Ride with GPS');
@@ -631,7 +631,7 @@ test('offers the file workflow when Strava refuses a connection at capacity', as
   await expect(page.getByRole('button', { name: 'Choose files' })).toBeVisible();
   // The message is about that one sign-in: it is gone when Strava is chosen again.
   await page.reload();
-  await page.getByRole('button', { name: 'Change source' }).click();
+  await backToSources(page);
   await pickSource(page, 'strava');
   await expect(page.getByRole('link', { name: 'Connect with Strava' })).toBeVisible();
   await expect(page.getByTestId('strava-unanswered')).toHaveCount(0);

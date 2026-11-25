@@ -19,7 +19,6 @@ test('starts without a network after the first visit', async ({ page, context })
   await page.evaluate('navigator.serviceWorker.ready');
   await context.setOffline(true);
   await page.reload();
-  await expect(page.getByRole('navigation', { name: 'Steps' })).toBeVisible();
   await expect(page.getByTestId('sources')).toBeVisible();
   await context.setOffline(false);
 });
@@ -27,7 +26,7 @@ test('starts without a network after the first visit', async ({ page, context })
 test('installs from its own button when the browser offers it', async ({ page }) => {
   await page.goto('/');
   const install = page.getByRole('button', { name: 'Install app' });
-  await expect(page.getByRole('navigation', { name: 'Steps' })).toBeVisible();
+  await expect(page.getByTestId('sources')).toBeVisible();
   await expect(install).toBeHidden();
 
   // The offer Chrome and Edge send once the app can be installed.

@@ -1,9 +1,9 @@
 <script setup lang="ts">
 // Step 1: where the activities come from. One source is chosen at a time: files saved on
 // this device, Strava, Ride with GPS, or the demo's made-up activities; they are never mixed.
-// Until one is chosen, and after "Change source", the step lists them to pick from. Once one
-// is chosen, the step shows what that source needs: adding files, connecting, or starting
-// the demo.
+// Until one is chosen, and after going back to the sources, the step lists them to pick from:
+// the app's home screen. Once one is chosen, the step shows what that source needs: adding
+// files, connecting, or starting the demo.
 import { computed, onMounted, ref, watch } from 'vue';
 import ActivityGrid from '../components/ActivityGrid.vue';
 import AddFiles from '../components/AddFiles.vue';
@@ -229,9 +229,6 @@ async function remove(ids: string[] | 'all'): Promise<void> {
           <p class="kicker">Current source</p>
           <h1 data-testid="chosen-source">{{ NAMES[chosen] }}</h1>
         </div>
-        <button type="button" class="link change" @click="emit('changeSource')">
-          Change source
-        </button>
       </header>
 
       <div v-if="chosen === 'files'" class="screen" data-testid="files-source">
@@ -355,7 +352,16 @@ async function remove(ids: string[] | 'all'): Promise<void> {
       />
     </template>
 
-    <StepNav step="import" :next-disabled="!ready" @next="emit('next')" />
+    <!-- Back leads to the list of sources, which clears the choice; the list itself is the
+         app's home screen and has no step bar. -->
+    <StepNav
+      v-if="!listing"
+      step="import"
+      back-label="Sources"
+      :next-disabled="!ready"
+      @back="emit('changeSource')"
+      @next="emit('next')"
+    />
   </section>
 </template>
 
@@ -426,11 +432,6 @@ async function remove(ids: string[] | 'all'): Promise<void> {
 
 .chosen h1 {
   margin: 0;
-}
-
-/* Back to the list of sources, at the end of the row. */
-.change {
-  margin-left: auto;
 }
 
 .kicker {

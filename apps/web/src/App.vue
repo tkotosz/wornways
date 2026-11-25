@@ -42,6 +42,8 @@ const steps = STEPS;
 /** The Design step's open section, kept while the app is open, like the step. */
 const section = ref<Section>('frame');
 const stepIndex = computed(() => steps.findIndex((s) => s.id === step.value));
+/** The home screen: the list of sources, before one is chosen. */
+const home = computed(() => step.value === 'import' && chosen.value === null);
 
 const unsupported = missingSupport();
 const version = WORNWAYS_VERSION;
@@ -435,7 +437,9 @@ onMounted(() => {
 
 <template>
   <!-- The header and the step bar stay at the top of the window while a step scrolls. -->
-  <div ref="topBar" class="top-bar" :class="{ editing: step === 'design' }">
+  <!-- The app's header shows on wide screens, and on phones only on the home screen (the list
+       of sources); elsewhere phones have only the step bar (#step-nav). -->
+  <div ref="topBar" class="top-bar" :class="{ editing: step === 'design', home }">
     <header class="header">
       <span class="brand">
         <img class="mark" src="/icons/route.svg" alt="" />
@@ -490,7 +494,7 @@ onMounted(() => {
         </ModalPanel>
       </span>
     </header>
-    <nav v-if="!unsupported && loaded" class="steps-row" aria-label="Steps">
+    <nav v-if="!unsupported && loaded && !home" class="steps-row" aria-label="Steps">
       <!-- Wide screens: a pill per step, a tick on the steps behind. -->
       <ol class="steps">
         <li v-for="(s, i) in steps" :key="s.id">
@@ -609,9 +613,14 @@ onMounted(() => {
   border-bottom: 1px solid var(--line);
 }
 
-/* Phones: the Design step is an editor screen with a top bar of its own. */
+/* Phones: the Design step is an editor screen with a top bar of its own; past the home
+   screen, the step bar takes the header's place. */
 @media (max-width: 760px) {
   .top-bar.editing {
+    display: none;
+  }
+
+  .top-bar:not(.home) .header {
     display: none;
   }
 }

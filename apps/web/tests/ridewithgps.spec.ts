@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { offlineMap } from './offline-map.ts';
-import { pickSource } from './sources.ts';
+import { backToSources, pickSource } from './sources.ts';
 import { expectSection } from './steps.ts';
 
 test.use({ serviceWorkers: 'block' });
@@ -187,7 +187,7 @@ test('switches between Ride with GPS and files without disconnecting', async ({ 
   // The newest five are fetched ahead.
   await expect.poll(() => fetched.length).toBe(5);
 
-  await page.getByRole('button', { name: 'Change source' }).click();
+  await backToSources(page);
   await expect(page.getByTestId('choose-rwgps')).toContainText(/Connected · \d+ downloaded/);
   await pickSource(page, 'files');
   await expect(page.getByTestId('chosen-source')).toHaveText('Files');
@@ -195,7 +195,7 @@ test('switches between Ride with GPS and files without disconnecting', async ({ 
   // Files were chosen last, so a reload stays with them; Ride with GPS is still connected.
   await page.reload();
   await expect(page.getByTestId('chosen-source')).toHaveText('Files');
-  await page.getByRole('button', { name: 'Change source' }).click();
+  await backToSources(page);
   await expect(page.getByTestId('choose-rwgps')).toContainText('Connected · 5 downloaded');
 
   // Its screen shows what is kept here without asking Ride with GPS; Continue reads the list.

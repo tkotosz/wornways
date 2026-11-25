@@ -1,22 +1,29 @@
 <script setup lang="ts">
 // Phones: the bar at the top of the window that moves between the steps: the way back at the
 // left, which step of how many in the middle, on at the right. The buttons name the step they
-// go to. Wide screens have the same buttons at the bottom of the step (StepNav).
+// go to; the first step's way back (`backLabel`) leads off the steps, to the list of sources.
+// Wide screens have the same buttons at the bottom of the step (StepNav).
 import { computed } from 'vue';
 import { STEPS, type Step } from '../step-list.ts';
 
-const props = defineProps<{ step: Step; backDisabled?: boolean; nextDisabled?: boolean }>();
+const props = defineProps<{
+  step: Step;
+  /** Where the way back leads when it is not the step before, e.g. "Sources". */
+  backLabel?: string;
+  backDisabled?: boolean;
+  nextDisabled?: boolean;
+}>();
 const emit = defineEmits<{ back: []; next: [] }>();
 
 const index = computed(() => STEPS.findIndex((s) => s.id === props.step));
-const before = computed(() => STEPS[index.value - 1]);
+const before = computed(() => props.backLabel ?? STEPS[index.value - 1]?.label);
 const after = computed(() => STEPS[index.value + 1]);
 </script>
 
 <template>
   <div class="step-bar">
     <button v-if="before" type="button" class="back" :disabled="backDisabled" @click="emit('back')">
-      ← <span class="visually-hidden">Back to </span>{{ before.label }}
+      ← <span class="visually-hidden">Back to </span>{{ before }}
     </button>
     <span v-else />
     <span class="where">

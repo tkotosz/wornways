@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { offlineMap } from './offline-map.ts';
-import { pickSource } from './sources.ts';
+import { backToSources, pickSource } from './sources.ts';
 import { openSection, openStep } from './steps.ts';
 
 const ride = new URL(
@@ -42,7 +42,7 @@ test('tries the demo, makes a video of it, and stores nothing on this device', a
 
   // Changing to files: nothing of the demo was kept, also after a reload.
   await page.getByRole('button', { name: 'Activities', exact: true }).click();
-  await page.getByRole('button', { name: 'Change source' }).click();
+  await backToSources(page);
   await pickSource(page, 'files');
   await expect(page.getByRole('button', { name: 'Choose files' })).toBeVisible();
   await expect(page.getByTestId('activity-count')).toHaveCount(0);
@@ -59,11 +59,12 @@ test('offers the demo next to the files on this device, and keeps them apart', a
   await expect(page.getByTestId('activity-count')).toHaveText('1 activity on this device');
 
   // Changing source chooses none: the later steps wait for a new choice, also after a reload.
-  await page.getByRole('button', { name: 'Change source' }).click();
+  await backToSources(page);
   await expect(page.getByTestId('choose-files')).toContainText('1 activity on this device');
   await expect(page.getByTestId('chosen-source')).toHaveCount(0);
-  await expect(page.getByRole('button', { name: 'Continue' })).toBeDisabled();
-  await expect(page.getByRole('button', { name: 'Activities', exact: true })).toBeDisabled();
+  // The list is the home screen: no step bar, nothing to continue to or go back to.
+  await expect(page.getByRole('navigation', { name: 'Steps' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: /^Continue/ })).toHaveCount(0);
   await expect(page.getByRole('button', { name: /^← Back/ })).toHaveCount(0);
   await page.reload();
   await expect(page.getByTestId('chosen-source')).toHaveCount(0);
@@ -72,12 +73,12 @@ test('offers the demo next to the files on this device, and keeps them apart', a
   await expect(page.getByTestId('chosen-count')).toContainText('25 of 25');
 
   // The demo's activities never join the files, and the files come back as they were.
-  await page.getByRole('button', { name: 'Change source' }).click();
+  await backToSources(page);
   await pickSource(page, 'files');
   await expect(page.getByTestId('activity-count')).toHaveText('1 activity on this device');
 });
 
-test("shows the demo's own screen, and Change source lists every source", async ({ page }) => {
+test("shows the demo's own screen, and going back lists every source", async ({ page }) => {
   page.setDefaultTimeout(15_000);
   await page.goto('/');
   await startDemo(page);
@@ -91,7 +92,7 @@ test("shows the demo's own screen, and Change source lists every source", async 
   await expect(page.getByTestId('demo-activities')).toContainText('Sa Calobra');
   await expect(page.getByTestId('demo-activities').getByRole('button')).toHaveCount(0);
 
-  await page.getByRole('button', { name: 'Change source' }).click();
+  await backToSources(page);
   await expect(page.getByTestId('sources')).toContainText('Files');
   await expect(page.getByTestId('chosen-source')).toHaveCount(0);
   await pickSource(page, 'files');
