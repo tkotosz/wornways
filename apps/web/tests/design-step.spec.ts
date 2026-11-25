@@ -24,11 +24,11 @@ test('opens any section of the Design step from its bar, and leaves the step fro
   // section.
   await expectSection(page, 'Frame');
   await openSection(page, 'Overlay');
-  await page.getByRole('button', { name: 'Continue to Export →' }).click();
+  await page.getByRole('button', { name: 'Continue to Export' }).click();
   await expect(page.getByRole('button', { name: 'Make video' })).toBeVisible();
-  await page.getByRole('button', { name: '← Back to Design' }).click();
+  await page.getByRole('button', { name: 'Back to Design' }).click();
   await expectSection(page, 'Overlay');
-  await page.getByRole('button', { name: '← Back to Activities' }).click();
+  await page.getByRole('button', { name: 'Back to Activities' }).click();
   await expect(page.getByTestId('chosen-count')).toBeVisible();
 
   // The bar opens any section, and the section stays open after leaving the step.
@@ -56,7 +56,7 @@ test.describe('the Design step on a phone', () => {
 
     // The app's header and step bar make way for the editor's own top bar.
     await expect(page.getByRole('navigation', { name: 'Steps' })).toBeHidden();
-    await expect(page.getByText('Step 3 of 4 · Design')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Step 3 of 4: Design' })).toBeVisible();
 
     const preview = page.getByTestId('preview').getByRole('img');
     const sections = page.getByRole('navigation', { name: 'Sections' });
@@ -103,10 +103,10 @@ test.describe('the Design step on a phone', () => {
     expect(await pageScrolls()).toBe(false);
 
     // The top bar leaves the step either way.
-    await page.getByRole('button', { name: 'Continue to Export →' }).click();
+    await page.getByRole('button', { name: 'Continue to Export' }).click();
     await expect(page.getByRole('button', { name: 'Make video' })).toBeVisible();
-    await page.getByRole('button', { name: '← Back to Design' }).click();
-    await page.getByRole('button', { name: '← Back to Activities' }).click();
+    await page.getByRole('button', { name: 'Back to Design' }).click();
+    await page.getByRole('button', { name: 'Back to Activities' }).click();
     await expect(page.getByTestId('chosen-count')).toBeVisible();
   });
 });

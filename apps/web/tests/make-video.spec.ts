@@ -437,7 +437,7 @@ test('keeps the video while the choice stays the same', async ({ page, context }
   await expect(page.getByTestId('result')).toBeVisible({ timeout: 150_000 });
 
   // Back opens the Design step on the section left open, and Continue comes back.
-  await page.getByRole('button', { name: '← Back to Design' }).click();
+  await page.getByRole('button', { name: 'Back to Design' }).click();
   await expectSection(page, 'Frame');
   await page.getByRole('button', { name: 'Continue' }).click();
   await expect(page.getByTestId('result')).toBeVisible();
@@ -498,7 +498,7 @@ test('previews and exports trimmed routes and leaves out routes too short to sho
     'replay.mp4',
   );
 
-  await page.getByRole('button', { name: '← Back' }).click();
+  await page.getByRole('button', { name: 'Back to Design' }).click();
   await openSection(page, 'Map');
   await expect(trim).toHaveValue('500');
   await trim.press('ArrowRight');
@@ -551,7 +551,7 @@ test('shares the video where the browser can share files', async ({ page, contex
   await page.getByRole('button', { name: 'Make video' }).click();
   await expect(page.getByTestId('result')).toBeVisible({ timeout: 150_000 });
 
-  const back = page.getByRole('button', { name: '← Back to Design' });
+  const back = page.getByRole('button', { name: 'Back to Design' });
   const download = page.getByRole('link', { name: 'Download', exact: true });
   const share = page.getByRole('button', { name: 'Share', exact: true });
   await expect(download).toBeVisible();

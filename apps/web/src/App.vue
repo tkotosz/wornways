@@ -717,6 +717,19 @@ onMounted(() => {
   .promise {
     display: none;
   }
+
+  /* A smaller mark and name, on the only screen phones show them. */
+  .mark {
+    height: 1.75rem;
+  }
+
+  .wordmark {
+    font-size: 1.15rem;
+  }
+
+  .name .wordmark {
+    line-height: 1.25rem;
+  }
 }
 
 /* The name in the mark's orange gradient, over the whole word. */

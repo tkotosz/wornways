@@ -1,7 +1,8 @@
 <script setup lang="ts">
-// Phones: the bar at the top of the window that moves between the steps: the way back at the
-// left, which step of how many in the middle, on at the right. The buttons name the step they
-// go to; the first step's way back (`backLabel`) leads off the steps, to the list of sources.
+// Phones: the bar at the top of the window that moves between the steps: the way back (←) at
+// the left, the step's name, Next at the right, and under them a segment per step that shows
+// how far along it is. The buttons tell screen readers which step they go to; the first
+// step's way back (`backLabel`) leads off the steps, to the list of sources.
 // Wide screens have the same buttons at the bottom of the step (StepNav).
 import { computed } from 'vue';
 import { STEPS, type Step } from '../step-list.ts';
@@ -22,68 +23,116 @@ const after = computed(() => STEPS[index.value + 1]);
 
 <template>
   <div class="step-bar">
-    <button v-if="before" type="button" class="back" :disabled="backDisabled" @click="emit('back')">
-      ← <span class="visually-hidden">Back to </span>{{ before }}
-    </button>
-    <span v-else />
-    <span class="where">
-      Step {{ index + 1 }} of {{ STEPS.length }} · <b>{{ STEPS[index]!.label }}</b>
-    </span>
-    <button
-      v-if="after"
-      type="button"
-      class="primary next"
-      :disabled="nextDisabled"
-      @click="emit('next')"
-    >
-      <span class="visually-hidden">Continue to </span>{{ after.label }} →
-    </button>
-    <span v-else />
+    <div class="row">
+      <button
+        v-if="before"
+        type="button"
+        class="back"
+        :aria-label="`Back to ${before}`"
+        :disabled="backDisabled"
+        @click="emit('back')"
+      >
+        ←
+      </button>
+      <h2 class="title">
+        <span class="visually-hidden">Step {{ index + 1 }} of {{ STEPS.length }}: </span>
+        {{ STEPS[index]!.label }}
+      </h2>
+      <button
+        v-if="after"
+        type="button"
+        class="primary next"
+        :aria-label="`Continue to ${after.label}`"
+        :disabled="nextDisabled"
+        @click="emit('next')"
+      >
+        Next
+      </button>
+    </div>
+    <!-- How far along: a segment per step, the ones behind filled, the current one bright. -->
+    <div class="segments" aria-hidden="true">
+      <span
+        v-for="(s, i) in STEPS"
+        :key="s.id"
+        :class="{ done: i < index, current: i === index }"
+      />
+    </div>
   </div>
 </template>
 
 <style scoped>
-/* Equal outer columns, so the middle stays centered whatever the buttons' widths. */
 .step-bar {
-  display: grid;
-  grid-template-columns: 1fr auto 1fr;
+  padding: 0.45rem 0.75rem 0.6rem;
+}
+
+.row {
+  display: flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.5rem 0.75rem;
+  gap: 0.4rem;
+  min-height: 2.25rem;
+  margin-bottom: 0.45rem;
 }
 
 .back {
-  justify-self: start;
-  padding: 0.4rem 0.25rem;
+  display: grid;
+  place-items: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  margin-left: -0.4rem;
+  padding: 0;
   border: 0;
-  color: var(--muted);
+  color: var(--text);
   background: none;
-  font: inherit;
-  white-space: nowrap;
+  font-size: 1.3rem;
+  line-height: 1;
 }
 
 .back:disabled {
   opacity: 0.4;
 }
 
-.where {
+.title {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
   overflow: hidden;
-  color: var(--muted);
-  font-size: 0.8rem;
+  font-size: 1.05rem;
+  font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.where b {
-  color: var(--text);
-  font-weight: 600;
+/* Without a way back the title starts where the bar does. */
+.title:first-child {
+  margin-left: 0.15rem;
 }
 
 .next {
-  justify-self: end;
-  padding: 0.4rem 0.9rem;
+  flex: none;
+  padding: 0.4rem 1.1rem;
   border-radius: 999px;
   font-size: 0.9rem;
-  white-space: nowrap;
+}
+
+/* A column per step, however many there are. */
+.segments {
+  display: grid;
+  grid-auto-columns: 1fr;
+  grid-auto-flow: column;
+  gap: 0.3rem;
+}
+
+.segments span {
+  height: 4px;
+  border-radius: 99px;
+  background: var(--line);
+}
+
+.segments .done {
+  background: #a45b2e;
+}
+
+.segments .current {
+  background: var(--accent);
 }
 </style>

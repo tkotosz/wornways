@@ -65,7 +65,7 @@ test('offers the demo next to the files on this device, and keeps them apart', a
   // The list is the home screen: no step bar, nothing to continue to or go back to.
   await expect(page.getByRole('navigation', { name: 'Steps' })).toHaveCount(0);
   await expect(page.getByRole('button', { name: /^Continue/ })).toHaveCount(0);
-  await expect(page.getByRole('button', { name: /^← Back/ })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: /^Back to/ })).toHaveCount(0);
   await page.reload();
   await expect(page.getByTestId('chosen-source')).toHaveCount(0);
   await expect(page.getByTestId('choose-demo')).toContainText('25 made-up activities');

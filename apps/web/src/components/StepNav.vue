@@ -41,10 +41,11 @@ const after = computed(() => STEPS[index.value + 1]);
       v-if="before"
       type="button"
       class="secondary step-button"
+      :aria-label="`Back to ${before}`"
       :disabled="backDisabled"
       @click="emit('back')"
     >
-      ← <span class="visually-hidden">Back to </span>{{ before }}
+      ← {{ before }}
     </button>
     <span v-else class="step-button" />
     <slot />
@@ -52,10 +53,11 @@ const after = computed(() => STEPS[index.value + 1]);
       v-if="after"
       type="button"
       class="primary step-button"
+      :aria-label="`Continue to ${after.label}`"
       :disabled="nextDisabled"
       @click="emit('next')"
     >
-      <span class="visually-hidden">Continue to </span>{{ after.label }} →
+      {{ after.label }} →
     </button>
   </div>
 </template>

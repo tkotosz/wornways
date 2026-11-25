@@ -11,5 +11,5 @@ export async function pickSource(page: Page, source: Source): Promise<void> {
  * its way back ("← Sources"), from Activities by "Change source".
  */
 export async function backToSources(page: Page): Promise<void> {
-  await page.getByRole('button', { name: /^(← Back to Sources|Change source)$/ }).click();
+  await page.getByRole('button', { name: /^(Back to Sources|Change source)$/ }).click();
 }

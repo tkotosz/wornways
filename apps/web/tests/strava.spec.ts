@@ -239,7 +239,7 @@ test.describe('Strava on a phone', () => {
     await page.getByRole('button', { name: 'Continue' }).click();
     await expectSection(page, 'Frame');
     await expect(page.getByTestId('preview').getByRole('img')).toBeVisible();
-    await page.getByRole('button', { name: 'Export →' }).click();
+    await page.getByRole('button', { name: 'Continue to Export' }).click();
     await page.getByRole('button', { name: 'Make video' }).click();
     await expect(page.getByTestId('result')).toBeVisible({ timeout: 60_000 });
     const download = page.waitForEvent('download');
@@ -247,7 +247,7 @@ test.describe('Strava on a phone', () => {
     expect((await download).suggestedFilename()).toMatch(/\.mp4$/);
     await expect(page.getByRole('button', { name: 'Done', exact: true })).toHaveCount(0);
     for (const step of ['Design', 'Activities', 'Source']) {
-      await page.getByRole('button', { name: `← Back to ${step}` }).click();
+      await page.getByRole('button', { name: `Back to ${step}` }).click();
     }
     await expect(page.getByTestId('chosen-source')).toHaveText('Strava');
     await backToSources(page);
@@ -520,7 +520,7 @@ test('reuses the selected track after a reload and socket interruption', async (
   await minimum.fill('1,4');
   await expect(page.getByTestId('chosen-count')).toContainText('of 1 activity');
   await page.getByRole('checkbox', { name: 'Strava test ride' }).check();
-  await page.getByRole('button', { name: '← Back to Source' }).click();
+  await page.getByRole('button', { name: 'Back to Source' }).click();
   await expect(page.getByRole('button', { name: 'Disconnect Strava' })).toBeVisible();
   await page.getByRole('button', { name: 'Continue' }).click();
   await expect(page.getByRole('checkbox', { name: 'Strava test ride' })).toBeChecked();

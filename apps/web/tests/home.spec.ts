@@ -11,13 +11,13 @@ test.describe('on a phone', () => {
     const about = page.getByRole('button', { name: 'About' });
     // The list of sources is the home screen: the header, and no step bar.
     await expect(about).toBeVisible();
-    await expect(page.getByText(/^Step 1 of 4/)).toHaveCount(0);
+    await expect(page.getByRole('heading', { name: /^Step 1 of 4/ })).toHaveCount(0);
 
     // A source's screen has the step bar in the header's place; its way back is the list.
     await pickSource(page, 'demo');
-    await expect(page.getByText('Step 1 of 4 · Source')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Step 1 of 4: Source' })).toBeVisible();
     await expect(about).toBeHidden();
-    await page.getByRole('button', { name: '← Back to Sources' }).click();
+    await page.getByRole('button', { name: 'Back to Sources' }).click();
     await expect(page.getByTestId('sources')).toBeVisible();
     await expect(about).toBeVisible();
   });
@@ -32,5 +32,5 @@ test('keeps the header on wide screens, without the step pills on the list of so
   await pickSource(page, 'demo');
   await expect(page.getByRole('button', { name: 'About' })).toBeVisible();
   await expect(page.getByRole('navigation', { name: 'Steps' })).toBeVisible();
-  await expect(page.getByRole('button', { name: '← Back to Sources' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Back to Sources' })).toBeVisible();
 });

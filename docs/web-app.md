@@ -42,13 +42,15 @@ always go back to an earlier step; nothing is lost by moving between steps.
 
 The step bar shows a pill per step, numbered, with a tick on the steps behind the current
 one, which is outlined in orange; a pill opens its step. Moving between steps works the
-same way on every step: the buttons name the step they go to ("← Source", "Design →") and
-always change the step. On wide screens they sit in a bar at the bottom of the step, which
-stays at the bottom of the window while the step is taller, with the step's own actions
-between them (Download and Share on Export). On a phone they sit in a slim bar at the top
-of the window, in place of the header and the pills: the way back at the left, "Step 2 of
-4 · Activities" in the middle, the way on at the right; the bottom bar then holds only the
-step's own actions, when there are some. Each step is one column on a phone.
+same way on every step: a way back and a way on, which always change the step. On wide
+screens they sit in a bar at the bottom of the step and name the step they go to ("←
+Source", "Design →"); the bar stays at the bottom of the window while the step is taller,
+with the step's own actions between them (Download and Share on Export). On a phone a slim
+bar at the top of the window takes the place of the header and the pills: ← at the left,
+the step's name, and Next at the right, with a segment per step under them that shows how
+far along it is (the ones behind filled, the current one bright); the buttons tell screen
+readers which step they go to. The bottom bar then holds only the step's own actions, when
+there are some. Each step is one column on a phone.
 
 The list of sources, before one is chosen, is the app's home screen: the header with the
 name, the version and About (and Install app where offered), and no step bar or pills,
