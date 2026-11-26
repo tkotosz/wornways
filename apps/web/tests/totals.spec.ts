@@ -75,15 +75,18 @@ test('arranges the totals card as widgets: the title and the totals, then more',
   await expect(page.getByTestId('widget-1')).toContainText('activities');
   await expect(page.getByTestId('widget-4')).toContainText('m climbed');
 
-  // Its tools add a text or a total; there is no chart and no watermark on the card.
-  await expect(page.getByRole('button', { name: 'Show the elevation chart' })).toHaveCount(0);
-  await expect(page.getByRole('button', { name: 'Show the watermark' })).toHaveCount(0);
-  await page.getByRole('button', { name: 'Add a value' }).click();
-  const totals = page.getByRole('dialog', { name: 'Values' });
+  // Its strip adds a text or a total; there is no chart and no watermark on the card.
+  await expect(page.getByRole('switch', { name: 'Elevation chart' })).toHaveCount(0);
+  await expect(page.getByRole('switch', { name: 'Show watermark' })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Add a total' }).click();
+  const totals = page.getByRole('dialog', { name: 'Totals' });
   await expect(totals.getByRole('button', { name: / Distance$/ })).toBeDisabled();
   await totals.getByRole('button', { name: / Days out$/ }).click();
   await expect(onCard).toHaveCount(6);
   await expect(page.getByTestId('widget-5')).toContainText('days out');
+  // Picked, a total has no label mode: its words are always under it.
+  await expect(page.getByRole('button', { name: /^Label: / })).toHaveCount(0);
+  await page.getByRole('button', { name: '✓ Done' }).click();
   await page.getByRole('button', { name: 'Add a text' }).click();
   await page.keyboard.type('What a spring');
   await page.keyboard.press('Enter');

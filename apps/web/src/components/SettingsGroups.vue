@@ -272,13 +272,6 @@ function valueText(setting: SettingDefinition): string {
   max-width: 22rem;
 }
 
-.switch {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding-top: 0.35rem;
-}
-
 .title {
   display: flex;
   flex-wrap: wrap;
@@ -305,39 +298,6 @@ function valueText(setting: SettingDefinition): string {
 .hint {
   margin: 0.4rem 0 0;
   font-size: 0.85rem;
-}
-
-/* An on/off switch: a pill with a knob that slides to the right when on. */
-.switch input {
-  appearance: none;
-  position: relative;
-  width: 2.6rem;
-  height: 1.5rem;
-  margin: 0;
-  border-radius: 999px;
-  background: var(--line);
-  cursor: pointer;
-  transition: background 0.15s;
-}
-
-.switch input::after {
-  content: '';
-  position: absolute;
-  top: 0.2rem;
-  left: 0.2rem;
-  width: 1.1rem;
-  height: 1.1rem;
-  border-radius: 50%;
-  background: var(--text);
-  transition: transform 0.15s;
-}
-
-.switch input:checked {
-  background: linear-gradient(90deg, var(--accent), var(--accent-strong));
-}
-
-.switch input:checked::after {
-  transform: translateX(1.1rem);
 }
 
 @media (max-width: 600px) {

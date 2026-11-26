@@ -5,17 +5,63 @@
 // its place while its value grows and shrinks during the replay. They are drawn in order,
 // the last on top.
 //
-// As text, a list is "name[:"text"]@x,y[,size]" items separated by ";", e.g.
-// `text:"Mallorca"@50,8;distance@20,88,120;elevation-chart@50,93`. A text widget without
-// its own text shows the video's title.
+// As text, a list is "name[:"text"|:label]@x,y[,size]" items separated by ";", e.g.
+// `text:"Mallorca"@50,8;distance@20,88,120;count:under@50,70;elevation-chart@50,93`. A text
+// widget without its own text shows the video's title; a value without a label mode shows
+// its words the way that value usually does (`defaultLabel`).
 
-import type { Metric } from './render.ts';
+import type { Metric, MetricValue } from './render.ts';
+
+/**
+ * How a value shows its words: not at all ("1,147 km"), in a short form of its own
+ * ("↑1,200 m", "142 bpm avg"), after the value on its line ("25 activities"), or on a line
+ * under it.
+ */
+export type LabelMode = 'off' | 'short' | 'inline' | 'under';
+export const LABEL_MODES: readonly LabelMode[] = ['off', 'short', 'inline', 'under'];
 
 export type Widget = { x: number; y: number; size: number } & (
   | { kind: 'text'; text: string | null }
-  | { kind: 'metric'; metric: Metric }
+  | { kind: 'metric'; metric: Metric; label: LabelMode }
   | { kind: 'elevation-chart' }
 );
+
+/** The values that have a short form of their own: an arrow, "avg", "best", "top". */
+const SHORT_FORMS: readonly Metric[] = [
+  'top-speed',
+  'elevation',
+  'descent',
+  'highest',
+  'longest',
+  'heart-rate',
+  'max-heart-rate',
+  'power',
+  'cadence',
+  'temperature',
+];
+/** The values that read as a number and its words on one line: "25 activities", "07:12 start". */
+const INLINE_BY_DEFAULT: readonly Metric[] = ['moving', 'start', 'count', 'days'];
+
+/** The label modes `metric` can take: the date has no words; only some have a short form. */
+export function labelModes(metric: Metric): LabelMode[] {
+  if (metric === 'date') return ['off'];
+  return LABEL_MODES.filter((mode) => mode !== 'short' || SHORT_FORMS.includes(metric));
+}
+
+/** The label mode a value starts with: its short form, its words inline, or none. */
+export function defaultLabel(metric: Metric): LabelMode {
+  if (SHORT_FORMS.includes(metric)) return 'short';
+  if (INLINE_BY_DEFAULT.includes(metric)) return 'inline';
+  return 'off';
+}
+
+/** What a value widget writes: its line, and the words under it (empty for none). */
+export function valueLines(value: MetricValue, mode: LabelMode): { line: string; under: string } {
+  if (mode === 'short') return { line: value.short ?? value.value, under: '' };
+  if (mode === 'inline' && value.label) return { line: `${value.value} ${value.label}`, under: '' };
+  if (mode === 'under') return { line: value.value, under: value.label };
+  return { line: value.value, under: '' };
+}
 
 /** The sizes a widget takes, in percent of its normal size. */
 export const WIDGET_SIZE = { min: 50, max: 250 } as const;
@@ -26,13 +72,14 @@ export const widgetName = (widget: Widget) =>
 
 /**
  * Reads a list of widgets from its text form; an empty text is no widgets. `metrics` are
- * the metric names a value widget can take; `chart` whether the elevation chart is one
- * (not on the totals card). Throws an Error that says what is wrong.
+ * the metric names a value widget can take; `chart` whether the elevation chart is one and
+ * `labels` whether values take a label mode (neither on the totals card, whose values always
+ * have their words under them). Throws an Error that says what is wrong.
  */
 export function parseWidgets(
   text: string,
   metrics: readonly string[],
-  { chart = true }: { chart?: boolean } = {},
+  { chart = true, labels = true }: { chart?: boolean; labels?: boolean } = {},
 ): Widget[] {
   const widgets: Widget[] = [];
   let i = 0;
@@ -49,8 +96,18 @@ export function parseWidgets(
     while (i < text.length && /[a-z-]/.test(text[i]!)) i++;
     const name = text.slice(nameStart, i);
     let own: string | null = null;
-    if (text[i] === ':') {
-      if (name !== 'text') fail(`only a text widget takes text, not "${name}"`);
+    let label: LabelMode | null = null;
+    if (text[i] === ':' && name !== 'text') {
+      if (!labels || !metrics.includes(name)) fail(`"${name}" takes no label mode`);
+      i++;
+      const modeStart = i;
+      while (i < text.length && /[a-z]/.test(text[i]!)) i++;
+      const mode = text.slice(modeStart, i) as LabelMode;
+      const modes = labelModes(name as Metric);
+      if (!modes.includes(mode))
+        fail(`"${name}" takes the label mode ${modes.join(', ')}, not "${mode}"`);
+      label = mode;
+    } else if (text[i] === ':') {
       i++;
       if (text[i] !== '"') fail('expected the text in double quotes');
       i++;
@@ -82,7 +139,14 @@ export function parseWidgets(
     else if (name === 'elevation-chart' && chart)
       widgets.push({ kind: 'elevation-chart', x, y, size });
     else if (metrics.includes(name))
-      widgets.push({ kind: 'metric', metric: name as Metric, x, y, size });
+      widgets.push({
+        kind: 'metric',
+        metric: name as Metric,
+        label: label ?? (labels ? defaultLabel(name as Metric) : 'under'),
+        x,
+        y,
+        size,
+      });
     else
       fail(
         `"${name}" is not a widget: text, ${chart ? 'elevation-chart or ' : ''}one of ${metrics.join(', ')}`,
@@ -94,14 +158,22 @@ export function parseWidgets(
 
 const round = (n: number) => Number(n.toFixed(1));
 
-/** A list of widgets in the text form `parseWidgets` reads. */
-export function widgetsText(widgets: Widget[]): string {
+/**
+ * A list of widgets in the text form `parseWidgets` reads, with the same `labels`: a value's
+ * label mode is written when it is not the value's usual one.
+ */
+export function widgetsText(
+  widgets: Widget[],
+  { labels = true }: { labels?: boolean } = {},
+): string {
   return widgets
     .map((widget) => {
       const text =
         widget.kind === 'text' && widget.text !== null
           ? `:"${widget.text.replace(/[\\"]/g, (c) => `\\${c}`)}"`
-          : '';
+          : labels && widget.kind === 'metric' && widget.label !== defaultLabel(widget.metric)
+            ? `:${widget.label}`
+            : '';
       const size = widget.size === 100 ? '' : `,${round(widget.size)}`;
       return `${widgetName(widget)}${text}@${round(widget.x)},${round(widget.y)}${size}`;
     })
@@ -139,10 +211,18 @@ export function startingWidgets(
   // The values: the first large, the others in a row under it, as one block from the left.
   const [first, ...rest] = options.metrics;
   if (first) {
-    const large: Widget = { kind: 'metric', metric: first, x: 0, y: 0, size: 100 * 1.15 };
+    const large: Widget = {
+      kind: 'metric',
+      metric: first,
+      label: defaultLabel(first),
+      x: 0,
+      y: 0,
+      size: 100 * 1.15,
+    };
     const small: Widget[] = rest.map((metric) => ({
       kind: 'metric',
       metric,
+      label: defaultLabel(metric),
       x: 0,
       y: 0,
       size: 100 * 0.8,

@@ -6,6 +6,7 @@ import {
   PRESETS,
   PRESET_NAMES,
   SETTINGS,
+  type LabelMode,
   type Metric,
   type Preset,
   type SettingDefinition,
@@ -386,6 +387,14 @@ const METRIC_NAMES: Partial<Record<Metric, string>> = {
 };
 export const metricName = (metric: Metric) =>
   METRIC_NAMES[metric] ?? metric.charAt(0).toUpperCase() + metric.slice(1);
+
+/** How a value's label modes are named: in the strip's chip and its sheet. */
+export const LABEL_MODE_NAMES: Record<LabelMode, string> = {
+  off: 'Off',
+  short: 'Short',
+  inline: 'Inline',
+  under: 'Under',
+};
 
 /** A widget's name in the list: "Text", a value's name, or "Elevation chart". */
 export const widgetLabel = (widget: Widget) =>

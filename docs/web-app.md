@@ -140,8 +140,9 @@ list.
    - **Map:** the street map, and the replay privacy that hides each route's start and
      finish.
    - **Overlay:** what is drawn over the replay, as widgets arranged on the still the way
-     stickers are in a story editor: text (at first the title), one value each (a metric:
-     its number large with a few words under it, "1,147 km" over "distance"), and the
+     stickers are in a story editor: text (at first the title), one value each (a metric,
+     with its words as its label mode has them: none, a short form, after it or under it),
+     and the
      elevation chart (when an activity recorded elevation). A video starts with the title at
      the top, the values that suit it at the bottom left (the first large, the others
      smaller in a row under it), and, for a single activity, the chart along the bottom. Each widget is centered on its point
@@ -166,17 +167,17 @@ list.
      Shift), + and - resize it and Delete removes it. On a story-shaped frame, while a
      widget moves, hatched guides marked "Covered on Instagram" show what Instagram's own
      controls cover (Meta's ads guide: 14% at the top, 35% at the bottom, 6% at each side).
-     A column of round tools at the top right of the picture adds widgets, as story
-     editors have them: Aa writes a new text, the value tool opens a sheet of the values
-     this video can show, each a tile with its own number (calories a service gives on
-     request are offered before they are known; a value already on the picture is
-     dimmed), the chart tool turns the elevation chart on and off (offered only when an
-     activity recorded elevation), and the mark turns the watermark on and off, a fixed
-     small mark at the bottom left on the map credit's line. The column hides while a
-     widget moves, and a new widget comes in a free spot clear of the middle. On a phone
-     Overlay has no settings under the picture, which gets the space. On a wide screen a
-     list stays beside it: "+ Add a widget" with the same palette, then a row per widget
-     that opens its settings (its text, its size and "Remove from the picture"), and the
+     Under the picture, as in the other sections, a strip of chips: Add Text writes a new
+     text; Add Value opens a sheet of the values this video can show, each a tile with its
+     own number (calories a service gives on request are offered before they are known; a
+     value already on the picture is dimmed); the elevation chart's switch (offered only
+     when an activity recorded elevation); and the watermark's, a fixed small mark at the
+     bottom left on the map credit's line. A new widget comes in a free spot clear of the
+     middle. A picked widget turns the strip into its own chips: Done (lets it go), Edit
+     (a text's text), Size (a sheet with a slider), Label (a value's label mode, each with
+     how the value reads in it), Center (to the middle across) and Remove. On a wide screen
+     the same strip is under the picture, and a list stays beside it: "+ Add a widget"
+     with the same palette, then a row per widget that opens all its settings, and the
      watermark switch.
    - **Ending:** what comes after the replay: the end pause on the finished picture, the
      totals card (for several activities only; on for Recap) and the end card. When the
@@ -184,9 +185,10 @@ list.
      and the page draws them over it, as in Overlay: at first the title over the usual
      totals, at the card's sizes (a text over its short orange rule, a total's number over
      its words in orange). They are picked, moved, resized and removed as over the replay,
-     and the same tools on the picture add a text or a total (a sheet of the totals these
-     activities have, each with its own number); there is no chart or watermark on the
-     card. The card's band behind them stays where the still drew it until it is drawn
+     and the strip has the same chips between the card's switch and the end card's: Add
+     Text and Add Total (a sheet of the totals these activities have, each with its own
+     number); there is no chart, watermark or label mode on the card, whose totals always
+     have their words under them. The card's band behind them stays where the still drew it until it is drawn
      again; the video has it behind the widgets as they are.
 4. **Export.** A stage in the video's shape, which shows the finished picture with a "Make
    video" button in the middle; while the video is made, its progress and a way to

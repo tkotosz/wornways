@@ -384,6 +384,12 @@ export const SETTINGS: readonly SettingDefinition[] = [
       'down, with a size in percent (50 to 250, 100 when left out), separated by ";": ' +
       'text:"Your text"@x,y,size (text@x,y for the title), a value such as distance@x,y,size, ' +
       'or elevation-chart@x,y,size. Later widgets are drawn over earlier ones; "" draws none. ' +
+      'A value takes a label mode after a colon, as count:under@x,y: off (the value alone), ' +
+      'short (its own short form: ↑1,200 m, 142 bpm avg, longest 124 km; for top-speed, ' +
+      'elevation, descent, highest, longest and the sensor values), inline (25 activities) or ' +
+      'under (the words on a line under it). Left out, a value shows its words as it usually ' +
+      'does: short where it has a short form, inline for moving, start, count and days, else ' +
+      'off. The date has no words. ' +
       `The values: ${METRICS.join(', ')}. A value the video cannot show is left out: start is ` +
       'for a single activity; count, days and longest for several activities; elevation, ' +
       'descent and highest need recorded elevation. Pace and top speed are in minutes per ' +
@@ -557,12 +563,12 @@ export function parseSettings(input: SettingsInput): RenderSettings {
   const widgetList = (
     name: string,
     metrics: readonly string[],
-    chart: boolean,
+    options: { chart: boolean; labels: boolean },
   ): Widget[] | null => {
     const value = text(name);
     if (value === null) return null;
     try {
-      return parseWidgets(value, metrics, { chart });
+      return parseWidgets(value, metrics, options);
     } catch (error) {
       throw new SettingsError(name, error instanceof Error ? error.message : String(error));
     }
@@ -647,9 +653,9 @@ export function parseSettings(input: SettingsInput): RenderSettings {
     width,
     height,
     fps: Number(choice('fps')),
-    widgets: widgetList('widgets', METRICS, true),
+    widgets: widgetList('widgets', METRICS, { chart: true, labels: true }),
     totalsCard: flag('totals-card'),
-    totalsWidgets: widgetList('totals-widgets', TOTALS_FIELDS, false),
+    totalsWidgets: widgetList('totals-widgets', TOTALS_FIELDS, { chart: false, labels: false }),
     endCard: flag('end-card'),
     watermark: flag('watermark'),
   };

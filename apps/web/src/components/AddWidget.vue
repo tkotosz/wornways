@@ -4,7 +4,13 @@
 // Calories a service gives only on request are offered before they are known.
 // A value already on the picture is dimmed; each shows once. A new widget comes in the
 // middle of the picture (the chart near the bottom).
-import { METRICS, type Metric, type MetricValue, type Widget } from '@wornways/engine';
+import {
+  METRICS,
+  defaultLabel,
+  type Metric,
+  type MetricValue,
+  type Widget,
+} from '@wornways/engine';
 import { computed } from 'vue';
 import { metricName } from '../adjust.ts';
 
@@ -16,6 +22,8 @@ const props = defineProps<{
   hasCalories: boolean;
   /** Only the values: text and the chart have tools of their own. */
   valuesOnly?: boolean;
+  /** Whether a value shows its words as it usually does; else under it, as on the totals card. */
+  labels: boolean;
 }>();
 const emit = defineEmits<{ add: [widget: Widget] }>();
 
@@ -65,7 +73,16 @@ const offered = computed(() =>
         type="button"
         class="tile"
         :disabled="used.has(metric)"
-        @click="emit('add', { kind: 'metric', metric, x: 50, y: 50, size: 100 })"
+        @click="
+          emit('add', {
+            kind: 'metric',
+            metric,
+            label: labels ? defaultLabel(metric) : 'under',
+            x: 50,
+            y: 50,
+            size: 100,
+          })
+        "
       >
         <b>{{ values.get(metric)?.value ?? 'kcal' }}</b>
         <span>{{ metricName(metric) }}</span>

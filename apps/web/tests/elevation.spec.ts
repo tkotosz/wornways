@@ -31,7 +31,7 @@ test('starts a single activity with elevation with the elevation chart, which ca
   await expect(onPicture).toBeVisible();
   // Removed, it leaves the list and the picture.
   await chart.click();
-  await page.getByRole('button', { name: 'Remove from the picture' }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Remove from the picture' }).click();
   await expect(chart).toHaveCount(0);
   await expect(onPicture).toHaveCount(0);
 });

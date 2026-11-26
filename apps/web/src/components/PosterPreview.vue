@@ -345,6 +345,13 @@ onBeforeUnmount(() => {
   background: #050608;
 }
 
+/* As tall as the page around it allows (`--preview-height`, set where it sits), keeping the
+   video's shape; as wide as its box when that is less. */
+.frame {
+  width: min(100%, calc(var(--preview-height, 100vh) * var(--ratio)));
+  margin-inline: auto;
+}
+
 .frame img,
 .frame video {
   display: block;

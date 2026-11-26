@@ -55,12 +55,15 @@ describe('parseSettings', () => {
       parseSettings({ 'totals-widgets': 'text@50,40;distance@30,50,120' }).totalsWidgets,
     ).toEqual([
       { kind: 'text', text: null, x: 50, y: 40, size: 100 },
-      { kind: 'metric', metric: 'distance', x: 30, y: 50, size: 120 },
+      { kind: 'metric', metric: 'distance', label: 'under', x: 30, y: 50, size: 120 },
     ]);
     expect(() => parseSettings({ 'totals-widgets': 'elevation-chart@50,90' })).toThrow(
       '"elevation-chart" is not a widget: text, one of count, distance',
     );
-    // The start time is for a single activity, not a total.
+    // A total always has its words under it; the start time is for a single activity.
+    expect(() => parseSettings({ 'totals-widgets': 'distance:off@30,50' })).toThrow(
+      '"distance" takes no label mode',
+    );
     expect(() => parseSettings({ 'totals-widgets': 'start@50,50' })).toThrow('is not a widget');
   });
 

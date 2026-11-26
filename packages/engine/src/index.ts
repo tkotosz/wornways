@@ -56,11 +56,16 @@ export {
   type Renderer,
 } from './replay/render.ts';
 export {
+  LABEL_MODES,
   WIDGET_SIZE,
+  defaultLabel,
+  labelModes,
   parseWidgets,
   startingWidgets,
+  valueLines,
   widgetName,
   widgetsText,
+  type LabelMode,
   type Widget,
 } from './replay/widgets.ts';
 export { distanceM, mercatorX, mercatorY } from './track/geo.ts';

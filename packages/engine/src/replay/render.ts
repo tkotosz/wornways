@@ -1,7 +1,7 @@
 import { drawBasemap, type Basemap, type MapLabel, type Tile } from '../map/basemap.ts';
 import { levelsFor, mapLevelViews, type CameraPath, type LevelWindow } from './camera.ts';
 import { drawElevationProfile, elevationProfile } from './elevation-profile.ts';
-import { WIDGET_SIZE, startingWidgets, type Widget } from './widgets.ts';
+import { WIDGET_SIZE, startingWidgets, valueLines, type Widget } from './widgets.ts';
 import { END_CARD_S, drawEndCard, endCardFrames } from './end-card.ts';
 import {
   AUTOMATIC_TOTALS,
@@ -141,8 +141,11 @@ export type FrameBox = { x: number; y: number; width: number; height: number };
  */
 export type OverlayBoxes = { widgets: (FrameBox | null)[]; watermark?: FrameBox };
 
-/** A value as a widget shows it: its number ("1,147 km") and the words under it ("distance"). */
-export type MetricValue = { value: string; label: string };
+/**
+ * A value as a widget shows it: its number ("1,147 km"), its words ("distance", none for a
+ * date), and for some a short form with the words folded in ("↑1,200 m").
+ */
+export type MetricValue = { value: string; label: string; short?: string };
 
 export type RenderOptions = {
   width: number;
@@ -307,16 +310,18 @@ const sensorEntries = (projected: Projected) =>
  * temperature, from its average over time or its highest value.
  */
 /** A sensor value as a widget shows it: the number with its unit, and its words. */
-function sensorText(metric: Metric, value: number, onFoot: boolean): [string, string] {
+function sensorText(metric: Metric, value: number, onFoot: boolean): [string, string, string] {
   const whole = Math.round(value);
-  if (metric === 'heart-rate') return [`${whole} bpm`, 'average heart rate'];
-  if (metric === 'max-heart-rate') return [`${whole} bpm`, 'max heart rate'];
-  if (metric === 'power') return [`${whole} W`, 'average power'];
-  if (metric === 'cadence')
+  if (metric === 'heart-rate') return [`${whole} bpm`, 'average heart rate', `${whole} bpm avg`];
+  if (metric === 'max-heart-rate') return [`${whole} bpm`, 'max heart rate', `${whole} bpm max`];
+  if (metric === 'power') return [`${whole} W`, 'average power', `${whole} W avg`];
+  if (metric === 'cadence') {
+    const steps = Math.round(value * 2);
     return onFoot
-      ? [`${Math.round(value * 2)} spm`, 'average cadence']
-      : [`${whole} rpm`, 'average cadence'];
-  return [`${whole} °C`, 'average temperature'];
+      ? [`${steps} spm`, 'average cadence', `${steps} spm avg`]
+      : [`${whole} rpm`, 'average cadence', `${whole} rpm avg`];
+  }
+  return [`${whole} °C`, 'average temperature', `${whole} °C avg`];
 }
 
 type Rect = { x0: number; y0: number; x1: number; y1: number };
@@ -652,6 +657,7 @@ export function createRenderer(
 
   /** Each value as it stands at the end of the replay, for laying widgets out. */
   const finalValues = metricValues(timeline.duration, finished());
+  const startValues = metricValues(0);
   /** The widgets set, else the ones a video starts with. */
   const widgets: Widget[] =
     options.widgets ??
@@ -661,9 +667,12 @@ export function createRenderer(
         metrics: defaultMetrics(kind).filter((m) => finalValues.has(m)),
         elevationChart: kind === 'single' && hasElevation,
       },
+      // As wide as a value gets: at the finish, or at the start for one that shrinks, such as
+      // a race's "25 still moving", which ends as "all finished".
       (widget) => {
-        const { width, height } = widgetPixels(widget, finalValues);
-        return { width: width / W, height: height / H };
+        const end = widgetPixels(widget, finalValues);
+        const start = widgetPixels(widget, startValues);
+        return { width: Math.max(end.width, start.width) / W, height: end.height / H };
       },
     ).map((widget) => ({
       ...widget,
@@ -871,8 +880,8 @@ export function createRenderer(
     const secondsSoFar = () =>
       tracks.reduce((sum, track, k) => sum + lastSecond(track) * timeline.progress(k, t), 0);
     const texts = new Map<Metric, MetricValue>();
-    const set = (metric: Metric, value: string, label: string) =>
-      texts.set(metric, { value, label });
+    const set = (metric: Metric, value: string, label: string, short?: string) =>
+      texts.set(metric, short === undefined ? { value, label } : { value, label, short });
     if (kind === 'single') {
       // One activity: its own elapsed time and distance so far.
       const elapsed = Math.floor(lastSecond(tracks[0]) * timeline.progress(0, t));
@@ -938,15 +947,27 @@ export function createRenderer(
         'calories',
       );
     const top = topSpeed(onFoot, fastest);
-    set('top-speed', `${top.value} ${top.unit}`, top.unit === '/km' ? 'best pace' : 'top speed');
+    set(
+      'top-speed',
+      `${top.value} ${top.unit}`,
+      top.unit === '/km' ? 'best pace' : 'top speed',
+      top.unit === '/km' ? `best ${top.value} /km` : `max ${top.value} km/h`,
+    );
     if (kind !== 'single') {
       set('days', String(days.size), days.size === 1 ? 'day out' : 'days out');
-      set('longest', `${wholeNumber(longest / 1000)} km`, 'longest');
+      const km = wholeNumber(longest / 1000);
+      set('longest', `${km} km`, 'longest', `longest ${km} km`);
     }
     if (hasElevation) {
-      set('elevation', `${wholeNumber(climbed)} m`, 'climbed');
-      set('descent', `${wholeNumber(descended)} m`, 'descended');
-      if (Number.isFinite(highest)) set('highest', `${wholeNumber(highest)} m`, 'highest point');
+      set('elevation', `${wholeNumber(climbed)} m`, 'climbed', `↑${wholeNumber(climbed)} m`);
+      set('descent', `${wholeNumber(descended)} m`, 'descended', `↓${wholeNumber(descended)} m`);
+      if (Number.isFinite(highest))
+        set(
+          'highest',
+          `${wholeNumber(highest)} m`,
+          'highest point',
+          `top ${wholeNumber(highest)} m`,
+        );
     }
     return texts;
   }
@@ -994,12 +1015,13 @@ export function createRenderer(
     }
     const value = values.get(widget.metric);
     if (!value) return { width: 0, height: 0 };
+    const { line, under } = valueLines(value, widget.label);
     ctx.font = fontOf(600, VALUE_SIZE * scale);
-    let width = ctx.measureText(value.value).width;
+    let width = ctx.measureText(line).width;
     let height = VALUE_SIZE * scale * 1.1;
-    if (value.label) {
+    if (under) {
       ctx.font = fontOf(400, LABEL_SIZE * scale);
-      width = Math.max(width, ctx.measureText(value.label).width);
+      width = Math.max(width, ctx.measureText(under).width);
       height += LABEL_SIZE * scale * 1.3;
     }
     return { width, height };
@@ -1034,14 +1056,14 @@ export function createRenderer(
       ctx.fillStyle = 'rgba(255, 255, 255, 0.92)';
       ctx.fillText(widget.text ?? options.title ?? '', cx, box.y0 + TEXT_SIZE * scale);
     } else if (widget.kind === 'metric') {
-      const value = values.get(widget.metric)!;
+      const { line, under } = valueLines(values.get(widget.metric)!, widget.label);
       ctx.font = fontOf(600, VALUE_SIZE * scale);
       ctx.fillStyle = 'rgba(255, 255, 255, 0.94)';
-      ctx.fillText(value.value, cx, box.y0 + VALUE_SIZE * scale * 0.95);
-      if (value.label) {
+      ctx.fillText(line, cx, box.y0 + VALUE_SIZE * scale * 0.95);
+      if (under) {
         ctx.font = fontOf(400, LABEL_SIZE * scale);
         ctx.fillStyle = 'rgba(255, 255, 255, 0.66)';
-        ctx.fillText(value.label, cx, box.y0 + VALUE_SIZE * scale * 1.1 + LABEL_SIZE * scale);
+        ctx.fillText(under, cx, box.y0 + VALUE_SIZE * scale * 1.1 + LABEL_SIZE * scale);
       }
     } else if (profile) {
       ctx.shadowColor = 'rgba(0, 0, 0, 0)';

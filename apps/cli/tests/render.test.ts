@@ -184,7 +184,7 @@ describe('a route with more points than a zoom level can show', () => {
       [track],
       chronologicalTimeline([5_000], { duration: seconds }),
       (w, h) => createCanvas(w, h) as unknown as CanvasLike,
-      { width, height, fps, camera, metrics: [], ...options },
+      { width, height, fps, camera, widgets: [], ...options },
     );
     for (let f = 0; f < renderer.replayFrames; f++) renderer.renderFrame(f);
     return heatPixels(renderer.canvas, width, height);
@@ -229,7 +229,7 @@ describe('the values', () => {
   const height = 480;
   /** Value widgets at the bottom left, as the video starts them. */
   const valuesAt = (metrics: Metric[]): Widget[] =>
-    metrics.map((metric) => ({ kind: 'metric', metric, x: 25, y: 90, size: 100 }));
+    metrics.map((metric) => ({ kind: 'metric', metric, label: 'under', x: 25, y: 90, size: 100 }));
 
   /** Text pixels in the top-right and the bottom-left of the last frame. */
   function lastFrame(options: Partial<RenderOptions>) {
@@ -255,7 +255,7 @@ describe('the values', () => {
 
   it('sits where its widget is placed', () => {
     const frame = lastFrame({
-      widgets: [{ kind: 'metric', metric: 'time', x: 75, y: 7, size: 100 }],
+      widgets: [{ kind: 'metric', metric: 'time', label: 'under', x: 75, y: 7, size: 100 }],
     });
 
     expect(frame.topRight).toBeGreaterThan(20);
@@ -450,8 +450,22 @@ describe('the totals card', () => {
 
   it('shows the usual totals unless told otherwise, and the widgets given when told', () => {
     const automatic = lastTotalsFrame();
-    const distance = { kind: 'metric', metric: 'distance', x: 50, y: 50, size: 100 } as const;
-    const count = { kind: 'metric', metric: 'count', x: 50, y: 30, size: 100 } as const;
+    const distance = {
+      kind: 'metric',
+      metric: 'distance',
+      label: 'under',
+      x: 50,
+      y: 50,
+      size: 100,
+    } as const;
+    const count = {
+      kind: 'metric',
+      metric: 'count',
+      label: 'under',
+      x: 50,
+      y: 30,
+      size: 100,
+    } as const;
     expect(lastTotalsFrame([distance]).equals(automatic)).toBe(false);
     expect(lastTotalsFrame([distance, count]).equals(lastTotalsFrame([count, distance]))).toBe(
       true,
@@ -534,7 +548,7 @@ describe('widgets', () => {
     const renderer = lastFrame({
       widgets: [
         { kind: 'text', text: null, x: 50, y: 20, size: 100 },
-        { kind: 'metric', metric: 'distance', x: 30, y: 60, size: 150 },
+        { kind: 'metric', metric: 'distance', label: 'under', x: 30, y: 60, size: 150 },
       ],
     });
     const [title, distance] = renderer.overlayBoxes().widgets.map((box) => edges(box!));
@@ -562,7 +576,7 @@ describe('widgets', () => {
     const at = (size: number) =>
       edges(
         lastFrame({
-          widgets: [{ kind: 'metric', metric: 'time', x: 50, y: 50, size }],
+          widgets: [{ kind: 'metric', metric: 'time', label: 'under', x: 50, y: 50, size }],
         }).overlayBoxes().widgets[0]!,
       );
     const normal = at(100);
@@ -573,8 +587,8 @@ describe('widgets', () => {
   it('shows a value with the words under it, and leaves out one the video cannot show', () => {
     const renderer = lastFrame({
       widgets: [
-        { kind: 'metric', metric: 'distance', x: 50, y: 50, size: 100 },
-        { kind: 'metric', metric: 'count', x: 50, y: 80, size: 100 },
+        { kind: 'metric', metric: 'distance', label: 'under', x: 50, y: 50, size: 100 },
+        { kind: 'metric', metric: 'count', label: 'under', x: 50, y: 80, size: 100 },
       ],
     });
     expect(renderer.finalValues.get('distance')).toEqual({ value: '5.3 km', label: 'distance' });
@@ -695,7 +709,7 @@ describe('the watermark', () => {
       [route()],
       chronologicalTimeline([5_000], { duration: 1 }),
       (w, h) => createCanvas(w, h) as unknown as CanvasLike,
-      { width, height, fps: 10, overlay: 'single', metrics: [], watermark },
+      { width, height, fps: 10, overlay: 'single', widgets: [], watermark },
     );
     for (let f = 0; f < renderer.frameCount; f++) renderer.renderFrame(f);
     const { data } = (renderer.canvas.getContext('2d') as Context2DLike).getImageData(
@@ -834,7 +848,7 @@ describe('the totals card', () => {
         { duration: 2 },
       ),
       (w, h) => createCanvas(w, h) as unknown as CanvasLike,
-      { width, height, fps, metrics: [], ...options },
+      { width, height, fps, widgets: [], ...options },
     );
 
   it('adds its seconds after the replay, before the end card', () => {

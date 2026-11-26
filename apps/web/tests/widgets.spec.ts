@@ -3,6 +3,9 @@ import { offlineMap } from './offline-map.ts';
 import { pickSource } from './sources.ts';
 import { chooseStyle, openSection, pickPeriod } from './steps.ts';
 
+// A laptop's window: the preview fits between the bars, so it is large enough to arrange on.
+test.use({ viewport: { width: 1280, height: 900 } });
+
 /** Opens the demo's Design step on Overlay, where the widgets are arranged on the still. */
 async function openOverlay(page: Page) {
   await page.goto('/');
@@ -78,7 +81,7 @@ test('removes a widget from its settings or by dropping it on the bin', async ({
 
   // From its row, in its settings.
   await page.getByRole('button', { name: /^Text: / }).click();
-  await page.getByRole('button', { name: 'Remove from the picture' }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Remove from the picture' }).click();
   await expect(rows).toHaveCount(3);
   await expect(page.getByRole('button', { name: /^Text: / })).toHaveCount(0);
 
@@ -175,7 +178,11 @@ test("keeps the browser's long-press menu off the picture", async ({ page, conte
   page.setDefaultTimeout(15_000);
   await offlineMap(context);
   await openOverlay(page);
+  // Run in the page; the tests are type-checked without the browser's own types.
   const prevented = await outline(page, 1).evaluate((widget) => {
+    const { MouseEvent } = globalThis as unknown as {
+      MouseEvent: new (type: string, init: object) => Event & { defaultPrevented: boolean };
+    };
     const event = new MouseEvent('contextmenu', { bubbles: true, cancelable: true });
     widget.dispatchEvent(event);
     return event.defaultPrevented;

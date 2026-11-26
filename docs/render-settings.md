@@ -148,9 +148,24 @@ What is drawn over the replay is a list of widgets, each centered on a point of 
 | Widgets | `--widgets` | `name@x,y,size` items separated by `;`; `""` for none | the title, the values that suit the video, and for one activity the elevation chart |
 
 A name is `text` (with its own text as `text:"Mallorca"`, else the title), any value of the
-table below (its number with a few words under it), or `elevation-chart`. For example
-`text@50,6;distance@25,85,120;count@60,85;elevation-chart@50,94`. The title is also the one
-on the totals card.
+table below, or `elevation-chart`. For example
+`text@50,6;distance@25,85,120;count:under@60,85;elevation-chart@50,94`. The title is also the
+one on the totals card.
+
+A value shows its words in one of these label modes, written after a colon (`count:under`):
+
+| Mode     | Shows                                                | Example             |
+| -------- | ---------------------------------------------------- | ------------------- |
+| `off`    | the value alone                                      | 1,147 km            |
+| `short`  | its own short form, for the values that have one     | ↑1,200 m            |
+| `inline` | the value with its words after it, on one line       | 25 activities       |
+| `under`  | the value, with its words smaller on a line under it | 1,147 km / distance |
+
+The short forms: `top-speed` ("best 4:30 /km", "max 45 km/h"), `elevation` (↑), `descent`
+(↓), `highest` ("top 1,450 m"), `longest` ("longest 124 km") and the sensor values
+("142 bpm avg", "142 bpm max", "210 W avg", "88 rpm avg", "21 °C avg"). The date has no
+words. Without a mode, a value shows its words as it usually reads: its short form when it
+has one; inline for `moving`, `start`, `count` and `days`; otherwise none.
 
 Without `--widgets`, a video starts with the title at the top in the middle; the values
 that suit it at the bottom left, the first large and the others smaller in a row under it

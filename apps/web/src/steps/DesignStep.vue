@@ -10,7 +10,9 @@
 // Phones: a full editor screen that does not scroll, as photo and video editors are laid
 // out: the step bar on top; the preview takes most of the screen; under it, the open
 // section's settings as one strip of chips that scrolls sideways, each opening its setting in
-// a sheet (Overlay has its tools on the picture instead); the sections along the bottom.
+// a sheet; the sections along the bottom. Where widgets are arranged, the strip starts with
+// adding them, and a picked widget turns it into that widget's options (WidgetStrip); wide
+// screens have that strip under the picture.
 import {
   METRICS,
   TOTALS_FIELDS,
@@ -36,6 +38,7 @@ import StepNav from '../components/StepNav.vue';
 import WidgetEditor from '../components/WidgetEditor.vue';
 import WidgetList from '../components/WidgetList.vue';
 import WidgetSettings from '../components/WidgetSettings.vue';
+import WidgetStrip from '../components/WidgetStrip.vue';
 import type { EngineClient } from '../engine-client.ts';
 import type { PlanReport, Poster, PosterScene } from '../messages.ts';
 
@@ -79,13 +82,19 @@ function open(id: Section): void {
 
 // Phones: the section's settings as a strip of chips, each with its value; a chip opens its
 // setting alone in a sheet.
-const sheet = ref<{ name: string; label: string } | null>(null);
+const sheet = ref<{
+  name: string;
+  label: string;
+  /** A widget's sheet: which widget, and only its size or label when a chip opened it. */
+  widget?: number;
+  only?: 'size' | 'label';
+} | null>(null);
 function openSetting(name: string, label: string): void {
   sheet.value = { name, label };
 }
 
-// Overlay and Ending: widgets arranged on the still (WidgetEditor) with the tools on it, over
-// the replay or on the totals card; on wide screens also listed beside it.
+// Overlay and Ending: widgets arranged on the still (WidgetEditor) and from the strip under it
+// (WidgetStrip), over the replay or on the totals card; on wide screens also listed beside it.
 /**
  * What the last still of the replay told: its widgets, the values the video can show and the
  * climb profile's shape, for drawing the widgets over the bare still.
@@ -125,7 +134,9 @@ const widgets = computed<Widget[]>(() => {
   if (typeof set !== 'string')
     return (totals ? drawnTotals.value?.widgets : drawn.value?.widgets) ?? [];
   try {
-    return totals ? parseWidgets(set, TOTALS_FIELDS, { chart: false }) : parseWidgets(set, METRICS);
+    return totals
+      ? parseWidgets(set, TOTALS_FIELDS, { chart: false, labels: false })
+      : parseWidgets(set, METRICS);
   } catch {
     return [];
   }
@@ -140,18 +151,28 @@ const title = computed(() => props.plan?.title ?? '');
 const selectedWidget = ref<number | null>(null);
 
 function setWidgets(list: Widget[]): void {
-  adjustments.value = { ...adjustments.value, [widgetSetting.value]: widgetsText(list) };
+  const text = widgetsText(list, { labels: board.value !== 'totals' });
+  adjustments.value = { ...adjustments.value, [widgetSetting.value]: text };
 }
 
-function openWidget(index: number): void {
+/** Opens a widget's settings in a sheet: all of them (the list), or its size or label. */
+function openWidget(index: number, only?: 'size' | 'label'): void {
   selectedWidget.value = index;
-  sheet.value = { name: `widget:${index}`, label: widgetLabel(widgets.value[index]!) };
+  const name = widgetLabel(widgets.value[index]!);
+  const label = only === 'size' ? `${name}: size` : only === 'label' ? `${name}: label` : name;
+  sheet.value = { name: 'widget', label, widget: index, ...(only ? { only } : {}) };
 }
 
 /** The widget a widget sheet is about. */
 const sheetWidget = computed(() =>
-  sheet.value?.name.startsWith('widget:') ? Number(sheet.value.name.slice(7)) : null,
+  sheet.value?.name === 'widget' ? (sheet.value.widget ?? null) : null,
 );
+
+/** Puts the widget in the middle across, where it is down. */
+function centerWidget(index: number): void {
+  const widget = widgets.value[index];
+  if (widget) changeWidget(index, { ...widget, x: 50 });
+}
 
 /**
  * Where a new widget goes: of a few spots clear of the middle, where Play sits, the one
@@ -206,30 +227,24 @@ function writeText(text: string): void {
   else if (widget?.kind === 'text') changeWidget(index, { ...widget, text });
 }
 
-/** The tools on the picture: what they show (see WidgetEditor), and what they do. */
-const watermark = computed(() => adjustments.value['watermark'] !== false);
-const toolState = computed(() =>
-  board.value === 'totals'
-    ? { chartOffered: false, chart: false, mark: null }
-    : {
-        chartOffered: !!props.plan?.hasElevation,
-        chart: widgets.value.some((widget) => widget.kind === 'elevation-chart'),
-        mark: watermark.value,
-      },
-);
+/** The elevation chart in the strip: offered over the replay when an activity has heights. */
+const chart = computed(() => ({
+  offered: board.value === 'overlay' && !!props.plan?.hasElevation,
+  shown: widgets.value.some((widget) => widget.kind === 'elevation-chart'),
+}));
 
-function useTool(tool: 'text' | 'values' | 'chart' | 'mark'): void {
+function useTool(tool: 'text' | 'values' | 'chart'): void {
   if (tool === 'text') {
     // A new text, written straight away; left empty, it goes again.
     editingText.value = addWidget({ kind: 'text', text: '', x: 50, y: 50, size: 100 });
   } else if (tool === 'values') {
-    sheet.value = { name: 'values', label: 'Values' };
-  } else if (tool === 'chart') {
-    const chart = widgets.value.findIndex((widget) => widget.kind === 'elevation-chart');
-    if (chart >= 0) removeWidget(chart);
-    else addWidget({ kind: 'elevation-chart', x: 50, y: 88, size: 100 });
+    sheet.value = { name: 'values', label: board.value === 'totals' ? 'Totals' : 'Values' };
   } else {
-    adjustments.value = { ...adjustments.value, watermark: !watermark.value };
+    // A switch: the strip stays as it is, so the new chart is not picked.
+    const at = widgets.value.findIndex((widget) => widget.kind === 'elevation-chart');
+    if (at >= 0) removeWidget(at);
+    else addWidget({ kind: 'elevation-chart', x: 50, y: 88, size: 100 });
+    selectedWidget.value = null;
   }
 }
 </script>
@@ -267,19 +282,17 @@ function useTool(tool: 'text' | 'values' | 'chart' | 'mark'): void {
               :title="title"
               :profile="drawn?.profile ?? null"
               :size="size"
-              :tools="toolState"
               :card="board === 'totals'"
               @change="setWidgets"
               @edit="editingText = $event"
-              @tool="useTool"
             />
           </template>
         </PosterPreview>
       </div>
 
-      <!-- The section's settings; Overlay has none here, its tools are on the picture. -->
+      <!-- The section's settings; where widgets are arranged, the tools for them first, or a
+           picked widget's options. -->
       <div
-        v-if="section !== 'overlay'"
         ref="controls"
         class="tools setting-strip"
         :aria-label="`${current.label} settings`"
@@ -299,6 +312,39 @@ function useTool(tool: 'text' | 'values' | 'chart' | 'mark'): void {
           view="rows"
           @open="openSetting"
         />
+        <WidgetStrip
+          v-else-if="board"
+          :widgets="widgets"
+          :selected="selectedWidget"
+          :card="board === 'totals'"
+          :chart="chart"
+          @done="selectedWidget = null"
+          @tool="useTool"
+          @edit="editingText = $event"
+          @open="openWidget"
+          @center="centerWidget"
+          @remove="removeWidget"
+        >
+          <!-- Ending: the pause and the card's switch, then its tools, then the end card. -->
+          <template v-if="board === 'totals'" #before>
+            <SettingsGroups
+              v-model="adjustments"
+              :groups="['pause', 'totals']"
+              :count="countOf(activities)"
+              :plan="plan"
+              view="rows"
+              @open="openSetting"
+            />
+          </template>
+          <SettingsGroups
+            v-model="adjustments"
+            :groups="board === 'totals' ? ['end-card'] : current.panels"
+            :count="countOf(activities)"
+            :plan="plan"
+            view="rows"
+            @open="openSetting"
+          />
+        </WidgetStrip>
         <SettingsGroups
           v-else
           v-model="adjustments"
@@ -371,7 +417,7 @@ function useTool(tool: 'text' | 'values' | 'chart' | 'mark'): void {
       </nav>
 
       <div class="layout">
-        <div class="stage">
+        <div class="stage" :class="{ 'with-strip': board }">
           <PosterPreview
             :engine="engine"
             :settings="settings"
@@ -391,14 +437,27 @@ function useTool(tool: 'text' | 'values' | 'chart' | 'mark'): void {
                 :title="title"
                 :profile="drawn?.profile ?? null"
                 :size="size"
-                :tools="toolState"
                 :card="board === 'totals'"
                 @change="setWidgets"
                 @edit="editingText = $event"
-                @tool="useTool"
               />
             </template>
           </PosterPreview>
+          <!-- Adding widgets, or the picked one's options, under the picture. -->
+          <div v-if="board" class="setting-strip board-strip" role="region" aria-label="Widgets">
+            <WidgetStrip
+              :widgets="widgets"
+              :selected="selectedWidget"
+              :card="board === 'totals'"
+              :chart="chart"
+              @done="selectedWidget = null"
+              @tool="useTool"
+              @edit="editingText = $event"
+              @open="openWidget"
+              @center="centerWidget"
+              @remove="removeWidget"
+            />
+          </div>
         </div>
         <div class="settings">
           <FramePanel v-if="section === 'frame'" v-model="adjustments" />
@@ -417,7 +476,7 @@ function useTool(tool: 'text' | 'values' | 'chart' | 'mark'): void {
               :title="title"
               :selected="selectedWidget"
               @add="sheet = { name: 'add-widget', label: 'Add a widget' }"
-              @open="openWidget"
+              @open="openWidget($event)"
             />
             <SettingsGroups
               v-model="adjustments"
@@ -449,12 +508,16 @@ function useTool(tool: 'text' | 'values' | 'chart' | 'mark'): void {
       :values="values"
       :has-elevation="board === 'overlay' && !!plan?.hasElevation"
       :has-calories="!!plan?.hasCalories"
+      :labels="board !== 'totals'"
       @add="addWidget"
     />
     <WidgetSettings
       v-else-if="sheetWidget !== null && widgets[sheetWidget]"
       :widget="widgets[sheetWidget]!"
       :title="title"
+      :values="values"
+      :labels="board !== 'totals'"
+      :only="sheet.only"
       @change="changeWidget(sheetWidget, $event)"
       @remove="removeWidget(sheetWidget)"
     />
@@ -500,9 +563,23 @@ function useTool(tool: 'text' | 'values' | 'chart' | 'mark'): void {
   align-items: start;
 }
 
+/* The picture as tall as fits between the bars, with the sections bar, the preview's heading
+   and caption, the widgets' strip (where there is one) and the bottom bar in view. */
 .layout .stage {
+  --preview-height: calc(100dvh - var(--top-bar-height, 0px) - 18.5rem);
+
   position: sticky;
   top: calc(var(--top-bar-height, 0px) + 1.5rem);
+  min-width: 0;
+}
+
+.layout .stage.with-strip {
+  --preview-height: calc(100dvh - var(--top-bar-height, 0px) - 22.5rem);
+}
+
+/* Wide screens: the widgets' strip under the picture. */
+.board-strip {
+  margin-top: 0.6rem;
 }
 
 /* The widgets in a box like the settings panels. */

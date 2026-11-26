@@ -205,7 +205,14 @@ export function startingTotalsWidgets(
   let rowTop = top + titleRoom;
   for (const row of rows) {
     row.fields.forEach((field, column) => {
-      const widget: Widget = { kind: 'metric', metric: field, x: 0, y: 0, size: 100 };
+      const widget: Widget = {
+        kind: 'metric',
+        metric: field,
+        label: 'under',
+        x: 0,
+        y: 0,
+        size: 100,
+      };
       widget.x = ((W / 2 + (column - (row.fields.length - 1) / 2) * columnWidth) / W) * 100;
       widget.y = ((rowTop + totalsWidgetHeight(widget, unit) / 2) / H) * 100;
       widgets.push(widget);

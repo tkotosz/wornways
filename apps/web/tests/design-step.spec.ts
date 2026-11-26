@@ -119,7 +119,7 @@ test.describe('the Design step on a phone', () => {
     expect((await fps.boundingBox())!.y).toBeCloseTo((await shape.boundingBox())!.y, 0);
     expect(sectionsBox.y + sectionsBox.height).toBeCloseTo(780, 0);
     const pageScrolls = () =>
-      page.evaluate(() => document.documentElement.scrollHeight > window.innerHeight);
+      page.locator('html').evaluate((html) => html.scrollHeight > html.clientHeight);
     expect(await pageScrolls()).toBe(false);
 
     // A chip opens its setting in a sheet, where a change shows on the chip at once.
@@ -140,11 +140,12 @@ test.describe('the Design step on a phone', () => {
     await expect(page.getByRole('button', { name: 'Grouping: Day' })).toBeVisible();
     await openSection(page, 'Overlay');
     await expectSection(page, 'Overlay');
-    // Overlay gives the screen to the picture: no settings under it, its tools on it.
+    // Overlay has its strip too: adding widgets, the chart and the watermark.
     await expect(page.getByRole('button', { name: 'Add a widget' })).toHaveCount(0);
     const onPicture = page.locator('[data-widget]');
     await expect(page.getByTestId('widget-0')).toBeVisible();
     const count = await onPicture.count();
+    const done = page.getByRole('button', { name: '✓ Done' });
     // A text is written over the whole screen, and a tap outside the text finishes, there only.
     await page.getByRole('button', { name: 'Add a text' }).click();
     const writing = page.getByRole('dialog', { name: 'Text' });
@@ -155,30 +156,54 @@ test.describe('the Design step on a phone', () => {
     await expect(onPicture).toHaveCount(count + 1);
     await expect(onPicture.last()).toContainText('Mallorca');
     await expectSection(page, 'Overlay');
+    // The new text is picked: the strip is its own, until Done.
+    await expect(page.getByRole('button', { name: 'Edit the text' })).toBeVisible();
+    await expect(page.getByRole('button', { name: /^Label: / })).toHaveCount(0);
+    await done.click();
     // A text left empty goes away.
     await page.getByRole('button', { name: 'Add a text' }).click();
     await page.keyboard.press('Enter');
     await expect(writing).toBeHidden();
     await expect(onPicture).toHaveCount(count + 1);
-    // Values come from a sheet of them alone.
+    // Values come from a sheet of them alone; a new one shows its words as it usually does.
     await page.getByRole('button', { name: 'Add a value' }).click();
     const values = page.getByRole('dialog', { name: 'Values' });
     await expect(values.getByRole('button', { name: /Elevation chart$/ })).toHaveCount(0);
-    await values.getByRole('button', { name: / Pace$/ }).click();
+    await values.getByRole('button', { name: / Days out$/ }).click();
     await expect(values).toBeHidden();
     await expect(onPicture).toHaveCount(count + 2);
+    const days = onPicture.last();
+    await expect(days).toContainText(/^\d+ days? out/);
+    // Its label mode, from its chip: under it.
+    await page.getByRole('button', { name: 'Label: Inline' }).click();
+    const label = page.getByRole('dialog', { name: 'Days out: label' });
+    await label.getByRole('radio', { name: /^Under/ }).click();
+    await label.getByRole('button', { name: 'Done' }).click();
+    await expect(page.getByRole('button', { name: 'Label: Under' })).toBeVisible();
+    await expect(days.locator('.words')).toHaveText(/days? out/);
+    // Center puts it in the middle across; Remove takes it off.
+    await page.getByRole('button', { name: 'Center it across' }).click();
+    await expect
+      .poll(async () => {
+        const box = (await days.boundingBox())!;
+        const picture = (await preview.boundingBox())!;
+        return box.x + box.width / 2 - (picture.x + picture.width / 2);
+      })
+      .toBeCloseTo(0, 0);
+    await page.getByRole('button', { name: 'Remove from the picture' }).click();
+    await expect(onPicture).toHaveCount(count + 1);
     // The chart and the watermark turn on and off.
-    const chart = page.getByRole('button', { name: 'Show the elevation chart' });
-    await expect(chart).toHaveAttribute('aria-pressed', 'false');
+    const chart = page.getByRole('switch', { name: 'Elevation chart' });
+    await expect(chart).not.toBeChecked();
     await chart.click();
-    await expect(chart).toHaveAttribute('aria-pressed', 'true');
-    await expect(onPicture).toHaveCount(count + 3);
-    await chart.click();
+    await expect(chart).toBeChecked();
     await expect(onPicture).toHaveCount(count + 2);
-    const mark = page.getByRole('button', { name: 'Show the watermark' });
-    await expect(mark).toHaveAttribute('aria-pressed', 'true');
+    await chart.click();
+    await expect(onPicture).toHaveCount(count + 1);
+    const mark = page.getByRole('switch', { name: 'Show watermark' });
+    await expect(mark).toBeChecked();
     await mark.click();
-    await expect(mark).toHaveAttribute('aria-pressed', 'false');
+    await expect(mark).not.toBeChecked();
     expect(await pageScrolls()).toBe(false);
 
     // The top bar leaves the step either way.
