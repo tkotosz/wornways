@@ -58,7 +58,7 @@ describe('the settings offered', () => {
   it('puts every panel in one section, in the order things are decided', () => {
     expect(SECTIONS.map((s) => s.id)).toEqual(['frame', 'playback', 'map', 'overlay', 'ending']);
     // Overlay's widgets are arranged on the still; the watermark stays a setting.
-    expect(SECTIONS.find((s) => s.id === 'overlay')!.panels).toEqual(['watermark']);
+    expect(SECTIONS.find((s) => s.id === 'overlay')!.panels).toEqual(['units', 'watermark']);
     expect(SECTIONS.find((s) => s.id === 'ending')!.panels).toEqual([
       'pause',
       'totals',

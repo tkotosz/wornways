@@ -125,6 +125,13 @@ Trimmed exports default to the filename `replay.mp4`.
 | Street map        | `--map` / `--no-map` | on/off                                                                 | on      |
 | Frame size        | `--size`             | `WxH`, presets: story 1080x1920, square 1080x1080, landscape 1920x1080 | story   |
 | Frames per second | `--fps`              | 24, 30, 60                                                             | 30      |
+| Units             | `--units`            | `metric` or `imperial`                                                 | metric  |
+
+Units: metric tells distances in kilometers, heights in meters, speeds in km/h, paces in
+minutes per kilometer and temperatures in °C; imperial in miles, feet, mph, minutes per mile
+and °F. They apply to the values over the replay and on the totals card. Heart rate, power,
+cadence and calories have no unit to change. In the web app the setting is in the Overlay
+section.
 
 In the Frame section, choose a frame preset or enter a custom size such as `640x480`. Both
 dimensions must be positive even numbers. Available encoder sizes depend on the device.
@@ -164,6 +171,28 @@ A value shows its words in one of these label modes, written after a colon (`cou
 The short forms: `climb` (↑1,200 m), `descent` (↓980 m), and every `avg-`, `max-` and `min-`
 value, its number and the keyword ("142 bpm avg", "45.2 km/h max", "4 °C min", "62.5 km
 avg"). The date has no words. Without a mode, a value has its words under it.
+
+A time, a date or a clock time is also written in a format of its own, after a colon, alone
+or after the label mode (`moving:hm`, `moving:inline:hm`):
+
+| Values                                               | Format | Example     |
+| ---------------------------------------------------- | ------ | ----------- |
+| `time`, `moving`, `avg-time`, `max-time`, `min-time` | `hms`  | 54:38:25    |
+|                                                      | `hm`   | 54:38       |
+|                                                      | `h`    | 55 h, 1.7 h |
+|                                                      | `d`    | 2.3 days    |
+| `date`                                               | `dmy`  | 8 May 2026  |
+|                                                      | `dm`   | 8 May       |
+|                                                      | `wdm`  | Fri 8 May   |
+|                                                      | `mdy`  | May 8, 2026 |
+|                                                      | `iso`  | 2026-05-08  |
+| `start`, `time-of-day`                               | `24h`  | 06:42       |
+|                                                      | `12h`  | 6:42 AM     |
+
+Without one, a time is `hms`, a date `dmy` and a clock time `24h`. Hours have a tenth under
+10 hours and are whole from 10 on; days have a tenth. Dates the activities span follow the
+format ("2 Apr – 8 May 2026", "Thu 2 Apr – Fri 8 May", "Apr 2 – May 8, 2026"), and a month
+is "May 2026", "May" or "2026-05".
 
 Without `--widgets`, a video starts with the title at the top in the middle; the values
 that suit it at the bottom left, the first large and the others smaller in a row under it
@@ -269,7 +298,9 @@ named as the values of the metrics table are (any of them for several activities
 the ones for one activity as it plays, and no elevation chart). Each is centered on its
 point, at a size from 50 to 250%. The text is drawn with the short orange rule under it; a
 total is its number large over its unit and what it is in orange: "312 / km in total",
-"15 / hours moving in total", "62.5 / km avg per ride", "178 / bpm max heart rate". The
+"15 / hours moving in total", "62.5 / km avg per ride", "178 / bpm max heart rate". A time
+or a date takes a format as over the replay; a time is in hours unless told otherwise, and
+its unit moves to the words: "0.6 / days moving in total", "14:30 / moving in total". The
 values fade in in their order, one after another, and count up; the speeds and the dates
 appear without counting up, and the dates are drawn smaller. A total the activities did not
 record (the climb, the descent and the elevations without elevation, the sensor values,

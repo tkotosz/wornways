@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { METRICS } from '../../src/replay/render.ts';
+import { TOTALS_FIELDS } from '../../src/replay/totals-card.ts';
 import {
   defaultLabel,
   labelModes,
@@ -40,11 +41,54 @@ describe('widgets as text', () => {
     ['time@1,2,300', 'a size is from 50 to 250 percent, got 300'],
     ['distance:"x"@1,2', '"distance" takes the label mode off, inline, under, not ""'],
     ['distance:short@1,2', '"distance" takes the label mode off, inline, under, not "short"'],
-    ['date:under@1,2', '"date" takes the label mode off, not "under"'],
+    [
+      'date:under@1,2',
+      '"date" takes the label mode off or the format dmy, dm, wdm, mdy, iso, not "under"',
+    ],
+    ['moving:hm:hms@1,2', '"moving" takes the label mode off, inline, under or the format'],
+    ['distance:hm@1,2', '"distance" takes the label mode off, inline, under, not "hm"'],
     ['elevation-chart:off@1,2', '"elevation-chart" takes no label mode'],
     ['text:"open@1,2', 'the text has no closing double quote'],
   ])('rejects %j', (text, message) => {
     expect(() => parseWidgets(text, METRICS)).toThrow(message);
+  });
+});
+
+describe('formats', () => {
+  it('takes a time, date or clock format after the label mode, or alone, and writes it back', () => {
+    const text = 'moving:inline:hm@20,80;date:dm@50,8;start:12h@50,20;time@10,10';
+    const widgets = parseWidgets(text, METRICS);
+    expect(widgets.map((w) => (w.kind === 'metric' ? [w.label, w.format] : null))).toEqual([
+      ['inline', 'hm'],
+      ['off', 'dm'],
+      ['under', '12h'],
+      ['under', undefined],
+    ]);
+    expect(widgetsText(widgets)).toBe(text);
+    // The usual format is not written.
+    expect(widgetsText(parseWidgets('moving:hms@1,2', METRICS))).toBe('moving@1,2');
+    // On the totals card a time is in hours unless told otherwise, and has no label mode.
+    const card = parseWidgets('moving:hm@1,2;time:h@1,2', TOTALS_FIELDS, { labels: false });
+    expect(widgetsText(card, { labels: false })).toBe('moving:hm@1,2;time@1,2');
+  });
+
+  it('writes a value in the format picked, its words and short form with it', () => {
+    const longest = {
+      value: '5:15:00',
+      label: 'max time per ride',
+      short: '5:15:00 max',
+      name: 'Max time per activity',
+      formats: {
+        hm: { value: '5:15', label: 'max time per ride', short: '5:15 max' },
+        d: { value: '0.2 days', label: 'max time per ride', short: '0.2 days max' },
+      },
+    };
+    expect(valueLines(longest, 'under', 'hm')).toEqual({
+      line: '5:15',
+      under: 'max time per ride',
+    });
+    expect(valueLines(longest, 'short', 'd')).toEqual({ line: '0.2 days max', under: '' });
+    expect(valueLines(longest, 'off')).toEqual({ line: '5:15:00', under: '' });
   });
 });
 

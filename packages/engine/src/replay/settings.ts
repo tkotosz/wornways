@@ -11,6 +11,7 @@ import { TOTALS_CARD_S, TOTALS_FIELDS } from './totals-card.ts';
 import { PRESETS, PRESET_NAMES, type Preset } from './presets.ts';
 import type { Grouping } from './plans.ts';
 import { METRICS, SINGLE_ONLY } from './metrics.ts';
+import type { Units } from './formats.ts';
 import { parseWidgets, type Widget } from './widgets.ts';
 
 export type RenderSettings = {
@@ -75,6 +76,8 @@ export type RenderSettings = {
   totalsCard: boolean;
   /** What the totals card shows; null: the title and the usual totals. */
   totalsWidgets: Widget[] | null;
+  /** Distances, heights, speeds and temperatures in metric or imperial units. */
+  units: Units;
 
   // Branding
   /** Whether the video ends with the Wornways card, after the replay. */
@@ -391,7 +394,12 @@ export const SETTINGS: readonly SettingDefinition[] = [
       'short (its own short form: ↑1,200 m, 142 bpm avg, 45 km/h max; for the climb, the ' +
       'descent and the avg-, max- and min- values), inline (25 activities) or under (the ' +
       'words on a line under it). Left out, a value has its words under it; the date has ' +
-      `none. The values: ${METRICS.join(', ')}. For several activities a plain value is ` +
+      'none. A time, a date or a clock time also takes a format after a colon, as ' +
+      'moving:hm@x,y or moving:inline:hm@x,y: a time hms (54:38:25, the usual), hm (54:38), ' +
+      'h (55 h) or d (2.3 days); the date dmy (8 May 2026, the usual), dm (8 May), wdm ' +
+      '(Fri 8 May), mdy (May 8, 2026) or iso (2026-05-08); start and time-of-day 24h (06:42, ' +
+      'the usual) or 12h (6:42 AM). ' +
+      `The values: ${METRICS.join(', ')}. For several activities a plain value is ` +
       'their total (time, moving, distance, climb, descent, calories); avg-, max- and min- ' +
       'time, distance, climb and calories are per activity; the speeds, elevations and ' +
       'sensors are over every activity together. A value the video cannot show is left out: ' +
@@ -429,8 +437,19 @@ export const SETTINGS: readonly SettingDefinition[] = [
       'time, distance, climb and calories are per activity; the speeds, elevations and ' +
       'sensors are over every activity together; date is the days spanned. A total the ' +
       'activities did not ' +
-      'record (elevation, the sensors, calories) is left out. The values fade in in their ' +
-      'order and count up.',
+      'record (elevation, the sensors, calories) is left out. A time, a date or a clock ' +
+      'time takes a format as over the replay; a time is in hours unless told otherwise. ' +
+      'The values fade in in their order and count up.',
+  },
+  {
+    name: 'units',
+    label: 'Units',
+    group: 'look',
+    kind: { type: 'choice', choices: ['metric', 'imperial'] },
+    default: 'metric',
+    help:
+      'metric: kilometers, meters, km/h, minutes per kilometer and °C. imperial: miles, feet, ' +
+      'mph, minutes per mile and °F. For the values over the replay and on the totals card.',
   },
 
   {
@@ -658,6 +677,7 @@ export function parseSettings(input: SettingsInput): RenderSettings {
     endPause: number('end-pause'),
     trimRadius: number('trim-radius'),
     camera: choice<RenderSettings['camera']>('camera'),
+    units: choice<RenderSettings['units']>('units'),
     map: flag('map'),
     title: text('title'),
     width,

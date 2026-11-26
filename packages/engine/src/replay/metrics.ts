@@ -1,5 +1,7 @@
 // The values a widget can show, as the overlay and the totals card share them.
 
+import type { ValueFormat } from './formats.ts';
+
 /**
  * A value a widget can show, by what it measures. For several activities, the plain ones are
  * totals ("Total distance"); avg-, max- and min-time, -distance, -climb and -calories are
@@ -120,8 +122,15 @@ export const SINGLE_ONLY = [
   'temperature-now',
 ] as const satisfies readonly Metric[];
 
+/** A value's text: its number with the unit, its words, and its short form where it has one. */
+export type MetricText = { value: string; label: string; short?: string };
+
 /**
- * A value as a widget shows it: its number with the unit, its words (`label`), its short form
- * where it has one, and its name for this video ("Total distance", "Race time").
+ * A value as a widget shows it: its text in the usual format, its name for this video ("Total
+ * distance", "Race time"), and for a time, date or clock time its text in every format
+ * (`formats`, see formats.ts).
  */
-export type MetricValue = { value: string; label: string; short?: string; name: string };
+export type MetricValue = MetricText & {
+  name: string;
+  formats?: Partial<Record<ValueFormat, MetricText>>;
+};

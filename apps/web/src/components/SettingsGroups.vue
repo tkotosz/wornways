@@ -38,6 +38,7 @@ const GROUP_TITLES: Record<Panel, string> = {
   camera: 'Camera',
   privacy: 'Replay privacy',
   map: 'Map',
+  units: 'Units',
   watermark: 'Watermark',
   pause: 'End pause',
   totals: 'Totals card',

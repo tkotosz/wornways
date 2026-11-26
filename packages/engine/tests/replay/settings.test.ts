@@ -41,6 +41,7 @@ describe('parseSettings', () => {
       widgets: null,
       totalsCard: false,
       totalsWidgets: null,
+      units: 'metric',
       endCard: true,
       watermark: true,
     });

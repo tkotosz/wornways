@@ -670,6 +670,34 @@ describe('widgets', () => {
     expect(renderer.overlayBoxes().widgets[1]).toBeNull();
   });
 
+  it('writes a time, the date and the start in every format, and the units asked for', () => {
+    const metric = lastFrame({});
+    const time = metric.finalValues.get('time')!;
+    expect(time.value).toBe('0:19:50');
+    expect(time.formats).toMatchObject({
+      hms: { value: '0:19:50' },
+      hm: { value: '0:19' },
+      h: { value: '0.3 h' },
+      d: { value: '0.0 days' },
+    });
+    expect(metric.finalValues.get('date')!.formats!.iso!.value).toBe(
+      new Date(Date.UTC(2026, 4, 2)).toLocaleDateString('sv'),
+    );
+    expect(Object.keys(metric.finalValues.get('start')!.formats!)).toEqual(['24h', '12h']);
+    // A wider box for the longer format.
+    const box = (format: 'hms' | 'd') =>
+      lastFrame({
+        widgets: [
+          { kind: 'metric', metric: 'time', label: 'off', format, x: 50, y: 50, size: 100 },
+        ],
+      }).overlayBoxes().widgets[0]!.width;
+    expect(box('d')).toBeGreaterThan(box('hms'));
+
+    const imperial = lastFrame({ units: 'imperial' }).finalValues;
+    expect(imperial.get('distance')!.value).toBe('3.3 mi');
+    expect(imperial.get('avg-speed')!.value).toMatch(/ \/mi$/);
+  });
+
   it('starts with the title, the values and the chart when none are given', () => {
     const renderer = lastFrame({ watermark: true });
     expect(

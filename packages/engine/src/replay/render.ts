@@ -16,8 +16,24 @@ import {
 import { drawWatermark } from './mark.ts';
 import { averagePace, isOnFoot, topSpeed } from './pace.ts';
 import { sensorValueText } from './sensor-text.ts';
-import type { Metric, MetricValue } from './metrics.ts';
-import { calendarDay, dateRange } from './plans.ts';
+import type { Metric, MetricText, MetricValue } from './metrics.ts';
+import { calendarDay } from './plans.ts';
+import {
+  CLOCK_FORMATS,
+  DATE_FORMATS,
+  TIME_FORMATS,
+  clockTimeText,
+  dateSpan,
+  dayText,
+  distanceUnit,
+  durationText,
+  heightUnit,
+  inDistanceUnits,
+  inHeightUnits,
+  type DateFormat,
+  type Units,
+  type ValueFormat,
+} from './formats.ts';
 import { composeHeat, createHeatRamp, decodeHeat, heatStyle, saturationFromHeat } from './heat.ts';
 import { projectTrack, type Projected, type SensorSums } from './project.ts';
 import type { Timeline } from './timeline.ts';
@@ -169,8 +185,8 @@ export type RenderOptions = {
   /** Draw the small Wornways mark on the map credit's line. Default false. */
   watermark?: boolean;
   fontFamily?: string;
-  /** BCP 47 locale for the date counter. */
-  locale?: string;
+  /** Distances, heights, speeds and temperatures in metric or imperial units. Default metric. */
+  units?: Units;
 };
 
 export type Renderer = {
@@ -217,7 +233,7 @@ export type Renderer = {
 /** Where an activity stands, for the values: as drawn so far, or at the end. */
 type MetricState = Pick<
   Prepared,
-  | 'date'
+  | 'start'
   | 'day'
   | 'hasElevation'
   | 'started'
@@ -235,7 +251,8 @@ type MetricState = Pick<
 >;
 
 type Prepared = Projected & {
-  date: string;
+  /** When the activity started, in milliseconds since 1970. */
+  start: number;
   /** The calendar day the activity started on, as a day count, to count the days between. */
   day: number;
   // Drawing state
@@ -336,8 +353,6 @@ type Level = {
 };
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
-const clockText = (s: number) =>
-  `${Math.floor(s / 3600)}:${String(Math.floor((s % 3600) / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
 const smoothstep = (f: number) => f * f * (3 - 2 * f);
 const wholeNumber = (n: number) => Math.round(n).toLocaleString('en-US');
 
@@ -366,8 +381,8 @@ function tracePoints(c: Context2DLike, xy: ArrayLike<number>, count: number, gap
 }
 
 /** Average pace ("5:32 /km") or, off foot, speed ("24.3 km/h") over the distance so far. */
-function paceText(onFoot: boolean, seconds: number, metres: number): string {
-  const { value, unit } = averagePace(onFoot, seconds, metres);
+function paceText(onFoot: boolean, seconds: number, metres: number, units: Units): string {
+  const { value, unit } = averagePace(onFoot, seconds, metres, units);
   return `${value} ${unit}`;
 }
 
@@ -416,20 +431,11 @@ export function createRenderer(
   const withCalories = tracks.some((track) => track.calories !== undefined);
   // Pace is in minutes per kilometer only when every activity is on foot.
   const onFoot = tracks.every((track) => isOnFoot(track.sport));
+  const units = options.units ?? 'metric';
   const starts = tracks.map((track) => track.startTime);
-  /** The days the activities span: "18–22 Apr 2026", or one day. */
-  const datesSpanned = dateRange(Math.min(...starts), Math.max(...starts));
-  /** The time of day an activity started, e.g. "06:42", in this device's time zone. */
-  const timeFormat = new Intl.DateTimeFormat(options.locale ?? 'en-GB', {
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  });
-  const dateFormat = new Intl.DateTimeFormat(options.locale ?? 'en-GB', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  });
+  /** The first and the last start: the days the activities span. */
+  const firstStart = Math.min(...starts);
+  const lastStart = Math.max(...starts);
   const replayFrames = Math.round(timeline.duration * fps);
   const pauseFrames = Math.round((options.endPause ?? 0) * fps);
   // The totals card is for several activities only.
@@ -456,7 +462,7 @@ export function createRenderer(
   const levelGap = (k: number) => (options.preserveRoutePoints ? 0 : MIN_GAP_PX / k);
   const prepared: Prepared[] = tracks.map((track) => ({
     ...projectTrack(track, view, minGapPx),
-    date: dateFormat.format(track.startTime),
+    start: track.startTime,
     day: calendarDay(track.startTime),
     idx: 0,
     headX: 0,
@@ -871,10 +877,11 @@ export function createRenderer(
     let lowest = Infinity;
     let moved = 0;
     let fastest = 0;
-    const days = new Set<string>();
+    const days = new Set<number>();
     let firstDay = Infinity;
     let lastDay = -Infinity;
-    let date = state[0]!.date;
+    /** The start of the last activity started so far. */
+    let latest = state[0]!.start;
     for (const tr of state) {
       if (!tr.done) moving++;
       if (!tr.started) continue;
@@ -888,10 +895,10 @@ export function createRenderer(
       }
       moved += tr.moved;
       fastest = Math.max(fastest, tr.topSpeed);
-      days.add(tr.date);
+      days.add(tr.day);
       firstDay = Math.min(firstDay, tr.day);
       lastDay = Math.max(lastDay, tr.day);
-      date = tr.date;
+      latest = tr.start;
     }
     const lastSecond = (track: Track) => track.points[track.points.length - 1];
     /** Each activity's recorded time so far. */
@@ -907,24 +914,51 @@ export function createRenderer(
         label: label ?? name.toLowerCase(),
         ...(short === undefined ? {} : { short }),
       });
+    /** A value written in each of `formats`, the first its usual way, with its name. */
+    const setFormats = <F extends ValueFormat>(
+      metric: Metric,
+      name: string,
+      formats: readonly F[],
+      text: (format: F) => MetricText,
+    ) => {
+      const all: Partial<Record<ValueFormat, MetricText>> = {};
+      for (const format of formats) all[format] = text(format);
+      texts.set(metric, { ...all[formats[0]!]!, name, formats: all });
+    };
+    /** A length of time in each time format; per activity with its short form. */
+    const setTime = (
+      metric: Metric,
+      seconds: number,
+      name: string,
+      label = name.toLowerCase(),
+      which?: 'avg' | 'max' | 'min',
+    ) =>
+      setFormats(metric, name, TIME_FORMATS, (format) => {
+        const value = durationText(seconds, format);
+        return { value, label, ...(which ? { short: `${value} ${which}` } : {}) };
+      });
     /** For several activities a plain value is their total: "Total distance". */
     const total = (name: string) => (several ? `Total ${name.toLowerCase()}` : name);
+    /** A distance in kilometers or miles, whole or to a tenth. */
+    const distanceText = (meters: number, tenths: boolean) => {
+      const value = inDistanceUnits(meters, units);
+      return `${tenths ? value.toFixed(1) : wholeNumber(value)} ${distanceUnit(units)}`;
+    };
+    /** A height in meters or feet. */
+    const heightText = (meters: number) =>
+      `${wholeNumber(inHeightUnits(meters, units))} ${heightUnit(units)}`;
 
     // Time.
-    if (kind === 'single') set('time', clockText(Math.floor(secondsOf(0))), 'Time');
-    else if (timeline.clock) set('time', clockText(Math.floor(timeline.clock(t))), 'Race time');
+    if (kind === 'single') setTime('time', secondsOf(0), 'Time');
+    else if (timeline.clock) setTime('time', timeline.clock(t), 'Race time');
     else
-      set(
+      setTime(
         'time',
-        clockText(Math.floor(tracks.reduce((sum, _, k) => sum + secondsOf(k), 0))),
+        tracks.reduce((sum, _, k) => sum + secondsOf(k), 0),
         'Total time',
       );
-    set('moving', clockText(Math.floor(moved)), total('Moving time'));
-    set(
-      'distance',
-      several ? `${wholeNumber(metres / 1000)} km` : `${(metres / 1000).toFixed(1)} km`,
-      total('Distance'),
-    );
+    setTime('moving', moved, total('Moving time'));
+    set('distance', distanceText(metres, !several), total('Distance'));
     if (several) {
       // Distance, time, climb and calories per activity: the average of the ones started so
       // far, the most of any, and the least of the ones finished (of the ones started until
@@ -935,56 +969,59 @@ export function createRenderer(
       const perActivity = (
         metric: 'time' | 'distance' | 'climb' | 'calories',
         of: (k: number) => number,
-        text: (value: number) => string,
+        text: ((value: number) => string) | 'time',
       ) => {
         if (!shown.length) return;
         const values = shown.map(of);
-        const avg = values.reduce((sum, v) => sum + v, 0) / values.length;
         const words = `${metric} per ${singular}`;
         const name = `${metric} per activity`;
-        set(`avg-${metric}`, text(avg), `Avg ${name}`, `avg ${words}`, `${text(avg)} avg`);
-        const max = Math.max(...values);
-        set(`max-${metric}`, text(max), `Max ${name}`, `max ${words}`, `${text(max)} max`);
-        const min = Math.min(...counted.map(of));
-        set(`min-${metric}`, text(min), `Min ${name}`, `min ${words}`, `${text(min)} min`);
+        const put = (which: 'avg' | 'max' | 'min', value: number) => {
+          const id = `${which}-${metric}` as const;
+          const named = `${which[0]!.toUpperCase()}${which.slice(1)} ${name}`;
+          if (text === 'time') setTime(id, value, named, `${which} ${words}`, which);
+          else set(id, text(value), named, `${which} ${words}`, `${text(value)} ${which}`);
+        };
+        put('avg', values.reduce((sum, v) => sum + v, 0) / values.length);
+        put('max', Math.max(...values));
+        put('min', Math.min(...counted.map(of)));
       };
-      perActivity('time', secondsOf, (v) => clockText(Math.floor(v)));
+      perActivity('time', secondsOf, 'time');
       perActivity(
         'distance',
         (k) => state[k]!.metres,
-        (v) => `${(v / 1000).toFixed(1)} km`,
+        (v) => distanceText(v, true),
       );
-      if (hasElevation)
-        perActivity(
-          'climb',
-          (k) => state[k]!.climbed,
-          (v) => `${wholeNumber(v)} m`,
-        );
+      if (hasElevation) perActivity('climb', (k) => state[k]!.climbed, heightText);
       if (withCalories) perActivity('calories', caloriesOf, (v) => `${wholeNumber(v)} kcal`);
     } else {
       // One activity: when it started, and where it is now.
       const track = tracks[0]!;
       const now = state[0]!;
-      set('start', timeFormat.format(track.startTime), 'Start time');
+      setFormats('start', 'Start time', CLOCK_FORMATS, (format) => ({
+        value: clockTimeText(track.startTime, format),
+        label: 'start time',
+      }));
       // The clock time as it plays: by the recorded clock, stops included.
       const recorded = (track.elapsedSeconds ?? lastSecond(track)) * timeline.progress(0, t);
-      set('time-of-day', timeFormat.format(track.startTime + recorded * 1000), 'Time of day');
-      const speed = topSpeed(onFoot, now.started ? now.speedNow : 0);
+      setFormats('time-of-day', 'Time of day', CLOCK_FORMATS, (format) => ({
+        value: clockTimeText(track.startTime + recorded * 1000, format),
+        label: 'time of day',
+      }));
+      const speed = topSpeed(onFoot, now.started ? now.speedNow : 0, units);
       set('speed-now', `${speed.value} ${speed.unit}`, onFoot ? 'Current pace' : 'Current speed');
-      if (now.hasElevation)
-        set('elevation-now', `${wholeNumber(now.elevationNow)} m`, 'Current elevation');
+      if (now.hasElevation) set('elevation-now', heightText(now.elevationNow), 'Current elevation');
     }
 
     // Speed: the average while moving, as Strava and the totals card give it, and the fastest.
-    const pace = paceText(onFoot, moved, metres);
+    const pace = paceText(onFoot, moved, metres, units);
     set('avg-speed', pace, onFoot ? 'Avg pace' : 'Avg speed', undefined, `${pace} avg`);
-    const top = topSpeed(onFoot, fastest);
+    const top = topSpeed(onFoot, fastest, units);
     const topText = `${top.value} ${top.unit}`;
     set('max-speed', topText, onFoot ? 'Max pace' : 'Max speed', undefined, `${topText} max`);
 
     // Elevation.
     if (hasElevation) {
-      const m = (value: number) => `${wholeNumber(value)} m`;
+      const m = heightText;
       set('climb', m(climbed), total('Climb'), undefined, `↑${m(climbed)}`);
       set('descent', m(descended), total('Descent'), undefined, `↓${m(descended)}`);
       if (Number.isFinite(highest))
@@ -1025,7 +1062,7 @@ export function createRenderer(
             : which === 'min'
               ? sum.min
               : sum.now;
-      const text = sensorValueText(channel, value, onFoot);
+      const text = sensorValueText(channel, value, onFoot, units);
       set(
         metric,
         text,
@@ -1042,15 +1079,19 @@ export function createRenderer(
     }
 
     // The activities.
-    if (kind === 'single') set('date', state[0]!.date, 'Date', '');
+    /** The date in each date format; it has no words. */
+    const setDate = (text: (format: DateFormat) => string) =>
+      setFormats('date', 'Date', DATE_FORMATS, (format) => ({ value: text(format), label: '' }));
+    if (kind === 'single') setDate((format) => dayText(state[0]!.start, format));
     else if (timeline.clock) {
       // A race: how many are still out.
       if (moving > 0) set('count', String(moving), 'Still moving', `still ${movingLabel}`);
       else set('count', 'all', 'Still moving', 'finished');
-      set('date', datesSpanned, 'Date', '');
+      setDate((format) => dateSpan(firstStart, lastStart, format));
     } else {
       set('count', String(started), 'Total activities', started === 1 ? singular : plural);
-      set('date', timeline.label?.(t) ?? date, 'Date', '');
+      const { label } = timeline;
+      setDate((format) => (label ? label(t, format) : dayText(latest, format)));
     }
     if (several) {
       const spanned = started === 0 ? 0 : lastDay - firstDay + 1;
@@ -1072,7 +1113,7 @@ export function createRenderer(
       const sensorsNow: MetricState['sensorsNow'] = {};
       for (const [channel, sums] of sensorEntries(tr)) sensorsNow[channel] = sensorAt(sums, last);
       return {
-        date: tr.date,
+        start: tr.start,
         day: tr.day,
         hasElevation: tr.hasElevation,
         started: true,
@@ -1107,7 +1148,7 @@ export function createRenderer(
     }
     const value = values.get(widget.metric);
     if (!value) return { width: 0, height: 0 };
-    const { line, under } = valueLines(value, widget.label);
+    const { line, under } = valueLines(value, widget.label, widget.format);
     ctx.font = fontOf(600, VALUE_SIZE * scale);
     let width = ctx.measureText(line).width;
     let height = VALUE_SIZE * scale * 1.1;
@@ -1148,7 +1189,7 @@ export function createRenderer(
       ctx.fillStyle = 'rgba(255, 255, 255, 0.92)';
       ctx.fillText(widget.text ?? options.title ?? '', cx, box.y0 + TEXT_SIZE * scale);
     } else if (widget.kind === 'metric') {
-      const { line, under } = valueLines(values.get(widget.metric)!, widget.label);
+      const { line, under } = valueLines(values.get(widget.metric)!, widget.label, widget.format);
       ctx.font = fontOf(600, VALUE_SIZE * scale);
       ctx.fillStyle = 'rgba(255, 255, 255, 0.94)';
       ctx.fillText(line, cx, box.y0 + VALUE_SIZE * scale * 0.95);
@@ -1344,7 +1385,8 @@ export function createRenderer(
         calories: withCalories ? tracks.map((track) => track.calories ?? 0) : null,
       },
       onFoot,
-      dates: datesSpanned,
+      firstStart,
+      lastStart,
       days: Math.max(...dayCounts) - Math.min(...dayCounts) + 1,
       movingDays: new Set(dayCounts).size,
       topSpeed: fastest,
@@ -1393,7 +1435,7 @@ export function createRenderer(
     (totalsLayout ??=
       options.totalsWidgets ??
       startingTotalsWidgets(
-        totalsEntries(totals(), 1, [singular, plural], AUTOMATIC_TOTALS).map((e) => e.field),
+        totalsEntries(totals(), 1, [singular, plural], AUTOMATIC_TOTALS, units).map((e) => e.field),
         !!options.title,
         { width: W, height: H },
       ));
@@ -1422,6 +1464,7 @@ export function createRenderer(
             fontFamily,
             title: options.title ?? '',
             countLabel: [singular, plural],
+            units,
             widgets: totalsWidgets(),
             hideWidgets: options.hideTotalsWidgets,
           });
@@ -1453,6 +1496,7 @@ export function createRenderer(
           fontFamily,
           title: options.title ?? '',
           countLabel: [singular, plural],
+          units,
           widgets: totalsWidgets(),
           hideWidgets: options.hideTotalsWidgets,
         });
@@ -1462,7 +1506,7 @@ export function createRenderer(
     widgets,
     totalsCard: () => ({
       widgets: totalsWidgets(),
-      values: totalsValues(totals(), [singular, plural]) as Map<Metric, MetricValue>,
+      values: totalsValues(totals(), [singular, plural], units) as Map<Metric, MetricValue>,
     }),
     finalValues,
     profileShape(samples: number) {

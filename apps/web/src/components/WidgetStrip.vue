@@ -2,11 +2,12 @@
 // The chips for arranging widgets, in the strip under the picture (Overlay, and Ending with
 // the totals card). With no widget picked: adding a text or a metric, and the elevation chart
 // on or off. With one picked, the strip is that widget's: Done lets it go; Edit writes a
-// text's text; Size and Label open their sheet; Center puts it in the middle across; Remove
-// takes it off the picture. The section's own settings stay in the slot, after the tools.
+// text's text; Size, Label and Format (a time, date or clock time) open their sheet; Center
+// puts it in the middle across; Remove takes it off the picture. The section's own settings
+// stay in the slot, after the tools.
 import type { Widget } from '@wornways/engine';
 import { computed } from 'vue';
-import { LABEL_MODE_NAMES } from '../adjust.ts';
+import { FORMAT_NAMES, LABEL_MODE_NAMES, formatOf } from '../adjust.ts';
 
 const props = defineProps<{
   widgets: Widget[];
@@ -23,8 +24,8 @@ const emit = defineEmits<{
   tool: [tool: 'text' | 'values' | 'chart'];
   /** Writes the picked text widget's text. */
   edit: [index: number];
-  /** Opens the picked widget's size or label in a sheet. */
-  open: [index: number, what: 'size' | 'label'];
+  /** Opens the picked widget's size, label or format in a sheet. */
+  open: [index: number, what: 'size' | 'label' | 'format'];
   center: [index: number];
   remove: [index: number];
 }>();
@@ -32,6 +33,8 @@ const emit = defineEmits<{
 const picked = computed(() =>
   props.selected === null ? null : (props.widgets[props.selected] ?? null),
 );
+/** The picked value's format, when it is a time, a date or a clock time. */
+const format = computed(() => (picked.value ? formatOf(picked.value, props.card) : null));
 </script>
 
 <template>
@@ -69,6 +72,17 @@ const picked = computed(() =>
     >
       <span>Label</span>
       <span class="value">{{ LABEL_MODE_NAMES[picked.label] }}</span>
+    </button>
+    <button
+      v-if="format"
+      type="button"
+      class="setting-row"
+      :aria-label="`Format: ${FORMAT_NAMES[format]}`"
+      aria-haspopup="dialog"
+      @click="emit('open', selected, 'format')"
+    >
+      <span>Format</span>
+      <span class="value">{{ FORMAT_NAMES[format] }}</span>
     </button>
     <button
       type="button"

@@ -6,6 +6,7 @@ import {
   PRESETS,
   PRESET_NAMES,
   SETTINGS,
+  defaultFormat,
   type LabelMode,
   type Metric,
   type MetricValue,
@@ -13,6 +14,7 @@ import {
   type SettingDefinition,
   type SettingGroup,
   type SettingsInput,
+  type ValueFormat,
   type Widget,
 } from '@wornways/engine';
 import type { PlanReport } from './messages.ts';
@@ -36,8 +38,9 @@ export const SECTIONS: { id: Section; label: string; panels: Panel[] }[] = [
   {
     id: 'overlay',
     label: 'Overlay',
-    // The widgets are arranged on the still (WidgetEditor) and listed above the watermark.
-    panels: ['watermark'],
+    // The widgets are arranged on the still (WidgetEditor) and listed above the units and
+    // the watermark.
+    panels: ['units', 'watermark'],
   },
   {
     id: 'ending',
@@ -217,6 +220,7 @@ const CHOICE_LABELS: Record<string, Record<string, string>> = {
   'group-pace': { fit: 'Fit to the group', real: 'Real pace' },
   pace: { time: 'As recorded', distance: 'Even speed' },
   camera: { zoom: 'Zooms out', fixed: 'Fixed', follow: 'Follows' },
+  units: { metric: 'Metric', imperial: 'Imperial' },
 };
 
 /** One line of explanation under a few settings. */
@@ -247,6 +251,10 @@ const HINTS: Record<string, string> = {
     'How long the finished picture stays on screen at the end, before the totals and the ' +
     'end card. Added to the video’s length.',
   'trim-radius': 'Hide the route within this radius of each activity’s start and finish.',
+  units:
+    'Metric: km, m, km/h, min/km and °C. Imperial: mi, ft, mph, min/mi and °F. For the values ' +
+    'over the replay and on the totals card; heart rate, power, cadence and calories stay ' +
+    'as they are.',
   'totals-card':
     'After the replay, a few seconds of totals: activities, kilometers, hours moving and ' +
     'meters climbed. On for Recap.',
@@ -273,7 +281,7 @@ export const sliderStep = (setting: string) => STEPS[setting] ?? 1;
 
 /** A panel of settings in the editor's sections. */
 export type Panel =
-  'timing' | 'camera' | 'privacy' | 'map' | 'watermark' | 'pause' | 'totals' | 'end-card';
+  'timing' | 'camera' | 'privacy' | 'map' | 'units' | 'watermark' | 'pause' | 'totals' | 'end-card';
 
 /** The settings of each panel on the screens, in order: mostly the settings table's groups. */
 const PANELS: Record<Panel, string[]> = {
@@ -282,6 +290,7 @@ const PANELS: Record<Panel, string[]> = {
   camera: ['camera'],
   privacy: ['trim-radius'],
   map: ['map'],
+  units: ['units'],
   watermark: ['watermark'],
   pause: ['end-pause'],
   totals: ['totals-card'],
@@ -478,6 +487,25 @@ export const LABEL_MODE_NAMES: Record<LabelMode, string> = {
   inline: 'Inline',
   under: 'Under',
 };
+
+/** The names of the ways a time, a date or a clock time can be written. */
+export const FORMAT_NAMES: Record<ValueFormat, string> = {
+  hms: 'h:mm:ss',
+  hm: 'h:mm',
+  h: 'Hours',
+  d: 'Days',
+  dmy: 'Day month year',
+  dm: 'Day month',
+  wdm: 'With weekday',
+  mdy: 'Month day, year',
+  iso: 'Numeric',
+  '24h': '24-hour',
+  '12h': '12-hour',
+};
+
+/** The format a value widget is written in: its own, else the value's usual one. */
+export const formatOf = (widget: Widget, card: boolean): ValueFormat | null =>
+  widget.kind === 'metric' ? (widget.format ?? defaultFormat(widget.metric, card)) : null;
 
 /** A widget's name in the list: "Text", a value's name, or "Elevation chart". */
 export const widgetLabel = (widget: Widget, values?: Map<Metric, MetricValue>) =>

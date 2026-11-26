@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import type { Widget } from '../../src/replay/widgets.ts';
 import {
+  AUTOMATIC_TOTALS,
   startingTotalsWidgets,
   totalsEntries,
+  totalsEntry,
+  totalsValues,
   totalsWidgetHeight,
   type Totals,
 } from '../../src/replay/totals-card.ts';
@@ -38,15 +41,16 @@ describe('totalsEntries', () => {
     maxTemperature: 31.4,
     calories: 6120,
     onFoot: false,
-    dates: '18–22 Apr 2026',
+    firstStart: new Date(2026, 3, 18, 8).getTime(),
+    lastStart: new Date(2026, 3, 22, 9).getTime(),
   };
   const rides: [string, string] = ['ride', 'rides'];
   /** The entries as "value / label", for short expectations. */
   const shown = (fields: Parameters<typeof totalsEntries>[3], of = totals, f = 1) =>
-    totalsEntries(of, f, rides, fields).map((e) => `${e.value} / ${e.label}`);
+    totalsEntries(of, f, rides, fields, 'metric').map((e) => `${e.value} / ${e.label}`);
 
   it('shows the totals unless told otherwise, each named for what it is', () => {
-    expect(totalsEntries(totals, 1, rides)).toEqual([
+    expect(totalsEntries(totals, 1, rides, AUTOMATIC_TOTALS, 'metric')).toEqual([
       { field: 'count', value: '5', label: 'rides', name: 'Total activities' },
       { field: 'distance', value: '312', label: 'km in total', name: 'Total distance' },
       { field: 'moving', value: '15', label: 'hours moving in total', name: 'Total moving time' },
@@ -98,7 +102,7 @@ describe('totalsEntries', () => {
       '2,200 / kcal max per ride',
       '400 / kcal min per ride',
     ]);
-    const [max] = totalsEntries(totals, 1, rides, ['max-distance']);
+    const [max] = totalsEntries(totals, 1, rides, ['max-distance'], 'metric');
     expect(max!.name).toBe('Max distance per activity');
   });
 
@@ -187,10 +191,9 @@ describe('totalsEntries', () => {
   });
 
   it('shows the values picked, in the order picked', () => {
-    expect(totalsEntries(totals, 1, rides, ['climb', 'count']).map((e) => e.field)).toEqual([
-      'climb',
-      'count',
-    ]);
+    expect(
+      totalsEntries(totals, 1, rides, ['climb', 'count'], 'metric').map((e) => e.field),
+    ).toEqual(['climb', 'count']);
   });
 
   it('shows the days spanned, and neither the dates nor the speed count up', () => {
@@ -199,6 +202,69 @@ describe('totalsEntries', () => {
       '21.5 / km/h avg speed',
       '62 / km in total',
     ]);
+  });
+
+  it('writes a time in hours unless told otherwise, the unit in its words', () => {
+    const moving = (format?: 'hms' | 'hm' | 'h' | 'd') =>
+      totalsEntry(totals, 'moving', { f: 1, countLabel: rides, units: 'metric', format });
+    expect(moving()).toMatchObject({ value: '15', label: 'hours moving in total' });
+    expect(moving('hms')).toMatchObject({ value: '14:30:00', label: 'moving in total' });
+    expect(moving('hm')).toMatchObject({ value: '14:30', label: 'moving in total' });
+    expect(moving('d')).toMatchObject({ value: '0.6', label: 'days moving in total' });
+    const time = (format: 'hm' | 'h') =>
+      totalsEntry(totals, 'time', { f: 1, countLabel: rides, units: 'metric', format });
+    expect(time('hm')).toMatchObject({ value: '18:00', label: 'time in total' });
+    expect(time('h')).toMatchObject({ value: '18', label: 'hours in total' });
+    const longest = totalsEntry(totals, 'max-time', {
+      f: 1,
+      countLabel: rides,
+      units: 'metric',
+      format: 'hm',
+    });
+    expect(longest).toMatchObject({ value: '5:15', label: 'max time per ride' });
+  });
+
+  it('writes the dates in the format picked', () => {
+    const dates = (format: 'dmy' | 'dm' | 'wdm' | 'mdy' | 'iso') =>
+      totalsEntry(totals, 'date', { f: 1, countLabel: rides, units: 'metric', format })!.value;
+    expect(dates('dmy')).toBe('18–22 Apr 2026');
+    expect(dates('dm')).toBe('18–22 Apr');
+    expect(dates('wdm')).toBe('Sat 18 Apr – Wed 22 Apr');
+    expect(dates('mdy')).toBe('Apr 18–22, 2026');
+    expect(dates('iso')).toBe('2026-04-18 – 2026-04-22');
+  });
+
+  it('tells distances, heights, speeds and temperatures in imperial units', () => {
+    const imperial = (fields: Parameters<typeof totalsEntries>[3], of = totals) =>
+      totalsEntries(of, 1, rides, fields, 'imperial').map((e) => `${e.value} / ${e.label}`);
+    expect(
+      imperial([
+        'distance',
+        'climb',
+        'avg-distance',
+        'max-elevation',
+        'avg-speed',
+        'max-temperature',
+      ]),
+    ).toEqual([
+      '194 / mi in total',
+      '13,812 / ft climbed in total',
+      '38.8 / mi avg per ride',
+      '4,741 / ft max elevation',
+      '13.4 / mph avg speed',
+      '89 / °F max temperature',
+    ]);
+    expect(imperial(['avg-speed'], { ...totals, onFoot: true })).toEqual([
+      '4:29 / min/mi avg pace',
+    ]);
+  });
+
+  it('gives the editor every format of a time and a date', () => {
+    const values = totalsValues(totals, rides, 'metric');
+    expect(values.get('moving')).toMatchObject({ value: '15', name: 'Total moving time' });
+    expect(values.get('moving')!.formats!.hm).toEqual({ value: '14:30', label: 'moving in total' });
+    expect(values.get('date')!.formats!.mdy!.value).toBe('Apr 18–22, 2026');
+    expect(values.get('distance')!.formats).toBeUndefined();
   });
 
   it('leaves out elevation when no activity recorded it, even when picked', () => {
@@ -211,13 +277,13 @@ describe('totalsEntries', () => {
       each: { ...totals.each, climbed: null },
     };
     expect(
-      totalsEntries(flat, 1, rides, [
-        'climb',
-        'descent',
-        'distance',
-        'max-elevation',
-        'avg-climb',
-      ]).map((e) => e.field),
+      totalsEntries(
+        flat,
+        1,
+        rides,
+        ['climb', 'descent', 'distance', 'max-elevation', 'avg-climb'],
+        'metric',
+      ).map((e) => e.field),
     ).toEqual(['distance']);
   });
 });

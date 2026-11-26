@@ -72,9 +72,9 @@ function open(id: Section): void {
 const sheet = ref<{
   name: string;
   label: string;
-  /** A widget's sheet: which widget, and only its size or label when a chip opened it. */
+  /** A widget's sheet: which widget, and only its size, label or format when a chip opened it. */
   widget?: number;
-  only?: 'size' | 'label';
+  only?: 'size' | 'label' | 'format';
 } | null>(null);
 function openSetting(name: string, label: string): void {
   sheet.value = { name, label };
@@ -142,11 +142,11 @@ function setWidgets(list: Widget[]): void {
   adjustments.value = { ...adjustments.value, [widgetSetting.value]: text };
 }
 
-/** Opens a widget's settings in a sheet: all of them (the list), or its size or label. */
-function openWidget(index: number, only?: 'size' | 'label'): void {
+/** Opens a widget's settings in a sheet: all of them (the list), or its size, label or format. */
+function openWidget(index: number, only?: 'size' | 'label' | 'format'): void {
   selectedWidget.value = index;
   const name = widgetLabel(widgets.value[index]!, values.value);
-  const label = only === 'size' ? `${name}: size` : only === 'label' ? `${name}: label` : name;
+  const label = only ? `${name}: ${only}` : name;
   sheet.value = { name: 'widget', label, widget: index, ...(only ? { only } : {}) };
 }
 

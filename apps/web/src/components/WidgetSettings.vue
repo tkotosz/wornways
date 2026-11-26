@@ -1,18 +1,21 @@
 <script setup lang="ts">
 // One widget's settings: the text of a text widget (the title until another is written),
-// its size, how a value shows its words (`labels`: not on the totals card), and removing it
-// from the picture. With `only`, just its size or its label, as the strip's chips open them.
+// its size, how a value shows its words (`labels`: not on the totals card), how a time, a date
+// or a clock time is written, and removing it from the picture. With `only`, just its size,
+// its label or its format, as the strip's chips open them.
 import {
   WIDGET_SIZE,
+  formatsOf,
   labelModes,
   valueLines,
   type LabelMode,
   type Metric,
   type MetricValue,
+  type ValueFormat,
   type Widget,
 } from '@wornways/engine';
 import { computed } from 'vue';
-import { LABEL_MODE_NAMES } from '../adjust.ts';
+import { FORMAT_NAMES, LABEL_MODE_NAMES, formatOf } from '../adjust.ts';
 import ExactNumber from './ExactNumber.vue';
 
 const props = defineProps<{
@@ -20,7 +23,7 @@ const props = defineProps<{
   title: string;
   values: Map<Metric, MetricValue>;
   labels: boolean;
-  only?: 'size' | 'label';
+  only?: 'size' | 'label' | 'format';
 }>();
 const emit = defineEmits<{ change: [widget: Widget]; remove: [] }>();
 
@@ -34,14 +37,31 @@ const modes = computed(() => {
   if (!props.labels || widget.kind !== 'metric' || widget.metric === 'date') return [];
   const value = props.values.get(widget.metric);
   return labelModes(widget.metric).map((mode: LabelMode) => {
-    const lines = value ? valueLines(value, mode) : null;
+    const lines = value ? valueLines(value, mode, widget.format) : null;
     return {
       mode,
       example: lines ? [lines.line, lines.under].filter(Boolean).join(' / ') : '',
     };
   });
 });
-const shows = (part: 'size' | 'label') => !props.only || props.only === part;
+/**
+ * The formats the value can be written in, each with how it reads: the value alone over the
+ * replay, with its words on the totals card, where they say the unit.
+ */
+const formats = computed(() => {
+  const widget = props.widget;
+  if (widget.kind !== 'metric') return [];
+  const value = props.values.get(widget.metric);
+  return formatsOf(widget.metric).map((format: ValueFormat) => {
+    const text = value?.formats?.[format];
+    return {
+      format,
+      example: !text ? '' : props.labels ? text.value : `${text.value} / ${text.label}`,
+    };
+  });
+});
+const currentFormat = computed(() => formatOf(props.widget, !props.labels));
+const shows = (part: 'size' | 'label' | 'format') => !props.only || props.only === part;
 </script>
 
 <template>
@@ -78,6 +98,23 @@ const shows = (part: 'size' | 'label') => !props.only || props.only === part;
         >
           <span>{{ LABEL_MODE_NAMES[m.mode] }}</span>
           <span class="example">{{ m.example }}</span>
+        </button>
+      </div>
+    </div>
+    <div v-if="shows('format') && formats.length" class="field">
+      <span id="widget-format" class="label" :class="{ 'visually-hidden': only }">Format</span>
+      <div class="modes" role="radiogroup" aria-labelledby="widget-format">
+        <button
+          v-for="f in formats"
+          :key="f.format"
+          type="button"
+          class="mode"
+          role="radio"
+          :aria-checked="currentFormat === f.format"
+          @click="set({ format: f.format })"
+        >
+          <span>{{ FORMAT_NAMES[f.format] }}</span>
+          <span class="example">{{ f.example }}</span>
         </button>
       </div>
     </div>

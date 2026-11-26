@@ -177,6 +177,7 @@ export async function prepareReplay(
     totalsWidgets: settings.totalsWidgets ?? undefined,
     hideTotalsWidgets: options.hideTotalsWidgets,
     watermark: settings.watermark,
+    units: settings.units,
     onlyFrame,
   });
   return { renderer, plan, title, width, height, fps, camera, cameraMode, map };

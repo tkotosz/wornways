@@ -74,7 +74,7 @@ function textOf(widget: Widget): { line: string; under: string } | null {
   if (widget.kind === 'metric') {
     const value = props.values.get(widget.metric);
     return value
-      ? valueLines(value, widget.label)
+      ? valueLines(value, widget.label, widget.format)
       : { line: '…', under: widgetLabel(widget, props.values) };
   }
   return null;

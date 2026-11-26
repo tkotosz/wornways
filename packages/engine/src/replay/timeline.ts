@@ -1,3 +1,5 @@
+import type { DateFormat } from './formats.ts';
+
 /** When one track is drawn, in seconds of video time. */
 export type TimelineEntry = { start: number; duration: number };
 
@@ -12,8 +14,8 @@ export type Timeline = {
   windows?: TimelineEntry[];
   /** Race mode: seconds of activity time elapsed on the shared clock at video time `t`. */
   clock?(t: number): number;
-  /** Text to show as the headline at video time `t`, e.g. the date of the current beat. */
-  label?(t: number): string;
+  /** The headline at video time `t` in a date format, e.g. the date of the group playing. */
+  label?(t: number, format: DateFormat): string;
 };
 
 const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
@@ -144,8 +146,8 @@ export function raceTimeline(durationsS: number[], options: RaceOptions): Timeli
 export type Group = {
   /** Indexes of the tracks that play during this group's time; they start together. */
   tracks: number[];
-  /** Headline while this group plays, e.g. "15 Oct 2026" or "March 2026". */
-  label: string;
+  /** Headline while this group plays in a date format, e.g. "15 Oct 2026" or "March 2026". */
+  label: (format: DateFormat) => string;
   /** How much time the group gets relative to the others, e.g. 1 for an even share. */
   share: number;
 };
@@ -256,11 +258,11 @@ export function groupTimeline(
     duration,
     windows,
     progress: (index, t) => progress[index](t),
-    label: (t) => {
+    label: (t, format) => {
       // The last group that has started; the first one before any has.
       let i = 0;
       while (i + 1 < groups.length && starts[i + 1] <= t) i++;
-      return groups[i].label;
+      return groups[i].label(format);
     },
   };
 }

@@ -69,6 +69,19 @@ export {
   type LabelMode,
   type Widget,
 } from './replay/widgets.ts';
+export {
+  CLOCK_FORMATS,
+  DATE_FORMATS,
+  TIME_FORMATS,
+  UNITS,
+  defaultFormat,
+  formatsOf,
+  type ClockFormat,
+  type DateFormat,
+  type TimeFormat,
+  type Units,
+  type ValueFormat,
+} from './replay/formats.ts';
 export { distanceM, mercatorX, mercatorY } from './track/geo.ts';
 export { MVT_LINE, decodeMvt, type MvtFeature, type MvtLayer } from './map/mvt.ts';
 export { fitView, trackArea, type View } from './replay/view.ts';

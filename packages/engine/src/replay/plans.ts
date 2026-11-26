@@ -4,6 +4,7 @@ import { trackLengthM } from '../track/clean.ts';
 import { canFollow } from './follow.ts';
 import { chronologicalTimeline, groupTimeline, raceTimeline, type Timeline } from './timeline.ts';
 import type { Track } from '../track/types.ts';
+import { dateSpan, dayText, monthText, type DateFormat } from './formats.ts';
 import type { RenderSettings } from './settings.ts';
 
 export type Plan = {
@@ -26,14 +27,7 @@ export const monthFormat = new Intl.DateTimeFormat('en-GB', { month: 'long', yea
 
 /** "3–9 Aug 2026", "28 Jul – 3 Aug 2026" or "28 Dec 2025 – 3 Jan 2026". */
 export function dateRange(a: number, b: number): string {
-  const [da, db] = [new Date(a), new Date(b)];
-  const mon = (d: Date) => d.toLocaleString('en-GB', { month: 'short' });
-  if (da.getFullYear() !== db.getFullYear())
-    return `${dayFormat.format(da)} – ${dayFormat.format(db)}`;
-  if (da.getMonth() !== db.getMonth())
-    return `${da.getDate()} ${mon(da)} – ${db.getDate()} ${mon(db)} ${db.getFullYear()}`;
-  if (da.getDate() === db.getDate()) return dayFormat.format(da);
-  return `${da.getDate()}–${db.getDate()} ${mon(db)} ${db.getFullYear()}`;
+  return dateSpan(a, b, 'dmy');
 }
 
 /**
@@ -90,18 +84,22 @@ function groupTracks(tracks: Track[], grouping: Grouping): number[][] {
   return groups;
 }
 
-/** A group's headline: a date, a week's dates, a month, or the dates all activities span. */
-function groupLabel(starts: number[], grouping: Grouping): string {
+/**
+ * A group's headline in a date format: a date, a week's dates, a month, or the dates all
+ * activities span.
+ */
+function groupLabel(starts: number[], grouping: Grouping): (format: DateFormat) => string {
   const firstStart = starts[0];
-  if (grouping === 'all') return dateRange(firstStart, starts[starts.length - 1]);
-  if (grouping === 'month') return monthFormat.format(firstStart);
+  if (grouping === 'all')
+    return (format) => dateSpan(firstStart, starts[starts.length - 1], format);
+  if (grouping === 'month') return (format) => monthText(firstStart, format);
   if (grouping === 'week') {
     const monday = mondayOf(firstStart);
     const sunday = new Date(monday);
     sunday.setDate(sunday.getDate() + 6);
-    return dateRange(monday.getTime(), sunday.getTime());
+    return (format) => dateSpan(monday.getTime(), sunday.getTime(), format);
   }
-  return dayFormat.format(firstStart);
+  return (format) => dayText(firstStart, format);
 }
 
 /**
