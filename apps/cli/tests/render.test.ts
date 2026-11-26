@@ -1,8 +1,10 @@
 import { createCanvas } from '@napi-rs/canvas';
 import { describe, expect, it } from 'vitest';
 import {
+  ICONS,
   chronologicalTimeline,
   createRenderer,
+  drawIcon,
   raceTimeline,
   parseSettings,
   planReplay,
@@ -14,6 +16,7 @@ import {
   type Context2DLike,
   type RenderOptions,
   type Track,
+  type IconName,
 } from '@wornways/engine';
 
 /** A 5 km loop-free route heading north-east, one point every 10 s. */
@@ -671,6 +674,28 @@ describe('widgets', () => {
     });
     // A single activity has no count.
     expect(renderer.overlayBoxes().widgets[1]).toBeNull();
+  });
+
+  it('draws an icon in front of a value when asked, which makes its box wider', () => {
+    const at = (icon: boolean) =>
+      lastFrame({
+        widgets: [
+          { kind: 'metric', metric: 'distance', label: 'off', icon, x: 50, y: 50, size: 100 },
+        ],
+      }).overlayBoxes().widgets[0]!.width;
+    expect(at(true)).toBeGreaterThan(at(false) * 1.2);
+  });
+
+  it('draws every icon', () => {
+    const canvas = createCanvas(40, 40) as unknown as CanvasLike;
+    const context = canvas.getContext('2d') as Context2DLike;
+    for (const icon of Object.keys(ICONS) as IconName[]) {
+      context.fillStyle = '#000';
+      context.fillRect(0, 0, 40, 40);
+      context.fillStyle = '#fff';
+      drawIcon(context, icon, 4, 4, 32);
+      expect(textPixels(canvas, 0, 0, 40, 40), icon).toBeGreaterThan(40);
+    }
   });
 
   it('writes a time, the date and the start in every format, and the units asked for', () => {

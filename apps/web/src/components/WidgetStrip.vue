@@ -4,7 +4,7 @@
 // on or off. With one picked, the strip is that widget's: Done lets it go; Edit writes a
 // text's text; Size, Label position (where a value's words are), Label text (what they say),
 // Unit (on or off, for a value that has one) and Format (a time, date or clock time) open
-// their sheet; Remove takes it off the picture. The section's own settings
+// their sheet; Icon turns a value's icon on or off in place; Remove takes it off the picture. The section's own settings
 // stay in the slot, after the tools.
 import { hasUnit, labelTextOf, type Metric, type MetricValue, type Widget } from '@wornways/engine';
 import { computed } from 'vue';
@@ -27,6 +27,8 @@ const emit = defineEmits<{
   tool: [tool: 'text' | 'values' | 'chart'];
   /** Writes the picked text widget's text. */
   edit: [index: number];
+  /** Changes the picked widget in place, as its icon switch does. */
+  change: [index: number, widget: Widget];
   /** Opens a part of the picked widget's settings in a sheet. */
   open: [index: number, what: WidgetPart];
   remove: [index: number];
@@ -106,6 +108,18 @@ const format = computed(() => (picked.value ? formatOf(picked.value, props.card)
       <span>Label text</span>
       <span class="value words">{{ wordsChip }}</span>
     </button>
+    <label v-if="picked.kind === 'metric'" class="setting-row">
+      <span>Icon</span>
+      <span class="switch">
+        <input
+          type="checkbox"
+          role="switch"
+          aria-label="Icon"
+          :checked="!!picked.icon"
+          @change="emit('change', selected, { ...picked, icon: !picked.icon })"
+        />
+      </span>
+    </label>
     <button
       v-if="unit"
       type="button"

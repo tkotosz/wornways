@@ -173,7 +173,12 @@ Without a mode, a value has its words under it; the date has none. Its words are
 ones (see Values) unless it has its own, in double quotes after a colon:
 `climb:before:"↑"` writes "↑ 15,423 m", `distance:above:"so far"`, and `count:""` leaves the
 words out. `nounit` writes the number without its unit, for a value that has one:
-`distance:nounit:"km in total"` writes "1,147" over "km in total".
+`distance:nounit:"km in total"` writes "1,147" over "km in total". `icon` draws the value's
+icon in front of its line, in the line's color: a stopwatch for times, a clock for the start
+and the time of day, a route for distances, a gauge for speeds, mountains for the climb,
+descent and elevations, a heart, a bolt for power, a crank for cadence, a thermometer, a
+flame for calories, a flag for the activities and a calendar for the date and the days
+(`distance:icon`).
 
 A time, a date or a clock time is also written in a format of its own, after a colon, alone
 or after the label mode (`moving:hm`, `moving:after:hm`):

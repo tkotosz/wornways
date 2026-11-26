@@ -281,6 +281,10 @@ test.describe('the editor on a phone', () => {
     await words.fill('');
     await text.getByRole('button', { name: 'Done' }).click();
     await expect(page.getByRole('button', { name: 'Label text: None' })).toBeVisible();
+    // Its icon, in front of it, from a switch of its own.
+    await expect(days.locator('.stat-icon')).toHaveCount(0);
+    await page.getByRole('switch', { name: 'Icon' }).check();
+    await expect(days.locator('.stat-icon')).toHaveCount(1);
     // Remove takes it off; there is no Center, as dragging snaps to the middle.
     await expect(page.getByRole('button', { name: 'Center it across' })).toHaveCount(0);
     await page.getByRole('button', { name: 'Remove from the picture' }).click();

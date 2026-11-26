@@ -301,6 +301,7 @@ function useTool(tool: 'text' | 'values' | 'chart'): void {
         @tool="useTool"
         @edit="editingText = $event"
         @open="openWidget"
+        @change="changeWidget"
         @remove="removeWidget"
       >
         <!-- Ending: the pause and the card's switch, then its tools, then the units and the
@@ -425,6 +426,7 @@ function useTool(tool: 'text' | 'values' | 'chart'): void {
             @tool="useTool"
             @edit="editingText = $event"
             @open="openWidget"
+            @change="changeWidget"
             @remove="removeWidget"
           />
         </div>

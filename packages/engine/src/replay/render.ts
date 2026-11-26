@@ -18,6 +18,7 @@ import { averagePace, isOnFoot, topSpeed } from './pace.ts';
 import { sensorValueText } from './sensor-text.ts';
 import { numberOf, type Metric, type MetricText, type MetricValue } from './metrics.ts';
 import { calendarDay } from './plans.ts';
+import { drawIconBefore, iconOf, iconRoom } from './icons.ts';
 import {
   CLOCK_FORMATS,
   DATE_FORMATS,
@@ -66,6 +67,7 @@ export interface Context2DLike {
   closePath(): void;
   moveTo(x: number, y: number): void;
   lineTo(x: number, y: number): void;
+  bezierCurveTo(c1x: number, c1y: number, c2x: number, c2y: number, x: number, y: number): void;
   arc(x: number, y: number, radius: number, startAngle: number, endAngle: number): void;
   stroke(): void;
   fill(): void;
@@ -1136,7 +1138,7 @@ export function createRenderer(
       widget.unit,
     );
     ctx.font = fontOf(600, VALUE_SIZE * scale);
-    let width = ctx.measureText(line).width;
+    let width = ctx.measureText(line).width + (widget.icon ? iconRoom(VALUE_SIZE * scale) : 0);
     let height = VALUE_SIZE * scale * 1.1;
     // The words above or under take a line of their own, smaller.
     const words = above || under;
@@ -1193,7 +1195,16 @@ export function createRenderer(
       }
       ctx.font = fontOf(600, VALUE_SIZE * scale);
       ctx.fillStyle = 'rgba(255, 255, 255, 0.94)';
-      ctx.fillText(line, cx, top + VALUE_SIZE * scale * 0.95);
+      const baseline = top + VALUE_SIZE * scale * 0.95;
+      if (widget.icon) {
+        // The icon and the line together centered.
+        const size = VALUE_SIZE * scale;
+        const left = cx - (iconRoom(size) + ctx.measureText(line).width) / 2;
+        const textX = drawIconBefore(ctx, iconOf(widget.metric), left, baseline, size);
+        ctx.textAlign = 'left';
+        ctx.fillText(line, textX, baseline);
+        ctx.textAlign = 'center';
+      } else ctx.fillText(line, cx, baseline);
       if (under) {
         ctx.font = fontOf(400, LABEL_SIZE * scale);
         ctx.fillStyle = 'rgba(255, 255, 255, 0.66)';

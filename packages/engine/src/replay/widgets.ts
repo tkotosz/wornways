@@ -5,7 +5,7 @@
 // its place while its value grows and shrinks during the replay. They are drawn in order,
 // the last on top.
 //
-// As text, a list is "name[:"text"|:label][:"words"][:nounit][:format]@x,y[,size]" items
+// As text, a list is "name[:"text"|:label][:"words"][:nounit][:icon][:format]@x,y[,size]" items
 // separated by ";", e.g. `text:"Mallorca"@50,8;distance:above:"so far"@20,88;moving:after:hm@50,70`.
 // A text widget without its own text shows the video's title; a value without a label mode
 // shows its words where that value usually does (`defaultLabel`), without words of its own
@@ -31,6 +31,8 @@ export type Widget = { x: number; y: number; size: number } & (
       labelText?: string;
       /** False to write the number without its unit ("1,147" for 1,147 km). */
       unit?: boolean;
+      /** True to draw its kind's icon in front of its line (see icons.ts). */
+      icon?: boolean;
       /** How a time, date or clock time is written; left out, the value's usual way. */
       format?: ValueFormat;
     }
@@ -125,6 +127,7 @@ export function parseWidgets(
     let label: LabelMode | null = null;
     let labelText: string | null = null;
     let noUnit = false;
+    let icon = false;
     let format: ValueFormat | null = null;
     if (text[i] === ':' && metrics.includes(name)) {
       // A value's label mode, its words in double quotes, nounit and its format, each once,
@@ -135,6 +138,7 @@ export function parseWidgets(
         `the label mode ${modes.join(', ')}`,
         'its words in double quotes',
         'nounit',
+        'icon',
         ...(formats.length ? [`the format ${formats.join(', ')}`] : []),
       ];
       while (text[i] === ':') {
@@ -148,6 +152,7 @@ export function parseWidgets(
         const token = text.slice(tokenStart, i);
         if (label === null && modes.includes(token as LabelMode)) label = token as LabelMode;
         else if (token === 'nounit' && !noUnit) noUnit = true;
+        else if (token === 'icon' && !icon) icon = true;
         else if (format === null && formats.includes(token as ValueFormat))
           format = token as ValueFormat;
         else fail(`"${name}" takes ${takes.join(', ')}, not "${token}"`);
@@ -180,6 +185,7 @@ export function parseWidgets(
         label: label ?? defaultLabel(name as Metric),
         ...(labelText === null ? {} : { labelText }),
         ...(noUnit ? { unit: false } : {}),
+        ...(icon ? { icon: true } : {}),
         ...(format ? { format } : {}),
         x,
         y,
@@ -212,6 +218,7 @@ export function widgetsText(widgets: Widget[], { card = false }: { card?: boolea
         if (widget.label !== defaultLabel(widget.metric)) text += `:${widget.label}`;
         if (widget.labelText !== undefined) text += `:${quote(widget.labelText)}`;
         if (widget.unit === false) text += ':nounit';
+        if (widget.icon) text += ':icon';
         if (widget.format && widget.format !== defaultFormat(widget.metric, card))
           text += `:${widget.format}`;
       }

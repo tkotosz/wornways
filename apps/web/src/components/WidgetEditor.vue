@@ -26,6 +26,7 @@ import {
 } from '@wornways/engine';
 import { computed, ref } from 'vue';
 import { widgetLabel } from '../adjust.ts';
+import StatIcon from './StatIcon.vue';
 
 const props = defineProps<{
   widgets: Widget[];
@@ -400,6 +401,7 @@ const story = computed(() => props.size.width / props.size.height < 0.8);
         :class="{ dates: widget.metric === 'date' }"
       >
         <span v-if="besideOf(widget)" class="value">
+          <StatIcon v-if="widget.icon" :metric="widget.metric" />
           <span v-if="besideOf(widget)!.before" class="words beside before">{{
             besideOf(widget)!.before
           }}</span>
@@ -410,7 +412,9 @@ const story = computed(() => props.size.width / props.size.height < 0.8);
         </span>
         <template v-else>
           <span v-if="textOf(widget)!.above" class="words above">{{ textOf(widget)!.above }}</span>
-          <span class="value">{{ textOf(widget)!.line }}</span>
+          <span class="value"
+            ><StatIcon v-if="widget.icon" :metric="widget.metric" />{{ textOf(widget)!.line }}</span
+          >
           <span v-if="textOf(widget)!.under" class="words">{{ textOf(widget)!.under }}</span>
         </template>
       </span>

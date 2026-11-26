@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { METRICS } from '../../src/replay/render.ts';
 import { TOTALS_FIELDS } from '../../src/replay/totals-card.ts';
+import { iconOf } from '../../src/replay/icons.ts';
 import {
   defaultLabel,
   hasUnit,
@@ -42,13 +43,13 @@ describe('widgets as text', () => {
     ['time@1,2,300', 'a size is from 50 to 250 percent, got 300'],
     [
       'distance:short@1,2',
-      '"distance" takes the label mode off, before, after, above, under, its words in double quotes, nounit, not "short"',
+      '"distance" takes the label mode off, before, after, above, under, its words in double quotes, nounit, icon, not "short"',
     ],
     ['distance:"a":"b"@1,2', 'not ""'],
     ['distance:"open@1,2', 'the text has no closing double quote'],
     [
       'moving:hm:hms@1,2',
-      'its words in double quotes, nounit, the format hms, hm, h, d, not "hms"',
+      'its words in double quotes, nounit, icon, the format hms, hm, h, d, not "hms"',
     ],
     ['elevation-chart:off@1,2', '"elevation-chart" takes no label mode'],
     ['text:"open@1,2', 'the text has no closing double quote'],
@@ -146,6 +147,21 @@ describe('labels', () => {
     const widgets = parseWidgets('climb:nounit:"m up"@1,2;distance:after:nounit@1,2', METRICS);
     expect(widgets.map((w) => (w.kind === 'metric' ? w.unit : null))).toEqual([false, false]);
     expect(widgetsText(widgets)).toBe('climb:"m up":nounit@1,2;distance:after:nounit@1,2');
+  });
+
+  it('take an icon in front of the value when asked, one for each kind of value', () => {
+    const widgets = parseWidgets('distance:icon@1,2;avg-power:after:icon@1,2;climb@1,2', METRICS);
+    expect(widgets.map((w) => (w.kind === 'metric' ? w.icon : null))).toEqual([
+      true,
+      true,
+      undefined,
+    ]);
+    expect(widgetsText(widgets)).toBe('distance:icon@1,2;avg-power:after:icon@1,2;climb@1,2');
+    expect(iconOf('max-distance')).toBe('route');
+    expect(iconOf('avg-power')).toBe('bolt');
+    expect(iconOf('time-of-day')).toBe('clock');
+    expect(iconOf('min-time')).toBe('stopwatch');
+    expect(iconOf('moving-days')).toBe('calendar');
   });
 
   it('write words of their own in double quotes, back as they were read', () => {

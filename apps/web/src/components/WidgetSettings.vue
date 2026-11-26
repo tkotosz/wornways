@@ -2,8 +2,8 @@
 // One widget's settings: the text of a text widget (the title until another is written),
 // its size, where a value shows its words and what they say, whether it shows its unit, how a
 // time, a date or a clock time is written (on the totals card, `card`, a time in hours unless
-// picked), and removing it from the picture. With `only`, just one of them, as the strip's
-// chips open them.
+// picked), its icon on or off, and removing it from the picture. With `only`, just one of
+// them, as the strip's chips open them.
 import {
   WIDGET_SIZE,
   LABEL_MODES,
@@ -146,6 +146,18 @@ const shows = (part: WidgetPart) => !props.only || props.only === part;
         Use the usual words, “{{ usualWords }}”
       </button>
     </div>
+    <label v-if="!only && widget.kind === 'metric'" class="field icon-switch">
+      <span class="label">Icon</span>
+      <span class="switch">
+        <input
+          type="checkbox"
+          role="switch"
+          aria-label="Icon"
+          :checked="!!widget.icon"
+          @change="set({ icon: !widget.icon })"
+        />
+      </span>
+    </label>
     <div v-if="shows('unit') && unitChoices.length" class="field">
       <span id="widget-unit" class="label" :class="{ 'visually-hidden': only }">Unit</span>
       <div class="modes" role="radiogroup" aria-labelledby="widget-unit">
@@ -295,5 +307,10 @@ const shows = (part: WidgetPart) => !props.only || props.only === part;
 .remove {
   border-color: #6b2a24;
   color: #ff7b6b;
+}
+.icon-switch {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
 }
 </style>

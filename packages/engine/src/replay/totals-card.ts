@@ -7,6 +7,7 @@
 // was given.
 
 import { averagePace, topSpeed } from './pace.ts';
+import { drawIconBefore, iconOf, iconRoom, type IconName } from './icons.ts';
 import {
   DATE_FORMATS,
   TIME_FORMATS,
@@ -557,11 +558,25 @@ export function drawTotalsCard(
     const gap = SIZES.labelGap * unit * scale;
     const mode = entry.label && widget.kind === 'metric' ? widget.label : 'off';
     ctx.globalAlpha = shownPart;
-    /** Draws the number, white, centered on `x` with its baseline at `y`. */
+    const icon = widget.kind === 'metric' && widget.icon ? iconOf(widget.metric) : null;
+    /** Draws the number, white, centered on `x` with its baseline at `y`, its icon before it. */
     const number = (y: number) => {
-      fitFont(entry.value, 700, size, width);
       ctx.fillStyle = 'rgba(255, 255, 255, 0.96)';
-      ctx.fillText(entry.value, x, y);
+      if (!icon) {
+        fitFont(entry.value, 700, size, width);
+        ctx.fillText(entry.value, x, y);
+        return;
+      }
+      // The icon and the number together centered, both smaller when too wide.
+      ctx.font = `700 ${Math.round(size)}px ${fontFamily}`;
+      const k = Math.min(1, width / (iconRoom(size) + ctx.measureText(entry.value).width));
+      const fontSize = size * k;
+      ctx.font = `700 ${Math.round(fontSize)}px ${fontFamily}`;
+      const left = x - (iconRoom(fontSize) + ctx.measureText(entry.value).width) / 2;
+      const textX = drawIconBefore(ctx, icon, left, y, fontSize);
+      ctx.textAlign = 'left';
+      ctx.fillText(entry.value, textX, y);
+      ctx.textAlign = 'center';
     };
     /** Draws the words, smaller in orange, centered on `x` with their baseline at `y`. */
     const words = (y: number) => {
@@ -576,17 +591,19 @@ export function drawTotalsCard(
     } else if (mode === 'above') {
       words(widgetTop + labelSize + rise);
       number(widgetTop + labelSize * (1 + DESCENT) + gap + size + rise);
-    } else drawBeside(entry, mode, x, widgetTop + size + rise, size, labelSize, width);
+    } else drawBeside(entry, mode, icon, x, widgetTop + size + rise, size, labelSize, width);
   }
   ctx.globalAlpha = 1;
 
   /**
    * Draws the number and its words on one line, the words before or after it, smaller and in
-   * orange on the same baseline, the two together centered on `x` and no wider than `width`.
+   * orange on the same baseline, after the icon when it has one, all together centered on `x`
+   * and no wider than `width`.
    */
   function drawBeside(
     entry: TotalsEntry,
     mode: 'before' | 'after',
+    icon: IconName | null,
     x: number,
     y: number,
     size: number,
@@ -600,14 +617,17 @@ export function drawTotalsCard(
       const n = ctx.measureText(entry.value).width;
       ctx.font = wordsFont(k);
       const w = ctx.measureText(entry.label).width;
-      return { n, w, space: labelSize * k * 0.35 };
+      return { n, w, space: labelSize * k * 0.35, room: icon ? iconRoom(size * k) : 0 };
     };
     const full = measure(1);
-    const k = Math.min(1, width / (full.n + full.space + full.w));
-    const { n, w, space } = k < 1 ? measure(k) : full;
-    const left = x - (n + space + w) / 2;
+    const k = Math.min(1, width / (full.room + full.n + full.space + full.w));
+    const { n, w, space, room } = k < 1 ? measure(k) : full;
+    const left = x - (room + n + space + w) / 2;
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.96)';
+    if (icon) drawIconBefore(ctx, icon, left, y, size * k);
+    const start = left + room;
     const [numberX, wordsX] =
-      mode === 'before' ? [left + w + space, left] : [left, left + n + space];
+      mode === 'before' ? [start + w + space, start] : [start, start + n + space];
     ctx.textAlign = 'left';
     ctx.font = numberFont(k);
     ctx.fillStyle = 'rgba(255, 255, 255, 0.96)';
