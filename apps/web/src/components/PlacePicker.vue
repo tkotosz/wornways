@@ -153,7 +153,8 @@ onMounted(() => {
       style: STYLE,
       center: [19, 47.5],
       zoom: 4,
-      attributionControl: { compact: true },
+      // The credit is a line of small text of the page's own, under the map's controls.
+      attributionControl: false,
     });
   } catch (error) {
     failed.value = `The map cannot be shown in this browser (${error instanceof Error ? error.message : error}). Pick a place from the list instead.`;
@@ -203,7 +204,22 @@ onBeforeUnmount(() => map?.remove());
 
 <template>
   <div class="picker">
-    <div v-if="!failed" ref="container" class="map" data-testid="place-map" />
+    <div v-if="!failed" class="frame">
+      <div ref="container" class="map" data-testid="place-map" />
+      <!-- The credit the map's data asks for, always in view, as on the video. -->
+      <p class="credit">
+        <a href="https://openfreemap.org" target="_blank" rel="noopener">OpenFreeMap</a>&#32;<a
+          href="https://www.openmaptiles.org/"
+          target="_blank"
+          rel="noopener"
+          >© OpenMapTiles</a
+        >
+        Data from
+        <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener"
+          >OpenStreetMap</a
+        >
+      </p>
+    </div>
     <p v-else class="muted">{{ failed }}</p>
     <div v-if="places.length" class="places">
       <span class="muted">Where your activities {{ end }} most often:</span>
@@ -228,10 +244,39 @@ onBeforeUnmount(() => map?.remove());
   gap: 0.6rem;
 }
 
+.frame {
+  position: relative;
+}
+
 .map {
   height: 340px;
   border-radius: 12px;
   overflow: hidden;
+}
+
+/* One line of small text at the bottom of the map, readable over it with a soft shadow. */
+.credit {
+  position: absolute;
+  right: 0.5rem;
+  bottom: 0.3rem;
+  left: 0.5rem;
+  margin: 0;
+  color: rgb(255 255 255 / 70%);
+  font-size: 0.62rem;
+  line-height: 1.3;
+  text-align: right;
+  text-shadow: 0 0 3px #000;
+  pointer-events: none;
+}
+
+.credit a {
+  color: inherit;
+  text-decoration: none;
+  pointer-events: auto;
+}
+
+.credit a:hover {
+  text-decoration: underline;
 }
 
 .places ol {
