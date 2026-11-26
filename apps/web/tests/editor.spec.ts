@@ -265,15 +265,8 @@ test.describe('the editor on a phone', () => {
     await label.getByRole('button', { name: 'Done' }).click();
     await expect(page.getByRole('button', { name: 'Label: Inline' })).toBeVisible();
     await expect(days).toContainText(/^\d+ moving days?/);
-    // Center puts it in the middle across; Remove takes it off.
-    await page.getByRole('button', { name: 'Center it across' }).click();
-    await expect
-      .poll(async () => {
-        const box = (await days.boundingBox())!;
-        const picture = (await preview.boundingBox())!;
-        return box.x + box.width / 2 - (picture.x + picture.width / 2);
-      })
-      .toBeCloseTo(0, 0);
+    // Remove takes it off; there is no Center, as dragging snaps to the middle.
+    await expect(page.getByRole('button', { name: 'Center it across' })).toHaveCount(0);
     await page.getByRole('button', { name: 'Remove from the picture' }).click();
     await expect(onPicture).toHaveCount(count + 1);
     // The chart and the watermark turn on and off.

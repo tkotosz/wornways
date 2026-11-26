@@ -1,0 +1,31 @@
+name: An idea
+description: Something the app could do, or do better.
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the idea. Issues are public: please leave out activity files and anything
+        from your Strava or Ride with GPS account.
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would you like?
+      placeholder: A way to show the elevation chart for a whole trip.
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: What would it help you with?
+      description: The video you want to make, or what gets in the way now.
+  - type: input
+    id: version
+    attributes:
+      label: App version
+      description: Filled in when you come from the app's menu.
+  - type: input
+    id: device
+    attributes:
+      label: Device and browser
+      description: Filled in when you come from the app's menu.

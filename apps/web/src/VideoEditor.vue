@@ -155,12 +155,6 @@ const sheetWidget = computed(() =>
   sheet.value?.name === 'widget' ? (sheet.value.widget ?? null) : null,
 );
 
-/** Puts the widget in the middle across, where it is down. */
-function centerWidget(index: number): void {
-  const widget = widgets.value[index];
-  if (widget) changeWidget(index, { ...widget, x: 50 });
-}
-
 /**
  * Where a new widget goes: of a few spots clear of the middle, where Play sits, the one
  * furthest from the widgets already there; the chart keeps its place near the bottom.
@@ -300,7 +294,6 @@ function useTool(tool: 'text' | 'values' | 'chart'): void {
         @tool="useTool"
         @edit="editingText = $event"
         @open="openWidget"
-        @center="centerWidget"
         @remove="removeWidget"
       >
         <!-- Ending: the pause and the card's switch, then its tools, then the end card. -->
@@ -423,7 +416,6 @@ function useTool(tool: 'text' | 'values' | 'chart'): void {
             @tool="useTool"
             @edit="editingText = $event"
             @open="openWidget"
-            @center="centerWidget"
             @remove="removeWidget"
           />
         </div>

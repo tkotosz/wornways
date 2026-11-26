@@ -1,14 +1,16 @@
 <script setup lang="ts">
 // The menu, from the ☰ button: a panel that slides in from the left over the dimmed screen.
 // At its top the name and the version; then switching the source (with the one in use),
-// installing the app where the browser can, About, and the privacy policy. Back, Escape, a
-// tap beside it or picking an item closes it.
-import { onMounted, ref } from 'vue';
+// installing the app where the browser can, About, reporting an issue on GitHub, and the
+// privacy policy. Back, Escape, a tap beside it or picking an item closes it.
+import { computed, onMounted, ref } from 'vue';
 import type { Source } from '../messages.ts';
+import { isInstalled } from '../install.ts';
+import { deviceSummary, reportUrl } from '../report.ts';
 import { SOURCE_NAMES } from '../sources.ts';
 import SourceIcon from './SourceIcon.vue';
 
-defineProps<{
+const props = defineProps<{
   version: string;
   source: Source | null;
   /** Whether Install app is offered: by the browser, or as steps on an iPhone or iPad. */
@@ -17,6 +19,12 @@ defineProps<{
 const emit = defineEmits<{ close: []; source: []; about: []; install: [] }>();
 
 const dialog = ref<HTMLDialogElement | null>(null);
+const report = computed(() =>
+  reportUrl(
+    props.version,
+    deviceSummary(navigator.userAgent, isInstalled(), navigator.maxTouchPoints > 1),
+  ),
+);
 onMounted(() => dialog.value?.showModal());
 
 function cancel(event: Event): void {
@@ -63,6 +71,15 @@ function tapped(event: MouseEvent): void {
           </svg>
           <span>About</span>
         </button>
+        <a class="item" :href="report" target="_blank" rel="noopener" @click="emit('close')">
+          <svg class="item-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M5 20V4M5 4h11l-2 4 2 4H5" />
+          </svg>
+          <span>
+            Report an issue
+            <small>A bug or an idea, on GitHub</small>
+          </span>
+        </a>
         <a class="item" href="/privacy.html" target="_blank" rel="noopener" @click="emit('close')">
           <svg class="item-icon" viewBox="0 0 24 24" aria-hidden="true">
             <rect x="5" y="10" width="14" height="10" rx="2" />

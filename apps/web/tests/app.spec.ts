@@ -24,6 +24,12 @@ test.describe('on a phone', () => {
       'href',
       '/privacy.html',
     );
+    // Reporting an issue opens GitHub's forms, the version and the device filled in.
+    const report = await menu.getByRole('link', { name: /^Report an issue/ }).getAttribute('href');
+    const url = new URL(report!);
+    expect(url.origin + url.pathname).toBe('https://github.com/tkotosz/wornways/issues/new/choose');
+    expect(url.searchParams.get('version')).toBe(await menu.getByTestId('version').textContent());
+    expect(url.searchParams.get('device')).toMatch(/, in the browser$/);
     await menu.getByRole('button', { name: 'About' }).click();
     const about = page.getByRole('dialog', { name: 'About Wornways' });
     await expect(about).toContainText('open source under the MIT License');

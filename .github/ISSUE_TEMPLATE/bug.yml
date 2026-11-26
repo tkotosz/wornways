@@ -1,0 +1,44 @@
+name: Something is wrong
+description: The app does something it should not, or a video looks wrong.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time. A few lines are enough; a screenshot or a short screen
+        recording helps most. Issues are public: please leave out activity files, places you
+        would rather keep private, and anything from your Strava or Ride with GPS account.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What you did, what you saw, and what you expected instead.
+      placeholder: I picked Recap and tapped Render; the video stopped at 40% with "Could not make the video".
+    validations:
+      required: true
+  - type: textarea
+    id: pictures
+    attributes:
+      label: Screenshots or a recording
+      description: Drop them here, or paste them from the clipboard.
+  - type: dropdown
+    id: source
+    attributes:
+      label: Where were the activities from?
+      options:
+        - Files on this device
+        - Strava
+        - Ride with GPS
+        - The demo
+        - Not about activities
+  - type: input
+    id: version
+    attributes:
+      label: App version
+      description: Filled in when you come from the app's menu; it is also at the top of the menu.
+  - type: input
+    id: device
+    attributes:
+      label: Device and browser
+      description: Filled in when you come from the app's menu.
+      placeholder: Android phone, Chrome, installed app

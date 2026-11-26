@@ -2,8 +2,8 @@
 // The chips for arranging widgets, in the strip under the picture (Overlay, and Ending with
 // the totals card). With no widget picked: adding a text or a metric, and the elevation chart
 // on or off. With one picked, the strip is that widget's: Done lets it go; Edit writes a
-// text's text; Size, Label and Format (a time, date or clock time) open their sheet; Center
-// puts it in the middle across; Remove takes it off the picture. The section's own settings
+// text's text; Size, Label and Format (a time, date or clock time) open their sheet; Remove
+// takes it off the picture. The section's own settings
 // stay in the slot, after the tools.
 import type { Widget } from '@wornways/engine';
 import { computed } from 'vue';
@@ -26,7 +26,6 @@ const emit = defineEmits<{
   edit: [index: number];
   /** Opens the picked widget's size, label or format in a sheet. */
   open: [index: number, what: 'size' | 'label' | 'format'];
-  center: [index: number];
   remove: [index: number];
 }>();
 
@@ -83,15 +82,6 @@ const format = computed(() => (picked.value ? formatOf(picked.value, props.card)
     >
       <span>Format</span>
       <span class="value">{{ FORMAT_NAMES[format] }}</span>
-    </button>
-    <button
-      type="button"
-      class="setting-row"
-      aria-label="Center it across"
-      @click="emit('center', selected)"
-    >
-      <span>Position</span>
-      <span class="value">Center</span>
     </button>
     <button
       type="button"

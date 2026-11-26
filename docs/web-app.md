@@ -207,7 +207,7 @@ drawing each. The editor's settings are remembered for the next visit.
   (a text's text), Size (a sheet with a slider), Label (a value's label mode, each with
   how the value reads in it), Format (for a time, a date or a clock time: h:mm:ss, h:mm,
   hours or days; five ways to write a date; 24 or 12 hours; each with how the value reads
-  in it), Center (to the middle across) and Remove. After the widgets' tools the strip has
+  in it) and Remove. After the widgets' tools the strip has
   the units (metric or imperial, for every value of the video and its totals card) and the
   watermark switch. On a wide screen the same strip is under the picture, and a list stays
   beside it: "+ Add a widget" with the same palette, then a row per widget that opens all
