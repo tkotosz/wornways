@@ -63,10 +63,7 @@ test('moves a widget on the still at once, snapping it to the middle, without a 
   await expect(still).toHaveAttribute('src', before!);
 });
 
-test('removes a widget from its settings or by dropping it on the bin', async ({
-  page,
-  context,
-}) => {
+test('removes a widget from its settings, and never by dragging it', async ({ page, context }) => {
   page.setDefaultTimeout(15_000);
   await offlineMap(context);
   await openOverlay(page);
@@ -79,7 +76,7 @@ test('removes a widget from its settings or by dropping it on the bin', async ({
   await expect(rows).toHaveCount(3);
   await expect(page.getByRole('button', { name: /^Text: / })).toHaveCount(0);
 
-  // Dropped on the bin at the bottom of the picture.
+  // Let go at the middle of the picture's bottom edge, it stays, moved there.
   await expect(outline(page, 0)).toBeVisible();
   const frame = (await page.getByTestId('preview').locator('.frame').boundingBox())!;
   const start = await grip(page, 0);
@@ -90,7 +87,9 @@ test('removes a widget from its settings or by dropping it on the bin', async ({
     frame.y + frame.height - 30 - start.y,
   );
   await page.mouse.up();
-  await expect(rows).toHaveCount(2);
+  await expect(rows).toHaveCount(3);
+  const moved = (await outline(page, 0).boundingBox())!;
+  expect(moved.y + moved.height).toBeGreaterThan(frame.y + frame.height * 0.85);
 });
 
 test('resizes a widget from its corner, and edits a text widget from a tap', async ({

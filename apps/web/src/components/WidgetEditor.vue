@@ -8,9 +8,7 @@
 // a fingertip need not land on a small widget exactly. A picked one has an outline and a
 // corner handle. Dragging moves it, centered on where it is let go; it snaps to the frame's
 // center lines and in line with the other widgets (their edges, and across their middles),
-// with a line shown, and
-// while it is dragged a bin shows at the bottom, where letting go removes it. Two fingers, or
-// the corner handle, resize it. A tap on a picked text widget asks for its text (`edit`).
+// with a line shown. Two fingers, or the corner handle, resize it. A tap on a picked text widget asks for its text (`edit`).
 // The keyboard moves a picked widget with the arrow keys, resizes it with + and -, and
 // removes it with Delete. On a story-shaped frame, while a widget moves, guides show the
 // parts the platforms' own controls cover. Adding widgets, and a picked one's options, are in
@@ -54,8 +52,6 @@ const emit = defineEmits<{
 const moving = ref<{ index: number; x: number; y: number; size: number } | null>(null);
 /** The lines the moving widget snapped to, in percent of the frame; null for none. */
 const snap = ref<{ x: number | null; y: number | null }>({ x: null, y: null });
-/** Whether the widget being dragged is over the bin. */
-const overBin = ref(false);
 
 /** Each widget as it shows: moving, or where it is. */
 const shown = computed(() =>
@@ -211,7 +207,6 @@ function start(event: PointerEvent, index: number, resize: boolean): void {
       const now = distance(a!, b!);
       reach ||= now;
       moved = true;
-      overBin.value = false;
       moving.value = {
         index,
         x: widget.x,
@@ -230,8 +225,6 @@ function start(event: PointerEvent, index: number, resize: boolean): void {
     if (across) x += across.shift;
     if (down) y += down.shift;
     snap.value = { x: across?.line ?? null, y: down?.line ?? null };
-    overBin.value =
-      Math.abs(e.clientX - (area.left + area.width / 2)) < 32 && area.bottom - e.clientY < 64;
     moving.value = { index, x, y, size: widget.size };
   };
   const end = (e: PointerEvent) => {
@@ -245,11 +238,8 @@ function start(event: PointerEvent, index: number, resize: boolean): void {
     surface.removeEventListener('pointercancel', end);
     surface.removeEventListener('lostpointercapture', end);
     const now = moving.value;
-    const bin = overBin.value;
     moving.value = null;
-    overBin.value = false;
     snap.value = { x: null, y: null };
-    if (bin) return remove(index);
     if (!moved || !now) {
       if (wasPicked && widget.kind === 'text') emit('edit', index);
       return;
@@ -364,14 +354,6 @@ const story = computed(() => props.size.width / props.size.height < 0.8);
       :style="{ top: `${snap.y}%` }"
       aria-hidden="true"
     />
-    <span
-      v-if="moving && moving.size === widgets[moving.index]?.size"
-      class="bin"
-      :class="{ over: overBin }"
-      aria-hidden="true"
-    >
-      <svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13" /></svg>
-    </span>
 
     <div
       v-for="(widget, index) in shown"
@@ -380,7 +362,6 @@ const story = computed(() => props.size.width / props.size.height < 0.8);
       :class="{
         selected: selected === index,
         moving: moving?.index === index,
-        gone: moving?.index === index && overBin,
       }"
       :style="{ left: `${widget.x}%`, top: `${widget.y}%`, '--size': widget.size / 100 }"
       role="button"
@@ -469,10 +450,6 @@ const story = computed(() => props.size.width / props.size.height < 0.8);
 
 .widget.moving {
   cursor: grabbing;
-}
-
-.widget.gone {
-  opacity: 0.4;
 }
 
 /* The engine's sizes, for a frame 1080 pixels on its shorter side (see `unit`), with the
@@ -596,39 +573,6 @@ const story = computed(() => props.size.width / props.size.height < 0.8);
   border-radius: 2px;
   background: #fff;
   cursor: nwse-resize;
-}
-
-/* The bin at the bottom middle while a widget is dragged; red when it would take it. */
-.bin {
-  position: absolute;
-  bottom: 4%;
-  left: 50%;
-  z-index: 2;
-  display: grid;
-  place-items: center;
-  width: 44px;
-  height: 44px;
-  border: 1.5px solid rgba(255, 255, 255, 0.6);
-  border-radius: 50%;
-  background: rgba(0, 0, 0, 0.6);
-  transform: translateX(-50%);
-  pointer-events: none;
-}
-
-.bin svg {
-  width: 20px;
-  height: 20px;
-  fill: none;
-  stroke: #fff;
-  stroke-width: 1.8;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-
-.bin.over {
-  border-color: #d9443a;
-  background: #d9443a;
-  transform: translateX(-50%) scale(1.15);
 }
 
 /* A center line the widget snapped to. */

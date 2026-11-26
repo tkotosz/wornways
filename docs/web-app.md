@@ -186,8 +186,8 @@ drawing each. The editor's settings are remembered for the next visit.
   and a corner handle; a tap on the picture outside the widgets lets it go. Dragging
   moves it; it snaps to the frame's center lines first, else in line with another
   widget's left edge, middle or right edge across and top or bottom down, with a line
-  shown, and while it is dragged a bin shows at the bottom, where letting it go removes
-  it. Two fingers, or the corner handle, resize it (50 to 250%). A tap on a picked text
+  shown; a widget is removed only on purpose (Remove in the strip or its settings, or
+  Delete), never by where it is dragged. Two fingers, or the corner handle, resize it (50 to 250%). A tap on a picked text
   widget opens its text over the whole screen, large as on the video, with the keyboard
   up; a tap outside the text or Enter finishes it, and a text left empty is removed. The
   arrow keys move a picked widget by 1% of the frame (5% with
