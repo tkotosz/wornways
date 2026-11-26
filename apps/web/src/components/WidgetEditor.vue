@@ -183,10 +183,47 @@ const pointers = new Map<number, { x: number; y: number }>();
 let holding = false;
 
 /**
- * What a hold does: move the widget, or resize it from its corner (or with two fingers) evenly,
- * or a chart from its right edge (its width) or its top edge (its height).
+ * What a hold does: move the widget; resize it from its corner, growing right and down with
+ * its top left corner in place; or resize a chart from one edge, the edge across from it in
+ * place. Two fingers resize it evenly about its point.
  */
-type Hold = 'move' | 'size' | 'width' | 'height';
+type Hold = 'move' | 'corner' | 'left' | 'right' | 'top' | 'bottom';
+
+/**
+ * One way of a widget, in percent of the frame: its point, and half of it, what scales (its
+ * drawing) apart from what does not (its outline's padding).
+ */
+type Along = { at: number; half: number; pad: number };
+
+/**
+ * A resize from one edge, the edge across from it in place: `dir` is the way the edge held
+ * moves out (1 right or down, -1 left or up) and `k` the scale the finger asks for. The edge
+ * snaps to the nearest of `lines` within `reach`; the scale, kept within `limits`, and the line
+ * it snapped to.
+ */
+function scaleFromEdge(
+  along: Along,
+  dir: 1 | -1,
+  k: number,
+  lines: number[],
+  reach: number,
+  limits: [number, number],
+): { k: number; line: number | null; gap: number } {
+  const fixed = along.at - dir * (along.half + along.pad);
+  let best: { k: number; line: number; gap: number } | null = null;
+  for (const line of lines) {
+    const target = ((dir * (line - fixed)) / 2 - along.pad) / along.half;
+    const gap = Math.abs(target - k) * 2 * along.half;
+    if (target > 0 && gap <= reach && (!best || gap < best.gap)) best = { k: target, line, gap };
+  }
+  const wanted = best?.k ?? k;
+  const kept = Math.min(limits[1], Math.max(limits[0], wanted));
+  return { k: kept, line: best && kept === wanted ? best.line : null, gap: best?.gap ?? Infinity };
+}
+
+/** Where the point of a widget resized by `k` from one edge goes, the edge across in place. */
+const pointAfter = (along: Along, dir: 1 | -1, k: number) =>
+  along.at - dir * (along.half + along.pad) + dir * (along.half * k + along.pad);
 
 /**
  * How much to scale by so an edge snaps: of the lines (`lines`), the one an edge of a widget
@@ -234,10 +271,6 @@ function start(event: PointerEvent, index: number, hold: Hold): void {
   const area = surface.getBoundingClientRect();
   pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
   const [x0, y0] = [event.clientX, event.clientY];
-  const centerPx = {
-    x: area.left + (widget.x / 100) * area.width,
-    y: area.top + (widget.y / 100) * area.height,
-  };
   // The widget's own edges as offsets from its point, and the other widgets' edges and
   // middles, which it lines up with, in percent of the frame.
   const edgesOf = (element: Element): Edges => {
@@ -259,11 +292,17 @@ function start(event: PointerEvent, index: number, hold: Hold): void {
   const drawn = mine?.firstElementChild ? edgesOf(mine.firstElementChild) : own;
   const halfX = (drawn.x[2]! - drawn.x[0]!) / 2;
   const halfY = (drawn.y[1]! - drawn.y[0]!) / 2;
-  const alongX = { half: halfX, pad: (own.x[2]! - own.x[0]!) / 2 - halfX };
-  const alongY = { half: halfY, pad: (own.y[1]! - own.y[0]!) / 2 - halfY };
+  const alongX = { at: widget.x, half: halfX, pad: (own.x[2]! - own.x[0]!) / 2 - halfX };
+  const alongY = { at: widget.y, half: halfY, pad: (own.y[1]! - own.y[0]!) / 2 - halfY };
+  /** The scales the sizes can take, from 50% to 250%: across (the width) and down. */
+  const limitsX: [number, number] = [WIDGET_SIZE.min / widget.size, WIDGET_SIZE.max / widget.size];
+  const limitsY: [number, number] = [WIDGET_SIZE.min / height0, WIDGET_SIZE.max / height0];
   const others = elements.filter((element) => element !== mine).map(edgesOf);
   const linesX = others.flatMap((edges) => edges.x);
   const linesY = others.flatMap((edges) => edges.y);
+  // Resizing also snaps to the frame's middle.
+  const linesAcross = [50, ...linesX];
+  const linesDown = [50, ...linesY];
   const reachX = (SNAP_PX / area.width) * 100;
   const reachY = (SNAP_PX / area.height) * 100;
   let moved = false;
@@ -272,7 +311,69 @@ function start(event: PointerEvent, index: number, hold: Hold): void {
   const distance = (a: { x: number; y: number }, b: { x: number; y: number }) =>
     Math.hypot(a.x - b.x, a.y - b.y);
 
-  /** Resizes by `kx` across and `ky` down, each edge that moves snapping to the lines. */
+  /** Shows the widget resized by `kx` across and `ky` down, its point at (`x`, `y`). */
+  const showResized = (kx: number, ky: number, x: number, y: number) => {
+    moving.value = {
+      index,
+      x,
+      y,
+      size: sizeIn(widget.size * kx),
+      ...(widget.kind === 'chart' ? { height: sizeIn(height0 * ky) } : {}),
+    };
+  };
+
+  /**
+   * Resizes from a handle as the finger has moved (`dx` across and `dy` down, in percent of the
+   * frame): from an edge, that way alone, the edge across in place; from the corner, both ways
+   * by one scale, the top left corner in place. The edges that move snap to the lines.
+   */
+  const resizeFrom = (handle: Exclude<Hold, 'move'>, dx: number, dy: number) => {
+    if (handle === 'left' || handle === 'right') {
+      const dir = handle === 'right' ? 1 : -1;
+      const { k, line } = scaleFromEdge(
+        alongX,
+        dir,
+        1 + (dir * dx) / (2 * halfX),
+        linesAcross,
+        reachX,
+        limitsX,
+      );
+      snap.value = { x: line, y: null };
+      const kx = sizeIn(widget.size * k) / widget.size;
+      showResized(kx, 1, pointAfter(alongX, dir, kx), widget.y);
+    } else if (handle === 'top' || handle === 'bottom') {
+      const dir = handle === 'bottom' ? 1 : -1;
+      const { k, line } = scaleFromEdge(
+        alongY,
+        dir,
+        1 + (dir * dy) / (2 * halfY),
+        linesDown,
+        reachY,
+        limitsY,
+      );
+      snap.value = { x: null, y: line };
+      const ky = sizeIn(height0 * k) / height0;
+      showResized(1, ky, widget.x, pointAfter(alongY, dir, ky));
+    } else {
+      // One scale for both ways, from how far the corner moved out; the nearer snap wins.
+      const k0 = 1 + (dx + dy) / (2 * (halfX + halfY));
+      const limits: [number, number] = [
+        Math.max(limitsX[0], limitsY[0]),
+        Math.min(limitsX[1], limitsY[1]),
+      ];
+      const across = scaleFromEdge(alongX, 1, k0, linesAcross, reachX, limits);
+      const down = scaleFromEdge(alongY, 1, k0, linesDown, reachY, limits);
+      const byX = across.line !== null && across.gap <= down.gap;
+      const byY = down.line !== null && !byX;
+      const k = byX ? across.k : byY ? down.k : Math.min(limits[1], Math.max(limits[0], k0));
+      snap.value = { x: byX ? across.line : null, y: byY ? down.line : null };
+      // The scale the size rounds to, so the corner stays where it is.
+      const kr = sizeIn(widget.size * k) / widget.size;
+      showResized(kr, kr, pointAfter(alongX, 1, kr), pointAfter(alongY, 1, kr));
+    }
+  };
+
+  /** Two fingers: resizes evenly by `k` about the widget's point, its edges snapping. */
   const resizeBy = (kx: number, ky: number, even: boolean) => {
     let [sx, sy] = [kx, ky];
     // Onto the frame's middle, or in line with another widget's edges or middle.
@@ -308,24 +409,22 @@ function start(event: PointerEvent, index: number, hold: Hold): void {
     if (!pointers.has(e.pointerId)) return;
     pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
     const fingers = [...pointers.values()];
-    if (fingers.length === 2 || hold !== 'move') {
-      const [a, b] = fingers.length === 2 ? fingers : [fingers[0]!, centerPx];
+    if (fingers.length === 2) {
+      // Two fingers: evenly, by how far apart they are now.
       moved = true;
-      // An edge: the distance across or down from the center; else the distance.
-      const now =
-        fingers.length === 2 || hold === 'size'
-          ? distance(a!, b!)
-          : hold === 'width'
-            ? Math.abs(a!.x - b!.x)
-            : Math.abs(a!.y - b!.y);
+      const now = distance(fingers[0]!, fingers[1]!);
       reach ||= now || 1;
-      if (fingers.length === 2 || hold === 'size') {
-        const k = now / reach;
-        resizeBy(k, k, true);
-      } else if (hold === 'width') {
-        // The edge follows the finger: what scales grows by what the finger moved.
-        resizeBy(1 + (now - reach) / ((halfX / 100) * area.width), 1, false);
-      } else resizeBy(1, 1 + (now - reach) / ((halfY / 100) * area.height), false);
+      resizeBy(now / reach, now / reach, true);
+      return;
+    }
+    if (hold !== 'move') {
+      // A handle: the edges held follow the finger.
+      moved = true;
+      resizeFrom(
+        hold,
+        ((e.clientX - x0) / area.width) * 100,
+        ((e.clientY - y0) / area.height) * 100,
+      );
       return;
     }
     if (!moved && Math.hypot(e.clientX - x0, e.clientY - y0) < 4) return;
@@ -566,27 +665,19 @@ const story = computed(() => props.size.width / props.size.height < 0.8);
           class="handle"
           :data-testid="`resize-${index}`"
           aria-hidden="true"
-          @pointerdown="start($event, index, 'size')"
+          @pointerdown="start($event, index, 'corner')"
         />
-        <!-- A chart's width from its right edge, its height from its top or bottom edge. -->
+        <!-- A chart's width from its left or right edge, its height from its top or bottom
+             edge, the edge across in place. -->
         <template v-if="widget.kind === 'chart'">
           <span
-            class="handle edge width"
-            :data-testid="`resize-width-${index}`"
+            v-for="edge in ['left', 'right', 'top', 'bottom'] as const"
+            :key="edge"
+            class="handle edge"
+            :class="edge"
+            :data-testid="`resize-${edge}-${index}`"
             aria-hidden="true"
-            @pointerdown="start($event, index, 'width')"
-          />
-          <span
-            class="handle edge height"
-            :data-testid="`resize-height-${index}`"
-            aria-hidden="true"
-            @pointerdown="start($event, index, 'height')"
-          />
-          <span
-            class="handle edge height bottom"
-            :data-testid="`resize-height-bottom-${index}`"
-            aria-hidden="true"
-            @pointerdown="start($event, index, 'height')"
+            @pointerdown="start($event, index, edge)"
           />
         </template>
       </template>
@@ -785,24 +876,28 @@ const story = computed(() => props.size.width / props.size.height < 0.8);
   cursor: nwse-resize;
 }
 
-/* A chart's edge handles: in the middle of its right edge, and of its top and bottom edges. */
-.handle.edge.width {
+/* A chart's edge handles: in the middle of each edge. */
+.handle.edge.left,
+.handle.edge.right {
   top: calc(50% - 6px);
-  right: -7px;
   bottom: auto;
   cursor: ew-resize;
 }
 
-.handle.edge.height {
-  top: -7px;
+.handle.edge.left {
+  right: auto;
+  left: -7px;
+}
+
+.handle.edge.top,
+.handle.edge.bottom {
   right: calc(50% - 6px);
-  bottom: auto;
   cursor: ns-resize;
 }
 
-.handle.edge.height.bottom {
-  top: auto;
-  bottom: -7px;
+.handle.edge.top {
+  top: -7px;
+  bottom: auto;
 }
 
 /* A center line the widget snapped to. */

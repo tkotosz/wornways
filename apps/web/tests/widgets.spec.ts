@@ -102,13 +102,19 @@ test('resizes a widget from its corner, and edits a text widget from a tap', asy
   await offlineMap(context);
   await openOverlay(page);
   await outline(page, 0).click({ position: { x: 10, y: 6 } });
-  const width = (await outline(page, 0).boundingBox())!.width;
+  const corner = (await outline(page, 0).boundingBox())!;
+  const width = corner.width;
   const handle = (await page.getByTestId('resize-0').boundingBox())!;
   await drag(page, { x: handle.x + 5, y: handle.y + 5 }, 40, 20);
   await page.mouse.up();
   await expect
     .poll(async () => (await outline(page, 0).boundingBox())!.width)
     .toBeGreaterThan(width);
+  // It grew right and down, its top left corner in place.
+  const grown = (await outline(page, 0).boundingBox())!;
+  // Within a pixel or two: the letters do not grow quite in step with their size.
+  expect(Math.abs(grown.x - corner.x)).toBeLessThan(2.5);
+  expect(Math.abs(grown.y - corner.y)).toBeLessThan(2.5);
 
   // A tap on the picked text widget writes its text over the whole screen; Enter finishes.
   await outline(page, 0).click({ position: { x: 10, y: 6 } });
@@ -122,7 +128,7 @@ test('resizes a widget from its corner, and edits a text widget from a tap', asy
   );
 });
 
-test('stretches a chart from its edges, an edge snapping to a guide line', async ({
+test('stretches a chart from its edges, the edge across in place, an edge snapping to a line', async ({
   page,
   context,
 }) => {
@@ -138,12 +144,21 @@ test('stretches a chart from its edges, an edge snapping to a guide line', async
   const index = Number(await chart.getAttribute('data-widget'));
   const before = (await chart.boundingBox())!;
 
-  // Its right edge: narrower, as high.
-  const right = (await page.getByTestId(`resize-width-${index}`).boundingBox())!;
+  // Its right edge: narrower, as high, its left edge in place.
+  const right = (await page.getByTestId(`resize-right-${index}`).boundingBox())!;
   await drag(page, { x: right.x + 5, y: right.y + 5 }, -60, 0);
   await page.mouse.up();
-  await expect.poll(async () => (await chart.boundingBox())!.width).toBeLessThan(before.width - 60);
+  await expect.poll(async () => (await chart.boundingBox())!.width).toBeLessThan(before.width - 50);
   expect((await chart.boundingBox())!.height).toBeCloseTo(before.height, 0);
+  expect((await chart.boundingBox())!.x).toBeCloseTo(before.x, 0);
+  // Its left edge, out again: its right edge in place.
+  const narrowed = (await chart.boundingBox())!;
+  const left = (await page.getByTestId(`resize-left-${index}`).boundingBox())!;
+  await drag(page, { x: left.x + 5, y: left.y + 5 }, -20, 0);
+  await page.mouse.up();
+  await expect.poll(async () => (await chart.boundingBox())!.x).toBeLessThan(narrowed.x - 15);
+  const widened = (await chart.boundingBox())!;
+  expect(widened.x + widened.width).toBeCloseTo(narrowed.x + narrowed.width, 0);
   await expect(page.getByRole('button', { name: /^Size: \d+ × 100%$/ })).toBeVisible();
 
   // Its top edge, up to just below the frame's middle: it snaps onto it, with the line shown.
@@ -155,7 +170,7 @@ test('stretches a chart from its edges, an edge snapping to a guide line', async
   const middle = frame.y + frame.height / 2;
   await expect.poll(async () => (await chart.boundingBox())!.y).toBeGreaterThan(middle + 8);
   const narrow = (await chart.boundingBox())!;
-  const top = (await page.getByTestId(`resize-height-${index}`).boundingBox())!;
+  const top = (await page.getByTestId(`resize-top-${index}`).boundingBox())!;
   await drag(page, { x: top.x + 5, y: top.y + 5 }, 0, middle + 3 - narrow.y);
   await expect(page.locator('.line.down')).toBeVisible();
   await page.mouse.up();
@@ -164,13 +179,15 @@ test('stretches a chart from its edges, an edge snapping to a guide line', async
   expect(Math.abs(tall.y - middle)).toBeLessThan(1.5);
   expect(tall.width).toBeCloseTo(narrow.width, 0);
 
-  // Its bottom edge, up: lower again.
-  const bottom = (await page.getByTestId(`resize-height-bottom-${index}`).boundingBox())!;
+  // The bottom of the chart stayed where it was while its top went up.
+  expect(tall.y + tall.height).toBeCloseTo(narrow.y + narrow.height, 0);
+
+  // Its bottom edge, up: lower again, its top in place.
+  const bottom = (await page.getByTestId(`resize-bottom-${index}`).boundingBox())!;
   await drag(page, { x: bottom.x + 5, y: bottom.y + 5 }, 0, -8);
   await page.mouse.up();
-  await expect
-    .poll(async () => (await chart.boundingBox())!.height)
-    .toBeLessThan(tall.height - 10);
+  await expect.poll(async () => (await chart.boundingBox())!.height).toBeLessThan(tall.height - 5);
+  expect((await chart.boundingBox())!.y).toBeCloseTo(tall.y, 0);
   const taller = (await chart.boundingBox())!;
 
   // Moved, it keeps its width and height.

@@ -191,12 +191,13 @@ drawing each. The editor's settings are remembered for the next visit.
   moves it; it snaps to the frame's center lines first, else in line with another
   widget's left edge, middle or right edge across and top or bottom down, with a line
   shown; a widget is removed only on purpose (Remove in the strip or its settings, or
-  Delete), never by where it is dragged. Two fingers, or the corner handle, resize it (50 to
-  250%), its letters keeping their shape; a chart also has a handle on its right edge for its
-  width and on its top and bottom edges for its height, each edge following the finger, and its Size
-  sheet has a Width and a Height slider. While resizing, the edges that move snap to the
-  frame's center lines and the other widgets' edges and middles, with the line shown, and
-  the widget stays centered on its point. A tap on a picked text
+  Delete), never by where it is dragged. Two fingers resize it evenly about its point; the corner handle
+  grows it right and down, its top left corner in place (50 to 250%), its letters keeping
+  their shape. A chart also has a handle in the middle of each edge: left and right for its
+  width, top and bottom for its height, the edge across staying in place and the edge held
+  following the finger; its Size sheet has a Width and a Height slider. While resizing, the
+  edges that move snap to the frame's center lines and the other widgets' edges and middles,
+  with the line shown. A tap on a picked text
   widget opens its text over the whole screen, large as on the video, with the keyboard
   up; a tap outside the text or Enter finishes it, and a text left empty is removed. The
   arrow keys move a picked widget by 1% of the frame (5% with
