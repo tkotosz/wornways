@@ -7,6 +7,7 @@ import {
   PRESET_NAMES,
   SETTINGS,
   defaultFormat,
+  type ChartColor,
   type ChartKind,
   type IconName,
   type LabelMode,
@@ -493,7 +494,7 @@ export const LABEL_MODE_NAMES: Record<LabelMode, string> = {
 };
 
 /** A part of a widget's settings that a chip of the strip opens on its own. */
-export type WidgetPart = 'size' | 'label' | 'words' | 'unit' | 'format';
+export type WidgetPart = 'size' | 'label' | 'words' | 'unit' | 'format' | 'color';
 /** Each part's name, as its chip and its sheet say it. */
 export const WIDGET_PART_NAMES: Record<WidgetPart, string> = {
   size: 'Size',
@@ -501,6 +502,19 @@ export const WIDGET_PART_NAMES: Record<WidgetPart, string> = {
   words: 'Label text',
   unit: 'Unit',
   format: 'Format',
+  color: 'Color',
+};
+
+/** The names of the colors a chart can take. */
+export const COLOR_NAMES: Record<ChartColor, string> = {
+  orange: 'Orange',
+  red: 'Red',
+  yellow: 'Yellow',
+  green: 'Green',
+  blue: 'Blue',
+  purple: 'Purple',
+  pink: 'Pink',
+  white: 'White',
 };
 
 /** The names of the ways a time, a date or a clock time can be written. */

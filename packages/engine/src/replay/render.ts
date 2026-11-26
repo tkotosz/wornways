@@ -3,6 +3,7 @@ import { levelsFor, mapLevelViews, type CameraPath, type LevelWindow } from './c
 import {
   chartProfile,
   chartProfiles,
+  defaultChartColor,
   drawChart,
   type ChartKind,
   type ChartProfile,
@@ -327,6 +328,7 @@ const SENSOR_WORDS: Record<SensorChannel, string> = {
   power: 'power',
   cadence: 'cadence',
   temperature: 'temperature',
+  speed: 'speed',
 };
 
 /** A sensor value's name: "Avg heart rate", "Max power", "Current cadence". */
@@ -1220,8 +1222,8 @@ export function createRenderer(
       ctx.shadowColor = 'rgba(0, 0, 0, 0)';
       drawChart(
         ctx,
-        widget.chart,
         profiles.get(widget.chart)!,
+        widget.color ?? defaultChartColor(widget.chart),
         { x: box.x0, y: box.y0, width: box.x1 - box.x0, height: box.y1 - box.y0 },
         prepared.map((tr) => ({
           meters: tr.started ? tr.metres : 0,

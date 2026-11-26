@@ -1,5 +1,5 @@
 // A Strava activity's streams turned into a track: positions, times and elevations, and the
-// heart rate, cadence, power and temperature recorded with them.
+// heart rate, cadence, power, temperature and speed recorded with them.
 
 import { sensorsFrom, STRIDE, type LatLon, type SensorChannel, type Track } from '@wornways/engine';
 import type { ActivitySummary } from '../messages.ts';
@@ -12,6 +12,8 @@ export type Streams = {
   cadence?: { data: number[] };
   watts?: { data: number[] };
   temp?: { data: number[] };
+  /** Speed in meters per second. */
+  velocity_smooth?: { data: number[] };
 };
 
 /** A [lat, lon] pair as a position; undefined when it is not one. */
@@ -46,6 +48,7 @@ export function trackFromStreams(activity: ActivitySummary, streams: Streams): T
       cadence: valueAt(streams.cadence, index),
       power: valueAt(streams.watts, index),
       temperature: valueAt(streams.temp, index),
+      speed: valueAt(streams.velocity_smooth, index),
     });
   }
   if (size < 2 * STRIDE) return null;

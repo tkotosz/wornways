@@ -294,7 +294,16 @@ test.describe('the editor on a phone', () => {
     const charts = page.getByRole('dialog', { name: 'Charts' });
     await charts.getByRole('button', { name: 'Speed chart' }).click();
     await expect(onPicture).toHaveCount(count + 2);
-    await expect(page.getByRole('button', { name: /^Speed chart on the picture/ })).toBeVisible();
+    const speed = page.getByRole('button', { name: /^Speed chart on the picture/ });
+    await expect(speed).toBeVisible();
+    // Its color, from its chip: blue at first, then purple.
+    await expect(speed.locator('path').nth(1)).toHaveAttribute('stroke', 'rgb(120, 205, 255)');
+    await page.getByRole('button', { name: 'Color: Blue' }).click();
+    const color = page.getByRole('dialog', { name: 'Speed chart: color' });
+    await color.getByRole('radio', { name: 'Purple' }).click();
+    await color.getByRole('button', { name: 'Done' }).click();
+    await expect(page.getByRole('button', { name: 'Color: Purple' })).toBeVisible();
+    await expect(speed.locator('path').nth(1)).toHaveAttribute('stroke', 'rgb(190, 160, 255)');
     await page.getByRole('button', { name: '✓ Done' }).click();
     await page.getByRole('button', { name: 'Add a chart' }).click();
     await expect(charts.getByRole('button', { name: 'Speed chart' })).toBeDisabled();

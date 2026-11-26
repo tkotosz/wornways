@@ -173,7 +173,7 @@ export function fitFileType(data: Uint8Array): number | null {
 export function parseFit(data: Uint8Array): ParsedActivity | null {
   const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
   const out: number[] = []; // lon, lat, ele, absolute FIT seconds
-  /** Per record in `out`: heart rate, cadence, power and temperature, NaN where missing. */
+  /** Per record in `out`: heart rate, cadence, power, temperature and speed, NaN where missing. */
   const readings: Record<SensorChannel, number>[] = [];
   let calories = NaN;
   let sport = -1;
@@ -236,6 +236,7 @@ export function parseFit(data: Uint8Array): ParsedActivity | null {
           cadence: NaN,
           power: NaN,
           temperature: NaN,
+          speed: NaN,
         };
         let fieldSport = 0xff;
         let fieldSubSport = 0xff;
@@ -266,6 +267,13 @@ export function parseFit(data: Uint8Array): ParsedActivity | null {
             } else if (num === 13 && size === 1) {
               const v = view.getInt8(pos);
               if (v !== 0x7f) reading.temperature = v;
+            } else if (num === 6 && size === 2) {
+              // speed: uint16, scale 1000, m/s. enhanced_speed (73) wins if present.
+              const v = view.getUint16(pos, little);
+              if (v !== 0xffff && Number.isNaN(reading.speed)) reading.speed = v / 1000;
+            } else if (num === 73 && size === 4) {
+              const v = view.getUint32(pos, little);
+              if (v !== 0xffffffff) reading.speed = v / 1000;
             }
           } else if (globalNum === MSG_SESSION && size === 1) {
             if (num === 5) fieldSport = data[pos];

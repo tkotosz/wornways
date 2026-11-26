@@ -212,7 +212,8 @@ drawing each. The editor's settings are remembered for the next visit.
   words go: off, before, after, above or under, each with how the value reads in it), Label
   text (the words themselves, "None" when empty; its usual ones until edited, with a way
   back to them), Unit (for a value that has one: on, or off for the number alone), Icon (a switch: the
-  value's icon in front of it, one for each kind of value), Format (for a time, a date or a clock time: h:mm:ss, h:mm,
+  value's icon in front of it, one for each kind of value), Color (a chart's: eight swatches),
+  Format (for a time, a date or a clock time: h:mm:ss, h:mm,
   hours or days; five ways to write a date; 24 or 12 hours; each with how the value reads
   in it) and Remove. After the widgets' tools the strip has
   the units (metric or imperial, for every value of the video and its totals card; also in

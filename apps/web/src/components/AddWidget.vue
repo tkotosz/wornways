@@ -9,6 +9,7 @@
 // the middle of the picture (a chart along the bottom).
 import {
   chartColors,
+  defaultChartColor,
   defaultLabel,
   type ChartKind,
   type Metric,
@@ -75,7 +76,7 @@ const groups = computed(() =>
           :disabled="usedCharts.has(chart)"
           @click="emit('add', { kind: 'chart', chart, x: 50, y: 88, size: 100 })"
         >
-          <b :style="{ color: `rgb(${chartColors(chart).line})` }">
+          <b :style="{ color: `rgb(${chartColors(defaultChartColor(chart)).line})` }">
             <StatIcon :icon="CHARTS[chart].icon" />
           </b>
           <span>{{ CHARTS[chart].name }}</span>

@@ -2,10 +2,13 @@
 // One widget's settings: the text of a text widget (the title until another is written),
 // its size, where a value shows its words and what they say, whether it shows its unit, how a
 // time, a date or a clock time is written (on the totals card, `card`, a time in hours unless
-// picked), its icon on or off, and removing it from the picture. With `only`, just one of
+// picked), its icon on or off, a chart's color, and removing it from the picture. With `only`, just one of
 // them, as the strip's chips open them.
 import {
+  CHART_COLORS,
   WIDGET_SIZE,
+  chartColors,
+  defaultChartColor,
   LABEL_MODES,
   formatsOf,
   hasUnit,
@@ -18,7 +21,13 @@ import {
   type Widget,
 } from '@wornways/engine';
 import { computed } from 'vue';
-import { FORMAT_NAMES, LABEL_MODE_NAMES, formatOf, type WidgetPart } from '../adjust.ts';
+import {
+  COLOR_NAMES,
+  FORMAT_NAMES,
+  LABEL_MODE_NAMES,
+  formatOf,
+  type WidgetPart,
+} from '../adjust.ts';
 import ExactNumber from './ExactNumber.vue';
 
 const props = defineProps<{
@@ -192,6 +201,25 @@ const shows = (part: WidgetPart) => !props.only || props.only === part;
         </button>
       </div>
     </div>
+    <div v-if="shows('color') && widget.kind === 'chart'" class="field">
+      <span id="widget-color" class="label" :class="{ 'visually-hidden': only }">Color</span>
+      <div class="swatches" role="radiogroup" aria-labelledby="widget-color">
+        <button
+          v-for="color in CHART_COLORS"
+          :key="color"
+          type="button"
+          class="swatch"
+          role="radio"
+          :aria-checked="(widget.color ?? defaultChartColor(widget.chart)) === color"
+          :aria-label="COLOR_NAMES[color]"
+          :style="{ '--swatch': `rgb(${chartColors(color).line})` }"
+          @click="set({ color })"
+        >
+          <span class="dot" aria-hidden="true" />
+          <span>{{ COLOR_NAMES[color] }}</span>
+        </button>
+      </div>
+    </div>
     <div v-if="shows('size')" class="field">
       <span id="widget-size" class="label" :class="{ 'visually-hidden': only }">Size</span>
       <div class="slider" role="group" aria-labelledby="widget-size">
@@ -312,5 +340,37 @@ const shows = (part: WidgetPart) => !props.only || props.only === part;
   flex-direction: row;
   align-items: center;
   justify-content: space-between;
+}
+.swatches {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.5rem;
+}
+
+/* A color: its dot over its name; the one in use outlined in it. */
+.swatch {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.55rem 0.2rem;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  color: var(--muted);
+  background: none;
+  font: inherit;
+  font-size: 0.75rem;
+}
+
+.swatch[aria-checked='true'] {
+  border-color: var(--swatch);
+  color: var(--text);
+}
+
+.swatch .dot {
+  width: 1.4rem;
+  height: 1.4rem;
+  border-radius: 50%;
+  background: var(--swatch);
 }
 </style>

@@ -125,6 +125,12 @@ describe('the other charts', () => {
     expect(profile.values[5]).toBeCloseTo(7.5, 0);
   });
 
+  it('takes the speed the device recorded where there is one', () => {
+    const track = withElevations(Array(20).fill(100));
+    const measured = { ...track, sensors: { speed: new Float32Array(20).fill(12) } };
+    expect(chartProfile([measured], 10, 'speed')!.values[5]).toBeCloseTo(12, 1);
+  });
+
   it('offers the speed always, and the others where an activity recorded them', () => {
     expect(chartsOf([withElevations([100, 110, 120])])).toEqual(['elevation', 'speed']);
     expect(chartsOf([recorded([120, 130, 140], [200, 210, 220])])).toEqual([

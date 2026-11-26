@@ -18,68 +18,66 @@ export const CHART_KINDS: readonly ChartKind[] = [
   'cadence',
 ];
 
+/** The colors a chart can take, each its own fill, line and dot glow. */
+export type ChartColor =
+  'orange' | 'red' | 'yellow' | 'green' | 'blue' | 'purple' | 'pink' | 'white';
+export const CHART_COLORS: readonly ChartColor[] = [
+  'orange',
+  'red',
+  'yellow',
+  'green',
+  'blue',
+  'purple',
+  'pink',
+  'white',
+];
+
+/** Each color as "red, green, blue": the fill, the line over it and the dot's glow. */
+const COLORS: Record<ChartColor, { fill: string; line: string; glow: string }> = {
+  orange: { fill: '255, 138, 42', line: '255, 176, 102', glow: '255, 190, 130' },
+  red: { fill: '255, 59, 79', line: '255, 120, 130', glow: '255, 150, 160' },
+  yellow: { fill: '255, 196, 0', line: '255, 214, 90', glow: '255, 225, 140' },
+  green: { fill: '84, 214, 110', line: '140, 230, 155', glow: '170, 240, 180' },
+  blue: { fill: '56, 182, 255', line: '120, 205, 255', glow: '160, 220, 255' },
+  purple: { fill: '156, 110, 255', line: '190, 160, 255', glow: '205, 185, 255' },
+  pink: { fill: '255, 92, 190', line: '255, 150, 215', glow: '255, 175, 225' },
+  white: { fill: '235, 238, 245', line: '250, 250, 252', glow: '255, 255, 255' },
+};
+
 /**
  * For each chart: the least range it is drawn against, so a flat stretch looks flat (meters,
  * beats per minute, watts, meters per second, rotations per minute); how many times its
- * values are smoothed, the jumpy ones the most; and its colors as red, green and blue: the fill, the line and the dot's glow.
+ * values are smoothed, the jumpy ones the most; and its color unless one is picked.
  */
-const CHARTS: Record<
-  ChartKind,
-  { minRange: number; smoothing: number; fill: string; line: string; glow: string }
-> = {
-  elevation: {
-    minRange: 60,
-    smoothing: 1,
-    fill: '255, 138, 42',
-    line: '255, 176, 102',
-    glow: '255, 190, 130',
-  },
-  'heart-rate': {
-    minRange: 30,
-    smoothing: 3,
-    fill: '255, 59, 79',
-    line: '255, 120, 130',
-    glow: '255, 150, 160',
-  },
-  power: {
-    minRange: 100,
-    smoothing: 8,
-    fill: '255, 196, 0',
-    line: '255, 214, 90',
-    glow: '255, 225, 140',
-  },
-  speed: {
-    minRange: 3,
-    smoothing: 6,
-    fill: '56, 182, 255',
-    line: '120, 205, 255',
-    glow: '160, 220, 255',
-  },
-  cadence: {
-    minRange: 20,
-    smoothing: 4,
-    fill: '84, 214, 110',
-    line: '140, 230, 155',
-    glow: '170, 240, 180',
-  },
+const CHARTS: Record<ChartKind, { minRange: number; smoothing: number; color: ChartColor }> = {
+  elevation: { minRange: 60, smoothing: 1, color: 'orange' },
+  'heart-rate': { minRange: 30, smoothing: 3, color: 'red' },
+  power: { minRange: 100, smoothing: 8, color: 'yellow' },
+  speed: { minRange: 3, smoothing: 6, color: 'blue' },
+  cadence: { minRange: 20, smoothing: 4, color: 'green' },
 };
 
-/** A chart's colors as "red, green, blue": its fill and its line, for drawing it elsewhere. */
-export const chartColors = (chart: ChartKind) => ({
-  fill: CHARTS[chart].fill,
-  line: CHARTS[chart].line,
+/** A chart's color unless one is picked. */
+export const defaultChartColor = (chart: ChartKind): ChartColor => CHARTS[chart].color;
+
+/** A color as "red, green, blue": its fill and its line, for drawing a chart elsewhere. */
+export const chartColors = (color: ChartColor) => ({
+  fill: COLORS[color].fill,
+  line: COLORS[color].line,
 });
 
 type ChartTrack = Pick<Track, 'points' | 'sensors' | 'recorded'>;
 
 /**
  * A chart's value at point `i` of `track`, NaN where it has none; `meters` are each point's
- * meters along the strip, for the speed: the distance from the point before over the
- * recorded time between them.
+ * meters along the strip, for a speed the device did not record: the distance from the point
+ * before over the recorded time between them.
  */
 function valueAt(track: ChartTrack, i: number, chart: ChartKind, meters?: Float64Array): number {
   if (chart === 'elevation') return track.points[i * STRIDE + 2]!;
   if (chart === 'speed') {
+    const measured = track.sensors?.speed?.[i];
+    if (measured !== undefined && Number.isFinite(measured)) return measured;
     if (i === 0 || !meters) return NaN;
     const seconds = (k: number) => track.recorded?.[k] ?? track.points[k * STRIDE + 3]!;
     const dt = seconds(i) - seconds(i - 1);
@@ -213,20 +211,20 @@ export type Box = { x: number; y: number; width: number; height: number };
 export type ProfileProgress = { meters: number; dot: number };
 
 /**
- * Draws the profile of `chart` in `box`, with one entry of `progress` per activity: the part
- * each has covered in the chart's color, the rest faint, a thin tick between activities, and
- * a glowing dot on the line where each one is.
+ * Draws a chart's `profile` in `box`, with one entry of `progress` per activity: the part each
+ * has covered in `color`, the rest faint, a thin tick between activities, and a glowing dot on
+ * the line where each one is.
  */
 export function drawChart(
   ctx: Context2DLike,
-  chart: ChartKind,
   profile: ChartProfile,
+  color: ChartColor,
   box: Box,
   progress: ProfileProgress[],
   unit: number,
 ): void {
   const { values, starts, low, high } = profile;
-  const colors = CHARTS[chart];
+  const colors = COLORS[color];
   const last = values.length - 1;
   const totalM = starts[starts.length - 1]!;
   const bottom = box.y + box.height;
@@ -314,8 +312,8 @@ export function drawChart(
 }
 
 /**
- * Which charts `tracks` can show: the speed always, elevation, heart rate, power and cadence
- * where one recorded them.
+ * Which charts `tracks` can show: the speed always (recorded, else from the points), and
+ * elevation, heart rate, power and cadence where one recorded them.
  */
 export function chartsOf(tracks: ChartTrack[]): ChartKind[] {
   return CHART_KINDS.filter((chart) =>

@@ -52,7 +52,11 @@ describe('widgets as text', () => {
       'moving:hm:hms@1,2',
       'its words in double quotes, nounit, icon, the format hms, hm, h, d, not "hms"',
     ],
-    ['elevation-chart:off@1,2', '"elevation-chart" takes no label mode'],
+    [
+      'elevation-chart:off@1,2',
+      '"elevation-chart" takes the color orange, red, yellow, green, blue, purple, pink, white, not "off"',
+    ],
+    ['climb-chart@1,2', '"climb-chart" is not a widget'],
     ['text:"open@1,2', 'the text has no closing double quote'],
   ])('rejects %j', (text, message) => {
     expect(() => parseWidgets(text, METRICS)).toThrow(message);
@@ -163,6 +167,15 @@ describe('labels', () => {
     expect(iconOf('time-of-day')).toBe('clock');
     expect(iconOf('min-time')).toBe('stopwatch');
     expect(iconOf('moving-days')).toBe('calendar');
+  });
+
+  it('give a chart a color of its own, written only when not its usual one', () => {
+    const widgets = parseWidgets('power-chart:blue@50,80;speed-chart:blue@50,90', METRICS);
+    expect(widgets).toMatchObject([
+      { kind: 'chart', chart: 'power', color: 'blue' },
+      { kind: 'chart', chart: 'speed', color: 'blue' },
+    ]);
+    expect(widgetsText(widgets)).toBe('power-chart:blue@50,80;speed-chart@50,90');
   });
 
   it('write words of their own in double quotes, back as they were read', () => {

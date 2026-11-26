@@ -78,7 +78,10 @@ export function projectTrack(
   const moving: number[] = [];
   const fastest: number[] = [];
   const speed: number[] = [];
-  const channels = SENSOR_CHANNELS.filter((channel) => track.sensors?.[channel]);
+  // The speed recorded is for the speed chart: the speed values go by the points.
+  const channels = SENSOR_CHANNELS.filter(
+    (channel) => channel !== 'speed' && track.sensors?.[channel],
+  );
   const sums = channels.map(() => ({
     total: [] as number[],
     time: [] as number[],

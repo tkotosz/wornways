@@ -33,15 +33,15 @@ describe('sensor values', () => {
 
   it('are built from rows, leaving out channels without any value', () => {
     const sensors = sensorsFrom([
-      { heartRate: 120, power: NaN, cadence: 80, temperature: NaN },
-      { heartRate: 125, power: NaN, cadence: NaN, temperature: NaN },
+      { heartRate: 120, power: NaN, cadence: 80, temperature: NaN, speed: NaN },
+      { heartRate: 125, power: NaN, cadence: NaN, temperature: NaN, speed: NaN },
     ])!;
     expect(Object.keys(sensors).sort()).toEqual(['cadence', 'heartRate']);
     expect(Array.from(sensors.cadence!)).toEqual([80, NaN]);
     expect(recorded(sensors, 'heartRate')).toBe(true);
     expect(recorded(sensors, 'power')).toBe(false);
     expect(
-      sensorsFrom([{ heartRate: NaN, power: NaN, cadence: NaN, temperature: NaN }]),
+      sensorsFrom([{ heartRate: NaN, power: NaN, cadence: NaN, temperature: NaN, speed: NaN }]),
     ).toBeUndefined();
   });
 });

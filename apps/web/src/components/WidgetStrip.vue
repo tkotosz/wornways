@@ -1,14 +1,27 @@
 <script setup lang="ts">
 // The chips for arranging widgets, in the strip under the picture (Overlay, and Ending with
 // the totals card). With no widget picked: adding a text, a stat or (over the replay) a
-// chart. With one picked, the strip is that widget's: Done lets it go; Edit writes a
-// text's text; Size, Label position (where a value's words are), Label text (what they say),
-// Unit (on or off, for a value that has one) and Format (a time, date or clock time) open
-// their sheet; Icon turns a value's icon on or off in place; Remove takes it off the picture. The section's own settings
-// stay in the slot, after the tools.
-import { hasUnit, labelTextOf, type Metric, type MetricValue, type Widget } from '@wornways/engine';
+// chart. With one picked, the strip is that widget's: Done lets it go; Edit writes a text's
+// text; Size, Label position (where a value's words are), Label text (what they say), Unit
+// (on or off, for a value that has one), Format (a time, date or clock time) and Color (a
+// chart's) open their sheet; Icon turns a value's icon on or off in place; Remove takes it off
+// the picture. The section's own settings stay in the slot, after the tools.
+import {
+  defaultChartColor,
+  hasUnit,
+  labelTextOf,
+  type Metric,
+  type MetricValue,
+  type Widget,
+} from '@wornways/engine';
 import { computed } from 'vue';
-import { FORMAT_NAMES, LABEL_MODE_NAMES, formatOf, type WidgetPart } from '../adjust.ts';
+import {
+  COLOR_NAMES,
+  FORMAT_NAMES,
+  LABEL_MODE_NAMES,
+  formatOf,
+  type WidgetPart,
+} from '../adjust.ts';
 
 const props = defineProps<{
   widgets: Widget[];
@@ -107,6 +120,17 @@ const format = computed(() => (picked.value ? formatOf(picked.value, props.card)
     >
       <span>Label text</span>
       <span class="value words">{{ wordsChip }}</span>
+    </button>
+    <button
+      v-if="picked.kind === 'chart'"
+      type="button"
+      class="setting-row"
+      :aria-label="`Color: ${COLOR_NAMES[picked.color ?? defaultChartColor(picked.chart)]}`"
+      aria-haspopup="dialog"
+      @click="emit('open', selected, 'color')"
+    >
+      <span>Color</span>
+      <span class="value">{{ COLOR_NAMES[picked.color ?? defaultChartColor(picked.chart)] }}</span>
     </button>
     <label v-if="picked.kind === 'metric'" class="setting-row">
       <span>Icon</span>

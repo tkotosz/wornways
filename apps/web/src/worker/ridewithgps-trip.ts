@@ -88,7 +88,10 @@ export function listedTrip(row: TripRow): RemoteActivity | null {
   };
 }
 
-/** A trip's point: position, elevation, time, and heart rate, cadence, power, temperature. */
+/**
+ * A trip's point: position, elevation, time, and heart rate, cadence, power, temperature and
+ * speed (`s`, in meters per second).
+ */
 export type TripPoint = {
   x?: unknown;
   y?: unknown;
@@ -98,6 +101,7 @@ export type TripPoint = {
   c?: unknown;
   p?: unknown;
   T?: unknown;
+  s?: unknown;
 };
 
 const reading = (value: unknown) =>
@@ -125,6 +129,7 @@ export function trackFromTrip(summary: ActivitySummary, points: TripPoint[]): Tr
       cadence: reading(point.c),
       power: reading(point.p),
       temperature: reading(point.T),
+      speed: reading(point.s),
     });
   }
   if (size < 2 * STRIDE) return null;

@@ -11,7 +11,13 @@
 // shows its words where that value usually does (`defaultLabel`), without words of its own
 // the value's usual ones, and without a format the usual way (`defaultFormat`, formats.ts).
 
-import { CHART_KINDS, type ChartKind } from './charts.ts';
+import {
+  CHART_COLORS,
+  CHART_KINDS,
+  defaultChartColor,
+  type ChartColor,
+  type ChartKind,
+} from './charts.ts';
 import { defaultFormat, formatsOf, type ValueFormat } from './formats.ts';
 import type { Metric, MetricValue } from './metrics.ts';
 
@@ -37,7 +43,12 @@ export type Widget = { x: number; y: number; size: number } & (
       /** How a time, date or clock time is written; left out, the value's usual way. */
       format?: ValueFormat;
     }
-  | { kind: 'chart'; chart: ChartKind }
+  | {
+      kind: 'chart';
+      chart: ChartKind;
+      /** Its color; left out, the chart's own (see charts.ts). */
+      color?: ChartColor;
+    }
 );
 
 /** The label mode a value starts with: its words under it; the date, which has none, off. */
@@ -133,6 +144,7 @@ export function parseWidgets(
     let label: LabelMode | null = null;
     let labelText: string | null = null;
     let noUnit = false;
+    let chartColor: ChartColor | null = null;
     let icon = false;
     let format: ValueFormat | null = null;
     if (text[i] === ':' && metrics.includes(name)) {
@@ -163,6 +175,15 @@ export function parseWidgets(
           format = token as ValueFormat;
         else fail(`"${name}" takes ${takes.join(', ')}, not "${token}"`);
       }
+    } else if (text[i] === ':' && chart && CHART_KINDS.some((kind) => name === `${kind}-chart`)) {
+      // A chart's color.
+      i++;
+      const colorStart = i;
+      while (i < text.length && /[a-z]/.test(text[i]!)) i++;
+      const token = text.slice(colorStart, i);
+      if (!CHART_COLORS.includes(token as ChartColor))
+        fail(`"${name}" takes the color ${CHART_COLORS.join(', ')}, not "${token}"`);
+      chartColor = token as ChartColor;
     } else if (text[i] === ':' && name === 'text') {
       i++;
       own = quoted();
@@ -186,6 +207,7 @@ export function parseWidgets(
       widgets.push({
         kind: 'chart',
         chart: name.slice(0, -'-chart'.length) as ChartKind,
+        ...(chartColor ? { color: chartColor } : {}),
         x,
         y,
         size,
@@ -226,6 +248,12 @@ export function widgetsText(widgets: Widget[], { card = false }: { card?: boolea
     .map((widget) => {
       let text = '';
       if (widget.kind === 'text' && widget.text !== null) text = `:${quote(widget.text)}`;
+      if (
+        widget.kind === 'chart' &&
+        widget.color &&
+        widget.color !== defaultChartColor(widget.chart)
+      )
+        text += `:${widget.color}`;
       if (widget.kind === 'metric') {
         if (widget.label !== defaultLabel(widget.metric)) text += `:${widget.label}`;
         if (widget.labelText !== undefined) text += `:${quote(widget.labelText)}`;

@@ -19,6 +19,7 @@
 import {
   WIDGET_SIZE,
   chartColors,
+  defaultChartColor,
   iconOf,
   labelTextOf,
   valueLines,
@@ -100,6 +101,10 @@ function besideOf(widget: Widget): { before: string; number: string; after: stri
     ? { before: words, number, after: '' }
     : { before: '', number, after: words };
 }
+
+/** A chart widget's colors: its own, else its chart's. */
+const colorsOf = (widget: Widget & { kind: 'chart' }) =>
+  chartColors(widget.color ?? defaultChartColor(widget.chart));
 
 /** A chart's outline over its box, 100 wide and 100 high, as the engine draws it. */
 function chartPath(chart: ChartKind): string {
@@ -431,16 +436,16 @@ const story = computed(() => props.size.width / props.size.height < 0.8);
         aria-hidden="true"
       >
         <defs>
-          <linearGradient :id="`chart-fill-${widget.chart}`" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0" :stop-color="`rgba(${chartColors(widget.chart).fill}, 0.55)`" />
-            <stop offset="1" :stop-color="`rgba(${chartColors(widget.chart).fill}, 0.12)`" />
+          <linearGradient :id="`chart-fill-${index}`" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" :stop-color="`rgba(${colorsOf(widget).fill}, 0.55)`" />
+            <stop offset="1" :stop-color="`rgba(${colorsOf(widget).fill}, 0.12)`" />
           </linearGradient>
         </defs>
-        <path :d="chartPath(widget.chart)" :fill="`url(#chart-fill-${widget.chart})`" />
+        <path :d="chartPath(widget.chart)" :fill="`url(#chart-fill-${index})`" />
         <path
           :d="chartPath(widget.chart)"
           fill="none"
-          :stroke="`rgb(${chartColors(widget.chart).line})`"
+          :stroke="`rgb(${colorsOf(widget).line})`"
           stroke-width="1.5"
           vector-effect="non-scaling-stroke"
         />
