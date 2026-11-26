@@ -681,6 +681,10 @@ export function createRenderer(
   const fontOf = (weight: number, px: number) => `${weight} ${Math.round(px)}px ${fontFamily}`;
   const hasElevation = prepared.some((tr) => tr.hasElevation);
 
+  /** Each value widget's line at its widest, in its font. */
+  const widestLines = new Map<Widget, number>();
+  /** The widest digit of each font. */
+  const widestDigits = new Map<string, string>();
   /** Each value as it stands at the end of the replay, for laying widgets out. */
   const finalValues = metricValues(timeline.duration, finished());
   const startValues = metricValues(0);
@@ -1179,7 +1183,8 @@ export function createRenderer(
       widget.unit,
     );
     ctx.font = fontOf(600, VALUE_SIZE * scale);
-    let width = ctx.measureText(line).width + (widget.icon ? iconRoom(VALUE_SIZE * scale) : 0);
+    // As wide as the line can get while its number counts, so the box keeps its size.
+    let width = widestLine(widget, line) + (widget.icon ? iconRoom(VALUE_SIZE * scale) : 0);
     let height = VALUE_SIZE * scale * 1.1;
     // The words above or under take a line of their own, smaller.
     const words = above || under;
@@ -1202,28 +1207,33 @@ export function createRenderer(
     });
   }
 
-  /** Each value widget's line at its widest, at the start or at the end, in its font. */
-  const widestLines = new Map<Widget, number>();
-  /** A value widget's line at its widest, the context's font set to its value's. */
-  function widestLine(widget: Widget & { kind: 'metric' }): number {
-    let widest = widestLines.get(widget);
-    if (widest === undefined) {
-      widest = 0;
+  /**
+   * How wide a value widget's line can get while its number counts, the context's font set to
+   * its value's: its line at the start and at the end, and `line` now, each with every digit
+   * as the font's widest, so no number in between is wider.
+   */
+  function widestLine(widget: Widget & { kind: 'metric' }, line: string): number {
+    let digit = widestDigits.get(ctx.font);
+    if (digit === undefined) {
+      digit = [...'0123456789'].reduce((a, b) =>
+        ctx.measureText(b).width > ctx.measureText(a).width ? b : a,
+      );
+      widestDigits.set(ctx.font, digit);
+    }
+    const wide = digit;
+    const widest = (text: string) => ctx.measureText(text.replace(/[0-9]/g, wide)).width;
+    let known = widestLines.get(widget);
+    if (known === undefined) {
+      known = 0;
       for (const values of [startValues, finalValues]) {
         const value = values.get(widget.metric);
         if (!value) continue;
-        const { line } = valueLines(
-          value,
-          widget.label,
-          widget.format,
-          widget.labelText,
-          widget.unit,
-        );
-        widest = Math.max(widest, ctx.measureText(line).width);
+        const lines = valueLines(value, widget.label, widget.format, widget.labelText, widget.unit);
+        known = Math.max(known, widest(lines.line));
       }
-      widestLines.set(widget, widest);
+      widestLines.set(widget, known);
     }
-    return widest;
+    return Math.max(known, widest(line));
   }
 
   /**
@@ -1261,17 +1271,15 @@ export function createRenderer(
       ctx.font = fontOf(600, VALUE_SIZE * scale);
       ctx.fillStyle = 'rgba(255, 255, 255, 0.94)';
       const baseline = top + VALUE_SIZE * scale * 0.95;
-      if (widget.icon) {
-        // The icon and the line centered as the line is at its widest, so the icon stays in
-        // place while the number counts; the line starts after it.
-        const size = VALUE_SIZE * scale;
-        const widest = Math.max(ctx.measureText(line).width, widestLine(widget));
-        const left = cx - (iconRoom(size) + widest) / 2;
-        const textX = drawIconBefore(ctx, iconOf(widget.metric), left, baseline, size);
-        ctx.textAlign = 'left';
-        ctx.fillText(line, textX, baseline);
-        ctx.textAlign = 'center';
-      } else ctx.fillText(line, cx, baseline);
+      // The icon and the line set by the line at its widest, so neither moves while the number
+      // counts: the line starts at a fixed place, after the icon.
+      const size = VALUE_SIZE * scale;
+      const room = widget.icon ? iconRoom(size) : 0;
+      let textX = cx - (room + widestLine(widget, line)) / 2;
+      if (widget.icon) textX = drawIconBefore(ctx, iconOf(widget.metric), textX, baseline, size);
+      ctx.textAlign = 'left';
+      ctx.fillText(line, textX, baseline);
+      ctx.textAlign = 'center';
       if (under) {
         ctx.font = fontOf(400, LABEL_SIZE * scale);
         ctx.fillStyle = 'rgba(255, 255, 255, 0.66)';
