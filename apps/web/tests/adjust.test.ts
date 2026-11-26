@@ -7,7 +7,6 @@ import {
   offered,
   presetChoices,
   presetOf,
-  resetPlayback,
   settingLabel,
   startingValue,
   valueOf,
@@ -70,9 +69,10 @@ describe('the settings offered', () => {
   });
 
   it('keeps the end pause out of the playback a preset decides', () => {
-    // Resetting playback leaves it, and one activity and several share it.
+    // Picking a preset, which starts the playback over, leaves it, and one activity and
+    // several share it.
     const paused = { preset: 'recap', 'end-pause': '3' };
-    expect(resetPlayback(paused, 'several')).toEqual({ 'end-pause': '3' });
+    expect(withPreset(paused, 'recap', 'several')).toEqual(paused);
     expect(adjustSettings(paused, 'several')['end-pause']).toBe('3');
     expect(adjustSettings(paused, 'one')['end-pause']).toBe('3');
     expect(playbackAdjustments(paused, 'several')['end-pause']).toBeUndefined();
@@ -144,10 +144,11 @@ describe('presets', () => {
     expect(adjustSettings(trip, 'several')).toEqual({ preset: 'multiday-trip', pace: 'distance' });
   });
 
-  it('picks a preset and keeps existing overrides', () => {
-    expect(withPreset({ preset: 'custom', duration: '20' }, 'all-at-once', 'several')).toEqual({
+  it('picks a preset, which starts the playback over from it', () => {
+    const tuned = { preset: 'custom', duration: '20', group: 'day', map: false };
+    expect(withPreset(tuned, 'all-at-once', 'several')).toEqual({
       preset: 'all-at-once',
-      duration: '20',
+      map: false,
     });
   });
 
@@ -171,17 +172,15 @@ describe('presets', () => {
     );
     expect(adjustSettings(several, 'one')).toEqual({ duration: '15', camera: 'fixed' });
     expect(adjustSettings(several, 'several')).toMatchObject({ duration: '22.5', camera: 'zoom' });
-    // A reset goes back to the first preset, with nothing fine-tuned, and only for its size.
+    // A preset picked starts that size's playback over, with nothing fine-tuned.
     const custom = withPreset(several, 'custom', 'several');
-    expect(presetOf(resetPlayback(custom, 'several'), 'several')).toBe('all-at-once');
-    expect(adjustSettings(resetPlayback(custom, 'several'), 'several')).toEqual({
-      preset: 'all-at-once',
+    const picked = withPreset(custom, 'all-at-once', 'several');
+    expect(presetOf(picked, 'several')).toBe('all-at-once');
+    expect(adjustSettings(picked, 'several')).toEqual({ preset: 'all-at-once' });
+    expect(adjustSettings(picked, 'one')).toEqual({ duration: '15', camera: 'fixed' });
+    expect(adjustSettings(withPreset(single, 'highlight', 'one'), 'one')).toEqual({
+      preset: 'highlight',
     });
-    expect(adjustSettings(resetPlayback(custom, 'several'), 'one')).toEqual({
-      duration: '15',
-      camera: 'fixed',
-    });
-    expect(adjustSettings(resetPlayback(single, 'one'), 'one')).toEqual({ preset: 'highlight' });
   });
 
   it('turns Custom when Fine-tune changes a value the preset sets, and only then', () => {

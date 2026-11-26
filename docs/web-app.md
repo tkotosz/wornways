@@ -121,7 +121,8 @@ connection ended asks to connect again.
 5. **Preset.** "How should it play?": the presets these activities can take as cards (the
    drawing, the name and its line), and "Keep my own playback" when the playback was set by
    hand. Asked for a new kind of selection, none is picked; opened from the top bar, the one
-   in use is marked. It is the only place the preset is picked. A preset sets the widgets
+   in use is marked. It is the only place the preset is picked, and picking one starts the
+   playback over from it: what was fine-tuned goes. A preset sets the widgets
    too: another preset than the one in use starts them again from the ones that suit its
    video, over the replay and on the totals card, as does a change to a single activity;
    the preset in use picked again, and "Keep my own playback", keep them.
@@ -162,7 +163,7 @@ drawing each. The editor's settings are remembered for the next visit.
   grouping, time share, group pace, overlap, drawing pace and the camera, built from
   the settings table, starting from the preset's values. Changing the length or one of
   the preset's values makes it Custom ("Custom playback", and "Preset: Custom" in the top
-  bar); picking a preset again goes back to it.
+  bar); picking a preset again starts the playback over from it.
 - **Map:** the street map, and the replay privacy that hides each route's start and
   finish.
 - **Overlay:** what is drawn over the replay, as widgets arranged on the still the way

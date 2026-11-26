@@ -1,7 +1,7 @@
 <script setup lang="ts">
-// How the routes play, past the preset (picked from the top bar): the video's length and
-// Fine-tune playback change the preset's values, which makes it Custom. A summary tells what
-// will play.
+// How the routes play, past the preset (picked from the top bar, which also starts the
+// playback over from it): the video's length and Fine-tune playback change the preset's
+// values, which makes it Custom. A summary tells what will play.
 import { SETTINGS } from '@wornways/engine';
 import { computed, ref } from 'vue';
 import {
@@ -11,7 +11,6 @@ import {
   fineTuned,
   playbackAdjustments,
   presetOf,
-  resetPlayback,
   settingHint,
   valueOf,
   type Adjustments,
@@ -81,13 +80,6 @@ const fineTuneOpen = ref(false);
       view="rows"
       @open="(name, label) => emit('open', name, label)"
     />
-    <button
-      type="button"
-      class="link reset"
-      @click="adjustments = resetPlayback(adjustments, count)"
-    >
-      Reset playback to defaults
-    </button>
   </div>
 
   <!-- One of Fine-tune's settings alone, in a sheet. -->
@@ -171,14 +163,6 @@ const fineTuneOpen = ref(false);
         :groups="PLAYBACK_PANELS"
         :count="count"
       />
-      <button
-        v-if="fineTuneOpen"
-        type="button"
-        class="link"
-        @click="adjustments = resetPlayback(adjustments, count)"
-      >
-        Reset playback to defaults
-      </button>
     </div>
   </div>
 </template>
@@ -279,14 +263,5 @@ const fineTuneOpen = ref(false);
 
 .fine-tune-panels {
   padding: 0 0.8rem 0.8rem;
-}
-
-.fine-tune .link {
-  margin: 0 0.8rem 0.8rem;
-}
-
-.reset {
-  align-self: flex-start;
-  margin-top: 0.8rem;
 }
 </style>

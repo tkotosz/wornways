@@ -145,9 +145,10 @@ export const withoutWidgets = (adjustments: Adjustments): Adjustments =>
   );
 
 /**
- * Picks a preset for this selection size. Another preset sets the widgets too: they start
- * again from the ones that suit the video it makes. The preset in use, picked again, and
- * Custom (the playback kept as set) keep them.
+ * Picks a preset for this selection size, which starts the playback over from it: what was
+ * fine-tuned for this size goes. Another preset sets the widgets too: they start again from
+ * the ones that suit the video it makes; the preset in use, picked again, keeps them. Custom
+ * (the playback kept as set) keeps everything.
  */
 export function withPreset(
   adjustments: Adjustments,
@@ -155,21 +156,13 @@ export function withPreset(
   count: ActivityCount,
 ): Adjustments {
   const key = presetKey(count);
-  const picked = { ...adjustments, [key]: preset };
-  const changed = preset !== 'custom' && preset !== presetOf(adjustments, count);
-  return changed ? withoutWidgets(picked) : picked;
-}
-
-/**
- * Back to the default playback for this selection size: its first preset (see
- * `presetChoices`), with nothing fine-tuned.
- */
-export function resetPlayback(adjustments: Adjustments, count: ActivityCount): Adjustments {
-  const names = new Set([
-    presetKey(count),
-    ...PLAYBACK_SETTINGS.map((name) => adjustmentKey(name, count)),
-  ]);
-  return Object.fromEntries(Object.entries(adjustments).filter(([name]) => !names.has(name)));
+  if (preset === 'custom') return { ...adjustments, [key]: preset };
+  const tuned = new Set(PLAYBACK_SETTINGS.map((name) => adjustmentKey(name, count)));
+  const picked = {
+    ...Object.fromEntries(Object.entries(adjustments).filter(([name]) => !tuned.has(name))),
+    [key]: preset,
+  };
+  return preset === presetOf(adjustments, count) ? picked : withoutWidgets(picked);
 }
 
 /**

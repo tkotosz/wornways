@@ -243,8 +243,7 @@ button.link {
   display: none;
 }
 
-.setting-strip .setting-row,
-.setting-strip .reset {
+.setting-strip .setting-row {
   flex: none;
   flex-direction: column;
   align-items: flex-start;
@@ -275,9 +274,4 @@ button.link {
 
 .setting-strip .setting-row .switch {
   padding: 0;
-}
-
-.setting-strip .reset {
-  color: var(--muted);
-  text-decoration: none;
 }

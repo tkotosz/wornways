@@ -879,11 +879,12 @@ test('offers Highlight for a single activity, and the other presets for several'
     'aria-pressed',
     'true',
   );
-  // Fine-tune the camera, and a value the preset sets, which makes it Custom; then reset.
+  // Fine-tune the camera, and a value the preset sets, which makes it Custom; then the preset
+  // picked again starts over from it.
   await camera.getByRole('button', { name: 'Fixed', exact: true }).click();
   await page.getByTestId('group-timing').getByRole('button', { name: 'Day', exact: true }).click();
   await expect(page.getByTestId('replay-summary')).toContainText('Custom playback');
-  await page.getByRole('button', { name: 'Reset playback to defaults' }).click();
+  await pickPreset(page, 'All at once');
   await expect(preset('All at once')).toBeVisible();
   await expect(camera.getByRole('button', { name: 'Zooms out' })).toHaveAttribute(
     'aria-pressed',
