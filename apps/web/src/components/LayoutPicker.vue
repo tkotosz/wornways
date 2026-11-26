@@ -1,15 +1,18 @@
 <script setup lang="ts">
-// The layouts to arrange the widgets in, as cards with a small drawing of each one's slots on
-// a story frame, its name and what it is. Picking one shows its slots as guides on the
-// picture; Arrange puts the widgets in its slots.
-import { LAYOUTS, LAYOUT_NAMES, layoutSlots, type LayoutName } from '@wornways/engine';
+// The layouts to arrange the widgets in (`names`: over the replay, or the totals card's), as
+// cards with a small drawing of each one's slots on a story frame, its name and what it is.
+// Picking one shows its slots as guides on the picture; Arrange puts the widgets in its slots.
+import { LAYOUTS, layoutSlots, type LayoutName } from '@wornways/engine';
+import { computed } from 'vue';
 
-defineProps<{ layout: LayoutName }>();
+const props = defineProps<{ layout: LayoutName; names: readonly LayoutName[] }>();
 const emit = defineEmits<{ pick: [layout: LayoutName]; arrange: [] }>();
 
 /** Each layout's slots on a story frame, for its drawing. */
-const drawings = Object.fromEntries(
-  LAYOUT_NAMES.map((name) => [name, layoutSlots(name, { width: 1080, height: 1920 })]),
+const drawings = computed(() =>
+  Object.fromEntries(
+    props.names.map((name) => [name, layoutSlots(name, { width: 1080, height: 1920 })]),
+  ),
 );
 </script>
 
@@ -17,7 +20,7 @@ const drawings = Object.fromEntries(
   <div class="layout-picker">
     <div class="cards" role="radiogroup" aria-label="Layout">
       <button
-        v-for="name in LAYOUT_NAMES"
+        v-for="name in names"
         :key="name"
         type="button"
         class="card"

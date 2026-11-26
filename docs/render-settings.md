@@ -320,7 +320,7 @@ are downloaded again.
 
 ### Totals card
 
-For a video of several activities: after the replay, 3.4 s more, before the end card. The
+After the replay, 3.4 s more, before the end card; for one activity too. The
 finished map dims, the video's title comes in with a short orange rule under it, and the
 totals count up, by default the activities (named after the one sport shown, such as
 rides), the kilometers, the hours moving and the meters climbed. Each total is the value a
@@ -344,13 +344,16 @@ record (the climb, the descent and the elevations without elevation, the sensor 
 calories) is left out.
 
 Unless set, the card starts with activities, distance, moving time and climb (`count`,
-`distance`, `moving`, `climb`), each with its icon, without the title, which the map behind it still shows; a
-text widget adds it (`text@50,30`). The values sit up to two
-to a row on a story or square frame, up to four on a wide one, a last short row centered,
-the whole block centered on the frame. In the web app they are arranged on the card in the
-Ending section, as the widgets over the replay are in Overlay.
+`distance`, `moving`, `climb`; for one activity distance, moving time and climb, named
+without "Total"), each with its icon, without the title, which the map behind it still
+shows; a text widget adds it (`text@50,30`). They start in the card's layout
+(`--totals-layout`): `grid-2x2` (the usual), `grid-2x3` and `grid-2x4` (rows of two),
+`column` (one under another) or `row` (side by side, for a wide frame), centered on the frame
+with a slot for the title over them. For one activity the count, the days and the values per
+activity are not offered. In the web app they are arranged on the card in the Ending
+section, as the widgets over the replay are in Overlay.
 
-The recap preset turns it on; any other video of several activities can. In the web app a
+The recap preset turns it on; any other video can. In the web app a
 Custom playback made from Recap keeps it on, and the switch in the Ending section always
 decides over the preset.
 

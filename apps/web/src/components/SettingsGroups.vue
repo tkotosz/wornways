@@ -6,7 +6,6 @@ import { computed } from 'vue';
 import {
   choiceLabel,
   offered,
-  panelOffered,
   startingValue,
   type ActivityCount,
   type Panel,
@@ -15,14 +14,12 @@ import {
   sliderStep,
   type Adjustments,
 } from '../adjust.ts';
-import type { PlanReport } from '../messages.ts';
 import ExactNumber from './ExactNumber.vue';
 
 const props = defineProps<{
   /** The groups to show, in order. */
   groups: Panel[];
   count: ActivityCount;
-  plan?: PlanReport | null;
   /**
    * Phones: `rows` lists the settings, a row each with its value, and `open` asks for one
    * to be shown alone (`only`), in a sheet. Without either, a box per group.
@@ -46,10 +43,7 @@ const GROUP_TITLES: Record<Panel, string> = {
 };
 
 const groups = computed(() =>
-  props.groups
-    .filter((group) => panelOffered(group, props.plan))
-    .map((group) => ({ group, main: offered(group) }))
-    .filter((g) => g.main.length > 0),
+  props.groups.map((group) => ({ group, main: offered(group) })).filter((g) => g.main.length > 0),
 );
 
 /** The value set, else where the preset starts it (the totals card under Recap), else the default. */

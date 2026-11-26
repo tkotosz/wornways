@@ -70,6 +70,15 @@ export const TOTALS_FIELDS: readonly TotalsField[] = METRICS.filter(
 );
 /** The values the totals card shows unless told otherwise, in this order. */
 export const AUTOMATIC_TOTALS: readonly TotalsField[] = ['count', 'distance', 'moving', 'climb'];
+/** The values a single activity's totals card shows unless told otherwise. */
+export const AUTOMATIC_TOTALS_ONE: readonly TotalsField[] = ['distance', 'moving', 'climb'];
+
+/** The values that mean nothing for one activity: the count, the days and the per activity. */
+const SEVERAL_ONLY = (field: TotalsField) =>
+  field === 'count' ||
+  field === 'days' ||
+  field === 'moving-days' ||
+  /^(avg|max|min)-(time|distance|climb|calories)$/.test(field);
 
 export type Totals = {
   activities: number;
@@ -135,7 +144,7 @@ export type TotalsCardOptions = {
   units: Units;
   /**
    * What the card shows, as widgets (see widgets.ts): text, and values (a value widget's
-   * metric is one of `TOTALS_FIELDS`). See `startingTotalsWidgets` for the usual ones.
+   * metric is one of `TOTALS_FIELDS`), at first arranged in the card's layout (layouts.ts).
    */
   widgets: readonly Widget[];
   /** Draw the card without its widgets, for an editor that draws them itself. */
@@ -168,63 +177,6 @@ export function totalsWidgetHeight(widget: Widget, unit: number): number {
 }
 
 /**
- * The widgets a totals card starts with: the title at the top, then the values in rows, up to
- * four to a row on a wide frame and two otherwise, a last short row centered; the dates are
- * too long to share a row, so they get one of their own where they sit in the order. The block
- * is centered on the frame. `fields` are the values to show, in order; `title` whether the
- * video has one.
- */
-export function startingTotalsWidgets(
-  fields: readonly TotalsField[],
-  title: boolean,
-  { width: W, height: H }: { width: number; height: number },
-): Widget[] {
-  const unit = Math.min(W, H) / 1080;
-  const numbers = fields.filter((field) => field !== 'date').length;
-  const perRow = W > H * 1.3 ? Math.min(4, Math.max(1, numbers)) : 2;
-  const rows: { fields: TotalsField[]; dates: boolean }[] = [];
-  for (const field of fields) {
-    const last = rows.at(-1);
-    if (field === 'date') rows.push({ fields: [field], dates: true });
-    else if (last && !last.dates && last.fields.length < perRow) last.fields.push(field);
-    else rows.push({ fields: [field], dates: false });
-  }
-  const gap = 70 * unit;
-  const rowHeight = (dates: boolean) =>
-    (dates ? SIZES.dates : SIZES.value) * unit + SIZES.label * unit + gap;
-  const titleRoom = title ? (SIZES.title + 90) * unit : 0;
-  const blockHeight = titleRoom + rows.reduce((sum, row) => sum + rowHeight(row.dates), 0) - gap;
-  const top = (H - blockHeight) / 2;
-  const columnWidth = Math.min(W * 0.4, (W * 0.86) / perRow);
-
-  const widgets: Widget[] = [];
-  if (title) {
-    const widget: Widget = { kind: 'text', text: null, x: 50, y: 0, size: 100 };
-    widget.y = ((top + totalsWidgetHeight(widget, unit) / 2) / H) * 100;
-    widgets.push(widget);
-  }
-  let rowTop = top + titleRoom;
-  for (const row of rows) {
-    row.fields.forEach((field, column) => {
-      const widget: Widget = {
-        kind: 'metric',
-        metric: field,
-        label: 'under',
-        icon: true,
-        x: 0,
-        y: 0,
-        size: 100,
-      };
-      widget.x = ((W / 2 + (column - (row.fields.length - 1) / 2) * columnWidth) / W) * 100;
-      widget.y = ((rowTop + totalsWidgetHeight(widget, unit) / 2) / H) * 100;
-      widgets.push(widget);
-    });
-    rowTop += rowHeight(row.dates);
-  }
-  return widgets;
-}
-
-/**
  * The values a totals card can show, at their final numbers, by field; a time or a date in
  * each of its formats too.
  */
@@ -235,6 +187,7 @@ export function totalsValues(
 ): Map<TotalsField, MetricValue> {
   const values = new Map<TotalsField, MetricValue>();
   for (const field of TOTALS_FIELDS) {
+    if (totals.activities === 1 && SEVERAL_ONLY(field)) continue;
     const shown = totalsEntry(totals, field, { f: 1, countLabel, units });
     if (!shown) continue;
     const { value, number, label, name } = shown;
@@ -311,6 +264,8 @@ export function totalsEntry(
   const height = (meters: number) =>
     `${wholeNumber(inHeightUnits(meters, units) * f)} ${heightUnit(units)}`;
   const whole = (n: number) => wholeNumber(n * f);
+  /** For several activities a plain value is their total: "Total distance". */
+  const total = (name: string) => (totals.activities > 1 ? `Total ${name.toLowerCase()}` : name);
   const entry = (field: TotalsField, value: string, name: string, label = name.toLowerCase()) => [
     { field, value, number: numberOf(field, value), label, name },
   ];
@@ -359,15 +314,15 @@ export function totalsEntry(
           totals.activities === 1 ? countLabel[0] : countLabel[1],
         );
       case 'time':
-        return entry(field, duration(totals.totalSeconds), 'Total time');
+        return entry(field, duration(totals.totalSeconds), total('Time'));
       case 'moving':
-        return entry(field, duration(totals.movingSeconds), 'Total moving time');
+        return entry(field, duration(totals.movingSeconds), total('Moving time'));
       case 'avg-time':
       case 'max-time':
       case 'min-time':
         return perActivity(field, totals.each.seconds, duration, 'time');
       case 'distance':
-        return entry(field, distance(totals.meters), 'Total distance');
+        return entry(field, distance(totals.meters), total('Distance'));
       case 'avg-distance':
       case 'max-distance':
       case 'min-distance':
@@ -377,11 +332,11 @@ export function totalsEntry(
       case 'max-speed':
         return speed(topSpeed(totals.onFoot, totals.topSpeed, units), 'Max');
       case 'climb':
-        return totals.climbed === null ? [] : entry(field, height(totals.climbed), 'Total climb');
+        return totals.climbed === null ? [] : entry(field, height(totals.climbed), total('Climb'));
       case 'descent':
         return totals.descended === null
           ? []
-          : entry(field, height(totals.descended), 'Total descent');
+          : entry(field, height(totals.descended), total('Descent'));
       case 'avg-climb':
       case 'max-climb':
       case 'min-climb':
@@ -413,7 +368,7 @@ export function totalsEntry(
       case 'calories':
         return totals.calories === null
           ? []
-          : entry(field, `${whole(totals.calories)} kcal`, 'Total calories');
+          : entry(field, `${whole(totals.calories)} kcal`, total('Calories'));
       case 'avg-calories':
       case 'max-calories':
       case 'min-calories':

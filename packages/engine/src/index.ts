@@ -92,12 +92,15 @@ export {
   type IconPart,
 } from './replay/icons.ts';
 export {
+  CARD_LAYOUT_NAMES,
   LAYOUTS,
   LAYOUT_NAMES,
   arrangeInLayout,
   layoutSlots,
+  type CardLayoutName,
   type LayoutName,
   type LayoutSlot,
+  type OverlayLayoutName,
   type SlotKind,
 } from './replay/layouts.ts';
 export {

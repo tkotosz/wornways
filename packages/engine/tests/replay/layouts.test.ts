@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { LAYOUTS, LAYOUT_NAMES, arrangeInLayout, layoutSlots } from '../../src/replay/layouts.ts';
+import {
+  CARD_LAYOUT_NAMES,
+  LAYOUTS,
+  LAYOUT_NAMES,
+  arrangeInLayout,
+  layoutSlots,
+} from '../../src/replay/layouts.ts';
 import { parseSettings } from '../../src/replay/settings.ts';
 import type { Widget } from '../../src/replay/widgets.ts';
 
@@ -48,6 +54,29 @@ describe('layout slots', () => {
       expect(LAYOUTS[name].name).not.toBe('');
       expect(LAYOUTS[name].help).toMatch(/\.$/);
     }
+  });
+});
+
+describe("the totals card's layouts", () => {
+  it('center their values in rows of two, one under another, or side by side', () => {
+    const kinds = (name: Parameters<typeof layoutSlots>[0]) =>
+      layoutSlots(name, story).filter((slot) => slot.kind === 'stat');
+    expect(kinds('grid-2x2')).toHaveLength(4);
+    expect(kinds('grid-2x3')).toHaveLength(6);
+    expect(kinds('grid-2x4')).toHaveLength(8);
+    expect(new Set(kinds('column').map((slot) => slot.x))).toEqual(new Set([50]));
+    expect(new Set(kinds('row').map((slot) => slot.y))).toEqual(new Set([50]));
+    // Centered down the frame.
+    const ys = kinds('grid-2x3').map((slot) => slot.y);
+    expect((Math.min(...ys) + Math.max(...ys)) / 2).toBeCloseTo(50);
+  });
+
+  it('stay inside the frame, also two by four on a wide one', () => {
+    for (const name of CARD_LAYOUT_NAMES)
+      for (const slot of layoutSlots(name, wide)) {
+        expect(slot.y - slot.height / 2).toBeGreaterThanOrEqual(0);
+        expect(slot.y + slot.height / 2).toBeLessThanOrEqual(100);
+      }
   });
 });
 

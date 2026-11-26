@@ -69,7 +69,7 @@ export async function makePoster(
   renderer.renderFrame(last);
   const boxes = scene === 'replay' ? renderer.overlayBoxes() : { widgets: [] };
   // The totals card is for several activities only, as in the video.
-  const totalsCard = scene === 'ending' && settings.totalsCard && selection.tracks.length > 1;
+  const totalsCard = scene === 'ending' && settings.totalsCard;
   if (totalsCard) renderer.drawFinishedCard('totals');
   else if (scene === 'ending' && settings.endCard) renderer.drawFinishedCard('end');
   const image = await (renderer.canvas as unknown as OffscreenCanvas).convertToBlob({

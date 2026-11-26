@@ -43,6 +43,7 @@ describe('parseSettings', () => {
       totalsWidgets: null,
       units: 'metric',
       layout: 'classic',
+      totalsLayout: 'grid-2x2',
       endCard: true,
       watermark: true,
     });

@@ -9,9 +9,20 @@
 
 import { WIDGET_SIZE, type Widget } from './widgets.ts';
 
-export type LayoutName =
+/** A layout over the replay. */
+export type OverlayLayoutName =
   'classic' | 'bottom-row' | 'corner-grid' | 'hero' | 'side-column' | 'story-safe';
-export const LAYOUT_NAMES: readonly LayoutName[] = [
+/** A layout of the totals card: its values as a grid, a column or a row, the title over them. */
+export type CardLayoutName = 'grid-2x2' | 'grid-2x3' | 'grid-2x4' | 'column' | 'row';
+export type LayoutName = OverlayLayoutName | CardLayoutName;
+export const CARD_LAYOUT_NAMES: readonly CardLayoutName[] = [
+  'grid-2x2',
+  'grid-2x3',
+  'grid-2x4',
+  'column',
+  'row',
+];
+export const LAYOUT_NAMES: readonly OverlayLayoutName[] = [
   'classic',
   'bottom-row',
   'corner-grid',
@@ -80,6 +91,88 @@ const stat = (
   align: 'left' | 'center' = across === 'left' ? 'left' : 'center',
   down: PlannedSlot['down'] = 'bottom',
 ): PlannedSlot => ({ kind: 'stat', x, y, width, height, across, down, align });
+
+/**
+ * The totals card's layouts, centered on the frame: the values in rows of two (2x2, 2x3,
+ * 2x4), one under another, or side by side, the title over them. A value is planned 8.5% of a
+ * story frame high, the rows 11.5% apart.
+ */
+function cardLayouts(): Record<
+  CardLayoutName,
+  { name: string; help: string; slots: PlannedSlot[] }
+> {
+  const PITCH = 11.5;
+  const HIGH = 8.5;
+  const centered = (x: number, y: number, width: number): PlannedSlot => ({
+    kind: 'stat',
+    x,
+    y,
+    width,
+    height: HIGH,
+    across: 'middle',
+    down: 'middle',
+    align: 'center',
+  });
+  /** `rows` rows of `columns` values, centered, and the title over them. */
+  const grid = (rows: number, columns: 1 | 2): PlannedSlot[] => {
+    const top = 50 - ((rows - 1) * PITCH) / 2;
+    const xs = columns === 2 ? [29, 71] : [50];
+    return [
+      {
+        kind: 'title',
+        x: 50,
+        y: top - PITCH - 0.5,
+        width: 84,
+        height: 5,
+        across: 'middle',
+        down: 'middle',
+        spans: true,
+      },
+      ...Array.from({ length: rows }, (_, row) =>
+        xs.map((x) => centered(x, top + row * PITCH, columns === 2 ? 38 : 60)),
+      ).flat(),
+    ];
+  };
+  return {
+    'grid-2x2': {
+      name: '2 × 2',
+      help: 'Four values in two rows of two, the title over them.',
+      slots: grid(2, 2),
+    },
+    'grid-2x3': {
+      name: '2 × 3',
+      help: 'Six values in three rows of two, the title over them.',
+      slots: grid(3, 2),
+    },
+    'grid-2x4': {
+      name: '2 × 4',
+      help: 'Eight values in four rows of two, the title over them.',
+      slots: grid(4, 2),
+    },
+    column: {
+      name: 'Column',
+      help: 'Four values one under another, the title over them.',
+      slots: grid(4, 1),
+    },
+    row: {
+      name: 'Row',
+      help: 'Four values side by side, for a wide frame, the title over them.',
+      slots: [
+        {
+          kind: 'title',
+          x: 50,
+          y: 38,
+          width: 84,
+          height: 5,
+          across: 'middle',
+          down: 'middle',
+          spans: true,
+        },
+        ...[14.5, 38.2, 61.8, 85.5].map((x) => centered(x, 50, 22)),
+      ],
+    },
+  };
+}
 
 /** Each layout's name and slots; stats fill the stat slots in order, the first the largest. */
 export const LAYOUTS: Record<LayoutName, { name: string; help: string; slots: PlannedSlot[] }> = {
@@ -155,6 +248,7 @@ export const LAYOUTS: Record<LayoutName, { name: string; help: string; slots: Pl
       { ...bottomChart, y: 50, width: 76, height: 5, down: 'middle' },
     ],
   },
+  ...cardLayouts(),
 };
 
 /** The margin a slot hangs from, in percent of a story frame. */
@@ -173,25 +267,24 @@ export function layoutSlots(
   const kx = short / width;
   const ky = ((short / height) * 16) / 9;
   const place = (at: number, from: number, k: number) => from + (at - from) * k;
-  return LAYOUTS[layout].slots.map((slot) => ({
-    kind: slot.kind,
-    x: slot.spans
+  /** A middle kept so its slot stays inside the frame. */
+  const inside = (at: number, size: number) => Math.min(100 - size / 2, Math.max(size / 2, at));
+  return LAYOUTS[layout].slots.map((slot) => {
+    const w = slot.spans ? slot.width : Math.min(100, slot.width * kx);
+    const h = Math.min(100, slot.height * ky);
+    const x = slot.spans
       ? slot.x
-      : slot.across === 'left'
-        ? place(slot.x, EDGE.left, kx)
-        : slot.across === 'right'
-          ? place(slot.x, EDGE.right, kx)
-          : place(slot.x, 50, kx),
-    y:
-      slot.down === 'top'
-        ? place(slot.y, EDGE.top, ky)
-        : slot.down === 'bottom'
-          ? place(slot.y, EDGE.bottom, ky)
-          : place(slot.y, 50, ky),
-    width: slot.spans ? slot.width : Math.min(100, slot.width * kx),
-    height: Math.min(100, slot.height * ky),
-    align: slot.align ?? 'center',
-  }));
+      : place(slot.x, { left: EDGE.left, middle: 50, right: EDGE.right }[slot.across], kx);
+    const y = place(slot.y, { top: EDGE.top, middle: 50, bottom: EDGE.bottom }[slot.down], ky);
+    return {
+      kind: slot.kind,
+      x: inside(x, w),
+      y: inside(y, h),
+      width: w,
+      height: h,
+      align: slot.align ?? 'center',
+    };
+  });
 }
 
 const sized = (size: number) =>

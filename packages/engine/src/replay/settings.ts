@@ -12,7 +12,13 @@ import { PRESETS, PRESET_NAMES, type Preset } from './presets.ts';
 import type { Grouping } from './plans.ts';
 import { METRICS, SINGLE_ONLY } from './metrics.ts';
 import type { Units } from './formats.ts';
-import { LAYOUTS, LAYOUT_NAMES, type LayoutName } from './layouts.ts';
+import {
+  CARD_LAYOUT_NAMES,
+  LAYOUTS,
+  LAYOUT_NAMES,
+  type CardLayoutName,
+  type OverlayLayoutName,
+} from './layouts.ts';
 import { parseWidgets, type Widget } from './widgets.ts';
 
 export type RenderSettings = {
@@ -80,7 +86,9 @@ export type RenderSettings = {
   /** Distances, heights, speeds and temperatures in metric or imperial units. */
   units: Units;
   /** Where the widgets start when none are set, and the guides shown while arranging them. */
-  layout: LayoutName;
+  layout: OverlayLayoutName;
+  /** The same for the totals card's values. */
+  totalsLayout: CardLayoutName;
 
   // Branding
   /** Whether the video ends with the Wornways card, after the replay. */
@@ -426,8 +434,23 @@ export const SETTINGS: readonly SettingDefinition[] = [
     kind: { type: 'switch' },
     default: false,
     help:
-      `For several activities: their totals after the replay (${TOTALS_CARD_S} s more): ` +
-      'activities, kilometers, hours moving and meters climbed. On with the recap preset.',
+      `The totals after the replay (${TOTALS_CARD_S} s more): for several activities the ` +
+      'activities, the distance, the moving time and the climb; for one the distance, the ' +
+      'moving time and the climb. On with the recap preset.',
+  },
+  {
+    name: 'totals-layout',
+    label: 'Totals card layout',
+    group: 'look',
+    kind: { type: 'choice', choices: [...CARD_LAYOUT_NAMES] },
+    default: 'grid-2x2',
+    help:
+      "Where the totals card's values start when --totals-widgets leaves them to the video, " +
+      'and the guides the web app shows while they are arranged: ' +
+      CARD_LAYOUT_NAMES.map(
+        (name) => `${name} (${LAYOUTS[name].help.toLowerCase().replace(/\.$/, '')})`,
+      ).join('; ') +
+      '.',
   },
   {
     name: 'totals-widgets',
@@ -704,6 +727,7 @@ export function parseSettings(input: SettingsInput): RenderSettings {
     camera: choice<RenderSettings['camera']>('camera'),
     units: choice<RenderSettings['units']>('units'),
     layout: choice<RenderSettings['layout']>('layout'),
+    totalsLayout: choice<RenderSettings['totalsLayout']>('totals-layout'),
     map: flag('map'),
     title: text('title'),
     width,

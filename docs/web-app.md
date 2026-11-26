@@ -210,8 +210,9 @@ drawing each. The editor's settings are remembered for the next visit.
   Under the picture, as in the other sections, a strip of chips: Layout opens the layouts as
   cards with a drawing of each one's slots; the one picked shows its slots on the picture as
   faint dashed boxes while arranging (never in the video), the widgets snapping to their edges
-  and middles, and "Arrange the widgets in it" puts the title, the stats and a chart in its
-  slots, sized to fit. A preset picks its layout with it. Add Text writes a new
+  and middles. Arrange, the chip after it (and a button in the layouts' sheet), puts the
+  title, the stats and a chart in its slots, sized to fit. A preset picks its layout with it.
+  The totals card has the same two chips, with its own layouts. Add Text writes a new
   text; Add Stat opens a sheet of the stats this video can show, grouped by what they
   measure (time, distance, speed, elevation, heart rate, power, cadence, temperature,
   calories, activities; a group only when the video has one of its values), each a tile with
@@ -235,7 +236,7 @@ drawing each. The editor's settings are remembered for the next visit.
   beside it: "+ Add a widget" with the same palette, then a row per widget that opens all
   its settings, then the units and the watermark switch.
 - **Ending:** what comes after the replay: the end pause on the finished picture, the
-  totals card (for several activities only; on for Recap) and the end card. When the
+  totals card (for one activity or several; on for Recap) and the end card. When the
   video has the totals card, the picture is the finished card, drawn without its widgets,
   and the page draws them over it, as in Overlay: at first the usual totals, without the
   title (Add Text puts it back), at the card's sizes (a text over its short orange rule, a total's number over

@@ -1067,10 +1067,19 @@ describe('the totals card', () => {
     expect(withTotals.frameCount).toBe(plain.frameCount + Math.round(3.4 * fps));
   });
 
-  it('is left out for a single activity', () => {
+  it('is shown for a single activity too, with its distance, moving time and climb', () => {
     const single = make([route()], { overlay: 'single', totalsCard: true });
-
-    expect(single.frameCount).toBe(single.replayFrames);
+    expect(single.frameCount).toBe(single.replayFrames + Math.round(3.4 * fps));
+    const { widgets, values } = single.totalsCard();
+    expect(widgets.map((w) => (w.kind === 'metric' ? w.metric : w.kind))).toEqual([
+      'distance',
+      'moving',
+      'climb',
+    ]);
+    // Named as one activity's, and without the values that are for several.
+    expect(values.get('distance')!.name).toBe('Distance');
+    expect(values.has('count')).toBe(false);
+    expect(values.has('avg-distance')).toBe(false);
   });
 
   it('shows the totals over the dimmed map, then the end card fades from it', () => {

@@ -179,6 +179,7 @@ export async function prepareReplay(
     watermark: settings.watermark,
     units: settings.units,
     layout: settings.layout,
+    totalsLayout: settings.totalsLayout,
     onlyFrame,
   });
   return { renderer, plan, title, width, height, fps, camera, cameraMode, map };

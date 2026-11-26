@@ -3,6 +3,7 @@
 // engine's settings table, so they offer the same settings as the command-line tool.
 
 import {
+  CARD_LAYOUT_NAMES,
   LAYOUT_NAMES,
   PRESETS,
   PRESET_NAMES,
@@ -10,8 +11,9 @@ import {
   defaultFormat,
   type ChartColor,
   type ChartKind,
+  type CardLayoutName,
   type LabelMode,
-  type LayoutName,
+  type OverlayLayoutName,
   type Metric,
   type MetricValue,
   type Preset,
@@ -21,7 +23,6 @@ import {
   type ValueFormat,
   type Widget,
 } from '@wornways/engine';
-import type { PlanReport } from './messages.ts';
 
 /** What the person changed in the editor, by setting name; the rest keeps its default. */
 export type Adjustments = Record<string, string | boolean>;
@@ -145,12 +146,22 @@ export const playbackAdjustments = (
 };
 
 /** The settings that hold the widgets: over the replay, and on the totals card. */
-const WIDGET_SETTINGS = ['widgets', 'totals-widgets', 'layout'];
+const WIDGET_SETTINGS = ['widgets', 'totals-widgets', 'layout', 'totals-layout'];
 
 /** The layout the widgets are arranged in: the one picked, else the preset's, else Classic. */
-export function layoutOf(adjustments: Adjustments, count: ActivityCount): LayoutName {
+export function layoutOf(adjustments: Adjustments, count: ActivityCount): OverlayLayoutName {
   const picked = adjustments['layout'] ?? startingValue(adjustments, count, 'layout');
-  return LAYOUT_NAMES.includes(picked as LayoutName) ? (picked as LayoutName) : 'classic';
+  return LAYOUT_NAMES.includes(picked as OverlayLayoutName)
+    ? (picked as OverlayLayoutName)
+    : 'classic';
+}
+
+/** The layout the totals card's values are arranged in: the one picked, else 2 × 2. */
+export function cardLayoutOf(adjustments: Adjustments): CardLayoutName {
+  const picked = adjustments['totals-layout'];
+  return CARD_LAYOUT_NAMES.includes(picked as CardLayoutName)
+    ? (picked as CardLayoutName)
+    : 'grid-2x2';
 }
 
 /** The adjustments without widgets: the video starts from the ones that suit it. */
@@ -328,15 +339,6 @@ const PANELS: Record<Panel, string[]> = {
   totals: ['totals-card'],
   'end-card': ['end-card'],
 };
-
-/**
- * Whether a panel has something to set for this video: the totals card only for several
- * activities. Until the plan is known, the totals card shows.
- */
-export function panelOffered(panel: Panel, plan: PlanReport | null | undefined): boolean {
-  if (panel === 'totals') return !plan || plan.activities > 1;
-  return true;
-}
 
 /** The frame rates offered in the Frame section, from the settings table. */
 export const FRAME_RATES: readonly string[] = (() => {

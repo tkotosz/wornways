@@ -17,9 +17,10 @@ import { arrangeInLayout, layoutSlots, type LayoutName } from './layouts.ts';
 import { END_CARD_S, drawEndCard, endCardFrames } from './end-card.ts';
 import {
   AUTOMATIC_TOTALS,
+  AUTOMATIC_TOTALS_ONE,
+  totalsWidgetHeight,
   TOTALS_CARD_S,
   drawTotalsCard,
-  startingTotalsWidgets,
   totalsCardFrames,
   totalsEntries,
   totalsValues,
@@ -199,6 +200,8 @@ export type RenderOptions = {
   units?: Units;
   /** Where the widgets start when none are set (see layouts.ts). Default classic. */
   layout?: LayoutName;
+  /** Where the totals card's values start when none are set. Default grid-2x2. */
+  totalsLayout?: LayoutName;
 };
 
 export type Renderer = {
@@ -452,7 +455,7 @@ export function createRenderer(
   const replayFrames = Math.round(timeline.duration * fps);
   const pauseFrames = Math.round((options.endPause ?? 0) * fps);
   // The totals card is for several activities only.
-  const totalsFrames = options.totalsCard && kind !== 'single' ? totalsCardFrames(fps) : 0;
+  const totalsFrames = options.totalsCard ? totalsCardFrames(fps) : 0;
   const frameCount =
     replayFrames + pauseFrames + totalsFrames + (options.endCard ? endCardFrames(fps) : 0);
   if (camera && camera.zoom.length < replayFrames)
@@ -1499,10 +1502,25 @@ export function createRenderer(
   const totalsWidgets = (): Widget[] =>
     (totalsLayout ??=
       options.totalsWidgets ??
-      startingTotalsWidgets(
-        totalsEntries(totals(), 1, [singular, plural], AUTOMATIC_TOTALS, units).map((e) => e.field),
-        false,
-        { width: W, height: H },
+      arrangeInLayout(
+        totalsEntries(
+          totals(),
+          1,
+          [singular, plural],
+          kind === 'single' ? AUTOMATIC_TOTALS_ONE : AUTOMATIC_TOTALS,
+          units,
+        ).map((entry): Widget => ({
+          kind: 'metric',
+          metric: entry.field,
+          label: 'under',
+          icon: true,
+          x: 50,
+          y: 50,
+          size: 100,
+        })),
+        layoutSlots(options.totalsLayout ?? 'grid-2x2', { width: W, height: H }),
+        // A value fits its slot by its height: its number shrinks to its column's width.
+        (widget) => ({ width: 0.001, height: totalsWidgetHeight(widget, unit) / H }),
       ));
 
   return {

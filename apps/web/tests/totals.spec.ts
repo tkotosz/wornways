@@ -114,7 +114,10 @@ test('arranges the totals card as widgets: the totals without the title, then mo
   await expect(onCard).toHaveCount(0);
 });
 
-test('offers the totals card for several activities only', async ({ page, context }) => {
+test('offers the totals card for a single activity too, off until switched on', async ({
+  page,
+  context,
+}) => {
   page.setDefaultTimeout(15_000);
   await offlineMap(context);
   await page.goto('/');
@@ -126,5 +129,28 @@ test('offers the totals card for several activities only', async ({ page, contex
   await useActivities(page);
   await openSection(page, 'Ending');
   await expect(page.getByTestId('group-end-card')).toBeVisible();
-  await expect(page.getByTestId('group-totals')).toHaveCount(0);
+  const totals = page.getByTestId('group-totals').getByRole('switch', { name: 'Totals card' });
+  await expect(totals).not.toBeChecked();
+  await totals.check();
+  // Its values are one activity's, arranged in the card's layout, which can be picked.
+  const onCard = page.locator('[data-widget]');
+  await expect(onCard.first()).toContainText('distance');
+  await expect(page.getByRole('button', { name: 'Layout: 2 × 2' })).toBeVisible();
+  await page.getByRole('button', { name: 'Layout: 2 × 2' }).click();
+  const sheet = page.getByRole('dialog', { name: 'Layout' });
+  await sheet.getByRole('radio', { name: 'Column' }).click();
+  await page.keyboard.press('Escape');
+  // Arrange, from the strip: one under another.
+  await page.getByRole('button', { name: 'Arrange the widgets in the layout' }).click();
+  await expect
+    .poll(async () => {
+      const xs = await onCard.evaluateAll((elements) =>
+        elements.map((element) => {
+          const box = element.getBoundingClientRect();
+          return Math.round(box.left + box.width / 2);
+        }),
+      );
+      return new Set(xs).size;
+    })
+    .toBe(1);
 });

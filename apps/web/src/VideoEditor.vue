@@ -12,12 +12,15 @@
 // picked widget turns it into that widget's options (WidgetStrip); wide screens have that
 // strip under the picture.
 import {
+  CARD_LAYOUT_NAMES,
   LAYOUTS,
+  LAYOUT_NAMES,
   METRICS,
   TOTALS_FIELDS,
   parseWidgets,
   widgetsText,
   type ChartKind,
+  type LayoutName,
   type Metric,
   type MetricValue,
   type SettingsInput,
@@ -27,6 +30,7 @@ import { computed, onBeforeUnmount, ref } from 'vue';
 import {
   SECTIONS,
   WIDGET_PART_NAMES,
+  cardLayoutOf,
   countOf,
   layoutOf,
   widgetLabel,
@@ -225,18 +229,29 @@ function writeText(text: string): void {
 /** The charts these activities can show, offered over the replay; none on the totals card. */
 const charts = computed(() => (board.value === 'overlay' ? (props.plan?.charts ?? []) : []));
 
-function useTool(tool: 'text' | 'values' | 'charts' | 'layout'): void {
+function useTool(tool: 'text' | 'values' | 'charts' | 'layout' | 'arrange'): void {
   if (tool === 'text') {
     // A new text, written straight away; left empty, it goes again.
     editingText.value = addWidget({ kind: 'text', text: '', x: 50, y: 50, size: 100 });
   } else if (tool === 'values') {
     sheet.value = { name: 'values', label: board.value === 'totals' ? 'Totals' : 'Stats' };
   } else if (tool === 'charts') sheet.value = { name: 'charts', label: 'Charts' };
+  else if (tool === 'arrange') editor.value?.arrange();
   else sheet.value = { name: 'layout', label: 'Layout' };
 }
 
-/** The layout the widgets over the replay are arranged in, its slots shown as guides. */
-const layout = computed(() => layoutOf(adjustments.value, countOf(props.activities)));
+/**
+ * The layout the board's widgets are arranged in, its slots shown as guides: over the replay
+ * or on the totals card.
+ */
+const layout = computed<LayoutName>(() =>
+  board.value === 'totals'
+    ? cardLayoutOf(adjustments.value)
+    : layoutOf(adjustments.value, countOf(props.activities)),
+);
+/** The layouts the board can take, and the setting that holds the one picked. */
+const layouts = computed(() => (board.value === 'totals' ? CARD_LAYOUT_NAMES : LAYOUT_NAMES));
+const layoutSetting = computed(() => (board.value === 'totals' ? 'totals-layout' : 'layout'));
 /** The picture's editor, which measures the widgets to arrange them. */
 const editor = ref<InstanceType<typeof WidgetEditor> | null>(null);
 
@@ -273,7 +288,7 @@ function arrangeInLayout(): void {
             :profiles="drawn?.profiles ?? {}"
             :size="size"
             :card="board === 'totals'"
-            :layout="board === 'overlay' ? layout : undefined"
+            :layout="layout"
             @change="setWidgets"
             @edit="editingText = $event"
           />
@@ -310,7 +325,7 @@ function arrangeInLayout(): void {
         :card="board === 'totals'"
         :values="values"
         :charts="charts.length > 0"
-        :layout="board === 'overlay' ? LAYOUTS[layout].name : undefined"
+        :layout="LAYOUTS[layout].name"
         @done="selectedWidget = null"
         @tool="useTool"
         @edit="editingText = $event"
@@ -325,7 +340,6 @@ function arrangeInLayout(): void {
             v-model="adjustments"
             :groups="['pause', 'totals']"
             :count="countOf(activities)"
-            :plan="plan"
             view="rows"
             @open="openSetting"
           />
@@ -334,7 +348,6 @@ function arrangeInLayout(): void {
           v-model="adjustments"
           :groups="board === 'totals' ? ['units', 'end-card'] : current.panels"
           :count="countOf(activities)"
-          :plan="plan"
           view="rows"
           @open="openSetting"
         />
@@ -344,7 +357,6 @@ function arrangeInLayout(): void {
         v-model="adjustments"
         :groups="current.panels"
         :count="countOf(activities)"
-        :plan="plan"
         view="rows"
         @open="openSetting"
       />
@@ -424,7 +436,7 @@ function arrangeInLayout(): void {
               :profiles="drawn?.profiles ?? {}"
               :size="size"
               :card="board === 'totals'"
-              :layout="board === 'overlay' ? layout : undefined"
+              :layout="layout"
               @change="setWidgets"
               @edit="editingText = $event"
             />
@@ -438,7 +450,7 @@ function arrangeInLayout(): void {
             :card="board === 'totals'"
             :values="values"
             :charts="charts.length > 0"
-            :layout="board === 'overlay' ? LAYOUTS[layout].name : undefined"
+            :layout="LAYOUTS[layout].name"
             @done="selectedWidget = null"
             @tool="useTool"
             @edit="editingText = $event"
@@ -471,7 +483,6 @@ function arrangeInLayout(): void {
             v-model="adjustments"
             :groups="current.panels"
             :count="countOf(activities)"
-            :plan="plan"
           />
         </template>
       </div>
@@ -490,7 +501,8 @@ function arrangeInLayout(): void {
     <LayoutPicker
       v-if="sheet.name === 'layout'"
       :layout="layout"
-      @pick="adjustments = { ...adjustments, layout: $event }"
+      :names="layouts"
+      @pick="adjustments = { ...adjustments, [layoutSetting]: $event }"
       @arrange="arrangeInLayout"
     />
     <AddWidget
@@ -525,7 +537,6 @@ function arrangeInLayout(): void {
       v-model="adjustments"
       :groups="current.panels"
       :count="countOf(activities)"
-      :plan="plan"
       :only="sheet.name"
     />
   </SettingSheet>
