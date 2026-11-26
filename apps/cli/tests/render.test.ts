@@ -686,6 +686,42 @@ describe('widgets', () => {
     expect(at(true)).toBeGreaterThan(at(false) * 1.2);
   });
 
+  it("keeps a value's icon in place while its number counts", () => {
+    // A ride over 10 km, so the distance gains a digit as it counts.
+    const long = route();
+    for (let i = 0; i < long.points.length / STRIDE; i++) long.points[i * STRIDE] = 19 + i * 0.0012;
+    const renderer = createRenderer(
+      [long],
+      chronologicalTimeline([5_000], { duration: 2 }),
+      (w, h) => createCanvas(w, h) as unknown as CanvasLike,
+      {
+        width,
+        height,
+        fps: 10,
+        overlay: 'single',
+        widgets: [
+          { kind: 'metric', metric: 'distance', label: 'off', icon: true, x: 50, y: 50, size: 150 },
+        ],
+      },
+    );
+    /** The leftmost white pixel in the widget's band: the icon's left edge. */
+    const leftmost = () => {
+      const context = renderer.canvas.getContext('2d') as Context2DLike;
+      const { data } = context.getImageData(0, height * 0.45, width, height * 0.1);
+      const row = width * 4;
+      let left = width;
+      for (let i = 0; i < data.length; i += 4)
+        if (data[i]! > 200 && data[i + 1]! > 200 && data[i + 2]! > 200)
+          left = Math.min(left, (i % row) / 4);
+      return left;
+    };
+    renderer.renderFrame(0);
+    renderer.renderFrame(1);
+    const early = leftmost();
+    for (let f = 2; f < renderer.replayFrames; f++) renderer.renderFrame(f);
+    expect(leftmost()).toBe(early);
+  });
+
   it('draws every icon', () => {
     const canvas = createCanvas(40, 40) as unknown as CanvasLike;
     const context = canvas.getContext('2d') as Context2DLike;

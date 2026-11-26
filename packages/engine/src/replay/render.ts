@@ -1202,6 +1202,30 @@ export function createRenderer(
     });
   }
 
+  /** Each value widget's line at its widest, at the start or at the end, in its font. */
+  const widestLines = new Map<Widget, number>();
+  /** A value widget's line at its widest, the context's font set to its value's. */
+  function widestLine(widget: Widget & { kind: 'metric' }): number {
+    let widest = widestLines.get(widget);
+    if (widest === undefined) {
+      widest = 0;
+      for (const values of [startValues, finalValues]) {
+        const value = values.get(widget.metric);
+        if (!value) continue;
+        const { line } = valueLines(
+          value,
+          widget.label,
+          widget.format,
+          widget.labelText,
+          widget.unit,
+        );
+        widest = Math.max(widest, ctx.measureText(line).width);
+      }
+      widestLines.set(widget, widest);
+    }
+    return widest;
+  }
+
   /**
    * Draws one widget in its box: text, a value with its words, or the climb profile. Text has
    * a soft shadow around its letters, so it reads on a busy map without darkening the frame.
@@ -1238,9 +1262,11 @@ export function createRenderer(
       ctx.fillStyle = 'rgba(255, 255, 255, 0.94)';
       const baseline = top + VALUE_SIZE * scale * 0.95;
       if (widget.icon) {
-        // The icon and the line together centered.
+        // The icon and the line centered as the line is at its widest, so the icon stays in
+        // place while the number counts; the line starts after it.
         const size = VALUE_SIZE * scale;
-        const left = cx - (iconRoom(size) + ctx.measureText(line).width) / 2;
+        const widest = Math.max(ctx.measureText(line).width, widestLine(widget));
+        const left = cx - (iconRoom(size) + widest) / 2;
         const textX = drawIconBefore(ctx, iconOf(widget.metric), left, baseline, size);
         ctx.textAlign = 'left';
         ctx.fillText(line, textX, baseline);

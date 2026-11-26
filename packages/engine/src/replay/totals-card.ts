@@ -422,10 +422,10 @@ export function drawTotalsCard(
   const f = easeOut(progress(t, TIMING.count.at, TIMING.count.length));
   /** The widgets with something to show: a text, or a value the activities have. */
   const shown = widgets.flatMap(
-    (widget): { widget: Widget; text: string; entry: TotalsEntry | null }[] => {
+    (widget): { widget: Widget; text: string; entry: TotalsEntry | null; widest: string }[] => {
       if (widget.kind === 'text') {
         const text = widget.text ?? title;
-        return text ? [{ widget, text, entry: null }] : [];
+        return text ? [{ widget, text, entry: null, widest: text }] : [];
       }
       const entry =
         widget.kind === 'metric'
@@ -441,7 +441,16 @@ export function drawTotalsCard(
       if (widget.kind !== 'metric') return [];
       const label = widget.labelText ?? entry.label;
       const value = widget.unit === false ? entry.number : entry.value;
-      return [{ widget, text: '', entry: { ...entry, label, value } }];
+      // Its number at the end of the count, which it is laid out by, so nothing moves as the
+      // number counts up.
+      const final = totalsEntry(totals, widget.metric as TotalsField, {
+        f: 1,
+        countLabel,
+        units,
+        format: widget.format,
+      })!;
+      const widest = widget.unit === false ? final.number : final.value;
+      return [{ widget, text: '', entry: { ...entry, label, value }, widest }];
     },
   );
   if (shown.length === 0) return;
@@ -480,7 +489,7 @@ export function drawTotalsCard(
   ctx.textAlign = 'center';
   ctx.textBaseline = 'alphabetic';
   let order = 0;
-  for (const { widget, text, entry } of shown) {
+  for (const { widget, text, entry, widest } of shown) {
     const scale = widget.size / 100;
     const x = (widget.x / 100) * W;
     const widgetTop = topOf(widget);
@@ -523,12 +532,13 @@ export function drawTotalsCard(
         ctx.fillText(entry.value, x, y);
         return;
       }
-      // The icon and the number together centered, both smaller when too wide.
+      // The icon and the number centered as the number ends, both smaller when too wide; the
+      // icon stays in place while the number counts up after it.
       ctx.font = `700 ${Math.round(size)}px ${fontFamily}`;
-      const k = Math.min(1, width / (iconRoom(size) + ctx.measureText(entry.value).width));
+      const k = Math.min(1, width / (iconRoom(size) + ctx.measureText(widest).width));
       const fontSize = size * k;
       ctx.font = `700 ${Math.round(fontSize)}px ${fontFamily}`;
-      const left = x - (iconRoom(fontSize) + ctx.measureText(entry.value).width) / 2;
+      const left = x - (iconRoom(fontSize) + ctx.measureText(widest).width) / 2;
       const textX = drawIconBefore(ctx, icon, left, y, fontSize);
       ctx.textAlign = 'left';
       ctx.fillText(entry.value, textX, y);
@@ -547,7 +557,8 @@ export function drawTotalsCard(
     } else if (mode === 'above') {
       words(widgetTop + labelSize + rise);
       number(widgetTop + labelSize * (1 + DESCENT) + gap + size + rise);
-    } else drawBeside(entry, mode, icon, x, widgetTop + size + rise, size, labelSize, width);
+    } else
+      drawBeside(entry, widest, mode, icon, x, widgetTop + size + rise, size, labelSize, width);
   }
   ctx.globalAlpha = 1;
 
@@ -558,6 +569,7 @@ export function drawTotalsCard(
    */
   function drawBeside(
     entry: TotalsEntry,
+    widest: string,
     mode: 'before' | 'after',
     icon: IconName | null,
     x: number,
@@ -570,7 +582,8 @@ export function drawTotalsCard(
     const wordsFont = (k: number) => `500 ${Math.round(labelSize * k)}px ${fontFamily}`;
     const measure = (k: number) => {
       ctx.font = numberFont(k);
-      const n = ctx.measureText(entry.value).width;
+      // Laid out by the number as it ends, so nothing moves while it counts up.
+      const n = ctx.measureText(widest).width;
       ctx.font = wordsFont(k);
       const w = ctx.measureText(entry.label).width;
       return { n, w, space: labelSize * k * 0.35, room: icon ? iconRoom(size * k) : 0 };
