@@ -127,7 +127,10 @@ connection ended asks to connect again.
    playback over from it: what was fine-tuned goes. A preset sets the widgets
    too: another preset than the one in use starts them again from the ones that suit its
    video, over the replay and on the totals card, as does a change to a single activity;
-   the preset in use picked again, and "Keep my own playback", keep them.
+   the preset in use picked again, and "Keep my own playback", keep them. Opened from the
+   top bar under a preset, "Reset to" the preset puts the video back as the preset starts it
+   (its playback, the widgets, the layout and the totals card), the frame, units, map and
+   ending kept; it asks once more, with Cancel, before it does.
 6. **Render.** Render makes the video at once: a stage in the video's shape with its
    progress, and Cancel in the footer; then the video itself, playing, with Download and,
    where the browser can share files (mostly on phones), Share, which hands the video to

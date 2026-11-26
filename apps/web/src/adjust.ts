@@ -181,6 +181,27 @@ export function withPreset(
 }
 
 /**
+ * The adjustments put back as `preset` starts them: its playback, and the widgets, the layout
+ * and its other settings (the totals card) its own again. The person's other choices stay: the
+ * frame, the units, the map, the privacy trim, the watermark, the end pause and the end card.
+ */
+export function resetToPreset(
+  adjustments: Adjustments,
+  preset: Preset,
+  count: ActivityCount,
+): Adjustments {
+  // The settings the preset starts, and the totals card's switch, which one preset sets.
+  const own = [...Object.keys(presetStarting(preset)), 'totals-card'];
+  return withoutWidgets(
+    Object.fromEntries(
+      Object.entries(withPreset(adjustments, preset, count)).filter(
+        ([name]) => !own.includes(name),
+      ),
+    ),
+  );
+}
+
+/**
  * The adjustments after editing the effective values under Fine-tune. Changing a setting the preset sets turns
  * the preset into Custom, starting from its values (also those of other sections, such as
  * the totals card, where the person has not set them); any other change keeps the preset.

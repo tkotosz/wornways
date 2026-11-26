@@ -229,6 +229,35 @@ test('shows a layout as guides, and arranges the widgets in it', async ({ page, 
   expect(Math.min(...middles)).toBeGreaterThan(Math.min(...slots));
 });
 
+test('resets the video to its preset from the preset popup, asked once more', async ({
+  page,
+  context,
+}) => {
+  page.setDefaultTimeout(15_000);
+  await offlineMap(context);
+  await openOverlay(page);
+  const count = await page.locator('[data-widget]').count();
+  const start = (await outline(page, 1).boundingBox())!;
+  // Moved, and a stat removed.
+  await outline(page, 1).focus();
+  await page.keyboard.press('Shift+ArrowUp');
+  await outline(page, 2).focus();
+  await page.keyboard.press('Delete');
+  await expect(page.locator('[data-widget]')).toHaveCount(count - 1);
+
+  await page.getByRole('button', { name: /^Preset: / }).click();
+  const popup = page.getByRole('dialog', { name: 'How should it play?' });
+  await popup.getByRole('button', { name: 'Reset to Recap' }).click();
+  // Cancel leaves it; Reset puts it back.
+  await popup.getByRole('button', { name: 'Cancel' }).click();
+  await popup.getByRole('button', { name: 'Reset to Recap' }).click();
+  await expect(popup).toContainText('start over as Recap sets them');
+  await popup.getByRole('button', { name: 'Reset', exact: true }).click();
+  await expect(popup).toBeHidden();
+  await expect(page.locator('[data-widget]')).toHaveCount(count);
+  await expect.poll(async () => (await outline(page, 1).boundingBox())!.y).toBeCloseTo(start.y, 0);
+});
+
 test('moves, resizes and removes a picked widget with the keyboard', async ({ page, context }) => {
   page.setDefaultTimeout(15_000);
   await offlineMap(context);

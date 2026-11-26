@@ -7,6 +7,7 @@ import {
   offered,
   presetChoices,
   presetOf,
+  resetToPreset,
   settingLabel,
   startingValue,
   valueOf,
@@ -238,6 +239,33 @@ describe('presets', () => {
     expect(adjustSettings({ 'totals-card': true }, 'several')).toEqual({
       preset: 'all-at-once',
       'totals-card': true,
+    });
+  });
+
+  it('resets to a preset: its playback, widgets, layout and totals card, the rest kept', () => {
+    const tuned = {
+      preset: 'recap',
+      duration: '20',
+      widgets: 'distance@50,50',
+      'totals-widgets': 'count@50,40',
+      layout: 'hero',
+      'totals-card': false,
+      units: 'imperial',
+      size: '1080x1080',
+      'end-pause': '2',
+    };
+    expect(resetToPreset(tuned, 'recap', 'several')).toEqual({
+      preset: 'recap',
+      units: 'imperial',
+      size: '1080x1080',
+      'end-pause': '2',
+    });
+    // From Custom, to the preset picked.
+    expect(resetToPreset({ ...tuned, preset: 'custom' }, 'all-at-once', 'several')).toEqual({
+      preset: 'all-at-once',
+      units: 'imperial',
+      size: '1080x1080',
+      'end-pause': '2',
     });
   });
 
