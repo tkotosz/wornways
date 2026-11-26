@@ -906,6 +906,38 @@ describe('the elevation profile', () => {
     expect(orangeAtTheBottom(hill(true), chart)).toBe(0);
   });
 
+  it("draws a chart's icon at its left end when asked, in the chart's color", () => {
+    const at = (icon: boolean) => {
+      const renderer = createRenderer(
+        [hill(true)],
+        chronologicalTimeline([5_000], { duration: 2 }),
+        (w, h) => createCanvas(w, h) as unknown as CanvasLike,
+        {
+          width,
+          height,
+          fps: 10,
+          overlay: 'single',
+          // White, which the pixels counted are.
+          widgets: [
+            { kind: 'chart', chart: 'elevation', color: 'white', icon, x: 50, y: 93, size: 100 },
+          ],
+        },
+      );
+      for (let f = 0; f < 10; f++) renderer.renderFrame(f);
+      const box = renderer.overlayBoxes().widgets[0]!;
+      const [left, top, bottom] = [box.x * width, box.y * height, (box.y + box.height) * height];
+      // The left end of the chart, as wide as the icon would be.
+      return textPixels(
+        renderer.canvas,
+        Math.round(left),
+        Math.round(top),
+        Math.round(left + (bottom - top) * 0.5),
+        Math.round(bottom),
+      );
+    };
+    expect(at(true)).toBeGreaterThan(at(false) + 10);
+  });
+
   it('shows under a single activity with elevation, unless the widgets leave it out', () => {
     expect(orangeAtTheBottom(hill(true))).toBeGreaterThan(200);
     expect(orangeAtTheBottom(hill(true), [])).toBe(0);

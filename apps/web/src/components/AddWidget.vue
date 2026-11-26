@@ -9,6 +9,7 @@
 // the middle of the picture (a chart along the bottom).
 import {
   chartColors,
+  chartIcon,
   defaultChartColor,
   defaultLabel,
   type ChartKind,
@@ -17,7 +18,7 @@ import {
   type Widget,
 } from '@wornways/engine';
 import { computed } from 'vue';
-import { CHARTS, METRIC_GROUPS, metricName } from '../adjust.ts';
+import { CHART_NAMES, METRIC_GROUPS, metricName } from '../adjust.ts';
 import StatIcon from './StatIcon.vue';
 
 const props = defineProps<{
@@ -77,9 +78,9 @@ const groups = computed(() =>
           @click="emit('add', { kind: 'chart', chart, x: 50, y: 88, size: 100 })"
         >
           <b :style="{ color: `rgb(${chartColors(defaultChartColor(chart)).line})` }">
-            <StatIcon :icon="CHARTS[chart].icon" />
+            <StatIcon :icon="chartIcon(chart)" />
           </b>
-          <span>{{ CHARTS[chart].name }}</span>
+          <span>{{ CHART_NAMES[chart] }}</span>
         </button>
       </div>
     </section>

@@ -19,6 +19,7 @@
 import {
   WIDGET_SIZE,
   chartColors,
+  chartIcon,
   defaultChartColor,
   iconOf,
   labelTextOf,
@@ -428,28 +429,29 @@ const story = computed(() => props.size.width / props.size.height < 0.8);
           <span v-if="textOf(widget)!.under" class="words">{{ textOf(widget)!.under }}</span>
         </template>
       </span>
-      <svg
+      <span
         v-else-if="widget.kind === 'chart'"
-        class="chart"
-        viewBox="0 0 100 100"
-        preserveAspectRatio="none"
-        aria-hidden="true"
+        class="chart-box"
+        :style="{ color: `rgb(${colorsOf(widget).line})` }"
       >
-        <defs>
-          <linearGradient :id="`chart-fill-${index}`" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0" :stop-color="`rgba(${colorsOf(widget).fill}, 0.55)`" />
-            <stop offset="1" :stop-color="`rgba(${colorsOf(widget).fill}, 0.12)`" />
-          </linearGradient>
-        </defs>
-        <path :d="chartPath(widget.chart)" :fill="`url(#chart-fill-${index})`" />
-        <path
-          :d="chartPath(widget.chart)"
-          fill="none"
-          :stroke="`rgb(${colorsOf(widget).line})`"
-          stroke-width="1.5"
-          vector-effect="non-scaling-stroke"
-        />
-      </svg>
+        <StatIcon v-if="widget.icon" class="chart-icon" :icon="chartIcon(widget.chart)" />
+        <svg class="chart" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+          <defs>
+            <linearGradient :id="`chart-fill-${index}`" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" :stop-color="`rgba(${colorsOf(widget).fill}, 0.55)`" />
+              <stop offset="1" :stop-color="`rgba(${colorsOf(widget).fill}, 0.12)`" />
+            </linearGradient>
+          </defs>
+          <path :d="chartPath(widget.chart)" :fill="`url(#chart-fill-${index})`" />
+          <path
+            :d="chartPath(widget.chart)"
+            fill="none"
+            :stroke="`rgb(${colorsOf(widget).line})`"
+            stroke-width="1.5"
+            vector-effect="non-scaling-stroke"
+          />
+        </svg>
+      </span>
 
       <span class="name" aria-hidden="true">{{ widgetLabel(widget, values) }}</span>
       <template v-if="selected === index && !moving">
@@ -535,10 +537,27 @@ const story = computed(() => props.size.width / props.size.height < 0.8);
   line-height: 1.3;
 }
 
-.chart {
-  display: block;
+/* A chart, after its icon when it shows one: as the engine sets it, half the chart's height
+   and 0.45 of that after it. */
+.chart-box {
+  display: flex;
+  align-items: center;
   width: min(100cqw, calc(86cqw * var(--size)));
   height: calc(var(--unit) * 80 * var(--size) * 1cqw);
+}
+
+.chart {
+  display: block;
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+}
+
+.chart-box .chart-icon {
+  flex: none;
+  width: calc(var(--unit) * 40 * var(--size) * 1cqw);
+  height: calc(var(--unit) * 40 * var(--size) * 1cqw);
+  margin: 0 calc(var(--unit) * 18 * var(--size) * 1cqw) 0 0;
 }
 
 /* On the totals card, its sizes (a value's number smaller for the dates), with no shadow: a

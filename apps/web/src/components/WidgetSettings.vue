@@ -155,7 +155,10 @@ const shows = (part: WidgetPart) => !props.only || props.only === part;
         Use the usual words, “{{ usualWords }}”
       </button>
     </div>
-    <label v-if="!only && widget.kind === 'metric'" class="field icon-switch">
+    <label
+      v-if="!only && (widget.kind === 'metric' || widget.kind === 'chart')"
+      class="field icon-switch"
+    >
       <span class="label">Icon</span>
       <span class="switch">
         <input

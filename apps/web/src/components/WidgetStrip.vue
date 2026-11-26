@@ -132,7 +132,7 @@ const format = computed(() => (picked.value ? formatOf(picked.value, props.card)
       <span>Color</span>
       <span class="value">{{ COLOR_NAMES[picked.color ?? defaultChartColor(picked.chart)] }}</span>
     </button>
-    <label v-if="picked.kind === 'metric'" class="setting-row">
+    <label v-if="picked.kind === 'metric' || picked.kind === 'chart'" class="setting-row">
       <span>Icon</span>
       <span class="switch">
         <input

@@ -48,6 +48,8 @@ export type Widget = { x: number; y: number; size: number } & (
       chart: ChartKind;
       /** Its color; left out, the chart's own (see charts.ts). */
       color?: ChartColor;
+      /** True to draw its kind's icon at its left end, in its color. */
+      icon?: boolean;
     }
 );
 
@@ -176,14 +178,17 @@ export function parseWidgets(
         else fail(`"${name}" takes ${takes.join(', ')}, not "${token}"`);
       }
     } else if (text[i] === ':' && chart && CHART_KINDS.some((kind) => name === `${kind}-chart`)) {
-      // A chart's color.
-      i++;
-      const colorStart = i;
-      while (i < text.length && /[a-z]/.test(text[i]!)) i++;
-      const token = text.slice(colorStart, i);
-      if (!CHART_COLORS.includes(token as ChartColor))
-        fail(`"${name}" takes the color ${CHART_COLORS.join(', ')}, not "${token}"`);
-      chartColor = token as ChartColor;
+      // A chart's color and icon, each once, in either order.
+      while (text[i] === ':') {
+        i++;
+        const tokenStart = i;
+        while (i < text.length && /[a-z]/.test(text[i]!)) i++;
+        const token = text.slice(tokenStart, i);
+        if (chartColor === null && CHART_COLORS.includes(token as ChartColor))
+          chartColor = token as ChartColor;
+        else if (token === 'icon' && !icon) icon = true;
+        else fail(`"${name}" takes the color ${CHART_COLORS.join(', ')} or icon, not "${token}"`);
+      }
     } else if (text[i] === ':' && name === 'text') {
       i++;
       own = quoted();
@@ -208,6 +213,7 @@ export function parseWidgets(
         kind: 'chart',
         chart: name.slice(0, -'-chart'.length) as ChartKind,
         ...(chartColor ? { color: chartColor } : {}),
+        ...(icon ? { icon: true } : {}),
         x,
         y,
         size,
@@ -254,6 +260,7 @@ export function widgetsText(widgets: Widget[], { card = false }: { card?: boolea
         widget.color !== defaultChartColor(widget.chart)
       )
         text += `:${widget.color}`;
+      if (widget.kind === 'chart' && widget.icon) text += ':icon';
       if (widget.kind === 'metric') {
         if (widget.label !== defaultLabel(widget.metric)) text += `:${widget.label}`;
         if (widget.labelText !== undefined) text += `:${quote(widget.labelText)}`;

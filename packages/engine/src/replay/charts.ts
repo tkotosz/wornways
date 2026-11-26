@@ -6,6 +6,7 @@
 
 import { distanceM } from '../track/geo.ts';
 import { STRIDE, type Track } from '../track/types.ts';
+import type { IconName } from './icons.ts';
 import type { Context2DLike } from './render.ts';
 
 /** What a chart shows. */
@@ -56,6 +57,23 @@ const CHARTS: Record<ChartKind, { minRange: number; smoothing: number; color: Ch
   speed: { minRange: 3, smoothing: 6, color: 'blue' },
   cadence: { minRange: 20, smoothing: 4, color: 'green' },
 };
+
+/**
+ * A chart's icon, when it shows one: its size as a part of the chart's height, and the gap
+ * after it as a part of its size.
+ */
+export const CHART_ICON = 0.5;
+export const CHART_ICON_GAP = 0.45;
+
+/** The icon a chart shows when asked: the one its kind of stat has (see icons.ts). */
+export const chartIcon = (chart: ChartKind): IconName =>
+  ({
+    elevation: 'mountain',
+    'heart-rate': 'heart',
+    power: 'bolt',
+    speed: 'gauge',
+    cadence: 'crank',
+  })[chart] as IconName;
 
 /** A chart's color unless one is picked. */
 export const defaultChartColor = (chart: ChartKind): ChartColor => CHARTS[chart].color;

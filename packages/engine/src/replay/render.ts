@@ -1,6 +1,10 @@
 import { drawBasemap, type Basemap, type MapLabel, type Tile } from '../map/basemap.ts';
 import { levelsFor, mapLevelViews, type CameraPath, type LevelWindow } from './camera.ts';
 import {
+  CHART_ICON,
+  CHART_ICON_GAP,
+  chartColors,
+  chartIcon,
   chartProfile,
   chartProfiles,
   defaultChartColor,
@@ -25,7 +29,7 @@ import { averagePace, isOnFoot, topSpeed } from './pace.ts';
 import { sensorValueText } from './sensor-text.ts';
 import { numberOf, type Metric, type MetricText, type MetricValue } from './metrics.ts';
 import { calendarDay } from './plans.ts';
-import { drawIconBefore, iconOf, iconRoom } from './icons.ts';
+import { drawIcon, drawIconBefore, iconOf, iconRoom } from './icons.ts';
 import {
   CLOCK_FORMATS,
   DATE_FORMATS,
@@ -1219,12 +1223,22 @@ export function createRenderer(
         ctx.fillText(under, cx, box.y0 + VALUE_SIZE * scale * 1.1 + LABEL_SIZE * scale);
       }
     } else if (widget.kind === 'chart' && profiles.get(widget.chart)) {
+      const color = widget.color ?? defaultChartColor(widget.chart);
+      const height = box.y1 - box.y0;
+      // Its icon at its left end, in its color, the chart after it.
+      let left = box.x0;
+      if (widget.icon) {
+        const size = height * CHART_ICON;
+        ctx.fillStyle = `rgb(${chartColors(color).line})`;
+        drawIcon(ctx, chartIcon(widget.chart), left, box.y0 + (height - size) / 2, size);
+        left += size * (1 + CHART_ICON_GAP);
+      }
       ctx.shadowColor = 'rgba(0, 0, 0, 0)';
       drawChart(
         ctx,
         profiles.get(widget.chart)!,
-        widget.color ?? defaultChartColor(widget.chart),
-        { x: box.x0, y: box.y0, width: box.x1 - box.x0, height: box.y1 - box.y0 },
+        color,
+        { x: left, y: box.y0, width: box.x1 - left, height },
         prepared.map((tr) => ({
           meters: tr.started ? tr.metres : 0,
           // One activity keeps its dot, also at the finish; several show theirs while moving.

@@ -94,8 +94,11 @@ export {
 } from './replay/icons.ts';
 export {
   CHART_COLORS,
+  CHART_ICON,
+  CHART_ICON_GAP,
   CHART_KINDS,
   chartColors,
+  chartIcon,
   chartsOf,
   defaultChartColor,
   type ChartColor,

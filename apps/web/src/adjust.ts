@@ -9,7 +9,6 @@ import {
   defaultFormat,
   type ChartColor,
   type ChartKind,
-  type IconName,
   type LabelMode,
   type Metric,
   type MetricValue,
@@ -536,13 +535,13 @@ export const FORMAT_NAMES: Record<ValueFormat, string> = {
 export const formatOf = (widget: Widget, card: boolean): ValueFormat | null =>
   widget.kind === 'metric' ? (widget.format ?? defaultFormat(widget.metric, card)) : null;
 
-/** Each chart's name, and the icon its tile shows (one of the stats' icons). */
-export const CHARTS: Record<ChartKind, { name: string; icon: IconName }> = {
-  elevation: { name: 'Elevation chart', icon: 'mountain' },
-  'heart-rate': { name: 'Heart rate chart', icon: 'heart' },
-  power: { name: 'Power chart', icon: 'bolt' },
-  speed: { name: 'Speed chart', icon: 'gauge' },
-  cadence: { name: 'Cadence chart', icon: 'crank' },
+/** Each chart's name. */
+export const CHART_NAMES: Record<ChartKind, string> = {
+  elevation: 'Elevation chart',
+  'heart-rate': 'Heart rate chart',
+  power: 'Power chart',
+  speed: 'Speed chart',
+  cadence: 'Cadence chart',
 };
 
 /** A widget's name in the list: "Text", a value's name, or its chart's ("Elevation chart"). */
@@ -551,4 +550,4 @@ export const widgetLabel = (widget: Widget, values?: Map<Metric, MetricValue>) =
     ? 'Text'
     : widget.kind === 'metric'
       ? metricName(widget.metric, values)
-      : CHARTS[widget.chart].name;
+      : CHART_NAMES[widget.chart];

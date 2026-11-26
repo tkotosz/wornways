@@ -54,7 +54,7 @@ describe('widgets as text', () => {
     ],
     [
       'elevation-chart:off@1,2',
-      '"elevation-chart" takes the color orange, red, yellow, green, blue, purple, pink, white, not "off"',
+      '"elevation-chart" takes the color orange, red, yellow, green, blue, purple, pink, white or icon, not "off"',
     ],
     ['climb-chart@1,2', '"climb-chart" is not a widget'],
     ['text:"open@1,2', 'the text has no closing double quote'],
@@ -169,13 +169,19 @@ describe('labels', () => {
     expect(iconOf('moving-days')).toBe('calendar');
   });
 
-  it('give a chart a color of its own, written only when not its usual one', () => {
-    const widgets = parseWidgets('power-chart:blue@50,80;speed-chart:blue@50,90', METRICS);
+  it('give a chart a color of its own, written only when not its usual one, and an icon', () => {
+    const widgets = parseWidgets(
+      'power-chart:blue@50,80;speed-chart:blue@50,90;heart-rate-chart:icon:green@50,70',
+      METRICS,
+    );
     expect(widgets).toMatchObject([
       { kind: 'chart', chart: 'power', color: 'blue' },
       { kind: 'chart', chart: 'speed', color: 'blue' },
+      { kind: 'chart', chart: 'heart-rate', color: 'green', icon: true },
     ]);
-    expect(widgetsText(widgets)).toBe('power-chart:blue@50,80;speed-chart@50,90');
+    expect(widgetsText(widgets)).toBe(
+      'power-chart:blue@50,80;speed-chart@50,90;heart-rate-chart:green:icon@50,70',
+    );
   });
 
   it('write words of their own in double quotes, back as they were read', () => {

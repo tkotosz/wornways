@@ -223,7 +223,8 @@ The other charts are drawn the same way along the distance, so the same spot on 
 same place on the route, each in its own color: `heart-rate-chart` red, `power-chart`
 yellow, `speed-chart` blue and `cadence-chart` green; elevation stays orange. A chart takes
 another color after a colon: orange, red, yellow, green, blue, purple, pink or white
-(`power-chart:blue@50,85`). The speed is the one the device recorded (FIT's speed, the speed
+(`power-chart:blue@50,85`), and `icon` draws its kind's icon at its left end, in its color,
+the chart after it (`heart-rate-chart:icon`). The speed is the one the device recorded (FIT's speed, the speed
 in GPX and TCX extensions, Strava's smoothed velocity, Ride with GPS's speed), else worked
 out from the distance and the recorded time between points; the speed values over the
 replay always go by the points. Heart rate, power and cadence need an activity that recorded

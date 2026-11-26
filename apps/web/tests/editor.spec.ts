@@ -304,6 +304,10 @@ test.describe('the editor on a phone', () => {
     await color.getByRole('button', { name: 'Done' }).click();
     await expect(page.getByRole('button', { name: 'Color: Purple' })).toBeVisible();
     await expect(speed.locator('path').nth(1)).toHaveAttribute('stroke', 'rgb(190, 160, 255)');
+    // Its icon, at its left end, from the same switch as a stat's.
+    await expect(speed.locator('.chart-icon')).toHaveCount(0);
+    await page.getByRole('switch', { name: 'Icon' }).check();
+    await expect(speed.locator('.chart-icon')).toHaveCount(1);
     await page.getByRole('button', { name: '✓ Done' }).click();
     await page.getByRole('button', { name: 'Add a chart' }).click();
     await expect(charts.getByRole('button', { name: 'Speed chart' })).toBeDisabled();
