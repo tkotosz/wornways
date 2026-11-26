@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { METRICS } from '../../src/replay/metrics.ts';
 import { SETTINGS, SettingsError, parseSettings } from '../../src/replay/settings.ts';
 
 /** The error `parseSettings` throws for the input, as "setting: message". */
@@ -58,7 +59,7 @@ describe('parseSettings', () => {
       { kind: 'metric', metric: 'distance', label: 'under', x: 30, y: 50, size: 120 },
     ]);
     expect(() => parseSettings({ 'totals-widgets': 'elevation-chart@50,90' })).toThrow(
-      '"elevation-chart" is not a widget: text, one of count, distance',
+      '"elevation-chart" is not a widget: text, one of time, moving',
     );
     // A total always has its words under it; the start time is for a single activity.
     expect(() => parseSettings({ 'totals-widgets': 'distance:off@30,50' })).toThrow(
@@ -145,7 +146,7 @@ describe('parseSettings', () => {
     [{ 'elevation-profile': true }, 'elevation-profile: is not a setting'],
     [
       { widgets: 'speed@50,50' },
-      'widgets: "speed" is not a widget: text, elevation-chart or one of time, moving, start, time-of-day, longest-time, distance, longest, average-distance, pace, top-speed, speed-now, elevation, descent, highest, lowest, elevation-now, biggest-climb, heart-rate, max-heart-rate, heart-rate-now, power, max-power, power-now, cadence, max-cadence, cadence-now, temperature, min-temperature, max-temperature, temperature-now, calories, count, days, date at character 12',
+      `widgets: "speed" is not a widget: text, elevation-chart or one of ${METRICS.join(', ')} at character 12`,
     ],
   ])('rejects %j', (input, message) => {
     expect(errorOf(input)).toBe(message);

@@ -67,13 +67,15 @@ test('removes a widget from its settings, and never by dragging it', async ({ pa
   page.setDefaultTimeout(15_000);
   await offlineMap(context);
   await openOverlay(page);
-  const rows = page.getByRole('button', { name: /^(Text|Date|Count|Distance):/ });
-  await expect(rows).toHaveCount(4);
+  const rows = page.getByRole('button', {
+    name: /^(Text|Date|Total activities|Total distance|Total climb):/,
+  });
+  await expect(rows).toHaveCount(5);
 
   // From its row, in its settings.
   await page.getByRole('button', { name: /^Text: / }).click();
   await page.getByRole('dialog').getByRole('button', { name: 'Remove from the picture' }).click();
-  await expect(rows).toHaveCount(3);
+  await expect(rows).toHaveCount(4);
   await expect(page.getByRole('button', { name: /^Text: / })).toHaveCount(0);
 
   // Let go at the middle of the picture's bottom edge, it stays, moved there.
@@ -87,7 +89,7 @@ test('removes a widget from its settings, and never by dragging it', async ({ pa
     frame.y + frame.height - 30 - start.y,
   );
   await page.mouse.up();
-  await expect(rows).toHaveCount(3);
+  await expect(rows).toHaveCount(4);
   const moved = (await outline(page, 0).boundingBox())!;
   expect(moved.y + moved.height).toBeGreaterThan(frame.y + frame.height * 0.85);
 });

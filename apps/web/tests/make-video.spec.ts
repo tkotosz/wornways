@@ -550,12 +550,12 @@ test('offers heart rate and cadence for an activity that recorded them', async (
   await page.getByRole('button', { name: 'Add a widget' }).click();
   const add = page.getByRole('dialog', { name: 'Add a widget' });
   const tile = (name: string) => add.getByRole('button', { name: new RegExp(` ${name}$`) });
-  for (const name of ['Average heart rate', 'Max heart rate', 'Current heart rate'])
+  for (const name of ['Avg heart rate', 'Max heart rate', 'Min heart rate', 'Current heart rate'])
     await expect(tile(name)).toHaveText(/bpm/);
-  for (const name of ['Average cadence', 'Max cadence', 'Current cadence'])
+  for (const name of ['Avg cadence', 'Max cadence', 'Current cadence'])
     await expect(tile(name)).toHaveText(/rpm/);
   // It recorded no power, temperature or calories.
-  for (const name of ['Average power', 'Max power', 'Average temperature', 'Calories'])
+  for (const name of ['Avg power', 'Max power', 'Avg temperature', 'Calories'])
     await expect(tile(name)).toHaveCount(0);
   await expect(add.getByRole('region', { name: 'Power' })).toHaveCount(0);
 });
@@ -756,7 +756,7 @@ test('sets up the video and its text, and keeps both for the next visit', async 
   await expectSection(page, 'Overlay');
   const titleRow = page.getByRole('button', { name: /^Text: / });
   await expect(titleRow).toHaveAccessibleName('Text: 27 Apr – 2 May 2026');
-  for (const name of ['Time', 'Count', 'Distance'])
+  for (const name of ['Race time', 'Still moving', 'Total distance'])
     await expect(page.getByRole('button', { name: new RegExp(`^${name}: `) })).toBeVisible();
   // A widget's settings: its text and its size.
   await titleRow.click();
@@ -767,18 +767,18 @@ test('sets up the video and its text, and keeps both for the next visit', async 
   await text.getByRole('slider', { name: 'Size' }).dispatchEvent('change');
   await text.getByRole('button', { name: 'Done' }).click();
   await expect(titleRow).toHaveAccessibleName('Text: Spring');
-  // A race offers every value to add, the dates and the average speed too.
+  // A race offers every value to add, the dates and the speeds too, each named for what it is.
   await page.getByRole('button', { name: 'Add a widget' }).click();
   const add = page.getByRole('dialog', { name: 'Add a widget' });
   for (const name of [
     'Date',
-    'Average speed',
-    'Top speed',
-    'Moving time',
+    'Avg speed',
+    'Max speed',
+    'Total moving time',
     'Days out',
-    'Longest activity',
-    'Longest time',
-    'Distance per activity',
+    'Avg distance per activity',
+    'Max distance per activity',
+    'Min time per activity',
   ])
     await expect(add.getByRole('button', { name: new RegExp(` ${name}$`) })).toBeEnabled();
   await add.getByRole('button', { name: 'Done' }).click();

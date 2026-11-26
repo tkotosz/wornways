@@ -50,17 +50,19 @@ describe('widgets as text', () => {
 
 describe('label modes', () => {
   it('start with the words under the value, except the date, which has none', () => {
-    expect(defaultLabel('elevation')).toBe('under');
-    expect(defaultLabel('heart-rate')).toBe('under');
+    expect(defaultLabel('climb')).toBe('under');
+    expect(defaultLabel('avg-heart-rate')).toBe('under');
     expect(defaultLabel('count')).toBe('under');
     expect(defaultLabel('distance')).toBe('under');
     expect(defaultLabel('date')).toBe('off');
-    expect(labelModes('elevation')).toEqual(['off', 'short', 'inline', 'under']);
+    // A short form for the climb's arrows and the avg, max and min values.
+    expect(labelModes('climb')).toEqual(['off', 'short', 'inline', 'under']);
+    expect(labelModes('max-power')).toEqual(['off', 'short', 'inline', 'under']);
     expect(labelModes('count')).toEqual(['off', 'inline', 'under']);
   });
 
   it('write a value alone, in its short form, with its words after it or under it', () => {
-    const climbed = { value: '1,200 m', label: 'climbed', short: '↑1,200 m' };
+    const climbed = { value: '1,200 m', label: 'climbed', short: '↑1,200 m', name: 'Climb' };
     expect(valueLines(climbed, 'off')).toEqual({ line: '1,200 m', under: '' });
     expect(valueLines(climbed, 'short')).toEqual({ line: '↑1,200 m', under: '' });
     expect(valueLines(climbed, 'inline')).toEqual({ line: '1,200 m climbed', under: '' });

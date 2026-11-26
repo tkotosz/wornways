@@ -274,6 +274,8 @@ self.onmessage = (event: MessageEvent<Request>) => void handle(event.data);
  */
 function showsCalories(settings: RenderSettings): boolean {
   const calories = (widgets: Widget[] | null) =>
-    (widgets ?? []).some((widget) => widget.kind === 'metric' && widget.metric === 'calories');
+    (widgets ?? []).some(
+      (widget) => widget.kind === 'metric' && widget.metric.includes('calories'),
+    );
   return calories(settings.widgets) || (settings.totalsCard && calories(settings.totalsWidgets));
 }

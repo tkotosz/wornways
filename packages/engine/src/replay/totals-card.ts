@@ -6,7 +6,9 @@
 // was given.
 
 import { averagePace, topSpeed } from './pace.ts';
+import { METRICS, SINGLE_ONLY, type Metric, type MetricValue } from './metrics.ts';
 import type { CanvasLike, Context2DLike } from './render.ts';
+import { sensorValueText } from './sensor-text.ts';
 import type { Widget } from './widgets.ts';
 
 /** How long the totals card plays, in seconds. */
@@ -31,83 +33,18 @@ const DIM = 0.82;
 export const totalsCardFrames = (fps: number) => Math.round(TOTALS_CARD_S * fps);
 
 /**
- * A value the totals card can show. The names are the metrics card's for the same values:
- * - count: the number of activities
- * - distance: kilometers
- * - moving: hours moving; time: hours in total, stops included
- * - elevation: meters climbed; descent: meters descended; highest: the highest point
- * - pace: the average pace or speed while moving; top-speed: the top speed
- * - date: the days the activities span; days: the days with an activity
- * - lowest: the lowest point; biggest-climb: the most climbed in one activity
- * - longest: the longest activity's kilometers; longest-time: the longest by time;
- *   average-distance: kilometers per activity
- * - heart-rate, power, cadence, temperature: their averages over time; max-heart-rate,
- *   max-power, max-cadence, max-temperature: the highest; min-temperature: the lowest;
- *   calories: the kilocalories, for the activities that recorded them
+ * A value the totals card can show: every value a widget can show over several activities
+ * (see `Metric`), as their totals at the end. Each is a number with its unit and words under
+ * it that say what it is: "312 / km in total", "62.5 / km avg per ride", "178 / bpm max heart
+ * rate".
  */
-export type TotalsField =
-  | 'count'
-  | 'distance'
-  | 'moving'
-  | 'time'
-  | 'elevation'
-  | 'descent'
-  | 'highest'
-  | 'lowest'
-  | 'biggest-climb'
-  | 'pace'
-  | 'top-speed'
-  | 'date'
-  | 'days'
-  | 'longest'
-  | 'longest-time'
-  | 'average-distance'
-  | 'heart-rate'
-  | 'max-heart-rate'
-  | 'power'
-  | 'max-power'
-  | 'cadence'
-  | 'max-cadence'
-  | 'temperature'
-  | 'min-temperature'
-  | 'max-temperature'
-  | 'calories';
+export type TotalsField = Exclude<Metric, (typeof SINGLE_ONLY)[number]>;
 /** Every value of the totals card, in the order the settings list them. */
-export const TOTALS_FIELDS: readonly TotalsField[] = [
-  'count',
-  'distance',
-  'moving',
-  'time',
-  'elevation',
-  'descent',
-  'highest',
-  'lowest',
-  'biggest-climb',
-  'pace',
-  'top-speed',
-  'date',
-  'days',
-  'longest',
-  'longest-time',
-  'average-distance',
-  'heart-rate',
-  'max-heart-rate',
-  'power',
-  'max-power',
-  'cadence',
-  'max-cadence',
-  'temperature',
-  'min-temperature',
-  'max-temperature',
-  'calories',
-];
+export const TOTALS_FIELDS: readonly TotalsField[] = METRICS.filter(
+  (metric): metric is TotalsField => !(SINGLE_ONLY as readonly Metric[]).includes(metric),
+);
 /** The values the totals card shows unless told otherwise, in this order. */
-export const AUTOMATIC_TOTALS: readonly TotalsField[] = [
-  'count',
-  'distance',
-  'moving',
-  'elevation',
-];
+export const AUTOMATIC_TOTALS: readonly TotalsField[] = ['count', 'distance', 'moving', 'climb'];
 
 export type Totals = {
   activities: number;
@@ -116,31 +53,34 @@ export type Totals = {
   movingSeconds: number;
   /** Seconds from each activity's first point to its last, added up. */
   totalSeconds: number;
-  /** Meters climbed; null when no activity recorded elevation. */
+  /** Meters climbed and descended; null when no activity recorded elevation. */
   climbed: number | null;
-  /** Meters descended; null when no activity recorded elevation. */
   descended: number | null;
-  /** The highest elevation reached, in meters; null when no activity recorded elevation. */
+  /** The highest and lowest elevation, in meters; null when no activity recorded elevation. */
   highest: number | null;
-  /** The lowest elevation reached, in meters; null when no activity recorded elevation. */
   lowest: number | null;
-  /** The most meters one activity climbed; null when no activity recorded elevation. */
-  biggestClimb: number | null;
   /** How many calendar days have an activity starting on them. */
   days: number;
-  /** The longest activity's meters. */
-  longest: number;
-  /** The longest activity's seconds, stops included. */
-  longestSeconds: number;
   /** The top speed of any activity, in meters per second (see `TOP_SPEED_WINDOW_S`). */
   topSpeed: number;
   /**
-   * Averages over time of the activities that recorded them, the highest, and the lowest
-   * temperature; null when none did. Cadence is in rotations per minute (one leg's strides
-   * on foot).
+   * Each activity's own meters, seconds (stops included), meters climbed (null when none
+   * recorded elevation) and calories (null when none gave them; zero for one that did not).
+   */
+  each: {
+    meters: number[];
+    seconds: number[];
+    climbed: number[] | null;
+    calories: number[] | null;
+  };
+  /**
+   * Averages over time of the activities that recorded them, the highest, and the lowest heart
+   * rate and temperature; null when none did. Cadence is in rotations per minute (one leg's
+   * strides on foot).
    */
   heartRate: number | null;
   maxHeartRate: number | null;
+  minHeartRate: number | null;
   power: number | null;
   maxPower: number | null;
   cadence: number | null;
@@ -256,11 +196,11 @@ export function startingTotalsWidgets(
 export function totalsValues(
   totals: Totals,
   countLabel: [string, string],
-): Map<TotalsField, { value: string; label: string }> {
+): Map<TotalsField, MetricValue> {
   return new Map(
-    totalsEntries(totals, 1, countLabel, TOTALS_FIELDS).map((entry) => [
-      entry.field,
-      { value: entry.value, label: entry.label },
+    totalsEntries(totals, 1, countLabel, TOTALS_FIELDS).map(({ field, ...value }) => [
+      field,
+      value,
     ]),
   );
 }
@@ -272,7 +212,7 @@ const progress = (t: number, at: number, length: number) =>
 const wholeNumber = (n: number) => Math.round(n).toLocaleString('en-US');
 
 /** A value of the totals card as shown: its text and the label under it. */
-export type TotalsEntry = { field: TotalsField; value: string; label: string };
+export type TotalsEntry = { field: TotalsField; value: string; label: string; name: string };
 
 /**
  * The values of `fields` in their order, with their labels, the numbers shown at a share `f`
@@ -286,118 +226,144 @@ export function totalsEntries(
   countLabel: [string, string],
   fields: readonly TotalsField[] = AUTOMATIC_TOTALS,
 ): TotalsEntry[] {
+  const ride = countLabel[0];
   const hours = (seconds: number) => {
     const h = seconds / 3600;
     return h < 10 ? (h * f).toFixed(1) : wholeNumber(h * f);
   };
-  return fields.flatMap((field) => {
+  const km = (meters: number, decimals = 0) =>
+    decimals ? ((meters / 1000) * f).toFixed(decimals) : wholeNumber((meters / 1000) * f);
+  const whole = (n: number) => wholeNumber(n * f);
+  const entry = (field: TotalsField, value: string, label: string, name: string): TotalsEntry => ({
+    field,
+    value,
+    label,
+    name,
+  });
+  /** Each activity's average, most and least: "62.5 / km avg per ride". */
+  const perActivity = (
+    field: TotalsField,
+    values: number[] | null,
+    text: (value: number) => string,
+    unit: string,
+    what: string,
+  ): TotalsEntry[] => {
+    if (!values?.length) return [];
+    const which = field.slice(0, 3) as 'avg' | 'max' | 'min';
+    const value =
+      which === 'avg'
+        ? values.reduce((sum, v) => sum + v, 0) / values.length
+        : which === 'max'
+          ? Math.max(...values)
+          : Math.min(...values);
+    const name = `${which[0]!.toUpperCase()}${which.slice(1)} ${what} per activity`;
+    return [entry(field, text(value), `${unit} ${which} per ${ride}`, name)];
+  };
+  const sensor = (
+    field: TotalsField,
+    channel: 'heartRate' | 'power' | 'cadence' | 'temperature',
+    value: number | null,
+    which: 'avg' | 'max' | 'min',
+    what: string,
+  ): TotalsEntry[] => {
+    if (value === null) return [];
+    const [number, unit] = sensorValueText(channel, value * f, totals.onFoot).split(' ');
+    const name = `${which[0]!.toUpperCase()}${which.slice(1)} ${what}`;
+    return [entry(field, number!, `${unit} ${which} ${what}`, name)];
+  };
+  return fields.flatMap((field): TotalsEntry[] => {
     switch (field) {
       case 'count':
-        return {
-          field,
-          value: wholeNumber(totals.activities * f),
-          label: totals.activities === 1 ? countLabel[0] : countLabel[1],
-        };
-      case 'distance':
-        return { field, value: wholeNumber((totals.meters / 1000) * f), label: 'km' };
-      case 'moving':
-        return { field, value: hours(totals.movingSeconds), label: 'hours moving' };
+        return [
+          entry(
+            field,
+            whole(totals.activities),
+            totals.activities === 1 ? countLabel[0] : countLabel[1],
+            'Total activities',
+          ),
+        ];
       case 'time':
-        return { field, value: hours(totals.totalSeconds), label: 'hours in total' };
-      case 'elevation':
+        return [entry(field, hours(totals.totalSeconds), 'hours in total', 'Total time')];
+      case 'moving':
+        return [
+          entry(field, hours(totals.movingSeconds), 'hours moving in total', 'Total moving time'),
+        ];
+      case 'avg-time':
+      case 'max-time':
+      case 'min-time':
+        return perActivity(field, totals.each.seconds, hours, 'hours', 'time');
+      case 'distance':
+        return [entry(field, km(totals.meters), 'km in total', 'Total distance')];
+      case 'avg-distance':
+      case 'max-distance':
+      case 'min-distance':
+        return perActivity(field, totals.each.meters, (m) => km(m, 1), 'km', 'distance');
+      case 'avg-speed': {
+        const { value, unit } = averagePace(totals.onFoot, totals.movingSeconds, totals.meters);
+        return unit === '/km'
+          ? [entry(field, value, 'min/km avg pace', 'Avg pace')]
+          : [entry(field, value, 'km/h avg speed', 'Avg speed')];
+      }
+      case 'max-speed': {
+        const { value, unit } = topSpeed(totals.onFoot, totals.topSpeed);
+        return unit === '/km'
+          ? [entry(field, value, 'min/km max pace', 'Max pace')]
+          : [entry(field, value, 'km/h max speed', 'Max speed')];
+      }
+      case 'climb':
         return totals.climbed === null
           ? []
-          : { field, value: wholeNumber(totals.climbed * f), label: 'm climbed' };
+          : [entry(field, whole(totals.climbed), 'm climbed in total', 'Total climb')];
       case 'descent':
         return totals.descended === null
           ? []
-          : { field, value: wholeNumber(totals.descended * f), label: 'm descended' };
-      case 'highest':
+          : [entry(field, whole(totals.descended), 'm descended in total', 'Total descent')];
+      case 'avg-climb':
+      case 'max-climb':
+      case 'min-climb':
+        return perActivity(field, totals.each.climbed, whole, 'm climbed', 'climb');
+      case 'max-elevation':
         return totals.highest === null
           ? []
-          : { field, value: wholeNumber(totals.highest * f), label: 'm highest point' };
-      case 'lowest':
+          : [entry(field, whole(totals.highest), 'm max elevation', 'Max elevation')];
+      case 'min-elevation':
         return totals.lowest === null
           ? []
-          : { field, value: wholeNumber(totals.lowest * f), label: 'm lowest point' };
-      case 'biggest-climb':
-        return totals.biggestClimb === null
-          ? []
-          : { field, value: wholeNumber(totals.biggestClimb * f), label: 'm biggest climb' };
-      case 'longest-time':
-        return { field, value: hours(totals.longestSeconds), label: 'hours longest' };
-      case 'average-distance':
-        return {
-          field,
-          value: ((totals.meters / 1000 / totals.activities) * f).toFixed(1),
-          label: `km per ${countLabel[0]}`,
-        };
-      case 'days':
-        return {
-          field,
-          value: wholeNumber(totals.days * f),
-          label: totals.days === 1 ? 'day out' : 'days out',
-        };
-      case 'longest':
-        return {
-          field,
-          value: wholeNumber((totals.longest / 1000) * f),
-          label: `km longest ${countLabel[0]}`,
-        };
-      case 'pace': {
-        const { value, unit } = averagePace(totals.onFoot, totals.movingSeconds, totals.meters);
-        return { field, value, label: unit === '/km' ? 'min/km average' : 'km/h average' };
-      }
-      case 'top-speed': {
-        const { value, unit } = topSpeed(totals.onFoot, totals.topSpeed);
-        return { field, value, label: unit === '/km' ? 'min/km best pace' : 'km/h top speed' };
-      }
-      case 'date':
-        return { field, value: totals.dates, label: 'dates' };
-      case 'heart-rate':
-        return totals.heartRate === null
-          ? []
-          : { field, value: wholeNumber(totals.heartRate * f), label: 'bpm average' };
+          : [entry(field, whole(totals.lowest), 'm min elevation', 'Min elevation')];
+      case 'avg-heart-rate':
+        return sensor(field, 'heartRate', totals.heartRate, 'avg', 'heart rate');
       case 'max-heart-rate':
-        return totals.maxHeartRate === null
-          ? []
-          : { field, value: wholeNumber(totals.maxHeartRate * f), label: 'bpm max' };
-      case 'power':
-      case 'max-power': {
-        const power = field === 'power' ? totals.power : totals.maxPower;
-        if (power === null) return [];
-        return {
-          field,
-          value: wholeNumber(power * f),
-          label: field === 'power' ? 'W average' : 'W max',
-        };
-      }
-      case 'cadence':
-      case 'max-cadence': {
-        const cadence = field === 'cadence' ? totals.cadence : totals.maxCadence;
-        if (cadence === null) return [];
-        const which = field === 'cadence' ? 'average' : 'max';
-        return totals.onFoot
-          ? { field, value: wholeNumber(cadence * 2 * f), label: `spm ${which}` }
-          : { field, value: wholeNumber(cadence * f), label: `rpm ${which}` };
-      }
-      case 'temperature':
+        return sensor(field, 'heartRate', totals.maxHeartRate, 'max', 'heart rate');
+      case 'min-heart-rate':
+        return sensor(field, 'heartRate', totals.minHeartRate, 'min', 'heart rate');
+      case 'avg-power':
+        return sensor(field, 'power', totals.power, 'avg', 'power');
+      case 'max-power':
+        return sensor(field, 'power', totals.maxPower, 'max', 'power');
+      case 'avg-cadence':
+        return sensor(field, 'cadence', totals.cadence, 'avg', 'cadence');
+      case 'max-cadence':
+        return sensor(field, 'cadence', totals.maxCadence, 'max', 'cadence');
+      case 'avg-temperature':
+        return sensor(field, 'temperature', totals.temperature, 'avg', 'temperature');
       case 'min-temperature':
-      case 'max-temperature': {
-        const which =
-          field === 'temperature' ? 'average' : field === 'min-temperature' ? 'min' : 'max';
-        const value =
-          which === 'average'
-            ? totals.temperature
-            : which === 'min'
-              ? totals.minTemperature
-              : totals.maxTemperature;
-        return value === null ? [] : { field, value: wholeNumber(value * f), label: `°C ${which}` };
-      }
+        return sensor(field, 'temperature', totals.minTemperature, 'min', 'temperature');
+      case 'max-temperature':
+        return sensor(field, 'temperature', totals.maxTemperature, 'max', 'temperature');
       case 'calories':
         return totals.calories === null
           ? []
-          : { field, value: wholeNumber(totals.calories * f), label: 'kcal' };
+          : [entry(field, whole(totals.calories), 'kcal in total', 'Total calories')];
+      case 'avg-calories':
+      case 'max-calories':
+      case 'min-calories':
+        return perActivity(field, totals.each.calories, whole, 'kcal', 'calories');
+      case 'days':
+        return [
+          entry(field, whole(totals.days), totals.days === 1 ? 'day out' : 'days out', 'Days out'),
+        ];
+      case 'date':
+        return [entry(field, totals.dates, 'dates', 'Date')];
     }
   });
 }

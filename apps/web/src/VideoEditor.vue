@@ -145,7 +145,7 @@ function setWidgets(list: Widget[]): void {
 /** Opens a widget's settings in a sheet: all of them (the list), or its size or label. */
 function openWidget(index: number, only?: 'size' | 'label'): void {
   selectedWidget.value = index;
-  const name = widgetLabel(widgets.value[index]!);
+  const name = widgetLabel(widgets.value[index]!, values.value);
   const label = only === 'size' ? `${name}: size` : only === 'label' ? `${name}: label` : name;
   sheet.value = { name: 'widget', label, widget: index, ...(only ? { only } : {}) };
 }

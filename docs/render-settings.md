@@ -161,18 +161,17 @@ A value shows its words in one of these label modes, written after a colon (`cou
 | `inline` | the value with its words after it, on one line       | 25 activities       |
 | `under`  | the value, with its words smaller on a line under it | 1,147 km / distance |
 
-The short forms: `top-speed` ("best 4:30 /km", "max 45 km/h"), `elevation` (↑), `descent`
-(↓), `highest` ("top 1,450 m"), `lowest` ("low 12 m"), `biggest-climb` ("↑1,830 m max"),
-`longest` ("longest 124 km") and the sensors' averages and extremes ("142 bpm avg",
-"178 bpm max", "210 W avg", "88 rpm avg", "4 °C min"). The date has no words. Without a
-mode, a value has its words under it.
+The short forms: `climb` (↑1,200 m), `descent` (↓980 m), and every `avg-`, `max-` and `min-`
+value, its number and the keyword ("142 bpm avg", "45.2 km/h max", "4 °C min", "62.5 km
+avg"). The date has no words. Without a mode, a value has its words under it.
 
 Without `--widgets`, a video starts with the title at the top in the middle; the values
 that suit it at the bottom left, the first large and the others smaller in a row under it
-(one activity: distance, time, climbed; a race: time, count, distance; in turn: date, count,
-distance, climbed; one day after another: date, distance, climbed, moving); and for a
-single activity with recorded elevation, the elevation chart along the bottom, with the
-values above it. Climbed needs recorded elevation.
+(one activity: distance, time, climb; a race: race time, still moving, total distance; in
+turn: date, total activities, total distance, total climb; one day after another: date,
+total distance, total climb, total moving time); and for a single activity with recorded
+elevation, the elevation chart along the bottom, with the values above it. The climb needs
+recorded elevation.
 
 The elevation chart is the climb over the distance from start to finish. For several
 activities it lays them end to end in date order on one height scale (a trip's days side by
@@ -185,46 +184,47 @@ less than 60 m is drawn against a 60 m range, so flat looks flat.
 
 ### Values
 
-What a value widget can show, by what it measures. A single-activity video shows live
-values as the activity plays; a video of several activities shows running totals. A value
-the video cannot show is left out.
+What a value widget can show, by what it measures, with the name the app gives it. A
+single-activity video shows live values as the activity plays; a video of several activities
+shows running totals. For several activities a plain value is their total ("Total
+distance"); `avg-`, `max-` and `min-` time, distance, climb and calories are per activity
+("Avg distance per activity": each activity's own, averaged); the speeds, the elevations and
+the sensors are over every activity together. The words under a value are its name in lower
+case ("total distance"), with the sport's word for an activity ("avg distance per ride"). A
+value the video cannot show is left out.
 
-| Value              | One activity                 | Race (all at once)           | In turn (groups)             | Totals card                    |
-| ------------------ | ---------------------------- | ---------------------------- | ---------------------------- | ------------------------------ |
-| `time`             | its time so far              | the race clock               | the activities' time so far  | hours in total, stops included |
-| `moving`           | its moving time so far       | moving time so far           | moving time so far           | hours moving                   |
-| `start`            | its start time, e.g. "06:42" | not offered                  | not offered                  | not offered                    |
-| `time-of-day`      | the clock time as it plays   | not offered                  | not offered                  | not offered                    |
-| `longest-time`     | not offered                  | longest by time so far       | longest by time so far       | longest activity in hours      |
-| `distance`         | kilometers so far            | kilometers so far            | kilometers so far            | kilometers                     |
-| `longest`          | not offered                  | longest so far               | longest activity so far      | longest activity               |
-| `average-distance` | not offered                  | kilometers per activity      | kilometers per activity      | kilometers per activity        |
-| `pace`             | average while moving         | average while moving         | average while moving         | average while moving           |
-| `top-speed`        | top speed so far             | top speed so far             | top speed so far             | top speed of any activity      |
-| `speed-now`        | the speed over the last 10 s | not offered                  | not offered                  | not offered                    |
-| `elevation`        | meters climbed so far        | meters climbed so far        | meters climbed so far        | meters climbed                 |
-| `descent`          | meters descended so far      | meters descended so far      | meters descended so far      | meters descended               |
-| `highest`          | highest point so far         | highest point so far         | highest point so far         | highest point                  |
-| `lowest`           | lowest point so far          | lowest point so far          | lowest point so far          | lowest point                   |
-| `elevation-now`    | the elevation as it plays    | not offered                  | not offered                  | not offered                    |
-| `biggest-climb`    | not offered                  | most one activity climbed    | most one activity climbed    | most one activity climbed      |
-| `heart-rate`       | average so far               | average so far               | average so far               | average                        |
-| `max-heart-rate`   | highest so far               | highest so far               | highest so far               | highest                        |
-| `heart-rate-now`   | as it plays                  | not offered                  | not offered                  | not offered                    |
-| `power`            | average so far               | average so far               | average so far               | average                        |
-| `max-power`        | highest so far               | highest so far               | highest so far               | highest                        |
-| `power-now`        | as it plays                  | not offered                  | not offered                  | not offered                    |
-| `cadence`          | average so far               | average so far               | average so far               | average                        |
-| `max-cadence`      | highest so far               | highest so far               | highest so far               | highest                        |
-| `cadence-now`      | as it plays                  | not offered                  | not offered                  | not offered                    |
-| `temperature`      | average so far               | average so far               | average so far               | average                        |
-| `min-temperature`  | lowest so far                | lowest so far                | lowest so far                | lowest                         |
-| `max-temperature`  | highest so far               | highest so far               | highest so far               | highest                        |
-| `temperature-now`  | as it plays                  | not offered                  | not offered                  | not offered                    |
-| `calories`         | so far                       | so far                       | so far                       | in total                       |
-| `count`            | not offered                  | how many are still moving    | activities so far            | activities                     |
-| `days`             | not offered                  | days with an activity        | days with an activity so far | days with an activity          |
-| `date`             | its day                      | the days the activities span | the playing group's dates    | the days the activities span   |
+| Value                                                   | One activity                            | Several activities (race / in turn)                      |
+| ------------------------------------------------------- | --------------------------------------- | -------------------------------------------------------- |
+| `time`                                                  | Time: so far, stops included            | Race time: the race clock / Total time                   |
+| `moving`                                                | Moving time                             | Total moving time                                        |
+| `avg-time`, `max-time`, `min-time`                      | not offered                             | Avg / Max / Min time per activity                        |
+| `start`                                                 | Start time, e.g. "06:42"                | not offered                                              |
+| `time-of-day`                                           | Time of day: the clock time as it plays | not offered                                              |
+| `distance`                                              | Distance                                | Total distance                                           |
+| `avg-distance`, `max-distance`, `min-distance`          | not offered                             | Avg / Max / Min distance per activity                    |
+| `avg-speed`                                             | Avg speed, while moving                 | Avg speed, while moving                                  |
+| `max-speed`                                             | Max speed, the fastest over 10 s        | Max speed of any activity                                |
+| `speed-now`                                             | Current speed, over the last 10 s       | not offered                                              |
+| `climb`, `descent`                                      | Climb, Descent                          | Total climb, Total descent                               |
+| `avg-climb`, `max-climb`, `min-climb`                   | not offered                             | Avg / Max / Min climb per activity                       |
+| `max-elevation`, `min-elevation`                        | Max / Min elevation so far              | Max / Min elevation of any activity so far               |
+| `elevation-now`                                         | Current elevation                       | not offered                                              |
+| `avg-heart-rate`, `max-heart-rate`, `min-heart-rate`    | Avg / Max / Min heart rate              | Avg / Max / Min heart rate                               |
+| `heart-rate-now`                                        | Current heart rate                      | not offered                                              |
+| `avg-power`, `max-power`                                | Avg / Max power                         | Avg / Max power                                          |
+| `power-now`                                             | Current power                           | not offered                                              |
+| `avg-cadence`, `max-cadence`                            | Avg / Max cadence                       | Avg / Max cadence                                        |
+| `cadence-now`                                           | Current cadence                         | not offered                                              |
+| `avg-temperature`, `min-temperature`, `max-temperature` | Avg / Min / Max temperature             | Avg / Min / Max temperature                              |
+| `temperature-now`                                       | Current temperature                     | not offered                                              |
+| `calories`                                              | Calories so far                         | Total calories                                           |
+| `avg-calories`, `max-calories`, `min-calories`          | not offered                             | Avg / Max / Min calories per activity                    |
+| `count`                                                 | not offered                             | Still moving: how many are still out / Total activities  |
+| `days`                                                  | not offered                             | Days out: days with an activity                          |
+| `date`                                                  | Date: its day                           | the days the activities span / the playing group's dates |
+
+While a video plays, a minimum per activity counts the activities finished so far (the ones
+started until one has), so an activity still under way does not count as the shortest.
 
 The time over the video follows the replay, where long pauses are shortened; the totals
 card's time in total keeps every stop as recorded. Moving time counts the stretches covered at
@@ -232,7 +232,7 @@ card's time in total keeps every stop as recorded. Moving time counts the stretc
 with even drawing pace. Top
 speed is the fastest average over 10 seconds, so a single point the GPS put too far away
 hardly counts; the speed as it plays is the average over the last 10 seconds. The average
-speed (`pace`) is over the moving time, as Strava gives it. The start time and the time of
+speed (`avg-speed`) is over the moving time, as Strava gives it. The start time and the time of
 day are in the time zone of the device making the video. Pace and the speeds are minutes
 per kilometer when every activity is on foot (run, walk, hike), otherwise kilometers per
 hour. Elevation shows only when an activity recorded it.
@@ -264,16 +264,18 @@ value widget shows at the end of the replay (see Values).
 
 What it shows is a list of widgets, written as the widgets over the replay are (see
 Widgets): text, which without its own text shows the title, and totals for every activity,
-named as the values of the metrics table are (any of them but `start`; no elevation chart).
-Each is centered on its point, at a size from 50 to 250%. The text is drawn with the short
-orange rule under it; a total is its number large over its words in orange. The values fade
-in in their order, one after another, and count up; the pace and the dates appear without
-counting up, and the dates are drawn smaller. A total the activities did not record (the
-climb, the descent and the highest point without elevation, the sensor values, calories) is
-left out.
+named as the values of the metrics table are (any of them for several activities; none of
+the ones for one activity as it plays, and no elevation chart). Each is centered on its
+point, at a size from 50 to 250%. The text is drawn with the short orange rule under it; a
+total is its number large over its unit and what it is in orange: "312 / km in total",
+"15 / hours moving in total", "62.5 / km avg per ride", "178 / bpm max heart rate". The
+values fade in in their order, one after another, and count up; the speeds and the dates
+appear without counting up, and the dates are drawn smaller. A total the activities did not
+record (the climb, the descent and the elevations without elevation, the sensor values,
+calories) is left out.
 
 Unless set, the card starts with the title at the top and activities, kilometers, hours
-moving and meters climbed (`count`, `distance`, `moving`, `elevation`) under it, up to two
+moving and meters climbed (`count`, `distance`, `moving`, `climb`) under it, up to two
 to a row on a story or square frame, up to four on a wide one, a last short row centered,
 the whole block centered on the frame. In the web app they are arranged on the card in the
 Ending section, as the widgets over the replay are in Overlay.

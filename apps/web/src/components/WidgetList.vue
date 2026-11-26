@@ -18,7 +18,9 @@ const emit = defineEmits<{ add: []; open: [index: number] }>();
 function shows(widget: Widget): string {
   if (widget.kind === 'text') return widget.text ?? (props.title || 'The title');
   if (widget.kind === 'metric')
-    return props.values.get(widget.metric)?.value ?? (widget.metric === 'calories' ? 'kcal' : '');
+    return (
+      props.values.get(widget.metric)?.value ?? (widget.metric.includes('calories') ? 'kcal' : '')
+    );
   return '';
 }
 </script>
@@ -36,11 +38,11 @@ function shows(widget: Widget): string {
       type="button"
       class="setting-row"
       :class="{ picked: selected === index }"
-      :aria-label="`${widgetLabel(widget)}${shows(widget) ? `: ${shows(widget)}` : ''}`"
+      :aria-label="`${widgetLabel(widget, values)}${shows(widget) ? `: ${shows(widget)}` : ''}`"
       aria-haspopup="dialog"
       @click="emit('open', index)"
     >
-      <span>{{ widgetLabel(widget) }}</span>
+      <span>{{ widgetLabel(widget, values) }}</span>
       <span class="value">{{ shows(widget) }}</span>
     </button>
   </div>

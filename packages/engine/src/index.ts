@@ -42,6 +42,7 @@ export {
 } from './replay/timeline.ts';
 export {
   METRICS,
+  SINGLE_ONLY,
   createRenderer,
   defaultMetrics,
   type FrameBox,

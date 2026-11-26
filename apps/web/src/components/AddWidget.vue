@@ -32,7 +32,7 @@ const groups = computed(() =>
   METRIC_GROUPS.map((group) => ({
     ...group,
     metrics: group.metrics.filter(
-      (metric) => props.values.has(metric) || (metric === 'calories' && props.hasCalories),
+      (metric) => props.values.has(metric) || (metric.includes('calories') && props.hasCalories),
     ),
   })).filter((group) => group.metrics.length),
 );
@@ -85,7 +85,7 @@ const groups = computed(() =>
           "
         >
           <b>{{ values.get(metric)?.value ?? 'kcal' }}</b>
-          <span>{{ metricName(metric) }}</span>
+          <span>{{ metricName(metric, values) }}</span>
         </button>
       </div>
     </section>

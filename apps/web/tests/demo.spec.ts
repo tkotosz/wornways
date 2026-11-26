@@ -104,25 +104,26 @@ test('follows the guide to a highlight of the long ride', async ({ page }) => {
   await expect(page.getByTestId('replay-summary')).toContainText('Highlight');
 
   // The demo's routes carry heights: one activity starts with its climb and the elevation
-  // chart, and its start time, descent, highest point, speeds and current elevation can be
-  // added; a count or the values per activity cannot.
+  // chart, and its start time, descent, elevations and speeds can be added; a count or the
+  // values per activity cannot.
   await openSection(page, 'Overlay');
   await expect(page.getByRole('button', { name: 'Elevation chart', exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Add a widget' }).click();
   const add = page.getByRole('dialog', { name: 'Add a widget' });
   const tile = (name: string) => add.getByRole('button', { name: new RegExp(` ${name}$`) });
-  await expect(tile('Climbed')).toBeDisabled();
+  await expect(tile('Climb')).toBeDisabled();
   for (const name of [
     'Start time',
     'Time of day',
     'Descent',
-    'Highest point',
+    'Max elevation',
+    'Min elevation',
     'Current elevation',
-    'Top speed',
+    'Max speed',
     'Current speed',
   ])
     await expect(tile(name)).toBeEnabled();
-  for (const name of ['Count', 'Distance per activity', 'Biggest climb'])
+  for (const name of ['Activities', 'Avg distance per activity', 'Max climb per activity'])
     await expect(tile(name)).toHaveCount(0);
   // Grouped by what they measure.
   await expect(add.getByRole('region', { name: 'Elevation' })).toContainText('Current elevation');

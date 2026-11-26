@@ -10,7 +10,7 @@
 // widget without its own text shows the video's title; a value without a label mode shows
 // its words the way that value usually does (`defaultLabel`).
 
-import type { Metric, MetricValue } from './render.ts';
+import type { Metric, MetricValue } from './metrics.ts';
 
 /**
  * How a value shows its words: not at all ("1,147 km"), in a short form of its own
@@ -26,30 +26,14 @@ export type Widget = { x: number; y: number; size: number } & (
   | { kind: 'elevation-chart' }
 );
 
-/** The values that have a short form of their own: an arrow, "avg", "max", "best", "top". */
-const SHORT_FORMS: readonly Metric[] = [
-  'top-speed',
-  'elevation',
-  'descent',
-  'highest',
-  'lowest',
-  'biggest-climb',
-  'longest',
-  'heart-rate',
-  'max-heart-rate',
-  'power',
-  'max-power',
-  'cadence',
-  'max-cadence',
-  'temperature',
-  'min-temperature',
-  'max-temperature',
-];
+/** Whether a value has a short form of its own: the climb's arrows, "avg", "max", "min". */
+const hasShortForm = (metric: Metric) =>
+  metric === 'climb' || metric === 'descent' || /^(avg|max|min)-/.test(metric);
 
 /** The label modes `metric` can take: the date has no words; only some have a short form. */
 export function labelModes(metric: Metric): LabelMode[] {
   if (metric === 'date') return ['off'];
-  return LABEL_MODES.filter((mode) => mode !== 'short' || SHORT_FORMS.includes(metric));
+  return LABEL_MODES.filter((mode) => mode !== 'short' || hasShortForm(metric));
 }
 
 /** The label mode a value starts with: its words under it; the date has none. */

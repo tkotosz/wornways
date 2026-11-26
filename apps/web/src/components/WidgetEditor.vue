@@ -73,7 +73,9 @@ function textOf(widget: Widget): { line: string; under: string } | null {
   if (widget.kind === 'text') return { line: widget.text ?? props.title, under: '' };
   if (widget.kind === 'metric') {
     const value = props.values.get(widget.metric);
-    return value ? valueLines(value, widget.label) : { line: '…', under: widgetLabel(widget) };
+    return value
+      ? valueLines(value, widget.label)
+      : { line: '…', under: widgetLabel(widget, props.values) };
   }
   return null;
 }
@@ -366,7 +368,7 @@ const story = computed(() => props.size.width / props.size.height < 0.8);
       :style="{ left: `${widget.x}%`, top: `${widget.y}%`, '--size': widget.size / 100 }"
       role="button"
       tabindex="0"
-      :aria-label="`${widgetLabel(widget)} on the picture: drag to move it; arrow keys move it, plus and minus resize it, Delete removes it`"
+      :aria-label="`${widgetLabel(widget, values)} on the picture: drag to move it; arrow keys move it, plus and minus resize it, Delete removes it`"
       :aria-pressed="selected === index"
       :data-testid="`widget-${index}`"
       :data-widget="index"
@@ -400,7 +402,7 @@ const story = computed(() => props.size.width / props.size.height < 0.8);
         />
       </svg>
 
-      <span class="name" aria-hidden="true">{{ widgetLabel(widget) }}</span>
+      <span class="name" aria-hidden="true">{{ widgetLabel(widget, values) }}</span>
       <template v-if="selected === index && !moving">
         <span
           class="handle"

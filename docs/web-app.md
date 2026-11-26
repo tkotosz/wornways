@@ -198,7 +198,7 @@ drawing each. The editor's settings are remembered for the next visit.
   Under the picture, as in the other sections, a strip of chips: Add Text writes a new
   text; Add Metric opens a sheet of the metrics this video can show, grouped by what they
   measure (time, distance, speed, elevation, heart rate, power, cadence, temperature,
-  energy, activities; a group only when the video has one of its values), each a tile with
+  calories, activities; a group only when the video has one of its values), each a tile with
   its own number (calories a service gives on request are offered before they are known; a
   value already on the picture is dimmed); the elevation chart's switch (offered only
   when an activity recorded elevation); and the watermark's, a fixed small mark at the

@@ -71,7 +71,7 @@ test('arranges the totals card as widgets: the title and the totals, then more',
   await expect(page.getByRole('switch', { name: 'Show watermark' })).toHaveCount(0);
   await page.getByRole('button', { name: 'Add a total' }).click();
   const totals = page.getByRole('dialog', { name: 'Totals' });
-  await expect(totals.getByRole('button', { name: / Distance$/ })).toBeDisabled();
+  await expect(totals.getByRole('button', { name: / Total distance$/ })).toBeDisabled();
   await totals.getByRole('button', { name: / Days out$/ }).click();
   await expect(onCard).toHaveCount(6);
   await expect(page.getByTestId('widget-5')).toContainText('days out');

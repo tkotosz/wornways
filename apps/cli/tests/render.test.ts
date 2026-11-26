@@ -277,35 +277,37 @@ describe('the values', () => {
     return textPixels(renderer.canvas, 0, height * 0.8, width / 2, height);
   }
 
-  it('shows the pace for several activities, in turn or in a race, and the dates in a race', () => {
+  it('shows the avg speed for several activities, in turn or in a race, and the dates in a race', () => {
     const inTurn = chronologicalTimeline([1_190, 1_190], { duration: 1 });
     const race = raceTimeline([1_190, 1_190], { duration: 1 });
-    expect(severalLastFrame(inTurn, ['pace'])).toBeGreaterThan(20);
-    expect(severalLastFrame(race, ['pace'])).toBeGreaterThan(20);
+    expect(severalLastFrame(inTurn, ['avg-speed'])).toBeGreaterThan(20);
+    expect(severalLastFrame(race, ['avg-speed'])).toBeGreaterThan(20);
     expect(severalLastFrame(race, ['date'])).toBeGreaterThan(20);
   });
 
-  it('shows the moving time, the descent, the highest point, the days and the longest', () => {
+  it('shows the moving time, the descent, the max elevation, the days and the max distance', () => {
     const inTurn = chronologicalTimeline([1_190, 1_190], { duration: 1 });
-    for (const metric of ['moving', 'descent', 'highest', 'days', 'longest'] as Metric[])
+    for (const metric of ['moving', 'descent', 'max-elevation', 'days', 'max-distance'] as Metric[])
       expect(severalLastFrame(inTurn, [metric]), metric).toBeGreaterThan(20);
-    // One activity: its moving time, but no days or longest, which would only repeat it.
+    // One activity: its moving time, but no days or values per activity, which would only
+    // repeat it.
     expect(lastFrame({ widgets: valuesAt(['moving']) }).bottomLeft).toBeGreaterThan(20);
-    expect(lastFrame({ widgets: valuesAt(['days', 'longest']) }).bottomLeft).toBe(0);
+    expect(lastFrame({ widgets: valuesAt(['days', 'max-distance']) }).bottomLeft).toBe(0);
   });
 
   it('shows the sensor values and calories of an activity that recorded them, and only then', () => {
     const sensorMetrics: Metric[] = [
-      'heart-rate',
+      'avg-heart-rate',
       'max-heart-rate',
+      'min-heart-rate',
       'heart-rate-now',
-      'power',
+      'avg-power',
       'max-power',
       'power-now',
-      'cadence',
+      'avg-cadence',
       'max-cadence',
       'cadence-now',
-      'temperature',
+      'avg-temperature',
       'min-temperature',
       'max-temperature',
       'temperature-now',
@@ -344,20 +346,29 @@ describe('the values', () => {
       expect(lastFrame({ widgets: valuesAt([metric]) }).bottomLeft, metric).toBeGreaterThan(20);
       expect(severalLastFrame(inTurn, [metric]), metric).toBe(0);
     }
-    for (const metric of ['longest-time', 'average-distance', 'biggest-climb'] as Metric[]) {
+    for (const metric of [
+      'avg-time',
+      'max-time',
+      'min-time',
+      'avg-distance',
+      'min-distance',
+      'avg-climb',
+      'max-climb',
+      'min-climb',
+    ] as Metric[]) {
       expect(severalLastFrame(inTurn, [metric]), metric).toBeGreaterThan(20);
       expect(lastFrame({ widgets: valuesAt([metric]) }).bottomLeft, metric).toBe(0);
     }
-    expect(lastFrame({ widgets: valuesAt(['lowest']) }).bottomLeft).toBeGreaterThan(20);
-    expect(severalLastFrame(inTurn, ['lowest'])).toBeGreaterThan(20);
+    expect(lastFrame({ widgets: valuesAt(['min-elevation']) }).bottomLeft).toBeGreaterThan(20);
+    expect(severalLastFrame(inTurn, ['min-elevation'])).toBeGreaterThan(20);
   });
 
-  it('shows the start time for a single activity only, and the top speed for any', () => {
+  it('shows the start time for a single activity only, and the max speed for any', () => {
     const inTurn = chronologicalTimeline([1_190, 1_190], { duration: 1 });
     expect(lastFrame({ widgets: valuesAt(['start']) }).bottomLeft).toBeGreaterThan(20);
     expect(severalLastFrame(inTurn, ['start'])).toBe(0);
-    expect(lastFrame({ widgets: valuesAt(['top-speed']) }).bottomLeft).toBeGreaterThan(20);
-    expect(severalLastFrame(inTurn, ['top-speed'])).toBeGreaterThan(20);
+    expect(lastFrame({ widgets: valuesAt(['max-speed']) }).bottomLeft).toBeGreaterThan(20);
+    expect(severalLastFrame(inTurn, ['max-speed'])).toBeGreaterThan(20);
   });
 
   it('is left out when no widget shows one', () => {
@@ -515,9 +526,13 @@ describe('the totals card', () => {
       'count',
       'distance',
       'moving',
-      'elevation',
+      'climb',
     ]);
-    expect(values.get('count')).toEqual({ value: '2', label: 'activities' });
+    expect(values.get('count')).toEqual({
+      value: '2',
+      label: 'activities',
+      name: 'Total activities',
+    });
     expect(lastTotalsFrame(widgets).equals(lastTotalsFrame())).toBe(true);
   });
 });
@@ -613,7 +628,11 @@ describe('widgets', () => {
         { kind: 'metric', metric: 'count', label: 'under', x: 50, y: 80, size: 100 },
       ],
     });
-    expect(renderer.finalValues.get('distance')).toEqual({ value: '5.3 km', label: 'distance' });
+    expect(renderer.finalValues.get('distance')).toEqual({
+      value: '5.3 km',
+      label: 'distance',
+      name: 'Distance',
+    });
     // A single activity has no count.
     expect(renderer.overlayBoxes().widgets[1]).toBeNull();
   });
@@ -622,7 +641,7 @@ describe('widgets', () => {
     const renderer = lastFrame({ watermark: true });
     expect(
       renderer.widgets.map((widget) => (widget.kind === 'metric' ? widget.metric : widget.kind)),
-    ).toEqual(['text', 'distance', 'time', 'elevation', 'elevation-chart']);
+    ).toEqual(['text', 'distance', 'time', 'climb', 'elevation-chart']);
     const [title, distance, time] = renderer.overlayBoxes().widgets.map((box) => edges(box!));
     // The title at the top in the middle; the first value large at the bottom left, the
     // others smaller in a row under it.

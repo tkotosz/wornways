@@ -89,7 +89,7 @@ test('starts several activities without the elevation chart, which can be added'
   // Several activities start without the chart; added, it is drawn.
   const chart = page.getByRole('button', { name: 'Elevation chart', exact: true });
   const onPicture = page.getByRole('button', { name: /^Elevation chart on the picture/ });
-  await expect(page.getByRole('button', { name: /^Time: / })).toBeVisible();
+  await expect(page.getByRole('button', { name: /^Race time: / })).toBeVisible();
   await expect(chart).toHaveCount(0);
   await page.getByRole('button', { name: 'Add a widget' }).click();
   await page

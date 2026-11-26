@@ -8,6 +8,7 @@ import {
   SETTINGS,
   type LabelMode,
   type Metric,
+  type MetricValue,
   type Preset,
   type SettingDefinition,
   type SettingGroup,
@@ -382,59 +383,90 @@ export function saveAdjustments(adjustments: Adjustments): void {
 }
 
 /** A value's name: its metric's, or a few words where the name alone would be unclear. */
+/**
+ * A value's name when the video does not give one (its value is not known yet): the video's
+ * own names say more, as "Total distance" for several activities or "Race time" in a race.
+ */
 const METRIC_NAMES: Partial<Record<Metric, string>> = {
   moving: 'Moving time',
+  'avg-time': 'Avg time per activity',
+  'max-time': 'Max time per activity',
+  'min-time': 'Min time per activity',
   start: 'Start time',
   'time-of-day': 'Time of day',
-  'longest-time': 'Longest time',
-  longest: 'Longest activity',
-  'average-distance': 'Distance per activity',
-  pace: 'Average speed',
-  'top-speed': 'Top speed',
+  'avg-distance': 'Avg distance per activity',
+  'max-distance': 'Max distance per activity',
+  'min-distance': 'Min distance per activity',
+  'avg-speed': 'Avg speed',
+  'max-speed': 'Max speed',
   'speed-now': 'Current speed',
-  elevation: 'Climbed',
-  highest: 'Highest point',
-  lowest: 'Lowest point',
+  'avg-climb': 'Avg climb per activity',
+  'max-climb': 'Max climb per activity',
+  'min-climb': 'Min climb per activity',
+  'max-elevation': 'Max elevation',
+  'min-elevation': 'Min elevation',
   'elevation-now': 'Current elevation',
-  'biggest-climb': 'Biggest climb',
-  'heart-rate': 'Average heart rate',
+  'avg-heart-rate': 'Avg heart rate',
   'max-heart-rate': 'Max heart rate',
+  'min-heart-rate': 'Min heart rate',
   'heart-rate-now': 'Current heart rate',
-  power: 'Average power',
+  'avg-power': 'Avg power',
   'max-power': 'Max power',
   'power-now': 'Current power',
-  cadence: 'Average cadence',
+  'avg-cadence': 'Avg cadence',
   'max-cadence': 'Max cadence',
   'cadence-now': 'Current cadence',
-  temperature: 'Average temperature',
+  'avg-temperature': 'Avg temperature',
   'min-temperature': 'Min temperature',
   'max-temperature': 'Max temperature',
   'temperature-now': 'Current temperature',
+  'avg-calories': 'Avg calories per activity',
+  'max-calories': 'Max calories per activity',
+  'min-calories': 'Min calories per activity',
+  count: 'Activities',
   days: 'Days out',
 };
-export const metricName = (metric: Metric) =>
-  METRIC_NAMES[metric] ?? metric.charAt(0).toUpperCase() + metric.slice(1);
+/** A value's name: the one the video gives it, else its usual one. */
+export const metricName = (metric: Metric, values?: Map<Metric, MetricValue>) =>
+  values?.get(metric)?.name ??
+  METRIC_NAMES[metric] ??
+  metric.charAt(0).toUpperCase() + metric.slice(1);
 
 /**
  * The values by what they measure, as the Metrics sheet groups them: each group's values side
  * by side (the average, the highest, the value as one activity plays…).
  */
 export const METRIC_GROUPS: { name: string; metrics: Metric[] }[] = [
-  { name: 'Time', metrics: ['time', 'moving', 'start', 'time-of-day', 'longest-time'] },
-  { name: 'Distance', metrics: ['distance', 'longest', 'average-distance'] },
-  { name: 'Speed', metrics: ['pace', 'top-speed', 'speed-now'] },
+  {
+    name: 'Time',
+    metrics: ['time', 'moving', 'avg-time', 'max-time', 'min-time', 'start', 'time-of-day'],
+  },
+  { name: 'Distance', metrics: ['distance', 'avg-distance', 'max-distance', 'min-distance'] },
+  { name: 'Speed', metrics: ['avg-speed', 'max-speed', 'speed-now'] },
   {
     name: 'Elevation',
-    metrics: ['elevation', 'descent', 'highest', 'lowest', 'elevation-now', 'biggest-climb'],
+    metrics: [
+      'climb',
+      'descent',
+      'avg-climb',
+      'max-climb',
+      'min-climb',
+      'max-elevation',
+      'min-elevation',
+      'elevation-now',
+    ],
   },
-  { name: 'Heart rate', metrics: ['heart-rate', 'max-heart-rate', 'heart-rate-now'] },
-  { name: 'Power', metrics: ['power', 'max-power', 'power-now'] },
-  { name: 'Cadence', metrics: ['cadence', 'max-cadence', 'cadence-now'] },
+  {
+    name: 'Heart rate',
+    metrics: ['avg-heart-rate', 'max-heart-rate', 'min-heart-rate', 'heart-rate-now'],
+  },
+  { name: 'Power', metrics: ['avg-power', 'max-power', 'power-now'] },
+  { name: 'Cadence', metrics: ['avg-cadence', 'max-cadence', 'cadence-now'] },
   {
     name: 'Temperature',
-    metrics: ['temperature', 'min-temperature', 'max-temperature', 'temperature-now'],
+    metrics: ['avg-temperature', 'min-temperature', 'max-temperature', 'temperature-now'],
   },
-  { name: 'Energy', metrics: ['calories'] },
+  { name: 'Calories', metrics: ['calories', 'avg-calories', 'max-calories', 'min-calories'] },
   { name: 'Activities', metrics: ['count', 'days', 'date'] },
 ];
 
@@ -447,9 +479,9 @@ export const LABEL_MODE_NAMES: Record<LabelMode, string> = {
 };
 
 /** A widget's name in the list: "Text", a value's name, or "Elevation chart". */
-export const widgetLabel = (widget: Widget) =>
+export const widgetLabel = (widget: Widget, values?: Map<Metric, MetricValue>) =>
   widget.kind === 'text'
     ? 'Text'
     : widget.kind === 'metric'
-      ? metricName(widget.metric)
+      ? metricName(widget.metric, values)
       : 'Elevation chart';

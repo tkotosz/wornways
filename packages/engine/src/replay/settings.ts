@@ -10,7 +10,7 @@ import { END_CARD_S } from './end-card.ts';
 import { TOTALS_CARD_S, TOTALS_FIELDS } from './totals-card.ts';
 import { PRESETS, PRESET_NAMES, type Preset } from './presets.ts';
 import type { Grouping } from './plans.ts';
-import { METRICS } from './render.ts';
+import { METRICS, SINGLE_ONLY } from './metrics.ts';
 import { parseWidgets, type Widget } from './widgets.ts';
 
 export type RenderSettings = {
@@ -388,18 +388,19 @@ export const SETTINGS: readonly SettingDefinition[] = [
       'text:"Your text"@x,y,size (text@x,y for the title), a value such as distance@x,y,size, ' +
       'or elevation-chart@x,y,size. Later widgets are drawn over earlier ones; "" draws none. ' +
       'A value takes a label mode after a colon, as count:off@x,y: off (the value alone), ' +
-      'short (its own short form: ↑1,200 m, 142 bpm avg, longest 124 km, where it has one), ' +
-      'inline (25 activities) or under (the words on a line under it). Left out, a value ' +
-      'has its words under it; the date has none. ' +
-      `The values: ${METRICS.join(', ')}. A value the video cannot show is left out: start, ` +
-      'time-of-day and the values as the activity plays (speed-now, elevation-now and the ' +
-      "sensors' -now) are for a single activity; count, days, longest, longest-time, " +
-      'average-distance and biggest-climb for several activities; the elevation values need ' +
-      'recorded elevation. Pace is the average while moving; pace and the speeds are in ' +
-      'minutes per kilometer when every activity is on foot, else km/h; top speed is the ' +
-      'fastest over 10 s, speed-now the speed over the last 10 s. Heart rate, power, cadence, ' +
-      'temperature and calories need an activity that recorded them; cadence is steps per ' +
-      'minute on foot.',
+      'short (its own short form: ↑1,200 m, 142 bpm avg, 45 km/h max; for the climb, the ' +
+      'descent and the avg-, max- and min- values), inline (25 activities) or under (the ' +
+      'words on a line under it). Left out, a value has its words under it; the date has ' +
+      `none. The values: ${METRICS.join(', ')}. For several activities a plain value is ` +
+      'their total (time, moving, distance, climb, descent, calories); avg-, max- and min- ' +
+      'time, distance, climb and calories are per activity; the speeds, elevations and ' +
+      'sensors are over every activity together. A value the video cannot show is left out: ' +
+      `${SINGLE_ONLY.join(', ')} are for a single activity; count, days and the per-activity ` +
+      'values for several; the elevation values need recorded elevation. The average speed ' +
+      'is over the moving time; speeds are minutes per kilometer when every activity is on ' +
+      'foot, else km/h; max-speed is the fastest over 10 s, speed-now the speed over the ' +
+      'last 10 s. The sensor values and calories need an activity that recorded them; ' +
+      'cadence is steps per minute on foot.',
   },
   {
     name: 'totals-card',
@@ -421,11 +422,11 @@ export const SETTINGS: readonly SettingDefinition[] = [
     help:
       'What the totals card shows, as --widgets is written: text:"Your text"@x,y,size ' +
       `(text@x,y for the title) and totals such as distance@x,y,size: ${TOTALS_FIELDS.join(', ')}. ` +
-      'As totals: time is hours in total, moving hours moving, pace the average while moving, ' +
-      'top-speed the fastest of any activity, date the days spanned, days the days with an ' +
-      'activity, longest-time the longest activity in hours, average-distance the kilometers ' +
-      'per activity, biggest-climb the most one activity climbed. A total the activities did ' +
-      'not record (elevation, the sensors, calories) is left out. The values fade in in their ' +
+      'As totals over every activity: count, time (hours, stops included), moving, distance, ' +
+      'climb, descent, calories and days are added up; avg-, max- and min- time, distance, ' +
+      'climb and calories are per activity; the speeds, elevations and sensors are over ' +
+      'every activity together; date is the days spanned. A total the activities did not ' +
+      'record (elevation, the sensors, calories) is left out. The values fade in in their ' +
       'order and count up.',
   },
 
