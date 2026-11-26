@@ -85,7 +85,7 @@ test('tells distances and heights in miles and feet when Imperial is picked', as
 
   // A value's unit can be left out, the number alone, here or over the replay.
   await distance.click();
-  await page.getByRole('button', { name: 'Unit: Shown' }).click();
+  await page.getByRole('button', { name: 'Unit: On' }).click();
   const unit = page.getByRole('dialog', { name: 'Total distance: unit' });
   await expect(unit.getByRole('radio', { name: /^Off/ })).toContainText('713');
   await unit.getByRole('radio', { name: /^Off/ }).click();

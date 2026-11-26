@@ -2,13 +2,13 @@
 // The chips for arranging widgets, in the strip under the picture (Overlay, and Ending with
 // the totals card). With no widget picked: adding a text or a stat, and the elevation chart
 // on or off. With one picked, the strip is that widget's: Done lets it go; Edit writes a
-// text's text; Size, Label (where a value's words are, and what they say), Unit (shown or left
-// out, for a value that has one) and Format (a time, date or clock time) open their sheet;
-// Remove takes it off the picture. The section's own settings
+// text's text; Size, Label position (where a value's words are), Label text (what they say),
+// Unit (on or off, for a value that has one) and Format (a time, date or clock time) open
+// their sheet; Remove takes it off the picture. The section's own settings
 // stay in the slot, after the tools.
-import { hasUnit, type Metric, type MetricValue, type Widget } from '@wornways/engine';
+import { hasUnit, labelTextOf, type Metric, type MetricValue, type Widget } from '@wornways/engine';
 import { computed } from 'vue';
-import { FORMAT_NAMES, LABEL_MODE_NAMES, formatOf } from '../adjust.ts';
+import { FORMAT_NAMES, LABEL_MODE_NAMES, formatOf, type WidgetPart } from '../adjust.ts';
 
 const props = defineProps<{
   widgets: Widget[];
@@ -27,25 +27,33 @@ const emit = defineEmits<{
   tool: [tool: 'text' | 'values' | 'chart'];
   /** Writes the picked text widget's text. */
   edit: [index: number];
-  /** Opens the picked widget's size, label, unit or format in a sheet. */
-  open: [index: number, what: 'size' | 'label' | 'unit' | 'format'];
+  /** Opens a part of the picked widget's settings in a sheet. */
+  open: [index: number, what: WidgetPart];
   remove: [index: number];
 }>();
 
 const picked = computed(() =>
   props.selected === null ? null : (props.widgets[props.selected] ?? null),
 );
-/** The picked value's label chip: where its words are. */
+/** The picked value's label chips: where its words are, and the words ("None" for none). */
 const labelChip = computed(() =>
   picked.value?.kind === 'metric' ? LABEL_MODE_NAMES[picked.value.label] : '',
 );
+const wordsChip = computed(() => {
+  const widget = picked.value;
+  if (widget?.kind !== 'metric') return '';
+  const value = props.values.get(widget.metric);
+  const format = formatOf(widget, props.card) ?? undefined;
+  const words = value ? labelTextOf(value, widget.labelText, format) : (widget.labelText ?? '');
+  return words || 'None';
+});
 /** Whether the picked value shows its unit, when it has one: null when it has none. */
 const unit = computed(() => {
   const widget = picked.value;
   if (widget?.kind !== 'metric') return null;
   const value = props.values.get(widget.metric);
   if (!value || !hasUnit(value, formatOf(widget, props.card) ?? undefined)) return null;
-  return widget.unit === false ? 'Off' : 'Shown';
+  return widget.unit === false ? 'Off' : 'On';
 });
 /** The picked value's format, when it is a time, a date or a clock time. */
 const format = computed(() => (picked.value ? formatOf(picked.value, props.card) : null));
@@ -80,12 +88,23 @@ const format = computed(() => (picked.value ? formatOf(picked.value, props.card)
       v-if="picked.kind === 'metric'"
       type="button"
       class="setting-row"
-      :aria-label="`Label: ${labelChip}`"
+      :aria-label="`Label position: ${labelChip}`"
       aria-haspopup="dialog"
       @click="emit('open', selected, 'label')"
     >
-      <span>Label</span>
+      <span>Label position</span>
       <span class="value">{{ labelChip }}</span>
+    </button>
+    <button
+      v-if="picked.kind === 'metric'"
+      type="button"
+      class="setting-row"
+      :aria-label="`Label text: ${wordsChip}`"
+      aria-haspopup="dialog"
+      @click="emit('open', selected, 'words')"
+    >
+      <span>Label text</span>
+      <span class="value words">{{ wordsChip }}</span>
     </button>
     <button
       v-if="unit"

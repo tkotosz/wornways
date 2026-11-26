@@ -22,7 +22,15 @@ import {
   type Widget,
 } from '@wornways/engine';
 import { computed, onBeforeUnmount, ref } from 'vue';
-import { SECTIONS, countOf, widgetLabel, type Adjustments, type Section } from './adjust.ts';
+import {
+  SECTIONS,
+  WIDGET_PART_NAMES,
+  countOf,
+  widgetLabel,
+  type Adjustments,
+  type Section,
+  type WidgetPart,
+} from './adjust.ts';
 import AddWidget from './components/AddWidget.vue';
 import FramePanel from './components/FramePanel.vue';
 import PlaybackPanel from './components/PlaybackPanel.vue';
@@ -74,7 +82,7 @@ const sheet = ref<{
   label: string;
   /** A widget's sheet: which widget, and only its size, label or format when a chip opened it. */
   widget?: number;
-  only?: 'size' | 'label' | 'unit' | 'format';
+  only?: WidgetPart;
 } | null>(null);
 function openSetting(name: string, label: string): void {
   sheet.value = { name, label };
@@ -141,10 +149,10 @@ function setWidgets(list: Widget[]): void {
 }
 
 /** Opens a widget's settings in a sheet: all of them (the list), or one part of them. */
-function openWidget(index: number, only?: 'size' | 'label' | 'unit' | 'format'): void {
+function openWidget(index: number, only?: WidgetPart): void {
   selectedWidget.value = index;
   const name = widgetLabel(widgets.value[index]!, values.value);
-  const label = only ? `${name}: ${only}` : name;
+  const label = only ? `${name}: ${WIDGET_PART_NAMES[only].toLowerCase()}` : name;
   sheet.value = { name: 'widget', label, widget: index, ...(only ? { only } : {}) };
 }
 

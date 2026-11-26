@@ -490,6 +490,17 @@ export const LABEL_MODE_NAMES: Record<LabelMode, string> = {
   under: 'Under',
 };
 
+/** A part of a widget's settings that a chip of the strip opens on its own. */
+export type WidgetPart = 'size' | 'label' | 'words' | 'unit' | 'format';
+/** Each part's name, as its chip and its sheet say it. */
+export const WIDGET_PART_NAMES: Record<WidgetPart, string> = {
+  size: 'Size',
+  label: 'Label position',
+  words: 'Label text',
+  unit: 'Unit',
+  format: 'Format',
+};
+
 /** The names of the ways a time, a date or a clock time can be written. */
 export const FORMAT_NAMES: Record<ValueFormat, string> = {
   hms: 'h:mm:ss',

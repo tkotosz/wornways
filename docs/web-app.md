@@ -204,10 +204,10 @@ drawing each. The editor's settings are remembered for the next visit.
   when an activity recorded elevation); and the watermark's, a fixed small mark at the
   bottom left on the map credit's line. A new widget comes in a free spot clear of the
   middle. A picked widget turns the strip into its own chips: Done (lets it go), Edit
-  (a text's text), Size (a sheet with a slider), Label (where a value's words go:
-  off, before, after, above or under, each with how the value reads in it; and the words
-  themselves, its usual ones until edited, with a way back to them), Unit (for a value
-  that has one: shown, or off for the number alone), Format (for a time, a date or a clock time: h:mm:ss, h:mm,
+  (a text's text), Size (a sheet with a slider), Label position (where a value's
+  words go: off, before, after, above or under, each with how the value reads in it), Label
+  text (the words themselves, "None" when empty; its usual ones until edited, with a way
+  back to them), Unit (for a value that has one: on, or off for the number alone), Format (for a time, a date or a clock time: h:mm:ss, h:mm,
   hours or days; five ways to write a date; 24 or 12 hours; each with how the value reads
   in it) and Remove. After the widgets' tools the strip has
   the units (metric or imperial, for every value of the video and its totals card; also in
@@ -224,7 +224,7 @@ drawing each. The editor's settings are remembered for the next visit.
   Text and Add Total (a sheet of the totals these activities have, each with its own
   number), and after them the units and the end card's switch; there is no chart or
   watermark on the card. A total is written as over the replay ("1,147 km" over "total
-  distance") and has the same Label, Unit and Format chips; its words go under it at first,
+  distance") and has the same Label position, Label text, Unit and Format chips; its words go under it at first,
   or above it, before or after it (smaller and orange on the number's line), or none. The card's band behind them stays where the still drew it until it is drawn
   again; the video has it behind the widgets as they are.
 
@@ -379,7 +379,9 @@ drawing each. The editor's settings are remembered for the next visit.
   other and while popups open and close.
 - In the Overlay and Ending sections, where things are arranged on the picture, the
   preview opens on the still. Play shows the draft (made then, or the one already made for
-  these settings) and its corner button Edit goes back to the still. Nothing is drawn or
+  these settings) and its corner button Edit goes back to the still. In Ending the draft
+  starts 2 s before the replay ends and loops back there, so each try shows the finish and
+  the cards at once; the player's bar still reaches the start. Nothing is drawn or
   played in the background: a draft is made only when Play is pressed. The engine draws frames forward only, so a video is what lets a person move back
   and forth. Measured in headless Chromium without a GPU: under 3 s for the 25 demo
   activities at once.

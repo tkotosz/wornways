@@ -242,7 +242,7 @@ test.describe('the editor on a phone', () => {
     await expectSection(page, 'Overlay');
     // The new text is picked: the strip is its own, until Done.
     await expect(page.getByRole('button', { name: 'Edit the text' })).toBeVisible();
-    await expect(page.getByRole('button', { name: /^Label: / })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: /^Label / })).toHaveCount(0);
     await done.click();
     // A text left empty goes away.
     await page.getByRole('button', { name: 'Add a text' }).click();
@@ -258,23 +258,29 @@ test.describe('the editor on a phone', () => {
     await expect(onPicture).toHaveCount(count + 2);
     const days = onPicture.last();
     await expect(days.locator('.words')).toHaveText(/moving days?/);
-    // Its label, from its chip: after it, then above it, then in words of its own.
-    await page.getByRole('button', { name: 'Label: Under' }).click();
-    const label = page.getByRole('dialog', { name: 'Moving days: label' });
-    await label.getByRole('radio', { name: /^After/ }).click();
+    // Its label position, from its chip: after it, then above it.
+    await page.getByRole('button', { name: 'Label position: Under' }).click();
+    const position = page.getByRole('dialog', { name: 'Moving days: label position' });
+    await expect(position.getByRole('textbox')).toHaveCount(0);
+    await position.getByRole('radio', { name: /^After/ }).click();
     await expect(days.locator('.value')).toHaveText(/^\d+ moving days?$/);
-    await label.getByRole('radio', { name: /^Above/ }).click();
+    await position.getByRole('radio', { name: /^Above/ }).click();
     await expect(days.locator('.words')).toHaveText(/moving days?/);
     await expect(days.locator('.words + .value')).toHaveText(/^\d+$/);
-    const words = label.getByRole('textbox', { name: 'Label text' });
+    await position.getByRole('button', { name: 'Done' }).click();
+    await expect(page.getByRole('button', { name: 'Label position: Above' })).toBeVisible();
+    // Its label text, from a chip of its own: words of its own, then back to the usual.
+    await page.getByRole('button', { name: /^Label text: moving days?$/ }).click();
+    const text = page.getByRole('dialog', { name: 'Moving days: label text' });
+    const words = text.getByRole('textbox', { name: 'Label text' });
     await expect(words).toHaveValue(/moving days?/);
     await words.fill('days riding');
     await expect(days.locator('.words')).toHaveText('days riding');
-    // Back to the usual words.
-    await label.getByRole('button', { name: /^Use the usual words/ }).click();
+    await text.getByRole('button', { name: /^Use the usual words/ }).click();
     await expect(days.locator('.words')).toHaveText(/moving days?/);
-    await label.getByRole('button', { name: 'Done' }).click();
-    await expect(page.getByRole('button', { name: 'Label: Above' })).toBeVisible();
+    await words.fill('');
+    await text.getByRole('button', { name: 'Done' }).click();
+    await expect(page.getByRole('button', { name: 'Label text: None' })).toBeVisible();
     // Remove takes it off; there is no Center, as dragging snaps to the middle.
     await expect(page.getByRole('button', { name: 'Center it across' })).toHaveCount(0);
     await page.getByRole('button', { name: 'Remove from the picture' }).click();

@@ -18,7 +18,7 @@ import {
   type Widget,
 } from '@wornways/engine';
 import { computed } from 'vue';
-import { FORMAT_NAMES, LABEL_MODE_NAMES, formatOf } from '../adjust.ts';
+import { FORMAT_NAMES, LABEL_MODE_NAMES, formatOf, type WidgetPart } from '../adjust.ts';
 import ExactNumber from './ExactNumber.vue';
 
 const props = defineProps<{
@@ -26,7 +26,7 @@ const props = defineProps<{
   title: string;
   values: Map<Metric, MetricValue>;
   card: boolean;
-  only?: 'size' | 'label' | 'unit' | 'format';
+  only?: WidgetPart;
 }>();
 const emit = defineEmits<{ change: [widget: Widget]; remove: [] }>();
 
@@ -82,11 +82,11 @@ const unitChoices = computed(() => {
   if (!value || !hasUnit(value, format)) return [];
   const text = (format && value.formats?.[format]) || value;
   return [
-    { shown: true, name: 'Shown', example: text.value },
+    { shown: true, name: 'On', example: text.value },
     { shown: false, name: 'Off', example: text.number },
   ];
 });
-const shows = (part: 'size' | 'label' | 'unit' | 'format') => !props.only || props.only === part;
+const shows = (part: WidgetPart) => !props.only || props.only === part;
 </script>
 
 <template>
@@ -110,7 +110,9 @@ const shows = (part: 'size' | 'label' | 'unit' | 'format') => !props.only || pro
       </button>
     </div>
     <div v-if="shows('label') && widget.kind === 'metric' && modes.length" class="field">
-      <span id="widget-label" class="label">Position</span>
+      <span id="widget-label" class="label" :class="{ 'visually-hidden': only }">
+        Label position
+      </span>
       <div class="modes" role="radiogroup" aria-labelledby="widget-label">
         <button
           v-for="m in modes"
@@ -126,8 +128,8 @@ const shows = (part: 'size' | 'label' | 'unit' | 'format') => !props.only || pro
         </button>
       </div>
     </div>
-    <div v-if="shows('label') && widget.kind === 'metric'" class="field">
-      <span id="widget-words" class="label">Label text</span>
+    <div v-if="shows('words') && widget.kind === 'metric'" class="field">
+      <span id="widget-words" class="label" :class="{ 'visually-hidden': only }">Label text</span>
       <input
         type="text"
         aria-labelledby="widget-words"

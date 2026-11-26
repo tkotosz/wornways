@@ -26,7 +26,8 @@ function dropDraft(): void {
 // for the ending the finished totals card or end card. Play makes a draft of the whole video,
 // small and at a low frame rate, and plays it in place of the picture, with a bar to move to
 // any moment. Where things are arranged on the still (`editing`), it opens on the still and
-// Edit goes back to it from the draft. It stays in view beside the settings on wide screens
+// Edit goes back to it from the draft. For the ending the draft starts, and loops back to,
+// shortly before the replay ends (`seconds`), so the cards being arranged come at once. It stays in view beside the settings on wide screens
 // and sits above them on phones, where only the picture shows. While editing, the `layer`
 // slot is drawn over the still, with the frame's size. With `bare`, the still is drawn
 // without its widgets, for an editor in the slot that draws them itself: a change to the
@@ -57,6 +58,22 @@ const emit = defineEmits<{ drawn: [poster: Poster, scene: PosterScene] }>();
 
 /** Waits this long after a change, so dragging a slider draws once, not at every step. */
 const PAUSE_MS = 400;
+/** For the ending, the draft starts this long before the replay ends. */
+const ENDING_LEAD_S = 2;
+
+/** Where the draft starts and loops back to: the start, or for the ending near its end. */
+const startAt = computed(() =>
+  props.scene === 'ending' && props.seconds !== undefined
+    ? Math.max(0, props.seconds - ENDING_LEAD_S)
+    : 0,
+);
+
+/** Moves the draft to where it starts; `play` for one that has come to its end. */
+function toStart(event: Event, play: boolean): void {
+  const video = event.target as HTMLVideoElement;
+  video.currentTime = startAt.value;
+  if (play) void video.play().catch(() => undefined);
+}
 
 const url = ref('');
 const busy = ref(false);
@@ -234,9 +251,11 @@ onBeforeUnmount(() => {
           aria-label="Preview of the video"
           controls
           autoplay
-          loop
+          :loop="startAt === 0"
           muted
           playsinline
+          @loadedmetadata="toStart($event, false)"
+          @ended="toStart($event, true)"
         />
         <img
           v-else-if="url"

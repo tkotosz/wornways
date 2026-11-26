@@ -68,10 +68,15 @@ test('plays a draft of the video in the preview, and edits on a still', async ({
   await preview.getByRole('button', { name: 'Edit', exact: true }).click();
   await expect(preview.getByTestId('preview-video')).toHaveCount(0);
 
-  // Ending also opens on a still: Play shows the draft already made, Edit goes back.
+  // Ending also opens on a still: Play shows the draft already made, from shortly before the
+  // replay ends, and Edit goes back.
   await openSection(page, 'Ending');
   await preview.getByRole('button', { name: 'Play preview' }).click();
   await expect(preview.getByTestId('preview-video')).toBeVisible();
+  const at = await preview
+    .getByTestId('preview-video')
+    .evaluate((element) => (element as unknown as { currentTime: number }).currentTime);
+  expect(at).toBeGreaterThan(seconds - 6);
   await expect(preview.getByRole('status')).toHaveCount(0);
   await preview.getByRole('button', { name: 'Edit', exact: true }).click();
   await expect(preview.getByTestId('preview-video')).toHaveCount(0);
