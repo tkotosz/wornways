@@ -24,6 +24,14 @@ test.describe('on a phone', () => {
       'href',
       '/privacy.html',
     );
+    await expect(menu.getByRole('link', { name: 'Source on GitHub' })).toHaveAttribute(
+      'href',
+      'https://github.com/tkotosz/wornways',
+    );
+    await expect(menu.getByRole('link', { name: 'Licenses' })).toHaveAttribute(
+      'href',
+      '/licenses.txt',
+    );
     // Reporting an issue opens GitHub's forms, the version and the device filled in.
     const report = await menu.getByRole('link', { name: /^Report an issue/ }).getAttribute('href');
     const url = new URL(report!);

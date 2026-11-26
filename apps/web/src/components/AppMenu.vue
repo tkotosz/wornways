@@ -1,8 +1,9 @@
 <script setup lang="ts">
 // The menu, from the ☰ button: a panel that slides in from the left over the dimmed screen.
 // At its top the name and the version; then switching the source (with the one in use),
-// installing the app where the browser can, About, reporting an issue on GitHub, and the
-// privacy policy. Back, Escape, a tap beside it or picking an item closes it.
+// installing the app where the browser can, About, reporting an issue on GitHub, the source
+// on GitHub, the licenses and the privacy policy. Back, Escape, a tap beside it or picking an
+// item closes it.
 import { computed, onMounted, ref } from 'vue';
 import type { Source } from '../messages.ts';
 import { isInstalled } from '../install.ts';
@@ -79,6 +80,24 @@ function tapped(event: MouseEvent): void {
             Report an issue
             <small>A bug or an idea, on GitHub</small>
           </span>
+        </a>
+        <a
+          class="item"
+          href="https://github.com/tkotosz/wornways"
+          target="_blank"
+          rel="noopener"
+          @click="emit('close')"
+        >
+          <svg class="item-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M8.5 7 3.5 12l5 5M15.5 7l5 5-5 5M13.5 5l-3 14" />
+          </svg>
+          <span>Source on GitHub</span>
+        </a>
+        <a class="item" href="/licenses.txt" target="_blank" rel="noopener" @click="emit('close')">
+          <svg class="item-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M6.5 3h8l4 4v14h-12zM14.5 3v4h4M9.5 12h6M9.5 15.5h6" />
+          </svg>
+          <span>Licenses</span>
         </a>
         <a class="item" href="/privacy.html" target="_blank" rel="noopener" @click="emit('close')">
           <svg class="item-icon" viewBox="0 0 24 24" aria-hidden="true">

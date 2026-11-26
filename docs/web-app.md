@@ -50,7 +50,9 @@ icons and Render are disabled.
 **The menu** slides in from the left over the dimmed screen: the mark, the name and the
 version, then Switch source (with the source in use),
 Install app (where offered, see Install), About (what the app is, its license, the source
-on GitHub and the licenses) and the privacy policy, a page of its own. Back, Escape, a tap
+on GitHub and the licenses), Report an issue (GitHub's new-issue page, with a form for a bug
+and one for an idea, the version and the kind of device filled in; GitHub asks to sign in
+first), Source on GitHub, Licenses and the privacy policy, a page of its own. Back, Escape, a tap
 beside it or picking an item closes it.
 
 **Popups** take the whole screen on a phone and are a panel in the middle on a wide screen,
