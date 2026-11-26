@@ -203,7 +203,7 @@ format ("2 Apr – 8 May 2026", "Thu 2 Apr – Fri 8 May", "Apr 2 – May 8, 202
 is "May 2026", "May" or "2026-05".
 
 Without `--widgets`, a video starts with the title at the top in the middle; the values
-that suit it at the bottom left, the first large and the others smaller in a row under it
+that suit it, each with its icon, at the bottom left, the first large and the others smaller in a row under it
 (one activity: distance, time, climb; a race: race time, still moving, total distance; in
 turn: date, total activities, total distance, total climb; one day after another: date,
 total distance, total climb, total moving time); and for a single activity with recorded
@@ -318,7 +318,7 @@ record (the climb, the descent and the elevations without elevation, the sensor 
 calories) is left out.
 
 Unless set, the card starts with activities, distance, moving time and climb (`count`,
-`distance`, `moving`, `climb`), without the title, which the map behind it still shows; a
+`distance`, `moving`, `climb`), each with its icon, without the title, which the map behind it still shows; a
 text widget adds it (`text@50,30`). The values sit up to two
 to a row on a story or square frame, up to four on a wide one, a last short row centered,
 the whole block centered on the frame. In the web app they are arranged on the card in the

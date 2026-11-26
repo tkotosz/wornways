@@ -233,9 +233,9 @@ export type Measure = (widget: Widget) => { width: number; height: number };
 
 /**
  * The widgets a video starts with when none are set: the title at the top, in the middle; the
- * values at the bottom left, the first large and the others smaller in a row under it; the
- * elevation chart along the bottom, with the values above it. `metrics` are the values in
- * order; `measure` gives each widget's size on the finished picture.
+ * values, each with its icon, at the bottom left, the first large and the others smaller in a
+ * row under it; the elevation chart along the bottom, with the values above it. `metrics` are
+ * the values in order; `measure` gives each widget's size on the finished picture.
  */
 export function startingWidgets(
   options: { title: boolean; metrics: Metric[]; elevationChart: boolean },
@@ -263,6 +263,7 @@ export function startingWidgets(
       kind: 'metric',
       metric: first,
       label: defaultLabel(first),
+      icon: true,
       x: 0,
       y: 0,
       size: 100 * 1.15,
@@ -271,6 +272,7 @@ export function startingWidgets(
       kind: 'metric',
       metric,
       label: defaultLabel(metric),
+      icon: true,
       x: 0,
       y: 0,
       size: 100 * 0.8,

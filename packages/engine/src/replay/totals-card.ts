@@ -210,6 +210,7 @@ export function startingTotalsWidgets(
         kind: 'metric',
         metric: field,
         label: 'under',
+        icon: true,
         x: 0,
         y: 0,
         size: 100,
