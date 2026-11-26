@@ -424,7 +424,8 @@ const METRIC_NAMES: Partial<Record<Metric, string>> = {
   'max-calories': 'Max calories per activity',
   'min-calories': 'Min calories per activity',
   count: 'Activities',
-  days: 'Days out',
+  days: 'Days',
+  'moving-days': 'Moving days',
 };
 /** A value's name: the one the video gives it, else its usual one. */
 export const metricName = (metric: Metric, values?: Map<Metric, MetricValue>) =>
@@ -467,7 +468,7 @@ export const METRIC_GROUPS: { name: string; metrics: Metric[] }[] = [
     metrics: ['avg-temperature', 'min-temperature', 'max-temperature', 'temperature-now'],
   },
   { name: 'Calories', metrics: ['calories', 'avg-calories', 'max-calories', 'min-calories'] },
-  { name: 'Activities', metrics: ['count', 'days', 'date'] },
+  { name: 'Activities', metrics: ['count', 'days', 'moving-days', 'date'] },
 ];
 
 /** How a value's label modes are named: in the strip's chip and its sheet. */

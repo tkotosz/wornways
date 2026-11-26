@@ -59,8 +59,10 @@ export type Totals = {
   /** The highest and lowest elevation, in meters; null when no activity recorded elevation. */
   highest: number | null;
   lowest: number | null;
-  /** How many calendar days have an activity starting on them. */
+  /** The calendar days from the first activity's to the last one's, both counted. */
   days: number;
+  /** How many calendar days have an activity starting on them. */
+  movingDays: number;
   /** The top speed of any activity, in meters per second (see `TOP_SPEED_WINDOW_S`). */
   topSpeed: number;
   /**
@@ -359,8 +361,15 @@ export function totalsEntries(
       case 'min-calories':
         return perActivity(field, totals.each.calories, whole, 'kcal', 'calories');
       case 'days':
+        return [entry(field, whole(totals.days), totals.days === 1 ? 'day' : 'days', 'Days')];
+      case 'moving-days':
         return [
-          entry(field, whole(totals.days), totals.days === 1 ? 'day out' : 'days out', 'Days out'),
+          entry(
+            field,
+            whole(totals.movingDays),
+            totals.movingDays === 1 ? 'moving day' : 'moving days',
+            'Moving days',
+          ),
         ];
       case 'date':
         return [entry(field, totals.dates, 'dates', 'Date')];

@@ -17,7 +17,8 @@ describe('totalsEntries', () => {
     descended: 4105,
     highest: 1445,
     lowest: 102,
-    days: 4,
+    days: 6,
+    movingDays: 4,
     topSpeed: 15,
     each: {
       meters: [112_300, 80_000, 60_000, 40_100, 20_000],
@@ -53,14 +54,18 @@ describe('totalsEntries', () => {
     ]);
   });
 
-  it('adds up the time with stops, the descent, the calories and the days', () => {
-    expect(shown(['time', 'descent', 'calories', 'days'])).toEqual([
+  it('adds up the time with stops, the descent and the calories, and counts the days', () => {
+    expect(shown(['time', 'descent', 'calories', 'days', 'moving-days'])).toEqual([
       '18 / hours in total',
       '4,105 / m descended in total',
       '6,120 / kcal in total',
-      '4 / days out',
+      '6 / days',
+      '4 / moving days',
     ]);
-    expect(shown(['days'], { ...totals, days: 1 })).toEqual(['1 / day out']);
+    expect(shown(['days', 'moving-days'], { ...totals, days: 1, movingDays: 1 })).toEqual([
+      '1 / day',
+      '1 / moving day',
+    ]);
   });
 
   it('tells the avg, max and min per activity of time, distance, climb and calories', () => {

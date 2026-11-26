@@ -287,12 +287,22 @@ describe('the values', () => {
 
   it('shows the moving time, the descent, the max elevation, the days and the max distance', () => {
     const inTurn = chronologicalTimeline([1_190, 1_190], { duration: 1 });
-    for (const metric of ['moving', 'descent', 'max-elevation', 'days', 'max-distance'] as Metric[])
+    const shown: Metric[] = [
+      'moving',
+      'descent',
+      'max-elevation',
+      'days',
+      'moving-days',
+      'max-distance',
+    ];
+    for (const metric of shown)
       expect(severalLastFrame(inTurn, [metric]), metric).toBeGreaterThan(20);
     // One activity: its moving time, but no days or values per activity, which would only
     // repeat it.
     expect(lastFrame({ widgets: valuesAt(['moving']) }).bottomLeft).toBeGreaterThan(20);
-    expect(lastFrame({ widgets: valuesAt(['days', 'max-distance']) }).bottomLeft).toBe(0);
+    expect(
+      lastFrame({ widgets: valuesAt(['days', 'moving-days', 'max-distance']) }).bottomLeft,
+    ).toBe(0);
   });
 
   it('shows the sensor values and calories of an activity that recorded them, and only then', () => {
@@ -534,6 +544,29 @@ describe('the totals card', () => {
       name: 'Total activities',
     });
     expect(lastTotalsFrame(widgets).equals(lastTotalsFrame())).toBe(true);
+  });
+
+  it('counts the days from the first activity to the last, and the days with one', () => {
+    // Two activities on one day and one three days later: four days, two with an activity.
+    const later = (id: string, days: number) => {
+      const track = route();
+      track.id = id;
+      track.startTime += days * 86_400_000;
+      return track;
+    };
+    const renderer = createRenderer(
+      [route(), later('same-day', 0.01), later('three-days-on', 3)],
+      chronologicalTimeline([5_000, 5_000, 5_000], { duration: 1 }),
+      (w, h) => createCanvas(w, h) as unknown as CanvasLike,
+      { width: 270, height: 480, fps: 10, totalsCard: true },
+    );
+    const { values } = renderer.totalsCard();
+    expect(values.get('days')).toEqual({ value: '4', label: 'days', name: 'Days' });
+    expect(values.get('moving-days')).toEqual({
+      value: '2',
+      label: 'moving days',
+      name: 'Moving days',
+    });
   });
 });
 

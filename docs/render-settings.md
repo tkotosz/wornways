@@ -220,7 +220,8 @@ value the video cannot show is left out.
 | `calories`                                              | Calories so far                         | Total calories                                           |
 | `avg-calories`, `max-calories`, `min-calories`          | not offered                             | Avg / Max / Min calories per activity                    |
 | `count`                                                 | not offered                             | Still moving: how many are still out / Total activities  |
-| `days`                                                  | not offered                             | Days out: days with an activity                          |
+| `days`                                                  | not offered                             | Days: from the first activity's day to the last one's    |
+| `moving-days`                                           | not offered                             | Moving days: the days with an activity                   |
 | `date`                                                  | Date: its day                           | the days the activities span / the playing group's dates |
 
 While a video plays, a minimum per activity counts the activities finished so far (the ones

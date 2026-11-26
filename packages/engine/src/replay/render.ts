@@ -17,7 +17,7 @@ import { drawWatermark } from './mark.ts';
 import { averagePace, isOnFoot, topSpeed } from './pace.ts';
 import { sensorValueText } from './sensor-text.ts';
 import type { Metric, MetricValue } from './metrics.ts';
-import { dateRange } from './plans.ts';
+import { calendarDay, dateRange } from './plans.ts';
 import { composeHeat, createHeatRamp, decodeHeat, heatStyle, saturationFromHeat } from './heat.ts';
 import { projectTrack, type Projected, type SensorSums } from './project.ts';
 import type { Timeline } from './timeline.ts';
@@ -218,6 +218,7 @@ export type Renderer = {
 type MetricState = Pick<
   Prepared,
   | 'date'
+  | 'day'
   | 'hasElevation'
   | 'started'
   | 'done'
@@ -235,6 +236,8 @@ type MetricState = Pick<
 
 type Prepared = Projected & {
   date: string;
+  /** The calendar day the activity started on, as a day count, to count the days between. */
+  day: number;
   // Drawing state
   /** Index of the last point the head has passed. */
   idx: number;
@@ -454,6 +457,7 @@ export function createRenderer(
   const prepared: Prepared[] = tracks.map((track) => ({
     ...projectTrack(track, view, minGapPx),
     date: dateFormat.format(track.startTime),
+    day: calendarDay(track.startTime),
     idx: 0,
     headX: 0,
     headY: 0,
@@ -868,6 +872,8 @@ export function createRenderer(
     let moved = 0;
     let fastest = 0;
     const days = new Set<string>();
+    let firstDay = Infinity;
+    let lastDay = -Infinity;
     let date = state[0]!.date;
     for (const tr of state) {
       if (!tr.done) moving++;
@@ -883,6 +889,8 @@ export function createRenderer(
       moved += tr.moved;
       fastest = Math.max(fastest, tr.topSpeed);
       days.add(tr.date);
+      firstDay = Math.min(firstDay, tr.day);
+      lastDay = Math.max(lastDay, tr.day);
       date = tr.date;
     }
     const lastSecond = (track: Track) => track.points[track.points.length - 1];
@@ -1044,8 +1052,16 @@ export function createRenderer(
       set('count', String(started), 'Total activities', started === 1 ? singular : plural);
       set('date', timeline.label?.(t) ?? date, 'Date', '');
     }
-    if (several)
-      set('days', String(days.size), 'Days out', days.size === 1 ? 'day out' : 'days out');
+    if (several) {
+      const spanned = started === 0 ? 0 : lastDay - firstDay + 1;
+      set('days', String(spanned), 'Days', spanned === 1 ? 'day' : 'days');
+      set(
+        'moving-days',
+        String(days.size),
+        'Moving days',
+        days.size === 1 ? 'moving day' : 'moving days',
+      );
+    }
     return texts;
   }
 
@@ -1057,6 +1073,7 @@ export function createRenderer(
       for (const [channel, sums] of sensorEntries(tr)) sensorsNow[channel] = sensorAt(sums, last);
       return {
         date: tr.date,
+        day: tr.day,
         hasElevation: tr.hasElevation,
         started: true,
         done: true,
@@ -1310,6 +1327,7 @@ export function createRenderer(
       moving += tr.moving[last];
     }
     const elapsed = (track: Track) => track.elapsedSeconds ?? track.points[track.points.length - 1];
+    const dayCounts = prepared.map((tr) => tr.day);
     return {
       activities: tracks.length,
       meters,
@@ -1327,7 +1345,8 @@ export function createRenderer(
       },
       onFoot,
       dates: datesSpanned,
-      days: new Set(prepared.map((tr) => tr.date)).size,
+      days: Math.max(...dayCounts) - Math.min(...dayCounts) + 1,
+      movingDays: new Set(dayCounts).size,
       topSpeed: fastest,
       ...sensorTotals(),
       calories: withCalories ? tracks.reduce((sum, track) => sum + (track.calories ?? 0), 0) : null,

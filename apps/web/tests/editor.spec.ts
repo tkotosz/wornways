@@ -253,18 +253,18 @@ test.describe('the editor on a phone', () => {
     await page.getByRole('button', { name: 'Add a metric' }).click();
     const values = page.getByRole('dialog', { name: 'Metrics' });
     await expect(values.getByRole('button', { name: /Elevation chart$/ })).toHaveCount(0);
-    await values.getByRole('button', { name: / Days out$/ }).click();
+    await values.getByRole('button', { name: / Moving days$/ }).click();
     await expect(values).toBeHidden();
     await expect(onPicture).toHaveCount(count + 2);
     const days = onPicture.last();
-    await expect(days.locator('.words')).toHaveText(/days? out/);
+    await expect(days.locator('.words')).toHaveText(/moving days?/);
     // Its label mode, from its chip: inline, after it.
     await page.getByRole('button', { name: 'Label: Under' }).click();
-    const label = page.getByRole('dialog', { name: 'Days out: label' });
+    const label = page.getByRole('dialog', { name: 'Moving days: label' });
     await label.getByRole('radio', { name: /^Inline/ }).click();
     await label.getByRole('button', { name: 'Done' }).click();
     await expect(page.getByRole('button', { name: 'Label: Inline' })).toBeVisible();
-    await expect(days).toContainText(/^\d+ days? out/);
+    await expect(days).toContainText(/^\d+ moving days?/);
     // Center puts it in the middle across; Remove takes it off.
     await page.getByRole('button', { name: 'Center it across' }).click();
     await expect

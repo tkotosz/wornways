@@ -13,8 +13,9 @@
  *   lowest point; elevation-now: as one activity plays
  * - heart rate, power, cadence and temperature: their average over time, highest, lowest
  *   (heart rate and temperature) and value as one activity plays
- * - calories; count: how many activities (a race: how many still out); days: the days with
- *   an activity; date
+ * - calories; count: how many activities (a race: how many still out); days: the calendar
+ *   days from the first activity's to the last one's; moving-days: the days with an activity;
+ *   date
  */
 export type Metric =
   | 'time'
@@ -59,6 +60,7 @@ export type Metric =
   | 'min-calories'
   | 'count'
   | 'days'
+  | 'moving-days'
   | 'date';
 export const METRICS: readonly Metric[] = [
   'time',
@@ -103,6 +105,7 @@ export const METRICS: readonly Metric[] = [
   'min-calories',
   'count',
   'days',
+  'moving-days',
   'date',
 ];
 /** The values that make sense only while one activity plays. */

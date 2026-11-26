@@ -36,6 +36,15 @@ export function dateRange(a: number, b: number): string {
   return `${da.getDate()}–${db.getDate()} ${mon(db)} ${db.getFullYear()}`;
 }
 
+/**
+ * The calendar day of `time` in this device's time zone, as a count of days: the days from
+ * one to another are their difference, also over a change to or from summer time.
+ */
+export function calendarDay(time: number): number {
+  const d = new Date(time);
+  return Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / 86_400_000;
+}
+
 const LEAD_S = 0.4;
 const HOLD_S = 2.5;
 /**

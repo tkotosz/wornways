@@ -395,7 +395,8 @@ export const SETTINGS: readonly SettingDefinition[] = [
       'their total (time, moving, distance, climb, descent, calories); avg-, max- and min- ' +
       'time, distance, climb and calories are per activity; the speeds, elevations and ' +
       'sensors are over every activity together. A value the video cannot show is left out: ' +
-      `${SINGLE_ONLY.join(', ')} are for a single activity; count, days and the per-activity ` +
+      `${SINGLE_ONLY.join(', ')} are for a single activity; count, days, moving-days and the ` +
+      'per-activity ' +
       'values for several; the elevation values need recorded elevation. The average speed ' +
       'is over the moving time; speeds are minutes per kilometer when every activity is on ' +
       'foot, else km/h; max-speed is the fastest over 10 s, speed-now the speed over the ' +
@@ -423,9 +424,11 @@ export const SETTINGS: readonly SettingDefinition[] = [
       'What the totals card shows, as --widgets is written: text:"Your text"@x,y,size ' +
       `(text@x,y for the title) and totals such as distance@x,y,size: ${TOTALS_FIELDS.join(', ')}. ` +
       'As totals over every activity: count, time (hours, stops included), moving, distance, ' +
-      'climb, descent, calories and days are added up; avg-, max- and min- time, distance, ' +
-      'climb and calories are per activity; the speeds, elevations and sensors are over ' +
-      'every activity together; date is the days spanned. A total the activities did not ' +
+      'climb, descent and calories are added up; days are the calendar days from the first ' +
+      'activity to the last, moving-days the days with an activity; avg-, max- and min- ' +
+      'time, distance, climb and calories are per activity; the speeds, elevations and ' +
+      'sensors are over every activity together; date is the days spanned. A total the ' +
+      'activities did not ' +
       'record (elevation, the sensors, calories) is left out. The values fade in in their ' +
       'order and count up.',
   },
