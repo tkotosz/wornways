@@ -1,5 +1,5 @@
 // The icons a value can show in front of it, one for each kind of value: a stopwatch for
-// times, a clock for clock times, a route for distances, a gauge for speeds, mountains for
+// times, a clock for clock times, a road for distances, a gauge for speeds, mountains for
 // elevation, a heart, a bolt for power, a crank for cadence, a thermometer, a flame for
 // calories, a flag for the activities and a calendar for days and dates.
 //
@@ -13,7 +13,7 @@ import type { Context2DLike } from './render.ts';
 export type IconName =
   | 'stopwatch'
   | 'clock'
-  | 'route'
+  | 'road'
   | 'gauge'
   | 'mountain'
   | 'heart'
@@ -76,12 +76,10 @@ export const ICONS: Record<IconName, IconPart[]> = {
     stroke('M18.2 6.8 L19.6 5.4'),
   ],
   clock: [stroke(circle(12, 12, 9)), stroke('M12 6.5 L12 12 L15.5 14')],
-  route: [
-    stroke('M5.5 19 C11 19 9 12.5 13.5 12.5 C16.5 12.5 18 13 18 10.5'),
-    fill(circle(5.5, 19, 2.2)),
-    fill(
-      'M18 2 C15.5 2 13.6 3.9 13.6 6.3 C13.6 9 18 12 18 12 C18 12 22.4 9 22.4 6.3 C22.4 3.9 20.5 2 18 2 Z',
-    ),
+  // A road narrowing into the distance, with its dashed middle line.
+  road: [
+    stroke('M3 21.5 L9 2.5 M21 21.5 L15 2.5'),
+    stroke('M12 19.5 L12 16.5 M12 12.5 L12 10 M12 6.5 L12 4.5', 1.8),
   ],
   gauge: [
     stroke(arc(12, 14, 9, 150, 390)),
@@ -129,7 +127,7 @@ export const ICONS: Record<IconName, IconPart[]> = {
 export function iconOf(metric: Metric): IconName {
   if (metric === 'start' || metric === 'time-of-day') return 'clock';
   if (metric === 'time' || metric === 'moving' || metric.endsWith('-time')) return 'stopwatch';
-  if (metric.endsWith('distance')) return 'route';
+  if (metric.endsWith('distance')) return 'road';
   if (metric.endsWith('speed')) return 'gauge';
   if (/climb|descent|elevation/.test(metric)) return 'mountain';
   if (metric.includes('heart-rate')) return 'heart';

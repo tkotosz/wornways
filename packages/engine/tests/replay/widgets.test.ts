@@ -157,7 +157,7 @@ describe('labels', () => {
       undefined,
     ]);
     expect(widgetsText(widgets)).toBe('distance:icon@1,2;avg-power:after:icon@1,2;climb@1,2');
-    expect(iconOf('max-distance')).toBe('route');
+    expect(iconOf('max-distance')).toBe('road');
     expect(iconOf('avg-power')).toBe('bolt');
     expect(iconOf('time-of-day')).toBe('clock');
     expect(iconOf('min-time')).toBe('stopwatch');
