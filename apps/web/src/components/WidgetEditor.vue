@@ -56,7 +56,14 @@ const emit = defineEmits<{
 }>();
 
 /** The widget being moved or resized, where it is now: its point and size. */
-const moving = ref<{ index: number; x: number; y: number; size: number } | null>(null);
+const moving = ref<{
+  index: number;
+  x: number;
+  y: number;
+  size: number;
+  /** A chart's height, when it has one apart from its width. */
+  height?: number;
+} | null>(null);
 /** The lines the moving widget snapped to, in percent of the frame; null for none. */
 const snap = ref<{ x: number | null; y: number | null }>({ x: null, y: null });
 
@@ -175,8 +182,38 @@ const pointers = new Map<number, { x: number; y: number }>();
 /** Whether a widget is held: a finger down now joins it, as the second of two. */
 let holding = false;
 
-/** Starts dragging a widget, or with `resize` its corner handle. */
-function start(event: PointerEvent, index: number, resize: boolean): void {
+/**
+ * What a hold does: move the widget, or resize it from its corner (or with two fingers) evenly,
+ * or a chart from its right edge (its width) or its top edge (its height).
+ */
+type Hold = 'move' | 'size' | 'width' | 'height';
+
+/**
+ * How much to scale by so an edge snaps: of the lines (`lines`), the one an edge of a widget
+ * centered on `at` comes nearest to when scaled by `k`, within `reach`; the scale that puts
+ * the edge on the line, and the line. Half the widget is `half` of what scales and `pad` of
+ * its outline's padding, which does not (all in percent of the frame). Both edges move, as the
+ * widget stays centered on its point.
+ */
+function snapScale(
+  at: number,
+  { half, pad }: { half: number; pad: number },
+  k: number,
+  lines: number[],
+  reach: number,
+): { k: number; line: number } | null {
+  if (!(half > 0)) return null;
+  let best: { k: number; line: number; gap: number } | null = null;
+  for (const line of lines) {
+    const target = (Math.abs(line - at) - pad) / half;
+    const gap = Math.abs(target - k) * half;
+    if (target > 0 && gap <= reach && (!best || gap < best.gap)) best = { k: target, line, gap };
+  }
+  return best && { k: best.k, line: best.line };
+}
+
+/** Starts a hold on a widget: moving it, or resizing it from a handle (see `Hold`). */
+function start(event: PointerEvent, index: number, hold: Hold): void {
   if (event.button !== 0 || !layer.value) return;
   event.preventDefault();
   event.stopPropagation();
@@ -191,6 +228,7 @@ function start(event: PointerEvent, index: number, resize: boolean): void {
   pointers.clear();
   holding = true;
   const widget = props.widgets[index]!;
+  const height0 = widget.kind === 'chart' ? (widget.height ?? widget.size) : widget.size;
   const wasPicked = selected.value === index;
   selected.value = index;
   const area = surface.getBoundingClientRect();
@@ -213,35 +251,81 @@ function start(event: PointerEvent, index: number, resize: boolean): void {
   };
   const elements = [...surface.querySelectorAll<HTMLElement>('[data-widget]')];
   const mine = elements.find((element) => Number(element.dataset.widget) === index);
-  const own = mine ? edgesOf(mine) : { x: [0], y: [0] };
+  const own = mine ? edgesOf(mine) : { x: [0, 0, 0], y: [0, 0] };
   const ownX = own.x.map((edge) => edge - widget.x);
   const ownY = own.y.map((edge) => edge - widget.y);
+  // Half the widget's width and height, in percent of the frame, at its size now: what
+  // scales (its drawing) and what does not (its outline's padding).
+  const drawn = mine?.firstElementChild ? edgesOf(mine.firstElementChild) : own;
+  const halfX = (drawn.x[2]! - drawn.x[0]!) / 2;
+  const halfY = (drawn.y[1]! - drawn.y[0]!) / 2;
+  const alongX = { half: halfX, pad: (own.x[2]! - own.x[0]!) / 2 - halfX };
+  const alongY = { half: halfY, pad: (own.y[1]! - own.y[0]!) / 2 - halfY };
   const others = elements.filter((element) => element !== mine).map(edgesOf);
   const linesX = others.flatMap((edges) => edges.x);
   const linesY = others.flatMap((edges) => edges.y);
   const reachX = (SNAP_PX / area.width) * 100;
   const reachY = (SNAP_PX / area.height) * 100;
   let moved = false;
-  /** The distance between two fingers, or from the widget's center to the finger, at first. */
+  /** The distance from the widget's center to the finger (or between two fingers), at first. */
   let reach = 0;
   const distance = (a: { x: number; y: number }, b: { x: number; y: number }) =>
     Math.hypot(a.x - b.x, a.y - b.y);
+
+  /** Resizes by `kx` across and `ky` down, each edge that moves snapping to the lines. */
+  const resizeBy = (kx: number, ky: number, even: boolean) => {
+    let [sx, sy] = [kx, ky];
+    // Onto the frame's middle, or in line with another widget's edges or middle.
+    const across =
+      kx === 1 && !even ? null : snapScale(widget.x, alongX, kx, [50, ...linesX], reachX);
+    const down =
+      ky === 1 && !even ? null : snapScale(widget.y, alongY, ky, [50, ...linesY], reachY);
+    if (even) {
+      // One scale for both ways: the nearer snap wins.
+      const gapX = across ? Math.abs(across.k - kx) * halfX : Infinity;
+      const gapY = down ? Math.abs(down.k - ky) * halfY : Infinity;
+      const k = gapX <= gapY ? (across?.k ?? kx) : (down?.k ?? ky);
+      [sx, sy] = [k, k];
+      snap.value = {
+        x: across && gapX <= gapY ? across.line : null,
+        y: down && gapY < gapX ? down.line : null,
+      };
+    } else {
+      if (across) sx = across.k;
+      if (down) sy = down.k;
+      snap.value = { x: across?.line ?? null, y: down?.line ?? null };
+    }
+    moving.value = {
+      index,
+      x: widget.x,
+      y: widget.y,
+      size: sizeIn(widget.size * sx),
+      ...(widget.kind === 'chart' ? { height: sizeIn(height0 * sy) } : {}),
+    };
+  };
 
   const move = (e: PointerEvent) => {
     if (!pointers.has(e.pointerId)) return;
     pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
     const fingers = [...pointers.values()];
-    if (fingers.length === 2 || resize) {
+    if (fingers.length === 2 || hold !== 'move') {
       const [a, b] = fingers.length === 2 ? fingers : [fingers[0]!, centerPx];
-      const now = distance(a!, b!);
-      reach ||= now;
       moved = true;
-      moving.value = {
-        index,
-        x: widget.x,
-        y: widget.y,
-        size: sizeIn((widget.size * now) / reach),
-      };
+      // An edge: the distance across or down from the center; else the distance.
+      const now =
+        fingers.length === 2 || hold === 'size'
+          ? distance(a!, b!)
+          : hold === 'width'
+            ? Math.abs(a!.x - b!.x)
+            : Math.abs(a!.y - b!.y);
+      reach ||= now || 1;
+      if (fingers.length === 2 || hold === 'size') {
+        const k = now / reach;
+        resizeBy(k, k, true);
+      } else if (hold === 'width') {
+        // The edge follows the finger: what scales grows by what the finger moved.
+        resizeBy(1 + (now - reach) / ((halfX / 100) * area.width), 1, false);
+      } else resizeBy(1, 1 + (now - reach) / ((halfY / 100) * area.height), false);
       return;
     }
     if (!moved && Math.hypot(e.clientX - x0, e.clientY - y0) < 4) return;
@@ -273,7 +357,12 @@ function start(event: PointerEvent, index: number, resize: boolean): void {
       if (wasPicked && widget.kind === 'text') emit('edit', index);
       return;
     }
-    update(index, { x: round(now.x), y: round(now.y), size: now.size });
+    // A chart's height is kept apart from its width only while they differ.
+    const height =
+      widget.kind === 'chart' && now.height !== undefined && now.height !== now.size
+        ? now.height
+        : undefined;
+    update(index, { x: round(now.x), y: round(now.y), size: now.size, height });
   };
   // Every move of the finger comes to the layer, and the hold ends however the browser lets
   // the finger go.
@@ -302,7 +391,7 @@ function touch(event: PointerEvent): void {
   const on = (event.target as HTMLElement).closest<HTMLElement>('[data-widget]');
   const near = on ? Number(on.dataset.widget) : nearestWidget(event.clientX, event.clientY);
   if (near === null) selected.value = null;
-  else start(event, near, false);
+  else start(event, near, 'move');
 }
 
 /** The widget nearest to a point on the screen within a finger's reach; null if none is. */
@@ -342,7 +431,13 @@ function key(event: KeyboardEvent, index: number): void {
     update(index, { x, y });
   } else if (event.key === '+' || event.key === '-') {
     event.preventDefault();
-    update(index, { size: sizeIn(widget.size + (event.key === '+' ? 10 : -10)) });
+    // A chart taller or shorter than wide keeps its shape, scaled the same way.
+    const size = sizeIn(widget.size + (event.key === '+' ? 10 : -10));
+    const height =
+      widget.kind === 'chart' && widget.height !== undefined
+        ? sizeIn((widget.height * size) / widget.size)
+        : undefined;
+    update(index, { size, height });
   } else if (event.key === 'Delete' || event.key === 'Backspace') {
     event.preventDefault();
     remove(index);
@@ -392,7 +487,12 @@ const story = computed(() => props.size.width / props.size.height < 0.8);
         selected: selected === index,
         moving: moving?.index === index,
       }"
-      :style="{ left: `${widget.x}%`, top: `${widget.y}%`, '--size': widget.size / 100 }"
+      :style="{
+        left: `${widget.x}%`,
+        top: `${widget.y}%`,
+        '--size': widget.size / 100,
+        '--height': (widget.kind === 'chart' ? (widget.height ?? widget.size) : widget.size) / 100,
+      }"
       role="button"
       tabindex="0"
       :aria-label="`${widgetLabel(widget, values)} on the picture: drag to move it; arrow keys move it, plus and minus resize it, Delete removes it`"
@@ -459,8 +559,23 @@ const story = computed(() => props.size.width / props.size.height < 0.8);
           class="handle"
           :data-testid="`resize-${index}`"
           aria-hidden="true"
-          @pointerdown="start($event, index, true)"
+          @pointerdown="start($event, index, 'size')"
         />
+        <!-- A chart's width from its right edge, its height from its top edge. -->
+        <template v-if="widget.kind === 'chart'">
+          <span
+            class="handle edge width"
+            :data-testid="`resize-width-${index}`"
+            aria-hidden="true"
+            @pointerdown="start($event, index, 'width')"
+          />
+          <span
+            class="handle edge height"
+            :data-testid="`resize-height-${index}`"
+            aria-hidden="true"
+            @pointerdown="start($event, index, 'height')"
+          />
+        </template>
       </template>
     </div>
   </div>
@@ -543,7 +658,7 @@ const story = computed(() => props.size.width / props.size.height < 0.8);
   display: flex;
   align-items: center;
   width: min(100cqw, calc(86cqw * var(--size)));
-  height: calc(var(--unit) * 80 * var(--size) * 1cqw);
+  height: calc(var(--unit) * 80 * var(--height) * 1cqw);
 }
 
 .chart {
@@ -555,9 +670,9 @@ const story = computed(() => props.size.width / props.size.height < 0.8);
 
 .chart-box .chart-icon {
   flex: none;
-  width: calc(var(--unit) * 40 * var(--size) * 1cqw);
-  height: calc(var(--unit) * 40 * var(--size) * 1cqw);
-  margin: 0 calc(var(--unit) * 18 * var(--size) * 1cqw) 0 0;
+  width: calc(var(--unit) * 40 * var(--height) * 1cqw);
+  height: calc(var(--unit) * 40 * var(--height) * 1cqw);
+  margin: 0 calc(var(--unit) * 18 * var(--height) * 1cqw) 0 0;
 }
 
 /* On the totals card, its sizes (a value's number smaller for the dates), with no shadow: a
@@ -655,6 +770,21 @@ const story = computed(() => props.size.width / props.size.height < 0.8);
   border-radius: 2px;
   background: #fff;
   cursor: nwse-resize;
+}
+
+/* A chart's edge handles: in the middle of its right edge, and of its top edge. */
+.handle.edge.width {
+  top: calc(50% - 6px);
+  right: -7px;
+  bottom: auto;
+  cursor: ew-resize;
+}
+
+.handle.edge.height {
+  top: -7px;
+  right: calc(50% - 6px);
+  bottom: auto;
+  cursor: ns-resize;
 }
 
 /* A center line the widget snapped to. */

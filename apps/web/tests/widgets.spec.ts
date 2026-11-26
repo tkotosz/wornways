@@ -122,6 +122,49 @@ test('resizes a widget from its corner, and edits a text widget from a tap', asy
   );
 });
 
+test('stretches a chart from its edges, an edge snapping to a guide line', async ({
+  page,
+  context,
+}) => {
+  page.setDefaultTimeout(15_000);
+  await offlineMap(context);
+  await openOverlay(page);
+  await page.getByRole('button', { name: 'Add a widget' }).click();
+  await page
+    .getByRole('dialog', { name: 'Add a widget' })
+    .getByRole('button', { name: 'Elevation chart' })
+    .click();
+  const chart = page.getByRole('button', { name: /^Elevation chart on the picture/ });
+  const index = Number(await chart.getAttribute('data-widget'));
+  const before = (await chart.boundingBox())!;
+
+  // Its right edge: narrower, as high.
+  const right = (await page.getByTestId(`resize-width-${index}`).boundingBox())!;
+  await drag(page, { x: right.x + 5, y: right.y + 5 }, -60, 0);
+  await page.mouse.up();
+  await expect.poll(async () => (await chart.boundingBox())!.width).toBeLessThan(before.width - 60);
+  expect((await chart.boundingBox())!.height).toBeCloseTo(before.height, 0);
+  await expect(page.getByRole('button', { name: /^Size: \d+ × 100%$/ })).toBeVisible();
+
+  // Its top edge, up to just below the frame's middle: it snaps onto it, with the line shown.
+  // Moved first to 56% down, clear of the other widgets.
+  await chart.focus();
+  for (let k = 0; k < 6; k++) await page.keyboard.press('Shift+ArrowUp');
+  for (let k = 0; k < 2; k++) await page.keyboard.press('ArrowUp');
+  const frame = (await page.locator('.layer').boundingBox())!;
+  const middle = frame.y + frame.height / 2;
+  await expect.poll(async () => (await chart.boundingBox())!.y).toBeGreaterThan(middle + 8);
+  const narrow = (await chart.boundingBox())!;
+  const top = (await page.getByTestId(`resize-height-${index}`).boundingBox())!;
+  await drag(page, { x: top.x + 5, y: top.y + 5 }, 0, middle + 3 - narrow.y);
+  await expect(page.locator('.line.down')).toBeVisible();
+  await page.mouse.up();
+  await expect(page.locator('.line.down')).toHaveCount(0);
+  const tall = (await chart.boundingBox())!;
+  expect(Math.abs(tall.y - middle)).toBeLessThan(1.5);
+  expect(tall.width).toBeCloseTo(narrow.width, 0);
+});
+
 test('moves, resizes and removes a picked widget with the keyboard', async ({ page, context }) => {
   page.setDefaultTimeout(15_000);
   await offlineMap(context);

@@ -50,6 +50,14 @@ const emit = defineEmits<{
 const picked = computed(() =>
   props.selected === null ? null : (props.widgets[props.selected] ?? null),
 );
+/** The picked widget's size: "120%", or a chart's width and height apart, "120 × 60%". */
+const sizeChip = computed(() => {
+  const widget = picked.value;
+  if (!widget) return '';
+  if (widget.kind === 'chart' && widget.height !== undefined && widget.height !== widget.size)
+    return `${widget.size} × ${widget.height}%`;
+  return `${widget.size}%`;
+});
 /** The picked value's label chips: where its words are, and the words ("None" for none). */
 const labelChip = computed(() =>
   picked.value?.kind === 'metric' ? LABEL_MODE_NAMES[picked.value.label] : '',
@@ -92,12 +100,12 @@ const format = computed(() => (picked.value ? formatOf(picked.value, props.card)
     <button
       type="button"
       class="setting-row"
-      :aria-label="`Size: ${picked.size}%`"
+      :aria-label="`Size: ${sizeChip}`"
       aria-haspopup="dialog"
       @click="emit('open', selected, 'size')"
     >
       <span>Size</span>
-      <span class="value">{{ picked.size }}%</span>
+      <span class="value">{{ sizeChip }}</span>
     </button>
     <button
       v-if="picked.kind === 'metric'"

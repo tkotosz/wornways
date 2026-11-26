@@ -50,6 +50,11 @@ export type Widget = { x: number; y: number; size: number } & (
       color?: ChartColor;
       /** True to draw its kind's icon at its left end, in its color. */
       icon?: boolean;
+      /**
+       * Its height in percent of its normal height, apart from its width (`size`); left out,
+       * the same as its width.
+       */
+      height?: number;
     }
 );
 
@@ -197,16 +202,28 @@ export function parseWidgets(
     i++;
     const placeStart = i;
     while (i < text.length && text[i] !== ';') i++;
-    const numbers = text
+    const parts = text
       .slice(placeStart, i)
       .split(',')
       .map((part) => part.trim().replace(/%$/, ''));
-    if (numbers.length < 2 || numbers.length > 3 || numbers.some((n) => !/^\d+(\.\d+)?$/.test(n)))
-      fail(`expected x,y or x,y,size in percent after "${name}@"`);
-    const [x, y, size = 100] = numbers.map(Number) as [number, number, number?];
+    // A chart's size may give its width and its height apart: 120x60.
+    const isChart = chart && CHART_KINDS.some((kind) => name === `${kind}-chart`);
+    const [sizePart = '100', heightPart] = (parts[2] ?? '100').split('x');
+    const numbers = [parts[0] ?? '', parts[1] ?? '', sizePart, ...(heightPart ? [heightPart] : [])];
+    if (
+      parts.length < 2 ||
+      parts.length > 3 ||
+      (heightPart !== undefined && !isChart) ||
+      numbers.some((n) => !/^\d+(\.\d+)?$/.test(n))
+    )
+      fail(
+        `expected x,y or x,y,size${isChart ? ' (or x,y,widthxheight)' : ''} in percent after "${name}@"`,
+      );
+    const [x, y, size, height] = numbers.map(Number) as [number, number, number, number?];
     if (x > 100 || y > 100) fail(`a place is from 0 to 100 percent, got ${x},${y}`);
-    if (size < WIDGET_SIZE.min || size > WIDGET_SIZE.max)
-      fail(`a size is from ${WIDGET_SIZE.min} to ${WIDGET_SIZE.max} percent, got ${size}`);
+    for (const value of [size, ...(height === undefined ? [] : [height])])
+      if (value < WIDGET_SIZE.min || value > WIDGET_SIZE.max)
+        fail(`a size is from ${WIDGET_SIZE.min} to ${WIDGET_SIZE.max} percent, got ${value}`);
     if (name === 'text') widgets.push({ kind: 'text', text: own, x, y, size });
     else if (chart && CHART_KINDS.some((kind) => name === `${kind}-chart`))
       widgets.push({
@@ -214,6 +231,7 @@ export function parseWidgets(
         chart: name.slice(0, -'-chart'.length) as ChartKind,
         ...(chartColor ? { color: chartColor } : {}),
         ...(icon ? { icon: true } : {}),
+        ...(height !== undefined && height !== size ? { height } : {}),
         x,
         y,
         size,
@@ -269,7 +287,13 @@ export function widgetsText(widgets: Widget[], { card = false }: { card?: boolea
         if (widget.format && widget.format !== defaultFormat(widget.metric, card))
           text += `:${widget.format}`;
       }
-      const size = widget.size === 100 ? '' : `,${round(widget.size)}`;
+      const height = widget.kind === 'chart' ? widget.height : undefined;
+      const size =
+        height !== undefined && height !== widget.size
+          ? `,${round(widget.size)}x${round(height)}`
+          : widget.size === 100
+            ? ''
+            : `,${round(widget.size)}`;
       return `${widgetName(widget)}${text}@${round(widget.x)},${round(widget.y)}${size}`;
     })
     .join(';');

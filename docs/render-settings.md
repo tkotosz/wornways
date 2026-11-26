@@ -147,7 +147,8 @@ activity to the next every few frames.
 ### Widgets
 
 What is drawn over the replay is a list of widgets, each centered on a point of the frame
-(percent across and down) at a size (50 to 250%, 100 when left out), drawn in order:
+(percent across and down) at a size (50 to 250%, 100 when left out; a chart's width and
+height apart as `120x60`), drawn in order:
 
 | Setting | CLI flag    | Values                                                | Default                                                                             |
 | ------- | ----------- | ----------------------------------------------------- | ----------------------------------------------------------------------------------- |

@@ -697,6 +697,9 @@ export function createRenderer(
     ).map((widget) => ({
       ...widget,
       size: clamp(Math.round(widget.size), WIDGET_SIZE.min, WIDGET_SIZE.max),
+      ...(widget.kind === 'chart' && widget.height !== undefined
+        ? { height: clamp(Math.round(widget.height), WIDGET_SIZE.min, WIDGET_SIZE.max) }
+        : {}),
     }));
   // The charts' profiles, each sampled for the widest a chart is drawn; null for one the
   // activities have nothing for.
@@ -1133,7 +1136,10 @@ export function createRenderer(
   ): { width: number; height: number } {
     const scale = widget.size / 100;
     if (widget.kind === 'chart')
-      return { width: Math.min(W, (W - 2 * margin) * scale), height: CHART_HEIGHT * scale };
+      return {
+        width: Math.min(W, (W - 2 * margin) * scale),
+        height: (CHART_HEIGHT * (widget.height ?? widget.size)) / 100,
+      };
     if (widget.kind === 'text') {
       const text = widget.text ?? options.title ?? '';
       if (!text) return { width: 0, height: 0 };
@@ -1244,7 +1250,8 @@ export function createRenderer(
           // One activity keeps its dot, also at the finish; several show theirs while moving.
           dot: kind === 'single' ? 1 : headAlpha(tr, t),
         })),
-        unit * scale,
+        // Lines and dots as thick as the narrower way the chart is sized.
+        unit * Math.min(scale, (widget.height ?? widget.size) / 100),
       );
     }
     ctx.shadowColor = 'rgba(0, 0, 0, 0)';

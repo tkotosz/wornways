@@ -95,6 +95,28 @@ const unitChoices = computed(() => {
     { shown: false, name: 'Off', example: text.number },
   ];
 });
+/**
+ * The sizes the Size sheet sets: a chart's width and height apart (its height kept only while
+ * it differs), any other widget's size.
+ */
+const sizeParts = computed(() => {
+  const widget = props.widget;
+  if (widget.kind !== 'chart')
+    return [{ label: 'Size', value: widget.size, set: (size: number) => set({ size }) }];
+  const height = widget.height ?? widget.size;
+  return [
+    {
+      label: 'Width',
+      value: widget.size,
+      set: (size: number) => set({ size, height: height === size ? undefined : height }),
+    },
+    {
+      label: 'Height',
+      value: height,
+      set: (value: number) => set({ height: value === widget.size ? undefined : value }),
+    },
+  ];
+});
 const shows = (part: WidgetPart) => !props.only || props.only === part;
 </script>
 
@@ -225,26 +247,40 @@ const shows = (part: WidgetPart) => !props.only || props.only === part;
     </div>
     <div v-if="shows('size')" class="field">
       <span id="widget-size" class="label" :class="{ 'visually-hidden': only }">Size</span>
-      <div class="slider" role="group" aria-labelledby="widget-size">
+      <!-- A chart's width and height apart; any other widget's size, both ways together. -->
+      <div
+        v-for="part in sizeParts"
+        :key="part.label"
+        class="slider"
+        role="group"
+        :aria-label="part.label"
+      >
+        <span v-if="sizeParts.length > 1" class="muted part">{{ part.label }}</span>
         <input
           type="range"
           :min="WIDGET_SIZE.min"
           :max="WIDGET_SIZE.max"
           step="5"
-          :value="widget.size"
-          aria-label="Size"
-          @change="set({ size: Number(($event.target as HTMLInputElement).value) })"
+          :value="part.value"
+          :aria-label="part.label"
+          @change="part.set(Number(($event.target as HTMLInputElement).value))"
         />
         <ExactNumber
-          label="Exact size (%)"
+          :label="`Exact ${part.label.toLowerCase()} (%)`"
           :min="WIDGET_SIZE.min"
           :max="WIDGET_SIZE.max"
-          :value="widget.size"
+          :value="part.value"
           unit="%"
-          @change="set({ size: $event })"
+          @change="part.set($event)"
         />
       </div>
-      <p class="muted hint">Or pinch it on the picture, or drag its corner.</p>
+      <p class="muted hint">
+        {{
+          sizeParts.length > 1
+            ? 'Or pinch it on the picture, or drag its corner, its right edge or its top edge.'
+            : 'Or pinch it on the picture, or drag its corner.'
+        }}
+      </p>
     </div>
     <button v-if="!only" type="button" class="secondary remove" @click="emit('remove')">
       Remove from the picture
@@ -287,6 +323,11 @@ const shows = (part: WidgetPart) => !props.only || props.only === part;
   display: flex;
   align-items: center;
   gap: 0.6rem;
+}
+
+.slider .part {
+  width: 3.2rem;
+  font-size: 0.8rem;
 }
 
 .slider input[type='range'] {

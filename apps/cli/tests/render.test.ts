@@ -938,6 +938,38 @@ describe('the elevation profile', () => {
     expect(at(true)).toBeGreaterThan(at(false) + 10);
   });
 
+  it('draws a chart as wide and as high as set apart', () => {
+    const box = (size: number, chartHeight?: number) => {
+      const renderer = createRenderer(
+        [hill(true)],
+        chronologicalTimeline([5_000], { duration: 2 }),
+        (w, h) => createCanvas(w, h) as unknown as CanvasLike,
+        {
+          width,
+          height,
+          fps: 10,
+          overlay: 'single',
+          widgets: [
+            {
+              kind: 'chart',
+              chart: 'elevation',
+              x: 50,
+              y: 80,
+              size,
+              ...(chartHeight ? { height: chartHeight } : {}),
+            },
+          ],
+        },
+      );
+      renderer.renderFrame(0);
+      return renderer.overlayBoxes().widgets[0]!;
+    };
+    const even = box(80);
+    const tall = box(80, 160);
+    expect(tall.width).toBeCloseTo(even.width);
+    expect(tall.height).toBeCloseTo(even.height * 2);
+  });
+
   it('shows under a single activity with elevation, unless the widgets leave it out', () => {
     expect(orangeAtTheBottom(hill(true))).toBeGreaterThan(200);
     expect(orangeAtTheBottom(hill(true), [])).toBe(0);

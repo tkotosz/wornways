@@ -184,6 +184,22 @@ describe('labels', () => {
     );
   });
 
+  it("take a chart's width and height apart, and no other widget's", () => {
+    const widgets = parseWidgets('elevation-chart@50,90,120x60;power-chart@50,80,80x80', METRICS);
+    expect(widgets).toMatchObject([
+      { kind: 'chart', chart: 'elevation', size: 120, height: 60 },
+      { kind: 'chart', chart: 'power', size: 80 },
+    ]);
+    expect(widgets[1]).not.toHaveProperty('height');
+    expect(widgetsText(widgets)).toBe('elevation-chart@50,90,120x60;power-chart@50,80,80');
+    expect(() => parseWidgets('distance@50,90,120x60', METRICS)).toThrow(
+      'expected x,y or x,y,size in percent after "distance@"',
+    );
+    expect(() => parseWidgets('speed-chart@50,90,120x300', METRICS)).toThrow(
+      'a size is from 50 to 250 percent, got 300',
+    );
+  });
+
   it('write words of their own in double quotes, back as they were read', () => {
     const text = 'distance:above:"so \\"far\\""@20,80;climb:"↑":before@50,80;count:""@1,2';
     const widgets = parseWidgets(text, METRICS);
