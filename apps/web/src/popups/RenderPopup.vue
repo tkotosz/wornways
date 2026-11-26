@@ -9,7 +9,6 @@ import { parseSettings, type SettingsInput } from '@wornways/engine';
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import AppPopup from '../components/AppPopup.vue';
 import { Canceled, type EngineClient } from '../engine-client.ts';
-import { countText, kmText } from '../format.ts';
 import type { MadeVideo } from '../made-video.ts';
 import type { PlanReport, Progress } from '../messages.ts';
 
@@ -30,18 +29,6 @@ const parsed = computed(() => {
   }
 });
 const settingsKey = computed(() => JSON.stringify(props.settings));
-const trimRadius = computed(() => parsed.value?.trimRadius ?? 0);
-
-/** The settings in words, e.g. "1080 × 1920 · 30 s + 2 s pause + end card". */
-const summary = computed(() => {
-  const s = parsed.value;
-  if (!s) return '';
-  const seconds = Number((props.plan?.seconds ?? s.duration).toFixed(1));
-  const parts = [`${seconds} s`];
-  if (s.endPause > 0) parts.push(`${s.endPause} s pause`);
-  if (s.endCard) parts.push('end card');
-  return `${s.width} × ${s.height} · ${parts.join(' + ')}`;
-});
 
 /**
  * The stage has the video's shape and is as large as fits: as wide as the page, or as wide
@@ -49,7 +36,7 @@ const summary = computed(() => {
  */
 const stageStyle = computed(() => {
   const [w, h] = parsed.value ? [parsed.value.width, parsed.value.height] : [9, 16];
-  const room = '(100dvh - 17rem)';
+  const room = '(100dvh - 12rem)';
   return { aspectRatio: `${w} / ${h}`, width: `min(100%, calc(${room} * ${w / h}))` };
 });
 
@@ -157,22 +144,6 @@ onBeforeUnmount(() => {
 
 <template>
   <AppPopup title="Your video" :closable="true" @close="emit('close')">
-    <p v-if="!trimRadius && plan" class="muted">
-      A replay of {{ countText(plan.activities, 'activity', 'activities') }} ({{
-        kmText(plan.meters)
-      }}). It is made on this device.
-    </p>
-    <p v-if="trimRadius" class="muted" role="status">
-      {{ trimRadius }} m trim radius at each start and finish.
-      <template v-if="plan">
-        {{ countText(plan.activities, 'activity', 'activities') }} in the replay ({{
-          kmText(plan.meters)
-        }}).
-        <template v-if="plan.privacyOmitted">
-          {{ countText(plan.privacyOmitted, 'activity', 'activities') }} omitted after trimming.
-        </template>
-      </template>
-    </p>
     <p v-if="planError" class="error" role="alert">{{ planError }}</p>
 
     <div class="stage" :style="stageStyle">
@@ -199,13 +170,6 @@ onBeforeUnmount(() => {
       </template>
     </div>
 
-    <p class="summary muted">
-      <span data-testid="video-summary">{{ summary }}</span>
-      <span v-if="result" data-testid="made">
-        · made: {{ countText(result.report.activities, 'activity', 'activities') }},
-        {{ result.report.seconds.toFixed(1) }} s
-      </span>
-    </p>
     <p v-if="error" class="error" role="alert">{{ error }}</p>
     <p v-if="result?.report.mapError" class="error">
       The map could not be loaded, so the video has no map: {{ result.report.mapError }}.
@@ -236,7 +200,7 @@ onBeforeUnmount(() => {
 .stage {
   position: relative;
   min-width: 12rem;
-  margin: 1rem auto 0.6rem;
+  margin: 0 auto;
   overflow: hidden;
   border: 1px solid var(--line);
   border-radius: 14px;
@@ -288,12 +252,6 @@ onBeforeUnmount(() => {
 .bar div {
   height: 100%;
   background: linear-gradient(90deg, var(--accent), var(--accent-strong));
-}
-
-.summary {
-  margin: 0;
-  text-align: center;
-  font-size: 0.9rem;
 }
 
 .download {

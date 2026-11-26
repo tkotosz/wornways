@@ -397,8 +397,6 @@ test('accepts month and year bounds and validates custom frame sizes', async ({
   await size.fill('640x480');
   await size.press('Enter');
   await expect(page.getByTestId('preview')).toContainText('640 × 480 · 30 fps');
-  await render(page);
-  await expect(page.getByTestId('video-summary')).toHaveText('640 × 480 · 15 s + end card');
 });
 
 test('makes a video of activities within the chosen distance range', async ({ page, context }) => {
@@ -429,12 +427,9 @@ test('makes a video of activities within the chosen distance range', async ({ pa
   await chooseStyle(page);
   // Render makes the video at once.
   await render(page);
-  await expect(page.getByText('A replay of 3 activities')).toBeVisible();
-  await expect(page.getByTestId('video-summary')).toHaveText('1080 × 1920 · 30 s + end card');
   await expect(page.getByTestId('progress')).toBeVisible();
   const result = page.getByTestId('result');
   await expect(result).toBeVisible({ timeout: 150_000 });
-  await expect(page.getByTestId('made')).toContainText('3 activities');
   await expect(page.getByText('could not be loaded')).toHaveCount(0);
   expect(mapRequests()).toBeGreaterThan(1);
 
@@ -516,8 +511,7 @@ test('previews and exports trimmed routes and leaves out routes too short to sho
   await expect(preview).toBeVisible();
   await expect(preview).not.toHaveAttribute('src', original);
   await render(page);
-  await expect(page.getByText('1 activity omitted after trimming.')).toBeVisible();
-  await expect(page.getByTestId('made')).toContainText('1 activity', { timeout: 150_000 });
+  await expect(page.getByTestId('result')).toBeVisible({ timeout: 150_000 });
   await expect(page.getByRole('link', { name: 'Download' })).toHaveAttribute(
     'download',
     'replay.mp4',
@@ -807,10 +801,12 @@ test('sets up the video and its text, and keeps both for the next visit', async 
 
   // Render: only the video.
   await render(page);
-  await expect(page.getByTestId('video-summary')).toHaveText('1080 × 1080 · 10 s + 2.5 s pause');
   const result = page.getByTestId('result');
   await expect(result).toBeVisible({ timeout: 150_000 });
-  await expect(page.getByTestId('made')).toContainText('12.5 s');
+  // 10 s of replay and the 2.5 s pause, without the end card.
+  await expect
+    .poll(() => result.evaluate((video) => (video as unknown as { duration: number }).duration))
+    .toBeCloseTo(12.5, 0);
 
   // A new visit goes straight to editing the same activities, without asking anything.
   await page.reload();
