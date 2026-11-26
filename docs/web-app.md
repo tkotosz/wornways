@@ -167,7 +167,7 @@ drawing each. The editor's settings are remembered for the next visit.
 - **Map:** the street map, and the replay privacy that hides each route's start and
   finish.
 - **Overlay:** what is drawn over the replay, as widgets arranged on the still the way
-  stickers are in a story editor: text (at first the title), one value each (a metric,
+  stickers are in a story editor: text (at first the title), one stat each (a value,
   with its words under it at first; they can also go before, after or above it, or be left
   out, and say words of its own),
   and the
@@ -196,7 +196,7 @@ drawing each. The editor's settings are remembered for the next visit.
   widget moves, hatched guides marked "Covered on Instagram" show what Instagram's own
   controls cover (Meta's ads guide: 14% at the top, 35% at the bottom, 6% at each side).
   Under the picture, as in the other sections, a strip of chips: Add Text writes a new
-  text; Add Metric opens a sheet of the metrics this video can show, grouped by what they
+  text; Add Stat opens a sheet of the stats this video can show, grouped by what they
   measure (time, distance, speed, elevation, heart rate, power, cadence, temperature,
   calories, activities; a group only when the video has one of its values), each a tile with
   its own number (calories a service gives on request are offered before they are known; a

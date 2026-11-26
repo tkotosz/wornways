@@ -249,9 +249,9 @@ test.describe('the editor on a phone', () => {
     await page.keyboard.press('Enter');
     await expect(writing).toBeHidden();
     await expect(onPicture).toHaveCount(count + 1);
-    // Metrics come from a sheet of them alone; a new one has its words under it.
-    await page.getByRole('button', { name: 'Add a metric' }).click();
-    const values = page.getByRole('dialog', { name: 'Metrics' });
+    // Stats come from a sheet of them alone; a new one has its words under it.
+    await page.getByRole('button', { name: 'Add a stat' }).click();
+    const values = page.getByRole('dialog', { name: 'Stats' });
     await expect(values.getByRole('button', { name: /Elevation chart$/ })).toHaveCount(0);
     await values.getByRole('button', { name: / Moving days$/ }).click();
     await expect(values).toBeHidden();

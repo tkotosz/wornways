@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // The chips for arranging widgets, in the strip under the picture (Overlay, and Ending with
-// the totals card). With no widget picked: adding a text or a metric, and the elevation chart
+// the totals card). With no widget picked: adding a text or a stat, and the elevation chart
 // on or off. With one picked, the strip is that widget's: Done lets it go; Edit writes a
 // text's text; Size, Label (where a value's words are, and what they say), Unit (shown or left
 // out, for a value that has one) and Format (a time, date or clock time) open their sheet;
@@ -134,12 +134,12 @@ const format = computed(() => (picked.value ? formatOf(picked.value, props.card)
     <button
       type="button"
       class="setting-row"
-      :aria-label="card ? 'Add a total' : 'Add a metric'"
+      :aria-label="card ? 'Add a total' : 'Add a stat'"
       aria-haspopup="dialog"
       @click="emit('tool', 'values')"
     >
       <span>Add</span>
-      <span class="value">{{ card ? 'Total' : 'Metric' }}</span>
+      <span class="value">{{ card ? 'Total' : 'Stat' }}</span>
     </button>
     <label v-if="chart.offered" class="setting-row">
       <span>Elevation chart</span>

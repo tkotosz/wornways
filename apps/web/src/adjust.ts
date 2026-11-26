@@ -444,7 +444,7 @@ export const metricName = (metric: Metric, values?: Map<Metric, MetricValue>) =>
   metric.charAt(0).toUpperCase() + metric.slice(1);
 
 /**
- * The values by what they measure, as the Metrics sheet groups them: each group's values side
+ * The values by what they measure, as the Stats sheet groups them: each group's values side
  * by side (the average, the highest, the value as one activity plays…).
  */
 export const METRIC_GROUPS: { name: string; metrics: Metric[] }[] = [
