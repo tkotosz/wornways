@@ -272,9 +272,7 @@ describe('totalsEntries', () => {
       '13.4 mph / avg speed',
       '89 °F / max temperature',
     ]);
-    expect(imperial(['avg-speed'], { ...totals, onFoot: true })).toEqual([
-      '4:29 /mi / avg pace',
-    ]);
+    expect(imperial(['avg-speed'], { ...totals, onFoot: true })).toEqual(['4:29 /mi / avg pace']);
   });
 
   it('gives the editor every format of a time and a date', () => {

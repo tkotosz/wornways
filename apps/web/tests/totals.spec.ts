@@ -48,7 +48,7 @@ test('turns the totals card on for Recap, and leaves the switch to the person', 
   await expect(totals).not.toBeChecked();
 });
 
-test('arranges the totals card as widgets: the title and the totals, then more', async ({
+test('arranges the totals card as widgets: the totals without the title, then more', async ({
   page,
   context,
 }) => {
@@ -57,15 +57,14 @@ test('arranges the totals card as widgets: the title and the totals, then more',
   await openDemo(page, 'Recap');
   await openSection(page, 'Ending');
 
-  // The card starts with the title over activities, kilometers, hours moving and meters
-  // climbed (the demo activities have heights), drawn by the page over the bare card.
+  // The card starts with activities, distance, moving time and climb (the demo activities
+  // have heights), without the title, drawn by the page over the bare card.
   const onCard = page.locator('[data-widget]');
-  await expect(onCard).toHaveCount(5);
-  await expect(page.getByTestId('widget-0')).toContainText('2026');
-  await expect(page.getByTestId('widget-1')).toContainText('25');
-  await expect(page.getByTestId('widget-1')).toContainText('activities');
-  await expect(page.getByTestId('widget-4')).toContainText('15,423 m');
-  await expect(page.getByTestId('widget-4')).toContainText('total climb');
+  await expect(onCard).toHaveCount(4);
+  await expect(page.getByTestId('widget-0')).toContainText('25');
+  await expect(page.getByTestId('widget-0')).toContainText('activities');
+  await expect(page.getByTestId('widget-3')).toContainText('15,423 m');
+  await expect(page.getByTestId('widget-3')).toContainText('total climb');
 
   // Its strip adds a text or a total; there is no chart and no watermark on the card.
   await expect(page.getByRole('switch', { name: 'Elevation chart' })).toHaveCount(0);
@@ -74,38 +73,38 @@ test('arranges the totals card as widgets: the title and the totals, then more',
   const totals = page.getByRole('dialog', { name: 'Totals' });
   await expect(totals.getByRole('button', { name: / Total distance$/ })).toBeDisabled();
   await totals.getByRole('button', { name: / Moving days$/ }).click();
-  await expect(onCard).toHaveCount(6);
-  await expect(page.getByTestId('widget-5')).toContainText('moving day');
+  await expect(onCard).toHaveCount(5);
+  await expect(page.getByTestId('widget-4')).toContainText('moving day');
   // Picked, a total's words go where its label chip puts them, in words of its own.
   await page.getByRole('button', { name: 'Label: Under' }).click();
   const label = page.getByRole('dialog', { name: 'Moving days: label' });
   await label.getByRole('radio', { name: /^After/ }).click();
-  await expect(page.getByTestId('widget-5').locator('.words.beside.after')).toHaveText(
+  await expect(page.getByTestId('widget-4').locator('.words.beside.after')).toHaveText(
     /moving days?/,
   );
   await label.getByRole('radio', { name: /^Above/ }).click();
-  await expect(page.getByTestId('widget-5').locator('.words.above')).toHaveText(/moving days?/);
+  await expect(page.getByTestId('widget-4').locator('.words.above')).toHaveText(/moving days?/);
   await label.getByRole('textbox', { name: 'Label text' }).fill('days on the bike');
-  await expect(page.getByTestId('widget-5')).toContainText('days on the bike');
+  await expect(page.getByTestId('widget-4')).toContainText('days on the bike');
   await label.getByRole('button', { name: 'Done' }).click();
   await expect(page.getByRole('button', { name: 'Label: Above' })).toBeVisible();
   await page.getByRole('button', { name: '✓ Done' }).click();
   await page.getByRole('button', { name: 'Add a text' }).click();
   await page.keyboard.type('What a spring');
   await page.keyboard.press('Enter');
-  await expect(onCard).toHaveCount(7);
-  await expect(page.getByTestId('widget-6')).toContainText('What a spring');
+  await expect(onCard).toHaveCount(6);
+  await expect(page.getByTestId('widget-5')).toContainText('What a spring');
 
   // A picked one moves and goes with the keyboard, as over the replay.
-  const before = (await page.getByTestId('widget-1').boundingBox())!;
-  await page.getByTestId('widget-1').focus();
+  const before = (await page.getByTestId('widget-0').boundingBox())!;
+  await page.getByTestId('widget-0').focus();
   await page.keyboard.press('ArrowRight');
   await expect
-    .poll(async () => (await page.getByTestId('widget-1').boundingBox())!.x)
+    .poll(async () => (await page.getByTestId('widget-0').boundingBox())!.x)
     .toBeGreaterThan(before.x);
   await page.keyboard.press('Delete');
-  await expect(onCard).toHaveCount(6);
-  await expect(page.getByTestId('widget-1')).not.toContainText('activities');
+  await expect(onCard).toHaveCount(5);
+  await expect(page.getByTestId('widget-0')).not.toContainText('activities');
 
   // Switched off, the card and its widgets go.
   await page.getByTestId('group-totals').getByRole('switch', { name: 'Totals card' }).click();

@@ -312,8 +312,9 @@ appear without counting up, and the dates are drawn smaller. A total the activit
 record (the climb, the descent and the elevations without elevation, the sensor values,
 calories) is left out.
 
-Unless set, the card starts with the title at the top and activities, kilometers, hours
-moving and meters climbed (`count`, `distance`, `moving`, `climb`) under it, up to two
+Unless set, the card starts with activities, distance, moving time and climb (`count`,
+`distance`, `moving`, `climb`), without the title, which the map behind it still shows; a
+text widget adds it (`text@50,30`). The values sit up to two
 to a row on a story or square frame, up to four on a wide one, a last short row centered,
 the whole block centered on the frame. In the web app they are arranged on the card in the
 Ending section, as the widgets over the replay are in Overlay.
@@ -325,7 +326,7 @@ decides over the preset.
 | Setting          | CLI flag                             | Values                                                | Default                                                   |
 | ---------------- | ------------------------------------ | ----------------------------------------------------- | --------------------------------------------------------- |
 | Show totals card | `--totals-card` / `--no-totals-card` | on/off                                                | off; on with `recap`                                      |
-| Widgets          | `--totals-widgets`                   | as `--widgets`: `text:"…"@x,y,size`, `distance@x,y,…` | the title over `count`, `distance`, `moving`, `elevation` |
+| Widgets          | `--totals-widgets`                   | as `--widgets`: `text:"…"@x,y,size`, `distance@x,y,…` | `count`, `distance`, `moving`, `climb`, without the title |
 
 ### Branding
 

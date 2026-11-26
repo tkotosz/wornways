@@ -1430,14 +1430,17 @@ export function createRenderer(
     };
   };
   let totalsShown: Totals | null = null;
-  /** The totals card's widgets: the ones given, else the title and the usual values. */
+  /**
+   * The totals card's widgets: the ones given, else the usual values without the title, which
+   * the map behind the card still shows.
+   */
   let totalsLayout: Widget[] | null = null;
   const totalsWidgets = (): Widget[] =>
     (totalsLayout ??=
       options.totalsWidgets ??
       startingTotalsWidgets(
         totalsEntries(totals(), 1, [singular, plural], AUTOMATIC_TOTALS, units).map((e) => e.field),
-        !!options.title,
+        false,
         { width: W, height: H },
       ));
 

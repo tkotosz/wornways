@@ -1,7 +1,8 @@
-// The totals card after the replay of several activities: the finished map dims, the
-// video's title comes in, and the totals count up. What it shows is a list of widgets, as
+// The totals card after the replay of several activities: the finished map dims, a text
+// such as the title comes in, and the totals count up. What it shows is a list of widgets, as
 // over the replay (see widgets.ts): text, and the totals as values, each centered on its
-// point; at first the title over activities, kilometers, hours moving and meters climbed.
+// point; at first activities, distance, moving time and climb, without the title, which the
+// map behind it still shows.
 // It is added after the replay and before the end card, so the replay keeps the length it
 // was given.
 

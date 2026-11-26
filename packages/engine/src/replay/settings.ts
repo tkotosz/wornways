@@ -429,7 +429,7 @@ export const SETTINGS: readonly SettingDefinition[] = [
     group: 'look',
     kind: { type: 'text', valueName: 'widgets' },
     default: null,
-    automatic: 'the title over activities, kilometers, hours moving and meters climbed',
+    automatic: 'activities, distance, moving time and climb, without the title',
     help:
       'What the totals card shows, as --widgets is written: text:"Your text"@x,y,size ' +
       `(text@x,y for the title) and totals such as distance@x,y,size: ${TOTALS_FIELDS.join(', ')}. ` +

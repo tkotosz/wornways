@@ -217,8 +217,8 @@ drawing each. The editor's settings are remembered for the next visit.
 - **Ending:** what comes after the replay: the end pause on the finished picture, the
   totals card (for several activities only; on for Recap) and the end card. When the
   video has the totals card, the picture is the finished card, drawn without its widgets,
-  and the page draws them over it, as in Overlay: at first the title over the usual
-  totals, at the card's sizes (a text over its short orange rule, a total's number over
+  and the page draws them over it, as in Overlay: at first the usual totals, without the
+  title (Add Text puts it back), at the card's sizes (a text over its short orange rule, a total's number over
   its words in orange). They are picked, moved, resized and removed as over the replay,
   and the strip has the same chips between the card's switch and the end card's: Add
   Text and Add Total (a sheet of the totals these activities have, each with its own
