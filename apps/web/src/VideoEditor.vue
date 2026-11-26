@@ -229,7 +229,7 @@ function writeText(text: string): void {
 /** The charts these activities can show, offered over the replay; none on the totals card. */
 const charts = computed(() => (board.value === 'overlay' ? (props.plan?.charts ?? []) : []));
 
-function useTool(tool: 'text' | 'values' | 'charts' | 'layout' | 'arrange'): void {
+function useTool(tool: 'text' | 'values' | 'charts' | 'layout' | 'arrange' | 'guides'): void {
   if (tool === 'text') {
     // A new text, written straight away; left empty, it goes again.
     editingText.value = addWidget({ kind: 'text', text: '', x: 50, y: 50, size: 100 });
@@ -237,6 +237,7 @@ function useTool(tool: 'text' | 'values' | 'charts' | 'layout' | 'arrange'): voi
     sheet.value = { name: 'values', label: board.value === 'totals' ? 'Totals' : 'Stats' };
   } else if (tool === 'charts') sheet.value = { name: 'charts', label: 'Charts' };
   else if (tool === 'arrange') editor.value?.arrange();
+  else if (tool === 'guides') adjustments.value = { ...adjustments.value, guides: !guides.value };
   else sheet.value = { name: 'layout', label: 'Layout' };
 }
 
@@ -249,6 +250,8 @@ const layout = computed<LayoutName>(() =>
     ? cardLayoutOf(adjustments.value)
     : layoutOf(adjustments.value, countOf(props.activities)),
 );
+/** Whether the layout's slots show as guides while arranging; on until switched off. */
+const guides = computed(() => adjustments.value['guides'] !== false);
 /** The layouts the board can take, and the setting that holds the one picked. */
 const layouts = computed(() => (board.value === 'totals' ? CARD_LAYOUT_NAMES : LAYOUT_NAMES));
 const layoutSetting = computed(() => (board.value === 'totals' ? 'totals-layout' : 'layout'));
@@ -289,6 +292,7 @@ function arrangeInLayout(): void {
             :size="size"
             :card="board === 'totals'"
             :layout="layout"
+            :guides="guides"
             @change="setWidgets"
             @edit="editingText = $event"
           />
@@ -326,6 +330,7 @@ function arrangeInLayout(): void {
         :values="values"
         :charts="charts.length > 0"
         :layout="LAYOUTS[layout].name"
+        :guides="guides"
         @done="selectedWidget = null"
         @tool="useTool"
         @edit="editingText = $event"
@@ -437,6 +442,7 @@ function arrangeInLayout(): void {
               :size="size"
               :card="board === 'totals'"
               :layout="layout"
+              :guides="guides"
               @change="setWidgets"
               @edit="editingText = $event"
             />
@@ -451,6 +457,7 @@ function arrangeInLayout(): void {
             :values="values"
             :charts="charts.length > 0"
             :layout="LAYOUTS[layout].name"
+            :guides="guides"
             @done="selectedWidget = null"
             @tool="useTool"
             @edit="editingText = $event"

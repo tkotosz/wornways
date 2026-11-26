@@ -53,6 +53,8 @@ const props = defineProps<{
    * the widgets snap to their edges and middles.
    */
   layout?: LayoutName;
+  /** Whether the layout's slots show, and the widgets snap to them. */
+  guides?: boolean;
 }>();
 /** The layout's slots on this frame; none without a layout. */
 const slots = computed(() => (props.layout ? layoutSlots(props.layout, props.size) : []));
@@ -309,7 +311,7 @@ function start(event: PointerEvent, index: number, hold: Hold): void {
   const limitsY: [number, number] = [WIDGET_SIZE.min / height0, WIDGET_SIZE.max / height0];
   const others = elements.filter((element) => element !== mine).map(edgesOf);
   // The layout's slots: their edges and middles both ways.
-  const slotList = slots.value;
+  const slotList = props.guides ? slots.value : [];
   const linesX = [
     ...others.flatMap((edges) => edges.x),
     ...slotList.flatMap((slot) => [slot.x - slot.width / 2, slot.x, slot.x + slot.width / 2]),
@@ -624,7 +626,7 @@ const story = computed(() => props.size.width / props.size.height < 0.8);
     </div>
     <!-- The layout's slots, faint, with what each is for. -->
     <span
-      v-for="(slot, k) in slots"
+      v-for="(slot, k) in guides ? slots : []"
       :key="`slot-${k}`"
       class="slot"
       :class="slot.kind"

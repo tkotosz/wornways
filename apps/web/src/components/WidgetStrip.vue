@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // The chips for arranging widgets, in the strip under the picture (Overlay, and Ending with
-// the totals card). With no widget picked: the layout (its slots as guides) and Arrange (the
-// widgets put in its slots); adding a text, a stat or (over the replay) a chart. With one picked, the strip is that widget's: Done lets it go; Edit writes a text's
+// the totals card). With no widget picked: the layout, Arrange (the widgets put in its slots)
+// and Guides (its slots shown, on or off); adding a text, a stat or (over the replay) a chart. With one picked, the strip is that widget's: Done lets it go; Edit writes a text's
 // text; Size, Label position (where a value's words are), Label text (what they say), Unit
 // (on or off, for a value that has one), Format (a time, date or clock time) and Color (a
 // chart's) open their sheet; Icon turns a value's icon on or off in place; Remove takes it off
@@ -34,12 +34,17 @@ const props = defineProps<{
   charts: boolean;
   /** The layout's name: over the replay, or the totals card's. */
   layout: string;
+  /** Whether the layout's slots show as guides. */
+  guides: boolean;
 }>();
 const emit = defineEmits<{
   /** Lets the picked widget go. */
   done: [];
-  /** Adds a text, opens the values, the charts or the layouts, or arranges in the layout. */
-  tool: [tool: 'text' | 'values' | 'charts' | 'layout' | 'arrange'];
+  /**
+   * Adds a text, opens the values, the charts or the layouts, arranges in the layout, or
+   * shows or hides its guides.
+   */
+  tool: [tool: 'text' | 'values' | 'charts' | 'layout' | 'arrange' | 'guides'];
   /** Writes the picked text widget's text. */
   edit: [index: number];
   /** Changes the picked widget in place, as its icon switch does. */
@@ -207,6 +212,18 @@ const format = computed(() => (picked.value ? formatOf(picked.value, props.card)
       <span>Widgets</span>
       <span class="value">Arrange</span>
     </button>
+    <label class="setting-row">
+      <span>Guides</span>
+      <span class="switch">
+        <input
+          type="checkbox"
+          role="switch"
+          aria-label="Guides"
+          :checked="guides"
+          @change="emit('tool', 'guides')"
+        />
+      </span>
+    </label>
     <button
       type="button"
       class="setting-row"

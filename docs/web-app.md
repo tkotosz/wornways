@@ -212,7 +212,9 @@ drawing each. The editor's settings are remembered for the next visit.
   faint dashed boxes while arranging (never in the video), the widgets snapping to their edges
   and middles. Arrange, the chip after it (and a button in the layouts' sheet), puts the
   title, the stats and a chart in its slots, sized to fit. A preset picks its layout with it.
-  The totals card has the same two chips, with its own layouts. Add Text writes a new
+  Guides, a switch after them, shows or hides the slots (on until switched off, remembered);
+  while off the widgets do not snap to them. The totals card has the same chips, with its own
+  layouts. Add Text writes a new
   text; Add Stat opens a sheet of the stats this video can show, grouped by what they
   measure (time, distance, speed, elevation, heart rate, power, cadence, temperature,
   calories, activities; a group only when the video has one of its values), each a tile with

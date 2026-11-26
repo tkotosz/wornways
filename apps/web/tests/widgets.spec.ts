@@ -207,6 +207,12 @@ test('shows a layout as guides, and arranges the widgets in it', async ({ page, 
   const chip = page.getByRole('button', { name: /^Layout: / });
   await expect(chip).toHaveAccessibleName('Layout: Classic');
   await expect(page.locator('.slot.stat')).toHaveCount(4);
+  // Guides off hides them, on shows them again.
+  const guides = page.getByRole('switch', { name: 'Guides' });
+  await guides.uncheck();
+  await expect(page.locator('.slot')).toHaveCount(0);
+  await guides.check();
+  await expect(page.locator('.slot.stat')).toHaveCount(4);
   // Another layout: its slots; Arrange puts the stats in them, side by side.
   await chip.click();
   const sheet = page.getByRole('dialog', { name: 'Layout' });
