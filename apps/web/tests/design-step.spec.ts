@@ -165,9 +165,9 @@ test.describe('the Design step on a phone', () => {
     await page.keyboard.press('Enter');
     await expect(writing).toBeHidden();
     await expect(onPicture).toHaveCount(count + 1);
-    // Values come from a sheet of them alone; a new one shows its words as it usually does.
-    await page.getByRole('button', { name: 'Add a value' }).click();
-    const values = page.getByRole('dialog', { name: 'Values' });
+    // Metrics come from a sheet of them alone; a new one shows its words as it usually does.
+    await page.getByRole('button', { name: 'Add a metric' }).click();
+    const values = page.getByRole('dialog', { name: 'Metrics' });
     await expect(values.getByRole('button', { name: /Elevation chart$/ })).toHaveCount(0);
     await values.getByRole('button', { name: / Days out$/ }).click();
     await expect(values).toBeHidden();

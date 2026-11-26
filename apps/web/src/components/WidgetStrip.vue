@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // The chips for arranging widgets, in the strip under the picture (Overlay, and Ending with
-// the totals card). With no widget picked: adding a text or a value, and the elevation chart
+// the totals card). With no widget picked: adding a text or a metric, and the elevation chart
 // on or off. With one picked, the strip is that widget's: Done lets it go; Edit writes a
 // text's text; Size and Label open their sheet; Center puts it in the middle across; Remove
 // takes it off the picture. The section's own settings stay in the slot, after the tools.
@@ -104,12 +104,12 @@ const picked = computed(() =>
     <button
       type="button"
       class="setting-row"
-      :aria-label="card ? 'Add a total' : 'Add a value'"
+      :aria-label="card ? 'Add a total' : 'Add a metric'"
       aria-haspopup="dialog"
       @click="emit('tool', 'values')"
     >
       <span>Add</span>
-      <span class="value">{{ card ? 'Total' : 'Value' }}</span>
+      <span class="value">{{ card ? 'Total' : 'Metric' }}</span>
     </button>
     <label v-if="chart.offered" class="setting-row">
       <span>Elevation chart</span>

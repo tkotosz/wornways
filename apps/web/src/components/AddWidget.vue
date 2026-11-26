@@ -65,7 +65,7 @@ const offered = computed(() =>
         </button>
       </div>
     </template>
-    <h3 v-if="!valuesOnly" class="setting-rows-title">Values</h3>
+    <h3 v-if="!valuesOnly" class="setting-rows-title">Metrics</h3>
     <div class="tiles">
       <button
         v-for="metric in offered"

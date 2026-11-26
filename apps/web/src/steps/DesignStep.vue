@@ -238,7 +238,7 @@ function useTool(tool: 'text' | 'values' | 'chart'): void {
     // A new text, written straight away; left empty, it goes again.
     editingText.value = addWidget({ kind: 'text', text: '', x: 50, y: 50, size: 100 });
   } else if (tool === 'values') {
-    sheet.value = { name: 'values', label: board.value === 'totals' ? 'Totals' : 'Values' };
+    sheet.value = { name: 'values', label: board.value === 'totals' ? 'Totals' : 'Metrics' };
   } else {
     // A switch: the strip stays as it is, so the new chart is not picked.
     const at = widgets.value.findIndex((widget) => widget.kind === 'elevation-chart');
