@@ -28,8 +28,8 @@ function dropDraft(): void {
 // any moment. Where things are arranged on the still (`editing`), it opens on the still and
 // Edit goes back to it from the draft. For the ending the draft starts, and loops back to,
 // shortly before the replay ends (`seconds`), so the cards being arranged come at once. The
-// picture is as large as the room it is given allows; on wide screens the video's frame and
-// length are under it, on phones only the picture shows. While editing, the `layer`
+// picture is as large as the room it is given allows; on wide screens a line under it says
+// when a draft is playing, on phones only the picture shows. While editing, the `layer`
 // slot is drawn over the still, with the frame's size. With `bare`, the still is drawn
 // without its widgets, for an editor in the slot that draws them itself: a change to the
 // widgets then draws nothing again. Each still is told (`drawn`, with its scene): the widgets
@@ -155,13 +155,13 @@ async function play(): Promise<void> {
   drafting.value = null;
 }
 
-/** The video's frame and length, for the box's shape and the lines around the picture. */
+/** The video's frame, for the box's shape. */
 const frame = computed(() => {
   try {
-    const { width, height, fps, duration } = parseSettings(props.settings);
-    return { width, height, fps, duration };
+    const { width, height } = parseSettings(props.settings);
+    return { width, height };
   } catch {
-    return { width: 1080, height: 1920, fps: 30, duration: 30 };
+    return { width: 1080, height: 1920 };
   }
 });
 const aspect = computed(() => `${frame.value.width} / ${frame.value.height}`);
@@ -279,11 +279,6 @@ onBeforeUnmount(() => {
         <span v-else-if="draftError" class="status error">{{ draftError }}</span>
       </div>
     </div>
-    <!-- The finished video's frame, not the preview's, which is drawn smaller. -->
-    <p class="caption muted" data-testid="video-frame">
-      Video: {{ frame.width }} × {{ frame.height }} · {{ frame.fps }} fps ·
-      {{ Number((seconds ?? frame.duration).toFixed(1)) }} s
-    </p>
     <p v-if="shownDraft" class="caption muted" data-testid="draft-note">
       Playing a quick draft at {{ shownDraft.width }} × {{ shownDraft.height }} and
       {{ shownDraft.fps }} fps. The video is made in full on Export.

@@ -145,7 +145,7 @@ section open last is kept while the app is open, also while popups open and clos
 live preview stays while the sections change (see Preview). On wide screens the editor is
 a screen that does not scroll, in three columns under the top bar: the sections on a rail at
 the left, each with its drawing; in the middle the preview, as large as the column allows,
-with the video's frame and length under it; at the right the open section's settings, the
+a line under it while a draft plays; at the right the open section's settings, the
 column scrolling by itself. A setting opened on its own (a layout, the stats or charts to
 add, a picked widget's settings) takes the settings' place at the right, with Done, and
 Escape closes it; the picture stays free to work on, and changes show on it as they are

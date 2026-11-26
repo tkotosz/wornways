@@ -45,8 +45,7 @@ test('plays a draft of the video in the preview, and edits on a still', async ({
   });
   expect(seconds).toBeGreaterThan(30);
   expect(seconds).toBeLessThan(35);
-  // The caption tells the video's frame from the draft's, which is smaller and slower.
-  await expect(preview.getByTestId('video-frame')).toContainText('Video: 1080 × 1920 · 30 fps');
+  // A line under it says the draft is smaller and slower than the video.
   await expect(preview.getByTestId('draft-note')).toContainText(
     'Playing a quick draft at 270 × 480 and 15 fps',
   );
