@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { openMenu } from './popups.ts';
 
 test('names its icons in the app manifest', async ({ page, request }) => {
   await page.goto('/');
@@ -23,11 +24,13 @@ test('starts without a network after the first visit', async ({ page, context })
   await context.setOffline(false);
 });
 
-test('installs from its own button when the browser offers it', async ({ page }) => {
+test('installs from its own menu item when the browser offers it', async ({ page }) => {
   await page.goto('/');
   const install = page.getByRole('button', { name: 'Install app' });
   await expect(page.getByTestId('sources')).toBeVisible();
+  await openMenu(page);
   await expect(install).toBeHidden();
+  await page.keyboard.press('Escape');
 
   // The offer Chrome and Edge send once the app can be installed.
   await page.evaluate(`{
@@ -38,8 +41,10 @@ test('installs from its own button when the browser offers it', async ({ page })
     };
     dispatchEvent(offer);
   }`);
+  await openMenu(page);
   await install.click();
   expect(await page.evaluate('window.installAsked')).toBe(true);
+  await openMenu(page);
   await expect(install).toBeHidden();
 });
 
@@ -52,6 +57,8 @@ test.describe('on an iPhone', () => {
 
   test('explains Add to Home Screen, as Safari never offers installing', async ({ page }) => {
     await page.goto('/');
+    await expect(page.getByTestId('sources')).toBeVisible();
+    await openMenu(page);
     await page.getByRole('button', { name: 'Install app' }).click();
     const dialog = page.getByRole('dialog', { name: 'Install Wornways' });
     await expect(dialog.getByText('Add to Home Screen')).toBeVisible();

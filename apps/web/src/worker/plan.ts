@@ -1,4 +1,4 @@
-// How a video will be paced, worked out without drawing anything: for the Design step,
+// How a video will be paced, worked out without drawing anything: for the editor,
 // which tells what the chosen settings will actually play.
 
 import {

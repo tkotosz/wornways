@@ -1,4 +1,4 @@
-// What the person chose in the Choose step, and the settings it stands for.
+// What the person chose in the activities popup, and the settings it stands for.
 
 import { parseDistanceKm, parseSettings, type SettingsInput } from '@wornways/engine';
 

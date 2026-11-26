@@ -22,7 +22,7 @@ runs on the user's device: in a browser Web Worker for the web app, in Node for 
   into settings, `load.ts` reads the library or the files named and selects the
   activities, `video.ts` draws the frames and encodes them, `tiles.ts` keeps map tiles on
   disk.
-- `apps/web`: the web app. The Vue page (`src/`) only shows steps and sends requests; one
+- `apps/web`: the web app. The Vue page (`src/`) only shows the editor and its popups and sends requests; one
   Web Worker (`src/worker/`) keeps the activities and makes videos with the engine,
   drawing on `OffscreenCanvas` and encoding with WebCodecs through Mediabunny.
   `src/messages.ts` lists every message between the two. `src/service-worker.js` keeps the

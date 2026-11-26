@@ -230,7 +230,7 @@ by restarting the GPU process during a video.
 
 ### 6. Move the progress bar without a transition
 
-The progress bar of the Export step grew with a 0.2 s transition, restarted at every
+The progress bar shown while a video is made grew with a 0.2 s transition, restarted at every
 update: for as long as a video was made, the page drew 60 times a second. While a page
 does that, the browser holds back the GPU work of the worker that draws the video. Without
 the transition the bar moves in steps of about 1.5% and the page draws only on an update.

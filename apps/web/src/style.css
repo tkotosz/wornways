@@ -122,24 +122,6 @@ button.link {
   background: rgba(255, 138, 42, 0.12);
 }
 
-/*
- * The Back and Next buttons at the bottom of a step. They stay pinned to the bottom of the
- * window while the step is taller than it, so the next step is always one click away.
- */
-.footer {
-  position: sticky;
-  bottom: 0;
-  z-index: 5;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-top: 1.5rem;
-  /* The same gap above the buttons as between the header's line and the step bar. */
-  padding: 1.5rem 0 calc(1.5rem + env(safe-area-inset-bottom));
-  border-top: 1px solid var(--line);
-  background: var(--background);
-}
-
 /* Read by screen readers, not drawn: a heading the layout shows otherwise, or the words that
    make a short button say what it does. */
 .visually-hidden {
@@ -238,7 +220,7 @@ button.link {
   transform: translateX(1.1rem);
 }
 
-/* Phones, in the Design step: the same rows as one strip of chips under the picture, which
+/* Phones, in the editor: the same rows as one strip of chips under the picture, which
    scrolls sideways: a chip each, its name small over its value. A chip opens its setting; a
    switch turns in place. The group titles are left out. */
 .setting-strip {

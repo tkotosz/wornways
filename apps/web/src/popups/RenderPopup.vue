@@ -1,12 +1,13 @@
 <script setup lang="ts">
-// The last step: a stage in the video's shape. First it shows the finished picture with a
-// button to make the video; while the video is made, its progress; then the video itself,
-// with Share (where the browser can share files, mostly on phones) and Download in the
-// bottom bar. The finished video belongs to the app frame, which keeps
-// it while the settings stay the same.
+// Making the video, from Render in the top bar: a stage in the video's shape. While the video
+// is made, its progress over the finished picture, with Cancel; then the video itself, with
+// Share (where the browser can share files, mostly on phones) and Download. Closing it goes
+// back to editing, and stops a video still being made. The finished video belongs to the
+// app frame, which keeps it while the settings stay the same, so Render shows it again
+// without making it twice.
 import { parseSettings, type SettingsInput } from '@wornways/engine';
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import StepNav from '../components/StepNav.vue';
+import { computed, onBeforeUnmount, ref, watch } from 'vue';
+import AppPopup from '../components/AppPopup.vue';
 import { Canceled, type EngineClient } from '../engine-client.ts';
 import { countText, kmText } from '../format.ts';
 import type { MadeVideo } from '../made-video.ts';
@@ -18,7 +19,7 @@ const props = defineProps<{
   plan: PlanReport | null;
   planError: string;
 }>();
-const emit = defineEmits<{ back: [] }>();
+const emit = defineEmits<{ close: [] }>();
 const result = defineModel<MadeVideo | null>('video', { required: true });
 
 const parsed = computed(() => {
@@ -48,50 +49,23 @@ const summary = computed(() => {
  */
 const stageStyle = computed(() => {
   const [w, h] = parsed.value ? [parsed.value.width, parsed.value.height] : [9, 16];
-  const room = '(100dvh - var(--top-bar-height, 0px) - 18rem)';
+  const room = '(100dvh - 17rem)';
   return { aspectRatio: `${w} / ${h}`, width: `min(100%, calc(${room} * ${w / h}))` };
 });
 
-// The finished picture, shown until the video is made.
-const poster = ref('');
-let cancelPoster: (() => void) | null = null;
 let left = false;
-
-/** Draws the finished picture for the current settings, unless the video is made. */
-async function drawPoster(): Promise<void> {
-  cancelPoster?.();
-  cancelPoster = null;
-  if (poster.value) URL.revokeObjectURL(poster.value);
-  poster.value = '';
-  if (result.value) return;
-  const task = props.engine.makePoster(props.settings);
-  cancelPoster = task.cancel;
-  try {
-    const { image } = await task.result;
-    if (left || cancelPoster !== task.cancel) return;
-    poster.value = URL.createObjectURL(image);
-  } catch {
-    // Without a picture the stage stays dark; the video can still be made. A newer
-    // picture that took over shows instead.
-  } finally {
-    if (cancelPoster === task.cancel) cancelPoster = null;
-  }
-}
-
-onMounted(drawPoster);
 
 const progress = ref<Progress | null>(null);
 const error = ref('');
 let cancel: (() => void) | null = null;
 
-// Settings that change while the step shows (as they may from elsewhere) draw it again.
+// Settings that change while it shows (as they may from elsewhere) stop the video made.
 watch(settingsKey, () => {
   cancel?.();
   cancel = null;
   progress.value = null;
   result.value = null;
   error.value = '';
-  void drawPoster();
 });
 
 const STAGES: Record<Progress['stage'], string> = {
@@ -113,7 +87,6 @@ const percent = computed(() => {
 async function make(): Promise<void> {
   if (progress.value || !props.plan || !parsed.value) return;
   const key = settingsKey.value;
-  cancelPoster?.();
   result.value = null;
   error.value = '';
   progress.value = { stage: 'choosing' };
@@ -142,6 +115,21 @@ async function make(): Promise<void> {
   }
 }
 
+// Render makes the video at once; the plan it needs may still be on its way.
+watch(
+  () => !!props.plan && !!parsed.value,
+  (ready) => {
+    if (ready && !result.value && !progress.value && !error.value) void make();
+  },
+  { immediate: true },
+);
+
+/** Stops making the video, and closes. */
+function stop(): void {
+  cancel?.();
+  emit('close');
+}
+
 /** Whether this browser can hand the video to other apps (the system's share sheet). */
 const canShare = computed(() => {
   const file = result.value?.file;
@@ -160,18 +148,15 @@ async function share(): Promise<void> {
   }
 }
 
-// Leaving the step stops a video or a picture that is still being made.
+// Closing stops a video that is still being made.
 onBeforeUnmount(() => {
   left = true;
   cancel?.();
-  cancelPoster?.();
-  if (poster.value) URL.revokeObjectURL(poster.value);
 });
 </script>
 
 <template>
-  <section>
-    <h1>Make your video</h1>
+  <AppPopup title="Your video" :closable="true" @close="emit('close')">
     <p v-if="!trimRadius && plan" class="muted">
       A replay of {{ countText(plan.activities, 'activity', 'activities') }} ({{
         kmText(plan.meters)
@@ -201,7 +186,6 @@ onBeforeUnmount(() => {
         data-testid="result"
       />
       <template v-else>
-        <img v-if="poster" :src="poster" alt="The last frame of the video" />
         <div class="cover">
           <div v-if="progress" class="progress" data-testid="progress">
             <span
@@ -209,12 +193,8 @@ onBeforeUnmount(() => {
               }}<template v-if="percent">, {{ percent }}%</template></span
             >
             <div class="bar"><div :style="{ width: `${percent}%` }" /></div>
-            <button type="button" class="secondary" @click="cancel?.()">Cancel</button>
           </div>
-          <button v-else type="button" class="make" :disabled="!plan || !parsed" @click="make">
-            <span class="play" aria-hidden="true">▶</span>
-            Make video
-          </button>
+          <button v-else-if="error" type="button" class="secondary" @click="make">Try again</button>
         </div>
       </template>
     </div>
@@ -232,27 +212,23 @@ onBeforeUnmount(() => {
       <button type="button" class="link" @click="make">Try again</button>
     </p>
 
-    <StepNav
-      step="export"
-      :back-disabled="!!progress"
-      :actions="!!result && !progress"
-      @back="emit('back')"
-    >
-      <template v-if="result && !progress">
-        <!-- Where sharing works, it is the main thing to do and sits at the right, with
-             Download in the middle; elsewhere Download is the main thing and takes the right. -->
+    <template #footer>
+      <button v-if="progress" type="button" class="secondary" @click="stop">Cancel</button>
+      <template v-else-if="result">
+        <!-- Where sharing works, it is the main thing to do and comes last; elsewhere Download
+             is the main thing. -->
         <a
-          :class="canShare ? 'secondary middle' : 'primary end'"
+          :class="canShare ? 'secondary' : 'primary'"
           class="download"
           :href="result.url"
           :download="result.file.name"
         >
           Download
         </a>
-        <button v-if="canShare" type="button" class="primary end" @click="share">Share</button>
+        <button v-if="canShare" type="button" class="primary" @click="share">Share</button>
       </template>
-    </StepNav>
-  </section>
+    </template>
+  </AppPopup>
 </template>
 
 <style scoped>
@@ -260,14 +236,13 @@ onBeforeUnmount(() => {
 .stage {
   position: relative;
   min-width: 12rem;
-  margin: 1.5rem auto 0.6rem;
+  margin: 1rem auto 0.6rem;
   overflow: hidden;
   border: 1px solid var(--line);
   border-radius: 14px;
   background: #050608;
 }
 
-.stage img,
 .stage video {
   display: block;
   width: 100%;
@@ -275,42 +250,13 @@ onBeforeUnmount(() => {
   object-fit: contain;
 }
 
-/* Over the picture: darkened, with the button or the progress in the middle. */
+/* Over the dark stage: the progress in the middle. */
 .cover {
   position: absolute;
   inset: 0;
   display: grid;
   place-items: center;
   background: rgba(5, 6, 9, 0.45);
-}
-
-.make {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.7rem;
-  border: 0;
-  border-radius: 999px;
-  padding: 0.9rem 1.6rem 0.9rem 1rem;
-  color: #160a02;
-  background: linear-gradient(90deg, var(--accent), var(--accent-strong));
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
-  font-size: 1.1rem;
-  font-weight: 700;
-}
-
-.make:disabled {
-  opacity: 0.55;
-  cursor: default;
-}
-
-.play {
-  display: inline-grid;
-  place-items: center;
-  width: 2.2rem;
-  height: 2.2rem;
-  border-radius: 50%;
-  background: rgba(22, 10, 2, 0.15);
-  font-size: 0.9rem;
 }
 
 .progress {
@@ -348,17 +294,6 @@ onBeforeUnmount(() => {
   margin: 0;
   text-align: center;
   font-size: 0.9rem;
-}
-
-/* In the bar at the bottom: Download in the middle when Share takes the right, else Download
-   at the right. */
-.middle {
-  grid-column: 2;
-}
-
-.end {
-  grid-column: 3;
-  justify-self: end;
 }
 
 .download {

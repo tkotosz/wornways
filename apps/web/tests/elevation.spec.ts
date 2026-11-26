@@ -1,7 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { offlineMap } from './offline-map.ts';
-import { pickSource } from './sources.ts';
-import { chooseStyle, openSection, pickPeriod } from './steps.ts';
+import { chooseStyle, openSection, pickPeriod, pickSource, useActivities } from './popups.ts';
 
 test('starts a single activity with elevation with the elevation chart, which can be removed', async ({
   page,
@@ -18,10 +17,10 @@ test('starts a single activity with elevation with the elevation chart, which ca
         .pathname,
     );
   await expect(page.getByTestId('activity-count')).toHaveText('1 activity on this device');
-  await page.getByRole('button', { name: 'Continue' }).click(); // to Activities
+  await page.getByRole('button', { name: 'Choose activities' }).click();
   await pickPeriod(page);
-  await page.getByRole('button', { name: 'Continue' }).click(); // to Design
-  await chooseStyle(page);
+  // One activity plays as a Highlight, without asking.
+  await useActivities(page);
   await openSection(page, 'Overlay');
 
   // A single activity starts with the elevation chart on the picture.
@@ -54,10 +53,10 @@ test('offers no elevation chart where there is no elevation', async ({ page, con
     buffer: Buffer.from(gpx),
   });
   await expect(page.getByTestId('activity-count')).toHaveText('1 activity on this device');
-  await page.getByRole('button', { name: 'Continue' }).click(); // to Activities
+  await page.getByRole('button', { name: 'Choose activities' }).click();
   await pickPeriod(page);
-  await page.getByRole('button', { name: 'Continue' }).click(); // to Design
-  await chooseStyle(page);
+  // One activity plays as a Highlight, without asking.
+  await useActivities(page);
   await openSection(page, 'Overlay');
   await expect(page.getByRole('button', { name: /^Time: / })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Elevation chart', exact: true })).toHaveCount(0);
@@ -81,9 +80,9 @@ test('starts several activities without the elevation chart, which can be added'
     .getByTestId('file-input')
     .setInputFiles([fixture('morning-ride.gpx'), fixture('trail-run.tcx')]);
   await expect(page.getByTestId('activity-count')).toHaveText('2 activities on this device');
-  await page.getByRole('button', { name: 'Continue' }).click(); // to Activities
+  await page.getByRole('button', { name: 'Choose activities' }).click();
   await pickPeriod(page);
-  await page.getByRole('button', { name: 'Continue' }).click(); // to Design
+  await useActivities(page);
   await chooseStyle(page);
   await openSection(page, 'Overlay');
 

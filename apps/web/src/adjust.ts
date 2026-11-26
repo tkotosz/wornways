@@ -16,14 +16,14 @@ import {
 } from '@wornways/engine';
 import type { PlanReport } from './messages.ts';
 
-/** What the person changed in the Video and Overlay steps, by setting name; the rest keeps its default. */
+/** What the person changed in the editor, by setting name; the rest keeps its default. */
 export type Adjustments = Record<string, string | boolean>;
 
 /** The panels of Fine-tune playback, in the Playback section. */
 export const PLAYBACK_PANELS: Panel[] = ['timing', 'camera'];
 
 /**
- * The sections of the Design step, in the order things are decided: where the video will be
+ * The sections of the editor, in the order things are decided: where the video will be
  * posted, how the routes play, the map, what is drawn over the replay, and what comes after
  * it. Frame and Playback have controls of their own; the others are panels.
  */
@@ -103,7 +103,7 @@ const presetPlayback = (preset: PresetChoice): Adjustments =>
 
 /**
  * The preset's values of other settings, such as the totals card: where they start, until
- * the person sets them in the Design step.
+ * the person sets them in the editor.
  */
 const presetStarting = (preset: PresetChoice): Adjustments =>
   Object.fromEntries(
@@ -159,8 +159,8 @@ export function resetPlayback(adjustments: Adjustments, count: ActivityCount): A
 
 /**
  * The adjustments after editing the effective values under Fine-tune. Changing a setting the preset sets turns
- * the preset into Custom, starting from its values (also those of other steps, such as the
- * totals card, where the person has not set them); any other change keeps the preset.
+ * the preset into Custom, starting from its values (also those of other sections, such as
+ * the totals card, where the person has not set them); any other change keeps the preset.
  */
 export function fineTuned(
   before: Adjustments,
@@ -184,7 +184,7 @@ export function fineTuned(
   return Object.fromEntries(tuned);
 }
 
-/** Every group the two steps offer. Which activities are chosen in the step before them. */
+/** Every group the editor offers. Which activities are chosen in a popup of their own. */
 const ADJUST_GROUPS: SettingGroup[] = ['timing', 'privacy', 'look', 'brand'];
 
 /** Shorter labels for the screen than the settings table's. */
@@ -262,7 +262,7 @@ export const settingHint = (setting: string, count: ActivityCount) =>
 
 export const sliderStep = (setting: string) => STEPS[setting] ?? 1;
 
-/** A panel of settings in the Design step's sections. */
+/** A panel of settings in the editor's sections. */
 export type Panel =
   'timing' | 'camera' | 'privacy' | 'map' | 'watermark' | 'pause' | 'totals' | 'end-card';
 
@@ -325,7 +325,7 @@ export function valueOf(
 }
 
 /**
- * The settings the adjustments stand for: only the ones the steps offer, so something
+ * The settings the adjustments stand for: only the ones the editor offers, so something
  * remembered from an earlier version of the app (such as a mode) does not get in the way.
  */
 export function adjustSettings(adjustments: Adjustments, count: ActivityCount): SettingsInput {

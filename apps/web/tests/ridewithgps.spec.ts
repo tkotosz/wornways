@@ -1,7 +1,14 @@
 import { expect, test, type Page } from '@playwright/test';
 import { offlineMap } from './offline-map.ts';
-import { backToSources, pickSource } from './sources.ts';
-import { chooseStyle, expectSection } from './steps.ts';
+import {
+  activitiesPopup,
+  chooseStyle,
+  expectSection,
+  openActivities,
+  pickSource,
+  switchSource,
+  useActivities,
+} from './popups.ts';
 
 test.use({ serviceWorkers: 'block' });
 
@@ -103,7 +110,7 @@ test('uses Ride with GPS trips as the source, fetching tracks only when needed',
   // Only the newest few are fetched ahead; the oldest only when a video needs them.
   await expect.poll(() => fetched.length).toBe(5);
   expect(fetched).not.toContain(25);
-  await page.getByRole('button', { name: 'Continue' }).click();
+  await useActivities(page);
   await chooseStyle(page);
   await expectSection(page, 'Frame');
   expect(fetched).not.toContain(25);
@@ -112,14 +119,16 @@ test('uses Ride with GPS trips as the source, fetching tracks only when needed',
   const before = fetched.length;
   await page.reload();
   await expect(page.getByTestId('source')).toContainText('Ride with GPS');
-  await page.getByRole('button', { name: 'Continue' }).click();
+  await useActivities(page);
   await chooseStyle(page);
   await expectSection(page, 'Frame');
   expect(fetched.length).toBe(before);
 
-  // The Source step shows which trips' tracks are kept here; deleting one only removes the copy.
+  // The connection's popup shows which trips' tracks are kept here; deleting one only removes
+  // the copy.
   const kept = new Set(fetched).size;
-  await page.getByRole('button', { name: 'Source' }).click();
+  const connection = page.getByRole('dialog', { name: 'Ride with GPS connection' });
+  await page.getByRole('button', { name: 'Ride with GPS connection' }).click();
   await expect(page.getByTestId('downloaded-count')).toHaveText(
     `${kept} activities downloaded to this device`,
   );
@@ -130,19 +139,19 @@ test('uses Ride with GPS trips as the source, fetching tracks only when needed',
   await page.getByRole('button', { name: 'Delete downloaded tracks' }).click();
   await page.getByRole('button', { name: 'Delete all', exact: true }).click();
   await expect(page.getByTestId('downloaded')).toHaveCount(0);
-  // Going on fetches the chosen trip again.
-  const beforeContinue = fetched.length;
-  await page.getByRole('button', { name: 'Continue' }).click();
-  await page.getByRole('button', { name: 'Continue' }).click();
-  await chooseStyle(page);
+  await connection.getByRole('button', { name: 'Close' }).click();
+  // Taking the activities to the editor again fetches the chosen trips again.
+  const beforeAgain = fetched.length;
+  await openActivities(page);
+  await useActivities(page);
   await expectSection(page, 'Frame');
-  expect(fetched.length).toBeGreaterThan(beforeContinue);
+  expect(fetched.length).toBeGreaterThan(beforeAgain);
 
   // Disconnecting stays with Ride with GPS, ready to connect again.
-  await page.getByRole('button', { name: 'Source' }).click();
+  await page.getByRole('button', { name: 'Ride with GPS connection' }).click();
   await page.getByRole('button', { name: 'Disconnect Ride with GPS' }).click();
-  await expect(page.getByRole('link', { name: 'Connect Ride with GPS' })).toBeVisible();
-  await expect(page.getByTestId('chosen-source')).toHaveText('Ride with GPS');
+  const connect = page.getByRole('dialog', { name: 'Connect Ride with GPS' });
+  await expect(connect.getByRole('link', { name: 'Connect Ride with GPS' })).toBeVisible();
   await expect(page.getByText('Ride with GPS disconnected')).toBeVisible();
   expect(disconnects).toEqual([1]);
   // A string, as the tests are type-checked without the browser's types.
@@ -160,7 +169,7 @@ test('shows the download in a dialog that can be canceled', async ({ page }) => 
   await page.getByRole('button', { name: 'All time' }).click();
   await expect(page.getByTestId('chosen-count')).toContainText('7 of 7 activities selected');
 
-  await page.getByRole('button', { name: 'Continue' }).click();
+  await useActivities(page);
   const dialog = page.getByTestId('download');
   await expect(dialog).toBeVisible();
   await expect(dialog).toContainText('Downloading tracks from Ride with GPS');
@@ -168,13 +177,13 @@ test('shows the download in a dialog that can be canceled', async ({ page }) => 
   await dialog.getByRole('button', { name: 'Cancel' }).click();
   await expect(dialog).toBeHidden();
   await expect(page.getByText('Download canceled.')).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Choose your activities' })).toBeVisible();
+  await expect(activitiesPopup(page)).toBeVisible();
 
   // The downloads under way finish; going on again fetches only the rest.
   release();
   await expect.poll(() => fetched.length).toBeGreaterThanOrEqual(5);
   const before = new Set(fetched);
-  await page.getByRole('button', { name: 'Continue' }).click();
+  await useActivities(page);
   await chooseStyle(page);
   await expectSection(page, 'Frame');
   expect(fetched.filter((id) => before.has(id)).length).toBe(before.size);
@@ -191,24 +200,21 @@ test('switches between Ride with GPS and files without disconnecting', async ({ 
   // The newest five are fetched ahead.
   await expect.poll(() => fetched.length).toBe(5);
 
-  await backToSources(page);
+  await switchSource(page);
   await expect(page.getByTestId('choose-rwgps')).toContainText(/Connected · \d+ downloaded/);
   await pickSource(page, 'files');
-  await expect(page.getByTestId('chosen-source')).toHaveText('Files');
+  const files = page.getByRole('dialog', { name: 'Files on this device' });
+  await expect(files).toBeVisible();
 
   // Files were chosen last, so a reload stays with them; Ride with GPS is still connected.
   await page.reload();
-  await expect(page.getByTestId('chosen-source')).toHaveText('Files');
-  await backToSources(page);
+  await expect(files).toBeVisible();
+  await switchSource(page);
   await expect(page.getByTestId('choose-rwgps')).toContainText('Connected · 5 downloaded');
 
-  // Its screen shows what is kept here without asking Ride with GPS; Continue reads the list.
+  // Picked again, it reads the list of trips.
   const listed = lists.length;
   await pickSource(page, 'rwgps');
-  await expect(page.getByTestId('downloaded')).toContainText('Coast loop');
-  await expect(page.getByTestId('downloaded')).toContainText('Trail run');
-  expect(lists.length).toBe(listed);
-  await page.getByRole('button', { name: 'Continue' }).click();
   await expect(page.getByTestId('source')).toContainText('Ride with GPS');
   await expect(page.getByTestId('chosen-count')).toContainText('2 of 2 activities selected');
   expect(lists.length).toBe(listed + 1);
@@ -218,7 +224,7 @@ test('switches between Ride with GPS and files without disconnecting', async ({ 
   await expect(page.getByTestId('source')).toContainText('Ride with GPS');
 });
 
-test('goes back to the Source step when Ride with GPS no longer accepts the connection', async ({
+test('asks to connect again when Ride with GPS no longer accepts the connection', async ({
   page,
 }) => {
   await fakeRideWithGps(page, { revoked: true });
@@ -228,7 +234,7 @@ test('goes back to the Source step when Ride with GPS no longer accepts the conn
   await expect(page.getByRole('alert')).toHaveText(
     'The Ride with GPS connection ended. Connect again.',
   );
-  // Back on the Ride with GPS screen, ready to connect again.
+  // Back on connecting Ride with GPS, ready to connect again.
   await expect(page.getByRole('link', { name: 'Connect Ride with GPS' })).toBeVisible();
 });
 

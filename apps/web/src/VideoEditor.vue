@@ -1,18 +1,16 @@
 <script setup lang="ts">
-// Step 3: designing the video, in sections, in the order things are decided: the frame, how
-// the routes play, the map, what is drawn over the replay, and how it ends. One preview stays
-// in view while the sections change. Where things are arranged on the picture (Overlay,
-// Ending), it opens on a still; Play shows the draft and Edit goes back.
-//
-// The sections are opened from the section bar, in any order; the buttons to the steps
-// before and after (StepNav, StepBar) leave the step, as on every step.
+// The editor, the app's one screen: designing the video, in sections, in the order things are
+// decided: the frame, how the routes play, the map, what is drawn over the replay, and how it
+// ends. One preview stays in view while the sections change. Where things are arranged on
+// the picture (Overlay, Ending), it opens on a still; Play shows the draft and Edit goes back.
+// The sections are opened from the section bar, in any order.
 // Wide screens: the section bar on top, the preview beside the settings; the page scrolls.
-// Phones: a full editor screen that does not scroll, as photo and video editors are laid
-// out: the step bar on top; the preview takes most of the screen; under it, the open
-// section's settings as one strip of chips that scrolls sideways, each opening its setting in
-// a sheet; the sections along the bottom. Where widgets are arranged, the strip starts with
-// adding them, and a picked widget turns it into that widget's options (WidgetStrip); wide
-// screens have that strip under the picture.
+// Phones: a screen that does not scroll, as photo and video editors are laid out, under the
+// app's top bar: the preview takes most of it; under it, the open section's settings as one
+// strip of chips that scrolls sideways, each opening its setting in a sheet; the sections
+// along the bottom. Where widgets are arranged, the strip starts with adding them, and a
+// picked widget turns it into that widget's options (WidgetStrip); wide screens have that
+// strip under the picture.
 import {
   METRICS,
   TOTALS_FIELDS,
@@ -24,23 +22,20 @@ import {
   type Widget,
 } from '@wornways/engine';
 import { computed, onBeforeUnmount, ref } from 'vue';
-import { SECTIONS, countOf, widgetLabel, type Adjustments, type Section } from '../adjust.ts';
-import AddWidget from '../components/AddWidget.vue';
-import FramePanel from '../components/FramePanel.vue';
-import PlaybackPanel from '../components/PlaybackPanel.vue';
-import PosterPreview from '../components/PosterPreview.vue';
-import SettingSheet from '../components/SettingSheet.vue';
-import StyleChooser from '../components/StyleChooser.vue';
-import SettingsGroups from '../components/SettingsGroups.vue';
-import TextEditor from '../components/TextEditor.vue';
-import StepBar from '../components/StepBar.vue';
-import StepNav from '../components/StepNav.vue';
-import WidgetEditor from '../components/WidgetEditor.vue';
-import WidgetList from '../components/WidgetList.vue';
-import WidgetSettings from '../components/WidgetSettings.vue';
-import WidgetStrip from '../components/WidgetStrip.vue';
-import type { EngineClient } from '../engine-client.ts';
-import type { PlanReport, Poster, PosterScene } from '../messages.ts';
+import { SECTIONS, countOf, widgetLabel, type Adjustments, type Section } from './adjust.ts';
+import AddWidget from './components/AddWidget.vue';
+import FramePanel from './components/FramePanel.vue';
+import PlaybackPanel from './components/PlaybackPanel.vue';
+import PosterPreview from './components/PosterPreview.vue';
+import SettingSheet from './components/SettingSheet.vue';
+import SettingsGroups from './components/SettingsGroups.vue';
+import TextEditor from './components/TextEditor.vue';
+import WidgetEditor from './components/WidgetEditor.vue';
+import WidgetList from './components/WidgetList.vue';
+import WidgetSettings from './components/WidgetSettings.vue';
+import WidgetStrip from './components/WidgetStrip.vue';
+import type { EngineClient } from './engine-client.ts';
+import type { PlanReport, Poster, PosterScene } from './messages.ts';
 
 const props = defineProps<{
   engine: EngineClient;
@@ -51,9 +46,6 @@ const props = defineProps<{
 }>();
 const adjustments = defineModel<Adjustments>({ required: true });
 const section = defineModel<Section>('section', { required: true });
-/** Whether the style is asked first, as it is each time the step is opened from Activities. */
-const choosing = defineModel<boolean>('choosing', { required: true });
-const emit = defineEmits<{ back: []; next: [] }>();
 
 const current = computed(() => SECTIONS.find((s) => s.id === section.value)!);
 
@@ -63,11 +55,6 @@ const phone = ref(phoneQuery.matches);
 const onWidth = (event: MediaQueryListEvent) => (phone.value = event.matches);
 phoneQuery.addEventListener('change', onWidth);
 onBeforeUnmount(() => phoneQuery.removeEventListener('change', onWidth));
-
-/** A style picked: the editor opens, on the section open last (Frame at first). */
-function chosen(): void {
-  choosing.value = false;
-}
 
 /** The phone's strip of settings, which scrolls by itself, sideways. */
 const controls = ref<HTMLElement | null>(null);
@@ -253,16 +240,153 @@ function useTool(tool: 'text' | 'values' | 'chart'): void {
   <!-- Phones: the editor screen. -->
   <section v-if="phone" class="editor">
     <h1 class="visually-hidden">Design your video</h1>
-    <header class="top">
-      <StepBar step="design" :next-disabled="choosing" @back="emit('back')" @next="emit('next')" />
-    </header>
-
-    <!-- Coming from Activities: how it plays, before the editor. -->
-    <div v-if="choosing" class="choosing">
-      <StyleChooser v-model="adjustments" :activities="activities" :plan="plan" @chosen="chosen" />
+    <div class="stage">
+      <PosterPreview
+        :engine="engine"
+        :settings="settings"
+        :seconds="plan?.seconds"
+        :scene="section === 'ending' ? 'ending' : 'replay'"
+        :editing="section === 'overlay' || section === 'ending'"
+        :hide-play="board !== null && selectedWidget !== null"
+        :bare="section === 'overlay' || section === 'ending'"
+        @drawn="onDrawn"
+      >
+        <template #layer="{ size }">
+          <WidgetEditor
+            v-if="board"
+            v-model:selected="selectedWidget"
+            :widgets="widgets"
+            :values="values"
+            :title="title"
+            :profile="drawn?.profile ?? null"
+            :size="size"
+            :card="board === 'totals'"
+            @change="setWidgets"
+            @edit="editingText = $event"
+          />
+        </template>
+      </PosterPreview>
     </div>
-    <template v-else>
-      <div class="stage">
+
+    <!-- The section's settings; where widgets are arranged, the tools for them first, or a
+           picked widget's options. -->
+    <div
+      ref="controls"
+      class="tools setting-strip"
+      :aria-label="`${current.label} settings`"
+      role="region"
+    >
+      <FramePanel
+        v-if="section === 'frame'"
+        v-model="adjustments"
+        view="rows"
+        @open="openSetting"
+      />
+      <PlaybackPanel
+        v-else-if="section === 'playback'"
+        v-model="adjustments"
+        :activities="activities"
+        :plan="plan"
+        view="rows"
+        @open="openSetting"
+      />
+      <WidgetStrip
+        v-else-if="board"
+        :widgets="widgets"
+        :selected="selectedWidget"
+        :card="board === 'totals'"
+        :chart="chart"
+        @done="selectedWidget = null"
+        @tool="useTool"
+        @edit="editingText = $event"
+        @open="openWidget"
+        @center="centerWidget"
+        @remove="removeWidget"
+      >
+        <!-- Ending: the pause and the card's switch, then its tools, then the end card. -->
+        <template v-if="board === 'totals'" #before>
+          <SettingsGroups
+            v-model="adjustments"
+            :groups="['pause', 'totals']"
+            :count="countOf(activities)"
+            :plan="plan"
+            view="rows"
+            @open="openSetting"
+          />
+        </template>
+        <SettingsGroups
+          v-model="adjustments"
+          :groups="board === 'totals' ? ['end-card'] : current.panels"
+          :count="countOf(activities)"
+          :plan="plan"
+          view="rows"
+          @open="openSetting"
+        />
+      </WidgetStrip>
+      <SettingsGroups
+        v-else
+        v-model="adjustments"
+        :groups="current.panels"
+        :count="countOf(activities)"
+        :plan="plan"
+        view="rows"
+        @open="openSetting"
+      />
+    </div>
+
+    <nav class="sections" aria-label="Sections">
+      <button
+        v-for="s in SECTIONS"
+        :key="s.id"
+        type="button"
+        :aria-current="s.id === section ? 'step' : undefined"
+        @click="open(s.id)"
+      >
+        <!-- A line drawing for each: a phone's frame, play, a folded map, text on a
+             picture, a finish flag. -->
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <template v-if="s.id === 'frame'">
+            <rect x="7" y="3" width="10" height="18" rx="2" />
+            <path d="M3 8v8M21 8v8" />
+          </template>
+          <template v-else-if="s.id === 'playback'">
+            <circle cx="12" cy="12" r="9" />
+            <path d="M10 8.5v7l6-3.5z" />
+          </template>
+          <template v-else-if="s.id === 'map'">
+            <path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2z" />
+            <path d="M9 4v14M15 6v14" />
+          </template>
+          <template v-else-if="s.id === 'overlay'">
+            <rect x="3" y="4" width="18" height="16" rx="2" />
+            <path d="M7 8h7M7 16h4" />
+          </template>
+          <path v-else d="M5 21V4h11l-2 4 2 4H5" />
+        </svg>
+        {{ s.label }}
+      </button>
+    </nav>
+  </section>
+
+  <!-- Wide screens. -->
+  <section v-else class="design">
+    <!-- The section bar says where the person is; the heading is for screen readers. -->
+    <h1 class="visually-hidden">Design your video</h1>
+    <nav class="sections-bar" aria-label="Sections">
+      <button
+        v-for="s in SECTIONS"
+        :key="s.id"
+        type="button"
+        class="chip"
+        :aria-current="s.id === section ? 'step' : undefined"
+        @click="open(s.id)"
+      >
+        {{ s.label }}
+      </button>
+    </nav>
+
+    <div class="layout">
+      <div class="stage" :class="{ 'with-strip': board }">
         <PosterPreview
           :engine="engine"
           :settings="settings"
@@ -288,208 +412,50 @@ function useTool(tool: 'text' | 'values' | 'chart'): void {
             />
           </template>
         </PosterPreview>
+        <!-- Adding widgets, or the picked one's options, under the picture. -->
+        <div v-if="board" class="setting-strip board-strip" role="region" aria-label="Widgets">
+          <WidgetStrip
+            :widgets="widgets"
+            :selected="selectedWidget"
+            :card="board === 'totals'"
+            :chart="chart"
+            @done="selectedWidget = null"
+            @tool="useTool"
+            @edit="editingText = $event"
+            @open="openWidget"
+            @center="centerWidget"
+            @remove="removeWidget"
+          />
+        </div>
       </div>
-
-      <!-- The section's settings; where widgets are arranged, the tools for them first, or a
-           picked widget's options. -->
-      <div
-        ref="controls"
-        class="tools setting-strip"
-        :aria-label="`${current.label} settings`"
-        role="region"
-      >
-        <FramePanel
-          v-if="section === 'frame'"
-          v-model="adjustments"
-          view="rows"
-          @open="openSetting"
-        />
+      <div class="settings">
+        <FramePanel v-if="section === 'frame'" v-model="adjustments" />
         <PlaybackPanel
           v-else-if="section === 'playback'"
           v-model="adjustments"
           :activities="activities"
           :plan="plan"
-          view="rows"
-          @open="openSetting"
         />
-        <WidgetStrip
-          v-else-if="board"
-          :widgets="widgets"
-          :selected="selectedWidget"
-          :card="board === 'totals'"
-          :chart="chart"
-          @done="selectedWidget = null"
-          @tool="useTool"
-          @edit="editingText = $event"
-          @open="openWidget"
-          @center="centerWidget"
-          @remove="removeWidget"
-        >
-          <!-- Ending: the pause and the card's switch, then its tools, then the end card. -->
-          <template v-if="board === 'totals'" #before>
-            <SettingsGroups
-              v-model="adjustments"
-              :groups="['pause', 'totals']"
-              :count="countOf(activities)"
-              :plan="plan"
-              view="rows"
-              @open="openSetting"
-            />
-          </template>
+        <template v-else>
+          <WidgetList
+            v-if="board"
+            class="widget-panel"
+            :widgets="widgets"
+            :values="values"
+            :title="title"
+            :selected="selectedWidget"
+            @add="sheet = { name: 'add-widget', label: 'Add a widget' }"
+            @open="openWidget($event)"
+          />
           <SettingsGroups
             v-model="adjustments"
-            :groups="board === 'totals' ? ['end-card'] : current.panels"
+            :groups="current.panels"
             :count="countOf(activities)"
             :plan="plan"
-            view="rows"
-            @open="openSetting"
           />
-        </WidgetStrip>
-        <SettingsGroups
-          v-else
-          v-model="adjustments"
-          :groups="current.panels"
-          :count="countOf(activities)"
-          :plan="plan"
-          view="rows"
-          @open="openSetting"
-        />
+        </template>
       </div>
-
-      <nav class="sections" aria-label="Sections">
-        <button
-          v-for="s in SECTIONS"
-          :key="s.id"
-          type="button"
-          :aria-current="s.id === section ? 'step' : undefined"
-          @click="open(s.id)"
-        >
-          <!-- A line drawing for each: a phone's frame, play, a folded map, text on a
-             picture, a finish flag. -->
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <template v-if="s.id === 'frame'">
-              <rect x="7" y="3" width="10" height="18" rx="2" />
-              <path d="M3 8v8M21 8v8" />
-            </template>
-            <template v-else-if="s.id === 'playback'">
-              <circle cx="12" cy="12" r="9" />
-              <path d="M10 8.5v7l6-3.5z" />
-            </template>
-            <template v-else-if="s.id === 'map'">
-              <path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2z" />
-              <path d="M9 4v14M15 6v14" />
-            </template>
-            <template v-else-if="s.id === 'overlay'">
-              <rect x="3" y="4" width="18" height="16" rx="2" />
-              <path d="M7 8h7M7 16h4" />
-            </template>
-            <path v-else d="M5 21V4h11l-2 4 2 4H5" />
-          </svg>
-          {{ s.label }}
-        </button>
-      </nav>
-    </template>
-  </section>
-
-  <!-- Wide screens. -->
-  <section v-else class="design">
-    <!-- The section bar says where the person is; the heading is for screen readers. -->
-    <h1 class="visually-hidden">Design your video</h1>
-    <StyleChooser
-      v-if="choosing"
-      v-model="adjustments"
-      :activities="activities"
-      :plan="plan"
-      @chosen="chosen"
-    />
-    <template v-else>
-      <nav class="sections-bar" aria-label="Sections">
-        <button
-          v-for="s in SECTIONS"
-          :key="s.id"
-          type="button"
-          class="chip"
-          :aria-current="s.id === section ? 'step' : undefined"
-          @click="open(s.id)"
-        >
-          {{ s.label }}
-        </button>
-      </nav>
-
-      <div class="layout">
-        <div class="stage" :class="{ 'with-strip': board }">
-          <PosterPreview
-            :engine="engine"
-            :settings="settings"
-            :seconds="plan?.seconds"
-            :scene="section === 'ending' ? 'ending' : 'replay'"
-            :editing="section === 'overlay' || section === 'ending'"
-            :hide-play="board !== null && selectedWidget !== null"
-            :bare="section === 'overlay' || section === 'ending'"
-            @drawn="onDrawn"
-          >
-            <template #layer="{ size }">
-              <WidgetEditor
-                v-if="board"
-                v-model:selected="selectedWidget"
-                :widgets="widgets"
-                :values="values"
-                :title="title"
-                :profile="drawn?.profile ?? null"
-                :size="size"
-                :card="board === 'totals'"
-                @change="setWidgets"
-                @edit="editingText = $event"
-              />
-            </template>
-          </PosterPreview>
-          <!-- Adding widgets, or the picked one's options, under the picture. -->
-          <div v-if="board" class="setting-strip board-strip" role="region" aria-label="Widgets">
-            <WidgetStrip
-              :widgets="widgets"
-              :selected="selectedWidget"
-              :card="board === 'totals'"
-              :chart="chart"
-              @done="selectedWidget = null"
-              @tool="useTool"
-              @edit="editingText = $event"
-              @open="openWidget"
-              @center="centerWidget"
-              @remove="removeWidget"
-            />
-          </div>
-        </div>
-        <div class="settings">
-          <FramePanel v-if="section === 'frame'" v-model="adjustments" />
-          <PlaybackPanel
-            v-else-if="section === 'playback'"
-            v-model="adjustments"
-            :activities="activities"
-            :plan="plan"
-          />
-          <template v-else>
-            <WidgetList
-              v-if="board"
-              class="widget-panel"
-              :widgets="widgets"
-              :values="values"
-              :title="title"
-              :selected="selectedWidget"
-              @add="sheet = { name: 'add-widget', label: 'Add a widget' }"
-              @open="openWidget($event)"
-            />
-            <SettingsGroups
-              v-model="adjustments"
-              :groups="current.panels"
-              :count="countOf(activities)"
-              :plan="plan"
-            />
-          </template>
-        </div>
-      </div>
-    </template>
-
-    <StepNav step="design" :next-disabled="choosing" @back="emit('back')" @next="emit('next')" />
+    </div>
   </section>
 
   <!-- A text widget's text, written over the whole screen. -->
@@ -563,10 +529,10 @@ function useTool(tool: 'text' | 'values' | 'chart'): void {
   align-items: start;
 }
 
-/* The picture as tall as fits between the bars, with the sections bar, the preview's heading
-   and caption, the widgets' strip (where there is one) and the bottom bar in view. */
+/* The picture as tall as fits under the top bar, with the sections bar, the preview's
+   heading and caption and the widgets' strip (where there is one) in view. */
 .layout .stage {
-  --preview-height: calc(100dvh - var(--top-bar-height, 0px) - 18.5rem);
+  --preview-height: calc(100dvh - var(--top-bar-height, 0px) - 13rem);
 
   position: sticky;
   top: calc(var(--top-bar-height, 0px) + 1.5rem);
@@ -574,7 +540,7 @@ function useTool(tool: 'text' | 'values' | 'chart'): void {
 }
 
 .layout .stage.with-strip {
-  --preview-height: calc(100dvh - var(--top-bar-height, 0px) - 22.5rem);
+  --preview-height: calc(100dvh - var(--top-bar-height, 0px) - 17rem);
 }
 
 /* Wide screens: the widgets' strip under the picture. */
@@ -596,28 +562,12 @@ function useTool(tool: 'text' | 'values' | 'chart'): void {
   min-width: 0;
 }
 
-/* Phones: the whole screen, over the app's page, which has nothing else on this step. */
+/* Phones: the rest of the screen under the app's top bar. */
 .editor {
-  position: fixed;
-  inset: 0;
-  z-index: 12;
   display: flex;
-  flex-direction: column;
-  background: var(--background);
-}
-
-.top {
-  flex: none;
-  padding-top: env(safe-area-inset-top);
-  border-bottom: 1px solid var(--line);
-}
-
-/* The style chooser takes the screen under the step bar, and scrolls. */
-.choosing {
   flex: 1;
+  flex-direction: column;
   min-height: 0;
-  padding: 1.2rem 1rem;
-  overflow-y: auto;
 }
 
 /* The preview takes what the rest leaves. */

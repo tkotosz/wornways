@@ -1,7 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
-import { pickSource } from './sources.ts';
-import { pickPeriod } from './steps.ts';
+import { pickPeriod, pickSource } from './popups.ts';
 
 const activity = new URL(
   '../../../packages/engine/tests/import/fixtures/trail-run.tcx',
@@ -39,9 +38,10 @@ test('saves the import after the database connection closes', async ({ page }) =
   await page.getByTestId('file-input').setInputFiles(activity);
   await expect(page.getByTestId('import-report')).toContainText('1 activity added');
   await page.reload();
-  await expect(page.getByRole('heading', { name: 'Choose your activities' })).toBeVisible();
-  await page.getByRole('button', { name: 'Source', exact: true }).click();
-  await expect(page.getByTestId('activity-count')).toHaveText('1 activity on this device');
+  // Kept: the files source goes straight to its activities.
+  await expect(page.getByRole('dialog', { name: 'Choose your activities' })).toBeVisible();
+  await pickPeriod(page);
+  await expect(page.getByTestId('chosen-count')).toContainText('1 of 1 activity');
 });
 
 test('can retry loading the library after its database keeps closing', async ({ page }) => {

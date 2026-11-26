@@ -1,7 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { offlineMap } from './offline-map.ts';
-import { pickSource } from './sources.ts';
-import { chooseStyle, openSection, pickPeriod } from './steps.ts';
+import { openDemo, openSection, pickPeriod, pickSource, useActivities } from './popups.ts';
 
 test('turns the totals card on for Recap, and leaves the switch to the person', async ({
   page,
@@ -9,13 +8,7 @@ test('turns the totals card on for Recap, and leaves the switch to the person', 
 }) => {
   page.setDefaultTimeout(15_000);
   await offlineMap(context);
-  await page.goto('/');
-  await pickSource(page, 'demo');
-  await expect(page.getByTestId('demo-count')).toHaveText('25 made-up activities');
-  await page.getByRole('button', { name: 'Continue' }).click(); // to Activities
-  await pickPeriod(page);
-  await page.getByRole('button', { name: 'Continue' }).click(); // to Design
-  await chooseStyle(page);
+  await openDemo(page);
 
   const presets = page.getByRole('radiogroup', { name: 'Preset' });
   const totals = page.getByTestId('group-totals').getByRole('switch', { name: 'Totals card' });
@@ -58,12 +51,7 @@ test('arranges the totals card as widgets: the title and the totals, then more',
 }) => {
   page.setDefaultTimeout(15_000);
   await offlineMap(context);
-  await page.goto('/');
-  await pickSource(page, 'demo');
-  await page.getByRole('button', { name: 'Continue' }).click(); // to Activities
-  await pickPeriod(page);
-  await page.getByRole('button', { name: 'Continue' }).click(); // to Design
-  await chooseStyle(page, 'Recap');
+  await openDemo(page, 'Recap');
   await openSection(page, 'Ending');
 
   // The card starts with the title over activities, kilometers, hours moving and meters
@@ -114,13 +102,11 @@ test('offers the totals card for several activities only', async ({ page, contex
   await offlineMap(context);
   await page.goto('/');
   await pickSource(page, 'demo');
-  await expect(page.getByTestId('demo-count')).toHaveText('25 made-up activities');
-  await page.getByRole('button', { name: 'Continue' }).click();
   await pickPeriod(page);
   await page.getByRole('checkbox', { name: 'Select all shown' }).click();
   await page.getByTestId('chosen').getByText('Easy run').click();
-  await page.getByRole('button', { name: 'Continue' }).click(); // to Design
-  await chooseStyle(page);
+  // One activity: a Highlight, without asking.
+  await useActivities(page);
   await openSection(page, 'Ending');
   await expect(page.getByTestId('group-end-card')).toBeVisible();
   await expect(page.getByTestId('group-totals')).toHaveCount(0);

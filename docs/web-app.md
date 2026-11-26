@@ -18,14 +18,14 @@ a static site that can be installed to the home screen.
 
 ## Screens
 
-The app is a short series of steps, one per screen, with a step bar on top. A person can
-always go back to an earlier step; nothing is lost by moving between steps.
+The app is one screen, the editor, under a top bar. Everything set up around the video
+happens in popups over it: the source, connecting it, what it keeps on the device, the
+activities, the preset and the finished video. On the way in each popup leads to the next;
+after that the top bar opens any of them, at any time.
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────┐
-│ wornways                                 Your files stay on this device │
-├──────────────────────────────────────────────────────────────────────────┤
-│        (✓ Source) (✓ Activities) (3 Design) (4 Export)                   │
+│ ☰  (Activities 25) (Files) (Preset)                             [Render] │
 ├──────────────────────────────────────────────────────────────────────────┤
 │ (Frame) [Playback] (Map) (Overlay) (Ending)                              │
 │ ┌─────────────┐  PLAYBACK STYLE                                          │
@@ -36,177 +36,188 @@ always go back to an earlier step; nothing is lost by moving between steps.
 │ │             │  Video length ─────────●──────────────────  30 seconds   │
 │ └─────────────┘  ▶ YOUR REPLAY  30 seconds · Recap                       │
 │                  Fine-tune playback   Optional: grouping, pace and camera│
-│ [← Activities]                                               [Export →]  │
 └──────────────────────────────────────────────────────────────────────────┘
 ```
 
-The step bar shows a pill per step, numbered, with a tick on the steps behind the current
-one, which is outlined in orange; a pill opens its step. Moving between steps works the
-same way on every step: a way back and a way on, which always change the step. On wide
-screens they sit in a bar at the bottom of the step and name the step they go to ("←
-Source", "Design →"); the bar stays at the bottom of the window while the step is taller,
-with the step's own actions between them (Download and Share on Export). On a phone a slim
-bar at the top of the window takes the place of the header and the pills: ← at the left,
-the step's name, and Next at the right, with a segment per step under them that shows how
-far along it is (the ones behind filled, the current one bright); the buttons tell screen
-readers which step they go to. The bottom bar then holds only the step's own actions, when
-there are some. Each step is one column on a phone.
+**The top bar.** At the left, icons without captions, to leave room on a phone; each tells
+screen readers what it opens and what is set: the menu (☰); the activities, with how many
+the video shows as a badge ("Activities: 25"); what the source keeps on the device (files,
+or a service's connection; not for the demo); and the preset ("Preset: Recap"). At the
+right, Render, the main button. Before activities are chosen, the activities and preset
+icons and Render are disabled.
 
-The list of sources, before one is chosen, is the app's home screen: the header with the
-name, the version and About (and Install app where offered), and no step bar or pills,
-since there is nowhere to go back to and nothing to go on with until a source is picked.
-On a phone it is the only screen with the header; wide screens keep the header on every
-step. A chosen source's screen is step 1, and its way back ("← Sources") leads to the
-list.
+**The menu** slides in from the left over the dimmed screen: the mark, the name and the
+version, "Your files stay on this device", then Switch source (with the source in use),
+Install app (where offered, see Install), About (what the app is, its license, the source
+on GitHub and the licenses) and the privacy policy, a page of its own. Back, Escape, a tap
+beside it or picking an item closes it.
 
-1. **Source.** Where the activities come from: files on this device, Strava, Ride with
-   GPS (the last two where the site offers them) or the demo. One source is chosen at a
-   time, and activities of different sources are never mixed. Until one is chosen the
-   step lists them as cards like the playback presets, in the order Demo, Files, Ride
-   with GPS, Strava, each with an icon and where it stands ("25 made-up activities", "3
-   activities on this device", "Connected · 12 downloaded", "Not connected"). Until a
-   source is picked, the way on and the later steps are disabled. Ride with GPS's card
-   shows its official icon; Strava's brand rules allow only its connect button and
-   badges, so its card has a drawing. Picking one shows what it needs, under a "Current
-   source" heading with the source's name. Its way back ("← Sources") clears the choice
-   and lists the sources again (connections stay): for files, a
-   drop zone and file and folder pickers, a report of what the last import added and what
-   could not be read (closable), and the library as a grid with a header row (date, name,
-   sport, distance) and a delete button per row ("Delete saved activities" removes them
-   all, after a confirmation); for Strava and Ride with GPS, connecting, or the
-   connection with a Disconnect button and the activities whose tracks are downloaded to
-   this device, in the same grid, each deletable ("Delete downloaded tracks" removes them
-   all; a deleted track is downloaded again when a video needs it) (a connection stays
-   when another source is chosen: Strava's for its two hours, Ride with GPS's until it is
-   disconnected); for the demo, what it holds and its activities in the grid, without
-   delete buttons; picking the demo loads them. The choice is remembered for the next
-   visit (without one, the list shows); a person whose chosen source is ready (files on
-   the device, a service connected) starts at step 2.
-2. **Activities.** Which activities the video shows is always a choice made, not a default:
-   with files or the demo the step starts with no period picked ("Which activities? Pick a
-   period."), and the other filters, the list and the way on come once one is (Strava and
-   Ride with GPS, which list a period at a time, start on this month). The filters (the
-   "Which activities" settings): period with shortcuts and a calendar for custom days,
-   sports (offered only when the period has them, with "All"), and two place filters,
-   "Starts near a place" and "Ends near a place". Each opens its own panel, where the place
-   is set in one field: a place clicked on the map shown under it (MapLibre with
-   OpenFreeMap's dark style, with zoom buttons, the circle of how near counts, and the
-   places activities start, or end, at most often), typed or pasted coordinates, or the
-   browser's current location, which is tried first when the browser allows it; a slider
-   sets how near counts. The second filter turned on starts at the first one's place, so the
-   same place for both takes one pick. A filter without a place waits for one. The location
-   never leaves the device. Under the filters, the matching activities in the same grid, all
-   ticked at first, with their count and total distance; the ticked ones are what the video
-   shows, and unticked ones stay unticked when the filters change. Nothing can be deleted
-   here.
-3. **Design.** Each time the step comes after Activities, it first asks how the video plays:
-   "How should it play?" with the presets these activities can take as cards (the drawing,
-   the name and its line), none picked, and "Keep my own playback" when the playback was set
-   by hand. The style decides what the video is, so it is always chosen; the editor and the
-   way on to Export wait for it, and Playback › Style changes it later. Coming back from
-   Export does not ask. Then: how the video plays and looks, in sections, with a section bar
-   under the step bar, in the order things are decided; the bar shows where the person is,
-   so the step has no title of its own. The bar opens any section, in any order, since every
-   setting has a default; the buttons to Activities and Export leave the step from any
-   section. The section open last is kept while the app is open, also when coming back from
-   Export. One live preview stays while the sections change (see Preview). On wide screens
-   it sits beside the settings and the page scrolls. On phones the step is a full editor
-   screen that does not scroll, laid out like photo and video editors: the slim step bar on
-   top, in place of the app's header; the preview alone, with no lines around it, as large
-   as the room allows; under it the open section's settings as one strip of chips that
-   scrolls sideways, a chip per setting with its name small over its value ("Grouping" over
-   "Day"), so the picture keeps most of the screen. A switch turns in place on its chip, and
-   a group switched off keeps only its switch. Any other chip opens its
-   setting alone in a sheet from the bottom, with the top of the picture still in view and
-   changes drawn on it as they are made: a choice as an option per row, with its
-   explanation; a number as a slider with the exact value; a position as the nine squares
-   with its name; the values to show as chips picked in order; the presets as their cards.
-   Done, Escape or a tap above the sheet closes it. The five sections along the bottom, with
-   a drawing each. The settings of this step are remembered for the next visit.
-   - **Frame:** the aspect ratio (Story, Square or Landscape, for where the video will be
-     posted, or a custom size) and the frame rate (24, 30 or 60 fps). It comes first
-     because the shape decides how everything else looks.
-   - **Playback:** how the routes play, as a preset: All at once (picked at first), Recap
-     or Multiday trip for several activities; Highlight (a 15-second clip of the
-     activity) for a single one. Each remembers its own choice. Each preset is a card with
-     a small looping drawing of how activities move in it. Under the cards, the video's
-     length, then a summary of the replay ("30 seconds · Recap" and a line telling what it
-     plays, e.g. "12 months (312 activities), 2.3 s each" or "a race of all 24
-     activities, each at its real pace"), then **Fine-tune playback**, folded at first:
-     grouping, time share, group pace, overlap, drawing pace and the camera, built from
-     the settings table, starting from the preset's values. Changing the length or one of
-     the preset's values makes it Custom ("Custom playback"), and no card is picked;
-     picking a card goes back to that preset.
-   - **Map:** the street map, and the replay privacy that hides each route's start and
-     finish.
-   - **Overlay:** what is drawn over the replay, as widgets arranged on the still the way
-     stickers are in a story editor: text (at first the title), one value each (a metric,
-     with its words as its label mode has them: none, a short form, after it or under it),
-     and the
-     elevation chart (when an activity recorded elevation). A video starts with the title at
-     the top, the values that suit it at the bottom left (the first large, the others
-     smaller in a row under it), and, for a single activity, the chart along the bottom. Each widget is centered on its point
-     of the frame, so it keeps its place while its value changes during the replay; text has
-     a soft shadow around its letters, so it reads on a busy map without darkening the
-     frame. In Overlay the still is drawn without the widgets (the engine lays them out and
-     leaves them off it) and the page draws them over it, at the sizes, font and shadow the
-     engine draws them with in the video, so they move under the finger at once; the still
-     is drawn again only for what is under them (and once when calories are first shown,
-     which a service may give only on request). Play in the middle plays the draft video,
-     with the widgets drawn by the engine, and Edit goes back to the still; Play steps aside
-     while a widget is picked. A tap picks one, the widget nearest the finger within about
-     28 pixels, so a fingertip need not land on a small widget exactly: its name on a tab
-     and a corner handle; a tap on the picture outside the widgets lets it go. Dragging
-     moves it; it snaps to the frame's center lines first, else in line with another
-     widget's left edge, middle or right edge across and top or bottom down, with a line
-     shown, and while it is dragged a bin shows at the bottom, where letting it go removes
-     it. Two fingers, or the corner handle, resize it (50 to 250%). A tap on a picked text
-     widget opens its text over the whole screen, large as on the video, with the keyboard
-     up; a tap outside the text or Enter finishes it, and a text left empty is removed. The
-     arrow keys move a picked widget by 1% of the frame (5% with
-     Shift), + and - resize it and Delete removes it. On a story-shaped frame, while a
-     widget moves, hatched guides marked "Covered on Instagram" show what Instagram's own
-     controls cover (Meta's ads guide: 14% at the top, 35% at the bottom, 6% at each side).
-     Under the picture, as in the other sections, a strip of chips: Add Text writes a new
-     text; Add Metric opens a sheet of the metrics this video can show, each a tile with its
-     own number (calories a service gives on request are offered before they are known; a
-     value already on the picture is dimmed); the elevation chart's switch (offered only
-     when an activity recorded elevation); and the watermark's, a fixed small mark at the
-     bottom left on the map credit's line. A new widget comes in a free spot clear of the
-     middle. A picked widget turns the strip into its own chips: Done (lets it go), Edit
-     (a text's text), Size (a sheet with a slider), Label (a value's label mode, each with
-     how the value reads in it), Center (to the middle across) and Remove. On a wide screen
-     the same strip is under the picture, and a list stays beside it: "+ Add a widget"
-     with the same palette, then a row per widget that opens all its settings, and the
-     watermark switch.
-   - **Ending:** what comes after the replay: the end pause on the finished picture, the
-     totals card (for several activities only; on for Recap) and the end card. When the
-     video has the totals card, the picture is the finished card, drawn without its widgets,
-     and the page draws them over it, as in Overlay: at first the title over the usual
-     totals, at the card's sizes (a text over its short orange rule, a total's number over
-     its words in orange). They are picked, moved, resized and removed as over the replay,
-     and the strip has the same chips between the card's switch and the end card's: Add
-     Text and Add Total (a sheet of the totals these activities have, each with its own
-     number); there is no chart, watermark or label mode on the card, whose totals always
-     have their words under them. The card's band behind them stays where the still drew it until it is drawn
-     again; the video has it behind the widgets as they are.
-4. **Export.** A stage in the video's shape, which shows the finished picture with a "Make
-   video" button in the middle; while the video is made, its progress and a way to
-   cancel; then the video itself, playing. Download then appears in the bottom bar, and
-   beside it Share, which hands the video to another
-   app through the system's share sheet. Share shows only where the browser can share
-   files (mostly on phones) and is then the main button.
+**Popups** take the whole screen on a phone and are a panel in the middle on a wide screen,
+over the dimmed editor. Each has a title, its content, which scrolls, and a footer for its
+buttons, which share the footer's width on a phone. Once there is something to edit, a
+popup closes with ✕, Escape, a tap beside the panel or the back gesture, and the editor is
+as it was. Until then the popups on the way in cannot close, since there is nothing behind
+them, and have the menu's button in place of ✕. Each popup and the menu are an entry in
+the browser's history, so the phone's back gesture closes them instead of leaving the site.
 
-Until a source is chosen (on a first visit), step 1 also says in a few words what the app
-does. On the files screen, "How to get your files" starts collapsed and opens instructions
-for exporting an account or a single activity from Strava or Garmin.
+**The way in.** A first visit starts with the sources. Picking one leads on: Strava and Ride
+with GPS ask to connect when they are not connected; files ask for files while there are
+none; then the activities are chosen, and their button takes them to the editor. The
+preset is asked when the editor is set up for a new kind of selection: the first one since
+the app opened, or a change between one activity and several, and only where there is more
+than one preset to pick (a single activity has one, Highlight, which it gets without
+asking). Choosing more or fewer activities of the same kind goes straight back to editing.
+A forced preset popup closes only with a choice. The source is remembered for the next
+visit: a source that is ready (files on the device, a service still connected, the demo)
+opens on its activities; one whose connection ended asks to connect again.
+
+1. **Sources.** Where the activities come from: files on this device, Strava, Ride with
+   GPS (the last two where the site offers them) or the demo. One source is used at a
+   time, and activities of different sources are never mixed. They are cards like the
+   playback presets, in the order Demo, Files, Ride with GPS, Strava, each with an icon and
+   where it stands ("25 made-up activities", "3 activities on this device", "Connected · 12
+   downloaded", "Not connected"); the one in use is marked. Ride with GPS's card shows its
+   official icon; Strava's brand rules allow only its connect button and badges, so its
+   card has a drawing. On a first visit a few words above them say what the app does.
+   Picking the source in use goes straight to its activities; another one starts over from
+   it, and a connection stays when another source is picked: Strava's for its two hours,
+   Ride with GPS's until it is disconnected. Picking the demo loads its activities.
+2. **Connect.** Strava or Ride with GPS, when picked and not connected: what the connection
+   allows and the service's own Connect button, which leaves for its sign-in page and comes
+   back to the activities, with the privacy policy linked; Switch source picks another one.
+3. **Stored on this device.** For files: a drop zone and file and folder pickers, a report of
+   what the last import added and what could not be read (closable), "How to get your
+   files" (instructions for exporting an account or a single activity from Strava or
+   Garmin), and the library as a grid with a header row (date, name, sport, distance) and a
+   delete button per row ("Delete saved activities" removes them all, after a
+   confirmation). For Strava and Ride with GPS: the connection with a Disconnect button,
+   and the activities whose tracks are downloaded to this device, in the same grid, each
+   deletable ("Delete downloaded tracks" removes them all; a deleted track is downloaded
+   again when a video needs it). Disconnecting the source in use asks to connect again. On
+   the way in, and when opened from the activities, "Choose activities" goes on to them.
+4. **Activities.** Which activities the video shows is always a choice made, not a default:
+   with files or the demo it starts with no period picked ("Which activities? Pick a
+   period."), and the other filters and the list come once one is (Strava and Ride with
+   GPS, which list a period at a time, start on this month). Above the filters, the source
+   in use, with links to manage what it keeps ("Manage files", "Manage connection") and to
+   change it. The filters (the "Which activities" settings): period with shortcuts and a
+   calendar for custom days, sports (offered only when the period has them, with "All"),
+   and two place filters, "Starts near a place" and "Ends near a place". Each opens its own
+   panel, where the place is set in one field: a place clicked on the map shown under it
+   (MapLibre with OpenFreeMap's dark style, with zoom buttons, the circle of how near
+   counts, and the places activities start, or end, at most often), typed or pasted
+   coordinates, or the browser's current location, which is tried first when the browser
+   allows it; a slider sets how near counts. The second filter turned on starts at the
+   first one's place, so the same place for both takes one pick. A filter without a place
+   waits for one. The location never leaves the device. Under the filters, the matching
+   activities in the same grid, all ticked at first, with their count and total distance;
+   the ticked ones are what the video shows, and unticked ones stay unticked when the
+   filters change. Nothing can be deleted here. The footer's button ("Use 12 activities")
+   takes them to the editor, once the tracks of a service are downloaded. Closed without
+   it, the activities are as they were.
+5. **Preset.** "How should it play?": the presets these activities can take as cards (the
+   drawing, the name and its line), and "Keep my own playback" when the playback was set by
+   hand. Asked for a new kind of selection, none is picked; opened from the top bar, the one
+   in use is marked. Playback › Style in the editor changes it too.
+6. **Render.** Render makes the video at once: a stage in the video's shape with its
+   progress, and Cancel in the footer; then the video itself, playing, with Download and,
+   where the browser can share files (mostly on phones), Share, which hands the video to
+   another app through the system's share sheet and is then the main button. Closing it
+   goes back to editing and stops a video still being made. The video is kept while the
+   settings stay the same, so Render shows it again without making it twice.
+
+**The editor.** How the video plays and looks, in sections, with a section bar in the order
+things are decided; the bar shows where the person is, so the screen has no title of its
+own. The bar opens any section, in any order, since every setting has a default. The
+section open last is kept while the app is open, also while popups open and close. One
+live preview stays while the sections change (see Preview). On wide screens it sits beside
+the settings and the page scrolls, under the top bar. On phones the editor is a screen that
+does not scroll, laid out like photo and video editors: under the top bar the preview
+alone, with no lines around it, as large as the room allows; under it the open section's
+settings as one strip of chips that scrolls sideways, a chip per setting with its name
+small over its value ("Grouping" over "Day"), so the picture keeps most of the screen. A
+switch turns in place on its chip, and a group switched off keeps only its switch. Any
+other chip opens its setting alone in a sheet from the bottom, with the top of the picture
+still in view and changes drawn on it as they are made: a choice as an option per row, with
+its explanation; a number as a slider with the exact value; a position as the nine squares
+with its name; the values to show as chips picked in order; the presets as their cards.
+Done, Escape or a tap above the sheet closes it. The five sections along the bottom, with a
+drawing each. The editor's settings are remembered for the next visit.
+
+- **Frame:** the aspect ratio (Story, Square or Landscape, for where the video will be
+  posted, or a custom size) and the frame rate (24, 30 or 60 fps). It comes first
+  because the shape decides how everything else looks.
+- **Playback:** how the routes play, as a preset: All at once (picked at first), Recap
+  or Multiday trip for several activities; Highlight (a 15-second clip of the
+  activity) for a single one. Each remembers its own choice. Each preset is a card with
+  a small looping drawing of how activities move in it. Under the cards, the video's
+  length, then a summary of the replay ("30 seconds · Recap" and a line telling what it
+  plays, e.g. "12 months (312 activities), 2.3 s each" or "a race of all 24
+  activities, each at its real pace"), then **Fine-tune playback**, folded at first:
+  grouping, time share, group pace, overlap, drawing pace and the camera, built from
+  the settings table, starting from the preset's values. Changing the length or one of
+  the preset's values makes it Custom ("Custom playback"), and no card is picked;
+  picking a card goes back to that preset.
+- **Map:** the street map, and the replay privacy that hides each route's start and
+  finish.
+- **Overlay:** what is drawn over the replay, as widgets arranged on the still the way
+  stickers are in a story editor: text (at first the title), one value each (a metric,
+  with its words as its label mode has them: none, a short form, after it or under it),
+  and the
+  elevation chart (when an activity recorded elevation). A video starts with the title at
+  the top, the values that suit it at the bottom left (the first large, the others
+  smaller in a row under it), and, for a single activity, the chart along the bottom. Each widget is centered on its point
+  of the frame, so it keeps its place while its value changes during the replay; text has
+  a soft shadow around its letters, so it reads on a busy map without darkening the
+  frame. In Overlay the still is drawn without the widgets (the engine lays them out and
+  leaves them off it) and the page draws them over it, at the sizes, font and shadow the
+  engine draws them with in the video, so they move under the finger at once; the still
+  is drawn again only for what is under them (and once when calories are first shown,
+  which a service may give only on request). Play in the middle plays the draft video,
+  with the widgets drawn by the engine, and Edit goes back to the still; Play steps aside
+  while a widget is picked. A tap picks one, the widget nearest the finger within about
+  28 pixels, so a fingertip need not land on a small widget exactly: its name on a tab
+  and a corner handle; a tap on the picture outside the widgets lets it go. Dragging
+  moves it; it snaps to the frame's center lines first, else in line with another
+  widget's left edge, middle or right edge across and top or bottom down, with a line
+  shown, and while it is dragged a bin shows at the bottom, where letting it go removes
+  it. Two fingers, or the corner handle, resize it (50 to 250%). A tap on a picked text
+  widget opens its text over the whole screen, large as on the video, with the keyboard
+  up; a tap outside the text or Enter finishes it, and a text left empty is removed. The
+  arrow keys move a picked widget by 1% of the frame (5% with
+  Shift), + and - resize it and Delete removes it. On a story-shaped frame, while a
+  widget moves, hatched guides marked "Covered on Instagram" show what Instagram's own
+  controls cover (Meta's ads guide: 14% at the top, 35% at the bottom, 6% at each side).
+  Under the picture, as in the other sections, a strip of chips: Add Text writes a new
+  text; Add Metric opens a sheet of the metrics this video can show, each a tile with its
+  own number (calories a service gives on request are offered before they are known; a
+  value already on the picture is dimmed); the elevation chart's switch (offered only
+  when an activity recorded elevation); and the watermark's, a fixed small mark at the
+  bottom left on the map credit's line. A new widget comes in a free spot clear of the
+  middle. A picked widget turns the strip into its own chips: Done (lets it go), Edit
+  (a text's text), Size (a sheet with a slider), Label (a value's label mode, each with
+  how the value reads in it), Center (to the middle across) and Remove. On a wide screen
+  the same strip is under the picture, and a list stays beside it: "+ Add a widget"
+  with the same palette, then a row per widget that opens all its settings, and the
+  watermark switch.
+- **Ending:** what comes after the replay: the end pause on the finished picture, the
+  totals card (for several activities only; on for Recap) and the end card. When the
+  video has the totals card, the picture is the finished card, drawn without its widgets,
+  and the page draws them over it, as in Overlay: at first the title over the usual
+  totals, at the card's sizes (a text over its short orange rule, a total's number over
+  its words in orange). They are picked, moved, resized and removed as over the replay,
+  and the strip has the same chips between the card's switch and the end card's: Add
+  Text and Add Total (a sheet of the totals these activities have, each with its own
+  number); there is no chart, watermark or label mode on the card, whose totals always
+  have their words under them. The card's band behind them stays where the still drew it until it is drawn
+  again; the video has it behind the widgets as they are.
 
 ## How it works
 
 ```
  page (Vue)                         worker                                 device
  ───────────                        ──────                                 ──────
- steps, settings   ── messages ──▶  import, library, preview, video  ──▶  IndexedDB (activities)
+ editor, popups    ── messages ──▶  import, library, preview, video  ──▶  IndexedDB (activities)
  preview canvas    ◀── frames ───   engine + browser adapters        ──▶  Cache Storage (map tiles)
  video player      ◀── MP4 ──────                                    ◀──  map tile server
 ```
@@ -257,15 +268,15 @@ for exporting an account or a single activity from Strava or Garmin.
 
 ### Ride with GPS
 
-- Ride with GPS is a source like Strava: while it is the source, the Activities step lists
+- Ride with GPS is a source like Strava: while it is the source, the activities popup lists
   the account's trips, and tracks are downloaded only when needed. The newest few are
-  fetched ahead, a trip ticked again moves to the front, and leaving the Activities step
-  fetches the chosen trips' missing tracks, a few at a time. This code is shared with
+  fetched ahead, a trip ticked again moves to the front, and taking the activities to the
+  editor fetches the chosen trips' missing tracks, a few at a time. This code is shared with
   Strava (`worker/remote-activities.ts`); each service says how to list and how to fetch
   one track.
 - For both services, a download that takes more than half a second opens a dialog with
   the count, a percentage bar and Cancel (Escape cancels too). Canceling stops at once
-  and stays on the Activities step; downloads already under way finish and are kept, so
+  and stays on the activities; downloads already under way finish and are kept, so
   going on again fetches only the rest. Loading a list shows a moving bar in place of the
   buttons of the source being opened, or above the activities.
 - Connecting: the page links to `/api/ridewithgps/connect`, a Pages Function that sends
@@ -276,12 +287,11 @@ for exporting an account or a single activity from Strava or Garmin.
   on to `/?ridewithgps=<outcome>`. The code and the token never reach page scripts.
 - Ride with GPS tokens do not expire and allow changing the account. The cookie lasts
   30 days, and the Functions only read: the trip list and one trip at a time.
-- The trip list has no date filter, so it is read whole when Continue leaves the Source
-  step (or a reload opens Ride with GPS), 200 trips a page, while the Activities step shows
-  it loading; the Function returns only the fields the app uses. The filters then work on
+- The trip list has no date filter, so it is read whole when Ride with GPS is picked (or a
+  reload opens it), 200 trips a page, while the activities popup shows it loading; the Function returns only the fields the app uses. The filters then work on
   it in the worker, and "All time" is offered. Trips without a route (indoor ones) are
   left out.
-- The Source step asks nothing of Strava or Ride with GPS: whether a service is connected
+- The list of sources asks nothing of Strava or Ride with GPS: whether a service is connected
   comes from this site's own Functions (the sign-in cookie), and what it keeps from the
   stored copies (Ride with GPS stores each trip's name, date, sport and distance with its
   track; Strava keeps an encrypted index beside its cache). A Strava list stops at the
@@ -297,14 +307,14 @@ for exporting an account or a single activity from Strava or Garmin.
 - A reload opens Ride with GPS again when it is the chosen source, with the tab's filters
   and selection; choosing files, Strava or the demo keeps the connection. When the person
   comes back from connecting one service, that one is the chosen source; the other one's
-  connection stays. The look of the video (the Design step) is the same one files use.
+  connection stays. The look of the video (the editor's settings) is the same one files use.
 - Trips get the id `rwgps-<trip id>`, and Ride with GPS's activity types (`cycling:road`,
   `running:trail`, ...) are mapped to the same sport names as files. There is no webhook:
   changes on Ride with GPS show up the next time the list is read.
 
 ### Demo
 
-- Besides files, Strava and Ride with GPS, the Source step offers a demo: made-up rides and
+- Besides files, Strava and Ride with GPS, the list of sources offers a demo: made-up rides and
   runs on real roads in Mallorca, for trying Wornways before adding one's own activities.
   A month of rides and runs from one town (for a recap), a five-day tour of the island
   (for a multiday trip) and one long climb (for a highlight). It is a source like the
@@ -347,10 +357,10 @@ for exporting an account or a single activity from Strava or Garmin.
 - Play, in the middle of the picture, makes a draft of the whole video, end card
   included, and plays it in its place, with the player's bar to move to any moment. The
   draft is the real video made small: at the preview's size, 15 frames a second and a
-  low bitrate, by the same code as Export. While it is made, the picture shows how far it
+  low bitrate, by the same code as Render. While it is made, the picture shows how far it
   is, with Cancel. Any change of settings goes back to the picture until Play is pressed
-  again; the draft stays while the settings stay the same, also from one section or step
-  to the other.
+  again; the draft stays while the settings stay the same, also from one section to the
+  other and while popups open and close.
 - In the Overlay and Ending sections, where things are arranged on the picture, the
   preview opens on the still. Play shows the draft (made then, or the one already made for
   these settings) and its corner button Edit goes back to the still. Nothing is drawn or
@@ -385,9 +395,9 @@ for exporting an account or a single activity from Strava or Garmin.
   sites (map tiles) are left alone, and the map tiles the app keeps let it make videos of
   areas it has drawn before without a network.
 - Chrome and Edge offer to install the app with an event; the app keeps the offer and
-  shows an "Install app" button in its header. Safari on iPhone and iPad sends no such
-  event, so there the button explains its Share → Add to Home Screen steps instead.
-  Firefox installs from its own menu, and the button stays hidden.
+  shows "Install app" in its menu. Safari on iPhone and iPad sends no such event, so there
+  the item explains its Share → Add to Home Screen steps instead. Firefox installs from its
+  own menu, and the item stays hidden.
 
 ## Rules
 

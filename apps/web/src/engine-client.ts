@@ -37,7 +37,7 @@ export type DownloadProgress = { done: number; total: number; cancel: () => void
 
 export class EngineClient {
   private nextId = 1;
-  /** Where the activities of the steps after Activities come from. */
+  /** Where the activities chosen for the editor come from. */
   private source: Source = 'files';
   private readonly pending = new Map<number, Pending>();
 

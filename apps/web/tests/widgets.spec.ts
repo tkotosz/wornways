@@ -1,19 +1,13 @@
 import { expect, test, type Page } from '@playwright/test';
 import { offlineMap } from './offline-map.ts';
-import { pickSource } from './sources.ts';
-import { chooseStyle, openSection, pickPeriod } from './steps.ts';
+import { openDemo, openSection } from './popups.ts';
 
-// A laptop's window: the preview fits between the bars, so it is large enough to arrange on.
+// A laptop's window: the preview fits under the top bar, so it is large enough to arrange on.
 test.use({ viewport: { width: 1280, height: 900 } });
 
-/** Opens the demo's Design step on Overlay, where the widgets are arranged on the still. */
+/** Opens the demo's editor on Overlay, where the widgets are arranged on the still. */
 async function openOverlay(page: Page) {
-  await page.goto('/');
-  await pickSource(page, 'demo');
-  await page.getByRole('button', { name: 'Continue' }).click(); // to Activities
-  await pickPeriod(page);
-  await page.getByRole('button', { name: 'Continue' }).click(); // to Design
-  await chooseStyle(page, 'Recap');
+  await openDemo(page, 'Recap');
   await openSection(page, 'Overlay');
   await expect(page.getByTestId('widget-0')).toBeVisible();
   await expect(page.getByText('Drawing preview')).toHaveCount(0);
