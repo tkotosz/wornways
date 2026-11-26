@@ -396,7 +396,11 @@ test('accepts month and year bounds and validates custom frame sizes', async ({
   await expect(page.getByRole('alert')).toContainText('needs even numbers');
   await size.fill('640x480');
   await size.press('Enter');
-  await expect(page.getByTestId('preview')).toContainText('640 × 480 · 30 fps');
+  // The preview takes the frame's shape.
+  await expect(page.getByTestId('preview').locator('.frame')).toHaveCSS(
+    'aspect-ratio',
+    '640 / 480',
+  );
 });
 
 test('makes a video of activities within the chosen distance range', async ({ page, context }) => {
