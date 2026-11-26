@@ -1,8 +1,7 @@
 <script setup lang="ts">
-// Choosing the activities the video shows, with filters and by ticking them. On the files
-// source it starts with no period picked, and the list and the other filters come once one
-// is: which activities a video shows is always chosen, not left to a default. Nothing is
-// deleted here. The button at the bottom takes the activities ticked to the editor.
+// Choosing the activities the video shows, with filters and by ticking them. The list and the
+// other filters come once a period is picked. Nothing is deleted here. The button at the
+// bottom takes the activities ticked to the editor.
 import { computed } from 'vue';
 import { placeMissing, type Choice } from '../choice.ts';
 import ActivityFilters from '../components/ActivityFilters.vue';

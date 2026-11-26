@@ -20,7 +20,7 @@ import {
   type Section,
 } from './adjust.ts';
 import {
-  NO_CHOICE,
+  ALL_ACTIVITIES,
   choiceSettings,
   distanceRange,
   placeMissing,
@@ -59,7 +59,28 @@ const libraryError = ref('');
 const library = ref<ActivitySummary[]>([]);
 const fileAdjustments = ref<Adjustments>(loadAdjustments());
 const stravaAdjustments = ref<Adjustments>({});
-const fileChoice = ref<Choice>({ ...NO_CHOICE });
+/** The key the files' choice is remembered under, for the next visit. */
+const FILE_CHOICE = 'wornways-file-choice';
+
+/** The choice of files made on an earlier visit; null when none is remembered. */
+function rememberedFileChoice(): Choice | null {
+  try {
+    const saved = localStorage.getItem(FILE_CHOICE);
+    return saved ? { ...ALL_ACTIVITIES, ...(JSON.parse(saved) as Partial<Choice>) } : null;
+  } catch {
+    return null;
+  }
+}
+
+const savedFileChoice = rememberedFileChoice();
+const fileChoice = ref<Choice>(savedFileChoice ?? { ...ALL_ACTIVITIES });
+watch(fileChoice, (choice) => {
+  try {
+    localStorage.setItem(FILE_CHOICE, JSON.stringify(choice));
+  } catch {
+    // Remembering is optional when browser storage is blocked or full.
+  }
+});
 const { matches: fileMatches, matching: fileMatching } = useMatches(
   props.engine,
   'files',
@@ -75,8 +96,32 @@ const menuOpen = ref(false);
 const page = ref<'about' | 'install' | null>(null);
 /** The preset popup asked for a new selection, which closes only with a choice. */
 const presetForced = ref(false);
-/** The kind of selection the editor is set up for; null until activities are chosen. */
+/**
+ * The kind of selection the editor is set up for: one activity or several; null until
+ * activities are chosen. Remembered for each source for the next visit (the demo starts
+ * fresh), so the preset is asked again only for a new kind of selection.
+ */
 const editedCount = ref<ActivityCount | null>(null);
+const KIND = (source: Source) => `wornways-kind-${source}`;
+
+function rememberedKind(source: Source): ActivityCount | null {
+  if (source === 'demo') return null;
+  try {
+    const saved = localStorage.getItem(KIND(source));
+    return saved === 'one' || saved === 'several' ? saved : null;
+  } catch {
+    return null;
+  }
+}
+
+function rememberKind(source: Source, kind: ActivityCount): void {
+  if (source === 'demo') return;
+  try {
+    localStorage.setItem(KIND(source), kind);
+  } catch {
+    // Remembering is optional when browser storage is blocked or full.
+  }
+}
 /** Whether the activities were taken to the editor, with their tracks on this device. */
 const selected = ref(false);
 /** The editor's open section, kept while the app is open. */
@@ -407,6 +452,7 @@ async function enterSource(): Promise<void> {
     popup.value = 'source';
     return;
   }
+  editedCount.value = rememberedKind(id);
   if (id === 'demo' && !demo.active.value && !(await demo.open())) {
     popup.value = 'source';
     return;
@@ -455,6 +501,7 @@ async function useActivities(): Promise<void> {
   if (!ask && editedCount.value !== null && editedCount.value !== kind)
     adjustments.value = withoutWidgets(adjustments.value);
   editedCount.value = kind;
+  rememberKind(source.value, kind);
   selected.value = true;
   presetForced.value = ask;
   popup.value = ask ? 'preset' : null;
@@ -494,6 +541,18 @@ watch(topBar, (bar) => {
 });
 onBeforeUnmount(() => topBarSize.disconnect());
 
+/**
+ * On a visit with files and the choice made last time, its activities go straight to the
+ * editor once they are matched, without asking anything again.
+ */
+let resuming = savedFileChoice !== null;
+watch([popup, matching], () => {
+  if (!resuming || popup.value !== 'activities' || matching.value) return;
+  resuming = false;
+  if (source.value === 'files' && chosenIds.value.length && !awaitingPlace.value)
+    void useActivities();
+});
+
 async function loadLibrary(): Promise<void> {
   libraryError.value = '';
   try {
@@ -506,7 +565,10 @@ async function loadLibrary(): Promise<void> {
     // Only the chosen source opens; the other connections stay as they are.
     if (chosen.value !== 'strava' && stravaKept)
       await props.engine.keepStrava(stravaKept).catch(() => {});
+    if (chosen.value !== 'files') resuming = false;
     await enterSource();
+    // Only straight from the start: files to add first, say, are a visit of their own.
+    if (popup.value !== 'activities') resuming = false;
   } catch (error) {
     libraryError.value = error instanceof Error ? error.message : String(error);
   }

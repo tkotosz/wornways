@@ -64,13 +64,15 @@ the browser's history, so the phone's back gesture closes them instead of leavin
 **The way in.** A first visit starts with the sources. Picking one leads on: Strava and Ride
 with GPS ask to connect when they are not connected; files ask for files while there are
 none; then the activities are chosen, and their button takes them to the editor. The
-preset is asked when the editor is set up for a new kind of selection: the first one since
-the app opened, or a change between one activity and several, and only where there is more
-than one preset to pick (a single activity has one, Highlight, which it gets without
-asking). Choosing more or fewer activities of the same kind goes straight back to editing.
-A forced preset popup closes only with a choice. The source is remembered for the next
-visit: a source that is ready (files on the device, a service still connected, the demo)
-opens on its activities; one whose connection ended asks to connect again.
+preset is asked when the editor is set up for a new kind of selection: the source's first
+one, or a change between one activity and several, and only where there is more than one
+preset to pick (a single activity has one, Highlight, which it gets without asking). The
+kind is remembered for each source for the next visit (the demo starts fresh). Choosing
+more or fewer activities of the same kind goes straight back to editing. A forced preset
+popup closes only with a choice. The source is remembered for the next visit: files with
+the choice made last time go straight to editing it; another source that is ready (files
+on the device, a service still connected, the demo) opens on its activities; one whose
+connection ended asks to connect again.
 
 1. **Sources.** Where the activities come from: files on this device, Strava, Ride with
    GPS (the last two where the site offers them) or the demo. One source is used at a
@@ -96,10 +98,10 @@ opens on its activities; one whose connection ended asks to connect again.
    deletable ("Delete downloaded tracks" removes them all; a deleted track is downloaded
    again when a video needs it). Disconnecting the source in use asks to connect again. On
    the way in, and when opened from the activities, "Choose activities" goes on to them.
-4. **Activities.** Which activities the video shows is always a choice made, not a default:
-   with files or the demo it starts with no period picked ("Which activities? Pick a
-   period."), and the other filters and the list come once one is (Strava and Ride with
-   GPS, which list a period at a time, start on this month). Above the filters, the source
+4. **Activities.** Files and the demo start on all their activities, all ticked; Strava and
+   Ride with GPS, which list a period at a time, start on this month (Strava with none
+   ticked). The files' choice is remembered for the next visit, the services' for the tab,
+   and the demo's starts fresh. Above the filters, the source
    in use, with links to manage what it keeps ("Manage files", "Manage connection") and to
    change it. The filters (the "Which activities" settings): period with shortcuts and a
    calendar for custom days, sports (offered only when the period has them, with "All"),

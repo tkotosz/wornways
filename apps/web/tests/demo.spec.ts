@@ -81,10 +81,10 @@ test('offers the demo next to the files on this device, and keeps them apart', a
   await expect(page.getByTestId('source')).toContainText('Files on this device');
   await pickPeriod(page);
   await expect(page.getByTestId('chosen-count')).toContainText('1 of 1 activity');
+  // The files' choice is remembered: a reload goes straight to editing it.
   await page.reload();
-  await expect(activitiesPopup(page)).toBeVisible();
-  await pickPeriod(page);
-  await expect(page.getByTestId('chosen-count')).toContainText('1 of 1 activity');
+  await expect(page.getByRole('button', { name: 'Activities: 1' })).toBeVisible();
+  await expect(activitiesPopup(page)).toBeHidden();
 });
 
 test('follows the guide to a highlight of the long ride', async ({ page }) => {
@@ -131,20 +131,22 @@ test('loads the demo only when it is picked, not with the app', async ({ page })
   expect(demoRequests.length).toBeGreaterThan(0);
 });
 
-test('asks for a period before it shows the activities', async ({ page }) => {
+test('starts on all of its activities, ready to use', async ({ page }) => {
   page.setDefaultTimeout(15_000);
   await page.goto('/');
   await pickSource(page, 'demo');
-  // Nothing is picked for the person: no period, no list, no way on.
-  await expect(page.getByText('Which activities? Pick a period.')).toBeVisible();
-  await expect(page.getByTestId('chosen')).toHaveCount(0);
-  await expect(page.getByText('Sports')).toHaveCount(0);
+  // All time, everything ticked: the button takes them to the editor at once.
+  await expect(page.getByRole('button', { name: 'All time', exact: true })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+  await expect(page.getByTestId('chosen-count')).toContainText('25 of 25');
   const use = activitiesPopup(page).getByRole('contentinfo').getByRole('button');
-  await expect(use).toBeDisabled();
+  await expect(use).toBeEnabled();
+  await expect(use).toHaveText('Use 25 activities');
 
+  // A narrower period narrows the list.
   await pickPeriod(page, 'Last month');
   await pickPeriod(page, 'All time');
   await expect(page.getByTestId('chosen-count')).toContainText('25 of 25');
-  await expect(use).toBeEnabled();
-  await expect(use).toHaveText('Use 25 activities');
 });

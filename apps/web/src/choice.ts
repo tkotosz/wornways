@@ -33,10 +33,7 @@ export type NearChoice = {
 };
 
 export type Choice = {
-  /**
-   * The period; null until the person picks one, so that which activities the video shows
-   * is always a choice made, not a default.
-   */
+  /** The period; null while none is picked. */
   period: Period | null;
   /** The custom period's first and last day, YYYY-MM-DD; empty when not set. */
   customFrom: string;
@@ -65,6 +62,9 @@ export const NO_CHOICE: Choice = {
   endNear: { on: false, place: '', radius: 1000 },
   excluded: [],
 };
+
+/** Where files and the demo start: every activity of all time, all ticked. */
+export const ALL_ACTIVITIES: Choice = { ...NO_CHOICE, period: 'all' };
 
 const day = (d: Date) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;

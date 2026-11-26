@@ -811,10 +811,10 @@ test('sets up the video and its text, and keeps both for the next visit', async 
   await expect(result).toBeVisible({ timeout: 150_000 });
   await expect(page.getByTestId('made')).toContainText('12.5 s');
 
+  // A new visit goes straight to editing the same activities, without asking anything.
   await page.reload();
-  await pickPeriod(page); // the period is picked again on a new visit
-  await useActivities(page);
-  await chooseStyle(page, 'Keep my own playback');
+  await expect(page.getByRole('button', { name: 'Activities: 2' })).toBeVisible();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
   await expect(chip('Square 1:1')).toHaveAttribute('aria-pressed', 'true');
   await openSection(page, 'Playback');
   await expect(summary).toHaveText('10 seconds · Custom playback');

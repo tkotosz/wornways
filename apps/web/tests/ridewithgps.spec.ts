@@ -119,8 +119,8 @@ test('uses Ride with GPS trips as the source, fetching tracks only when needed',
   const before = fetched.length;
   await page.reload();
   await expect(page.getByTestId('source')).toContainText('Ride with GPS');
+  // Several, as before: the preset is not asked again.
   await useActivities(page);
-  await chooseStyle(page);
   await expectSection(page, 'Frame');
   expect(fetched.length).toBe(before);
 
