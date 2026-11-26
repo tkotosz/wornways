@@ -303,8 +303,10 @@ total is its number large over its unit and what it is in orange: "312 / km in t
 "15 / hours moving in total", "62.5 / km avg per ride", "178 / bpm max heart rate". A time
 or a date takes a format as over the replay; a time is in hours unless told otherwise, and
 its unit moves to the words: "0.6 / days moving in total", "14:30 / moving in total". A
-total takes words of its own as over the replay (`distance:"km together"`), always under it;
-they stay as written when the units or the format change. The
+total takes a label mode and words of its own as over the replay (`distance:after:"km
+together"`). Under is its usual place; above, the words are over the number; before or
+after, they stay smaller and orange on the number's line. Its own words stay as written when
+the units or the format change. The
 values fade in in their order, one after another, and count up; the speeds and the dates
 appear without counting up, and the dates are drawn smaller. A total the activities did not
 record (the climb, the descent and the elevations without elevation, the sensor values,

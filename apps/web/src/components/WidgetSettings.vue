@@ -1,6 +1,7 @@
 <script setup lang="ts">
 // One widget's settings: the text of a text widget (the title until another is written),
-// its size, how a value shows its words (`labels`: not on the totals card), how a time, a date
+// its size, where a value shows its words and what they say (`labels`: false on the totals
+// card, whose words say the unit), how a time, a date
 // or a clock time is written, and removing it from the picture. With `only`, just its size,
 // its label or its format, as the strip's chips open them.
 import {
@@ -35,7 +36,7 @@ function set(changed: Partial<Widget>): void {
 /** The label modes the value can take, each with how the value reads in it. */
 const modes = computed(() => {
   const widget = props.widget;
-  if (!props.labels || widget.kind !== 'metric') return [];
+  if (widget.kind !== 'metric') return [];
   const value = props.values.get(widget.metric);
   return LABEL_MODES.map((mode: LabelMode) => {
     const lines = value ? valueLines(value, mode, widget.format, widget.labelText) : null;

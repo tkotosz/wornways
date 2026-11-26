@@ -221,8 +221,9 @@ drawing each. The editor's settings are remembered for the next visit.
   its words in orange). They are picked, moved, resized and removed as over the replay,
   and the strip has the same chips between the card's switch and the end card's: Add
   Text and Add Total (a sheet of the totals these activities have, each with its own
-  number); there is no chart, watermark or label mode on the card, whose totals always
-  have their words under them, though its Label chip edits what they say. A time or a date on the card has the Format chip too, its
+  number); there is no chart or watermark on the card. A total's Label chip works as over
+  the replay: its words under it at first, or above it, before or after it (smaller and
+  orange on the number's line), or none, and what they say. A time or a date on the card has the Format chip too, its
   words saying the unit ("hours moving in total"). The card's band behind them stays where the still drew it until it is drawn
   again; the video has it behind the widgets as they are.
 

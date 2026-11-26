@@ -432,8 +432,8 @@ export const SETTINGS: readonly SettingDefinition[] = [
     help:
       'What the totals card shows, as --widgets is written: text:"Your text"@x,y,size ' +
       `(text@x,y for the title) and totals such as distance@x,y,size: ${TOTALS_FIELDS.join(', ')}. ` +
-      'A total has its words under it, its usual ones ("km in total") unless it has its own, ' +
-      'as distance:"km together"@x,y. ' +
+      'A total takes a label mode as over the replay (under unless told otherwise) and words of ' +
+      'its own in place of its usual ones ("km in total"), as distance:above:"km together"@x,y. ' +
       'As totals over every activity: count, time (hours, stops included), moving, distance, ' +
       'climb, descent and calories are added up; days are the calendar days from the first ' +
       'activity to the last, moving-days the days with an activity; avg-, max- and min- ' +
@@ -595,7 +595,7 @@ export function parseSettings(input: SettingsInput): RenderSettings {
   const widgetList = (
     name: string,
     metrics: readonly string[],
-    options: { chart: boolean; labels: boolean },
+    options: { chart: boolean; card: boolean },
   ): Widget[] | null => {
     const value = text(name);
     if (value === null) return null;
@@ -686,9 +686,9 @@ export function parseSettings(input: SettingsInput): RenderSettings {
     width,
     height,
     fps: Number(choice('fps')),
-    widgets: widgetList('widgets', METRICS, { chart: true, labels: true }),
+    widgets: widgetList('widgets', METRICS, { chart: true, card: false }),
     totalsCard: flag('totals-card'),
-    totalsWidgets: widgetList('totals-widgets', TOTALS_FIELDS, { chart: false, labels: false }),
+    totalsWidgets: widgetList('totals-widgets', TOTALS_FIELDS, { chart: false, card: true }),
     endCard: flag('end-card'),
     watermark: flag('watermark'),
   };

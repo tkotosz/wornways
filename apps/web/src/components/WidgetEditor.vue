@@ -18,6 +18,7 @@
 // orange rule under it, without the shadow.
 import {
   WIDGET_SIZE,
+  labelTextOf,
   valueLines,
   type Metric,
   type MetricValue,
@@ -78,6 +79,22 @@ function textOf(widget: Widget): { above: string; line: string; under: string } 
       : { above: '', line: '…', under: widgetLabel(widget, props.values) };
   }
   return null;
+}
+
+/**
+ * On the totals card, a value with its words on its line: smaller and in orange, before or
+ * after its number, as the card draws them. Null for any other.
+ */
+function besideOf(widget: Widget): { before: string; number: string; after: string } | null {
+  if (!props.card || widget.kind !== 'metric') return null;
+  if (widget.label !== 'before' && widget.label !== 'after') return null;
+  const value = props.values.get(widget.metric);
+  const words = value ? labelTextOf(value, widget.labelText, widget.format) : '';
+  if (!value || !words) return null;
+  const number = valueLines(value, 'off', widget.format).line;
+  return widget.label === 'before'
+    ? { before: words, number, after: '' }
+    : { before: '', number, after: words };
 }
 
 /** The chart's outline over its box, 100 wide and 100 high, as the engine draws it. */
@@ -382,9 +399,20 @@ const story = computed(() => props.size.width / props.size.height < 0.8);
         class="metric"
         :class="{ dates: widget.metric === 'date' }"
       >
-        <span v-if="textOf(widget)!.above" class="words">{{ textOf(widget)!.above }}</span>
-        <span class="value">{{ textOf(widget)!.line }}</span>
-        <span v-if="textOf(widget)!.under" class="words">{{ textOf(widget)!.under }}</span>
+        <span v-if="besideOf(widget)" class="value">
+          <span v-if="besideOf(widget)!.before" class="words beside before">{{
+            besideOf(widget)!.before
+          }}</span>
+          {{ besideOf(widget)!.number }}
+          <span v-if="besideOf(widget)!.after" class="words beside after">{{
+            besideOf(widget)!.after
+          }}</span>
+        </span>
+        <template v-else>
+          <span v-if="textOf(widget)!.above" class="words above">{{ textOf(widget)!.above }}</span>
+          <span class="value">{{ textOf(widget)!.line }}</span>
+          <span v-if="textOf(widget)!.under" class="words">{{ textOf(widget)!.under }}</span>
+        </template>
       </span>
       <svg v-else class="chart" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
         <defs>
@@ -536,6 +564,18 @@ const story = computed(() => props.size.width / props.size.height < 0.8);
   font-size: calc(var(--unit) * 30 * var(--size) * 1cqw);
   font-weight: 500;
   line-height: 1.27;
+}
+
+/* On the card, words above the number end the gap above it; words beside it sit on its line,
+   at their own size, as the card draws them. */
+.card .metric .words.above {
+  margin-top: 0;
+  margin-bottom: calc(var(--unit) * 22 * var(--size) * 1cqw);
+}
+
+.card .metric .words.beside {
+  display: inline;
+  margin: 0;
 }
 
 /* The widget's name on a tab above its outline, when picked. */

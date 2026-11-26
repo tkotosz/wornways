@@ -35,9 +35,12 @@ export type Widget = { x: number; y: number; size: number } & (
   | { kind: 'elevation-chart' }
 );
 
-/** The label mode a value starts with: its words under it; the date, which has none, off. */
-export function defaultLabel(metric: Metric): LabelMode {
-  return metric === 'date' ? 'off' : 'under';
+/**
+ * The label mode a value starts with: its words under it; over the replay the date, which has
+ * none, off.
+ */
+export function defaultLabel(metric: Metric, card = false): LabelMode {
+  return metric === 'date' && !card ? 'off' : 'under';
 }
 
 /** A value widget's words: its own, else the value's usual ones in `format`. */
@@ -75,13 +78,13 @@ export const widgetName = (widget: Widget) =>
 /**
  * Reads a list of widgets from its text form; an empty text is no widgets. `metrics` are
  * the metric names a value widget can take; `chart` whether the elevation chart is one and
- * `labels` whether values take a label mode (neither on the totals card, whose values always
- * have their words under them). Throws an Error that says what is wrong.
+ * `card` whether they are the totals card's, where a value starts with its words under it and
+ * a time in hours. Throws an Error that says what is wrong.
  */
 export function parseWidgets(
   text: string,
   metrics: readonly string[],
-  { chart = true, labels = true }: { chart?: boolean; labels?: boolean } = {},
+  { chart = true, card = false }: { chart?: boolean; card?: boolean } = {},
 ): Widget[] {
   const widgets: Widget[] = [];
   let i = 0;
@@ -118,10 +121,10 @@ export function parseWidgets(
     if (text[i] === ':' && metrics.includes(name)) {
       // A value's label mode, its words in double quotes and its format, each once, in any
       // order.
-      const modes = labels ? LABEL_MODES : [];
+      const modes = LABEL_MODES;
       const formats = formatsOf(name as Metric);
       const takes = [
-        ...(modes.length ? [`the label mode ${modes.join(', ')}`] : []),
+        `the label mode ${modes.join(', ')}`,
         'its words in double quotes',
         ...(formats.length ? [`the format ${formats.join(', ')}`] : []),
       ];
@@ -164,7 +167,7 @@ export function parseWidgets(
       widgets.push({
         kind: 'metric',
         metric: name as Metric,
-        label: label ?? (labels ? defaultLabel(name as Metric) : 'under'),
+        label: label ?? defaultLabel(name as Metric, card),
         ...(labelText === null ? {} : { labelText }),
         ...(format ? { format } : {}),
         x,
@@ -185,21 +188,18 @@ const round = (n: number) => Number(n.toFixed(1));
 const quote = (text: string) => `"${text.replace(/[\\"]/g, (c) => `\\${c}`)}"`;
 
 /**
- * A list of widgets in the text form `parseWidgets` reads, with the same `labels` (none on the
- * totals card): a value's label mode and format are written when not the value's usual ones.
+ * A list of widgets in the text form `parseWidgets` reads, with the same `card`: a value's
+ * label mode and format are written when not the value's usual ones.
  */
-export function widgetsText(
-  widgets: Widget[],
-  { labels = true }: { labels?: boolean } = {},
-): string {
+export function widgetsText(widgets: Widget[], { card = false }: { card?: boolean } = {}): string {
   return widgets
     .map((widget) => {
       let text = '';
       if (widget.kind === 'text' && widget.text !== null) text = `:${quote(widget.text)}`;
       if (widget.kind === 'metric') {
-        if (labels && widget.label !== defaultLabel(widget.metric)) text += `:${widget.label}`;
+        if (widget.label !== defaultLabel(widget.metric, card)) text += `:${widget.label}`;
         if (widget.labelText !== undefined) text += `:${quote(widget.labelText)}`;
-        if (widget.format && widget.format !== defaultFormat(widget.metric, !labels))
+        if (widget.format && widget.format !== defaultFormat(widget.metric, card))
           text += `:${widget.format}`;
       }
       const size = widget.size === 100 ? '' : `,${round(widget.size)}`;

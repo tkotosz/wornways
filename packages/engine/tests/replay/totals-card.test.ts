@@ -314,6 +314,21 @@ describe('startingTotalsWidgets', () => {
     expect(top).toBeCloseTo(1920 - bottom);
   });
 
+  it('is as high as a value with its words above or under it, or without them a line', () => {
+    const value = (label: 'off' | 'before' | 'after' | 'above' | 'under'): Widget => ({
+      kind: 'metric',
+      metric: 'distance',
+      label,
+      x: 50,
+      y: 50,
+      size: 100,
+    });
+    const under = totalsWidgetHeight(value('under'), 1);
+    expect(totalsWidgetHeight(value('above'), 1)).toBe(under);
+    expect(totalsWidgetHeight(value('after'), 1)).toBeLessThan(under);
+    expect(totalsWidgetHeight(value('before'), 1)).toBe(totalsWidgetHeight(value('off'), 1));
+  });
+
   it('puts up to four values in a row on a wide frame, and the dates in a row of their own', () => {
     const widgets = startingTotalsWidgets(
       ['count', 'distance', 'date', 'moving', 'climb'],

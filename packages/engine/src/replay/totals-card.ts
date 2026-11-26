@@ -146,13 +146,15 @@ const DESCENT = 0.27;
 
 /**
  * A widget's height on the card, in pixels at `unit` (pixels per 1080th of the shorter side):
- * a text down to the bottom of its rule; a value from the top of its number's line down to
- * below the words under it.
+ * a text down to the bottom of its rule; a value its number's line, and the line of its words
+ * when they are above or under it.
  */
 export function totalsWidgetHeight(widget: Widget, unit: number): number {
   const scale = widget.size / 100;
   if (widget.kind === 'text') return (SIZES.title + RULE.below + RULE.height) * unit * scale;
   const size = widget.kind === 'metric' && widget.metric === 'date' ? SIZES.dates : SIZES.value;
+  const words = widget.kind === 'metric' && (widget.label === 'above' || widget.label === 'under');
+  if (!words) return size * (1 + DESCENT) * unit * scale;
   return (size + SIZES.labelGap + SIZES.label * (1 + DESCENT)) * unit * scale;
 }
 
@@ -510,12 +512,7 @@ export function drawTotalsCard(
   const room = 120 * unit;
   const top = Math.min(...shown.map(({ widget }) => topOf(widget)));
   const bottom = Math.max(
-    ...shown.map(({ widget, entry }) => {
-      const scale = widget.size / 100;
-      const size = entry ? (entry.field === 'date' ? SIZES.dates : SIZES.value) : SIZES.title;
-      // A text's rule and a value's words reach a little further than the band needs to.
-      return topOf(widget) + (entry ? size + SIZES.label : size + 20) * unit * scale;
-    }),
+    ...shown.map(({ widget }) => topOf(widget) + totalsWidgetHeight(widget, unit)),
   );
   const band = ctx.createLinearGradient(0, top - room, 0, bottom + room);
   band.addColorStop(0, 'rgba(5, 6, 8, 0)');
@@ -573,14 +570,68 @@ export function drawTotalsCard(
       progress(t, TIMING.values.at + order * TIMING.values.stagger, TIMING.values.length),
     );
     order++;
-    const y = widgetTop + size + (1 - shownPart) * 24 * unit;
+    const rise = (1 - shownPart) * 24 * unit;
+    const gap = SIZES.labelGap * unit * scale;
+    const mode = entry.label && widget.kind === 'metric' ? widget.label : 'off';
     ctx.globalAlpha = shownPart;
-    fitFont(entry.value, 700, size, width);
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.96)';
-    ctx.fillText(entry.value, x, y);
-    fitFont(entry.label, 500, labelSize, width);
-    ctx.fillStyle = 'rgba(255, 176, 102, 0.9)';
-    ctx.fillText(entry.label, x, y + labelSize + SIZES.labelGap * unit * scale);
+    /** Draws the number, white, centered on `x` with its baseline at `y`. */
+    const number = (y: number) => {
+      fitFont(entry.value, 700, size, width);
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.96)';
+      ctx.fillText(entry.value, x, y);
+    };
+    /** Draws the words, smaller in orange, centered on `x` with their baseline at `y`. */
+    const words = (y: number) => {
+      fitFont(entry.label, 500, labelSize, width);
+      ctx.fillStyle = 'rgba(255, 176, 102, 0.9)';
+      ctx.fillText(entry.label, x, y);
+    };
+    if (mode === 'off') number(widgetTop + size + rise);
+    else if (mode === 'under') {
+      number(widgetTop + size + rise);
+      words(widgetTop + size + gap + labelSize + rise);
+    } else if (mode === 'above') {
+      words(widgetTop + labelSize + rise);
+      number(widgetTop + labelSize * (1 + DESCENT) + gap + size + rise);
+    } else drawBeside(entry, mode, x, widgetTop + size + rise, size, labelSize, width);
   }
   ctx.globalAlpha = 1;
+
+  /**
+   * Draws the number and its words on one line, the words before or after it, smaller and in
+   * orange on the same baseline, the two together centered on `x` and no wider than `width`.
+   */
+  function drawBeside(
+    entry: TotalsEntry,
+    mode: 'before' | 'after',
+    x: number,
+    y: number,
+    size: number,
+    labelSize: number,
+    width: number,
+  ): void {
+    const numberFont = (k: number) => `700 ${Math.round(size * k)}px ${fontFamily}`;
+    const wordsFont = (k: number) => `500 ${Math.round(labelSize * k)}px ${fontFamily}`;
+    const measure = (k: number) => {
+      ctx.font = numberFont(k);
+      const n = ctx.measureText(entry.value).width;
+      ctx.font = wordsFont(k);
+      const w = ctx.measureText(entry.label).width;
+      return { n, w, space: labelSize * k * 0.35 };
+    };
+    const full = measure(1);
+    const k = Math.min(1, width / (full.n + full.space + full.w));
+    const { n, w, space } = k < 1 ? measure(k) : full;
+    const left = x - (n + space + w) / 2;
+    const [numberX, wordsX] =
+      mode === 'before' ? [left + w + space, left] : [left, left + n + space];
+    ctx.textAlign = 'left';
+    ctx.font = numberFont(k);
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.96)';
+    ctx.fillText(entry.value, numberX, y);
+    ctx.font = wordsFont(k);
+    ctx.fillStyle = 'rgba(255, 176, 102, 0.9)';
+    ctx.fillText(entry.label, wordsX, y);
+    ctx.textAlign = 'center';
+  }
 }

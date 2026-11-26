@@ -32,14 +32,10 @@ const emit = defineEmits<{
 const picked = computed(() =>
   props.selected === null ? null : (props.widgets[props.selected] ?? null),
 );
-/**
- * The picked value's label chip: where its words are, or on the totals card, where they are
- * always under it, that its words can be edited.
- */
-const labelChip = computed(() => {
-  if (picked.value?.kind !== 'metric') return '';
-  return props.card ? 'Edit' : LABEL_MODE_NAMES[picked.value.label];
-});
+/** The picked value's label chip: where its words are. */
+const labelChip = computed(() =>
+  picked.value?.kind === 'metric' ? LABEL_MODE_NAMES[picked.value.label] : '',
+);
 /** The picked value's format, when it is a time, a date or a clock time. */
 const format = computed(() => (picked.value ? formatOf(picked.value, props.card) : null));
 </script>

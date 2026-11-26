@@ -77,7 +77,7 @@ const groups = computed(() =>
             emit('add', {
               kind: 'metric',
               metric,
-              label: labels ? defaultLabel(metric) : 'under',
+              label: defaultLabel(metric, !labels),
               x: 50,
               y: 50,
               size: 100,

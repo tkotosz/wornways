@@ -62,10 +62,11 @@ describe('parseSettings', () => {
     expect(() => parseSettings({ 'totals-widgets': 'elevation-chart@50,90' })).toThrow(
       '"elevation-chart" is not a widget: text, one of time, moving',
     );
-    // A total always has its words under it; the start time is for a single activity.
-    expect(() => parseSettings({ 'totals-widgets': 'distance:off@30,50' })).toThrow(
-      '"distance" takes its words in double quotes, not "off"',
-    );
+    // A total has its words under it unless told otherwise; the start time is for a single
+    // activity.
+    expect(parseSettings({ 'totals-widgets': 'distance:off@30,50' }).totalsWidgets).toEqual([
+      { kind: 'metric', metric: 'distance', label: 'off', x: 30, y: 50, size: 100 },
+    ]);
     expect(() => parseSettings({ 'totals-widgets': 'start@50,50' })).toThrow('is not a widget');
   });
 

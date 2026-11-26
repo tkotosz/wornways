@@ -122,7 +122,7 @@ const widgets = computed<Widget[]>(() => {
     return (totals ? drawnTotals.value?.widgets : drawn.value?.widgets) ?? [];
   try {
     return totals
-      ? parseWidgets(set, TOTALS_FIELDS, { chart: false, labels: false })
+      ? parseWidgets(set, TOTALS_FIELDS, { chart: false, card: true })
       : parseWidgets(set, METRICS);
   } catch {
     return [];
@@ -138,7 +138,7 @@ const title = computed(() => props.plan?.title ?? '');
 const selectedWidget = ref<number | null>(null);
 
 function setWidgets(list: Widget[]): void {
-  const text = widgetsText(list, { labels: board.value !== 'totals' });
+  const text = widgetsText(list, { card: board.value === 'totals' });
   adjustments.value = { ...adjustments.value, [widgetSetting.value]: text };
 }
 

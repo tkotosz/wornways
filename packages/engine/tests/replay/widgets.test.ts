@@ -67,8 +67,8 @@ describe('formats', () => {
     // The usual format is not written.
     expect(widgetsText(parseWidgets('moving:hms@1,2', METRICS))).toBe('moving@1,2');
     // On the totals card a time is in hours unless told otherwise, and has no label mode.
-    const card = parseWidgets('moving:hm@1,2;time:h@1,2', TOTALS_FIELDS, { labels: false });
-    expect(widgetsText(card, { labels: false })).toBe('moving:hm@1,2;time@1,2');
+    const card = parseWidgets('moving:hm@1,2;time:h@1,2', TOTALS_FIELDS, { card: true });
+    expect(widgetsText(card, { card: true })).toBe('moving:hm@1,2;time@1,2');
   });
 
   it('writes a value in the format picked, with its words in that format', () => {
@@ -139,8 +139,14 @@ describe('labels', () => {
     expect(widgetsText(widgets)).toBe(
       'distance:above:"so \\"far\\""@20,80;climb:before:"↑"@50,80;count:""@1,2',
     );
-    // On the totals card too, where the words are always under.
-    const card = parseWidgets('distance:"km together"@1,2', TOTALS_FIELDS, { labels: false });
-    expect(widgetsText(card, { labels: false })).toBe('distance:"km together"@1,2');
+    // On the totals card too, where every value, the dates too, starts with its words under it.
+    const text2 = 'distance:"km together"@1,2;moving:after@1,2;date@1,2';
+    const card = parseWidgets(text2, TOTALS_FIELDS, { card: true });
+    expect(card.map((w) => (w.kind === 'metric' ? w.label : null))).toEqual([
+      'under',
+      'after',
+      'under',
+    ]);
+    expect(widgetsText(card, { card: true })).toBe(text2);
   });
 });
