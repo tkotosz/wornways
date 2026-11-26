@@ -135,14 +135,29 @@ export const playbackAdjustments = (
   return { ...values, ...presetPlayback(presetOf(adjustments, count)) };
 };
 
-/** Picks a preset for this selection size. */
+/** The settings that hold the widgets: over the replay, and on the totals card. */
+const WIDGET_SETTINGS = ['widgets', 'totals-widgets'];
+
+/** The adjustments without widgets: the video starts from the ones that suit it. */
+export const withoutWidgets = (adjustments: Adjustments): Adjustments =>
+  Object.fromEntries(
+    Object.entries(adjustments).filter(([name]) => !WIDGET_SETTINGS.includes(name)),
+  );
+
+/**
+ * Picks a preset for this selection size. Another preset sets the widgets too: they start
+ * again from the ones that suit the video it makes. The preset in use, picked again, and
+ * Custom (the playback kept as set) keep them.
+ */
 export function withPreset(
   adjustments: Adjustments,
   preset: PresetChoice,
   count: ActivityCount,
 ): Adjustments {
   const key = presetKey(count);
-  return { ...adjustments, [key]: preset };
+  const picked = { ...adjustments, [key]: preset };
+  const changed = preset !== 'custom' && preset !== presetOf(adjustments, count);
+  return changed ? withoutWidgets(picked) : picked;
 }
 
 /**

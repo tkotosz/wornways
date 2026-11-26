@@ -151,6 +151,15 @@ describe('presets', () => {
     });
   });
 
+  it('starts the widgets again from the ones that suit another preset', () => {
+    const arranged = { widgets: 'count@50,70', 'totals-widgets': 'distance@50,40', map: false };
+    expect(withPreset(arranged, 'recap', 'several')).toEqual({ preset: 'recap', map: false });
+    // The preset in use, picked again, and the playback kept as set keep them.
+    const recap = { ...arranged, preset: 'recap' };
+    expect(withPreset(recap, 'recap', 'several')).toEqual(recap);
+    expect(withPreset(arranged, 'custom', 'several')).toEqual({ ...arranged, preset: 'custom' });
+  });
+
   it('keeps custom timing and camera settings independent for each selection size', () => {
     const single = fineTuned({}, { ...playbackAdjustments({}, 'one'), camera: 'fixed' }, 'one');
     expect(adjustSettings(single, 'one')).toEqual({ duration: '15', camera: 'fixed' });

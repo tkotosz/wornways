@@ -98,6 +98,47 @@ test('asks for the preset for a new kind of selection, and keeps it for more or 
   await expect(chooser).toBeHidden();
 });
 
+test('sets the widgets with the preset, and keeps them with the playback kept', async ({
+  page,
+  context,
+}) => {
+  page.setDefaultTimeout(15_000);
+  await offlineMap(context);
+  await openDemo(page, 'Recap');
+  await openSection(page, 'Overlay');
+  const onPicture = page.locator('[data-widget]');
+  await expect(page.getByTestId('widget-0')).toBeVisible();
+
+  // A text added by hand…
+  await page.getByRole('button', { name: 'Add a text' }).click();
+  await page.keyboard.type('Mallorca');
+  await page.keyboard.press('Enter');
+  await expect(onPicture.filter({ hasText: 'Mallorca' })).toHaveCount(1);
+
+  // …stays when the preset in use is picked again…
+  await page.getByRole('button', { name: 'Preset: Recap' }).click();
+  await chooseStyle(page, 'Recap');
+  await expect(onPicture.filter({ hasText: 'Mallorca' })).toHaveCount(1);
+
+  // …and goes with another preset, whose video starts with its own widgets: a race's count.
+  await page.getByRole('button', { name: 'Preset: Recap' }).click();
+  await chooseStyle(page, 'All at once');
+  await expect(onPicture.filter({ hasText: 'Mallorca' })).toHaveCount(0);
+  await expect(onPicture.filter({ hasText: 'all finished' })).toHaveCount(1);
+
+  // Playback set by hand keeps them.
+  await page.getByRole('button', { name: 'Add a text' }).click();
+  await page.keyboard.type('Mallorca');
+  await page.keyboard.press('Enter');
+  await openSection(page, 'Playback');
+  await page.getByRole('button', { name: /Fine-tune playback/ }).click();
+  await page.getByTestId('group-timing').getByRole('button', { name: 'Day', exact: true }).click();
+  await page.getByRole('button', { name: 'Preset: Custom' }).click();
+  await chooseStyle(page, 'Keep my own playback');
+  await openSection(page, 'Overlay');
+  await expect(onPicture.filter({ hasText: 'Mallorca' })).toHaveCount(1);
+});
+
 test('opens any section from its bar, and keeps it while popups open and close', async ({
   page,
   context,

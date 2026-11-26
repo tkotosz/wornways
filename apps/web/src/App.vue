@@ -14,6 +14,7 @@ import {
   loadAdjustments,
   presetOf,
   saveAdjustments,
+  withoutWidgets,
   type ActivityCount,
   type Adjustments,
   type Section,
@@ -448,6 +449,11 @@ async function useActivities(): Promise<void> {
   }
   const kind = countOf(chosenIds.value.length);
   const ask = asksPreset(editedCount.value, kind);
+  // A change of kind without asking (to one activity, which has a single preset): its preset
+  // is taken as picked, and the widgets start again from the ones that suit it. The first
+  // selection of a visit keeps the widgets arranged before.
+  if (!ask && editedCount.value !== null && editedCount.value !== kind)
+    adjustments.value = withoutWidgets(adjustments.value);
   editedCount.value = kind;
   selected.value = true;
   presetForced.value = ask;

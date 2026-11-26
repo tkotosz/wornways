@@ -119,7 +119,10 @@ opens on its activities; one whose connection ended asks to connect again.
 5. **Preset.** "How should it play?": the presets these activities can take as cards (the
    drawing, the name and its line), and "Keep my own playback" when the playback was set by
    hand. Asked for a new kind of selection, none is picked; opened from the top bar, the one
-   in use is marked. Playback › Style in the editor changes it too.
+   in use is marked. Playback › Style in the editor changes it too. A preset sets the widgets
+   too: another preset than the one in use starts them again from the ones that suit its
+   video, over the replay and on the totals card, as does a change to a single activity;
+   the preset in use picked again, and "Keep my own playback", keep them.
 6. **Render.** Render makes the video at once: a stage in the video's shape with its
    progress, and Cancel in the footer; then the video itself, playing, with Download and,
    where the browser can share files (mostly on phones), Share, which hands the video to
