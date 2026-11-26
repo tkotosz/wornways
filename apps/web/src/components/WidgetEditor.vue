@@ -24,7 +24,10 @@ import {
   iconOf,
   labelTextOf,
   valueLines,
+  arrangeInLayout,
+  layoutSlots,
   type ChartKind,
+  type LayoutName,
   type Metric,
   type MetricValue,
   type Widget,
@@ -45,7 +48,14 @@ const props = defineProps<{
   size: { width: number; height: number };
   /** Whether the widgets are the totals card's, drawn as the card draws them. */
   card?: boolean;
+  /**
+   * The layout the widgets are arranged in: its slots show as guides (never in the video), and
+   * the widgets snap to their edges and middles.
+   */
+  layout?: LayoutName;
 }>();
+/** The layout's slots on this frame; none without a layout. */
+const slots = computed(() => (props.layout ? layoutSlots(props.layout, props.size) : []));
 /** The picked widget's index; null when none is. */
 const selected = defineModel<number | null>('selected', { required: true });
 const emit = defineEmits<{
@@ -298,8 +308,18 @@ function start(event: PointerEvent, index: number, hold: Hold): void {
   const limitsX: [number, number] = [WIDGET_SIZE.min / widget.size, WIDGET_SIZE.max / widget.size];
   const limitsY: [number, number] = [WIDGET_SIZE.min / height0, WIDGET_SIZE.max / height0];
   const others = elements.filter((element) => element !== mine).map(edgesOf);
-  const linesX = others.flatMap((edges) => edges.x);
-  const linesY = others.flatMap((edges) => edges.y);
+  // The layout's slots: their edges and middles both ways.
+  const slotList = slots.value;
+  const linesX = [
+    ...others.flatMap((edges) => edges.x),
+    ...slotList.flatMap((slot) => [slot.x - slot.width / 2, slot.x, slot.x + slot.width / 2]),
+  ];
+  const linesY = [
+    ...others.flatMap((edges) => edges.y),
+    ...slotList.flatMap((slot) => [slot.y - slot.height / 2, slot.y + slot.height / 2]),
+  ];
+  /** The slots' middles down, which a widget's own middle snaps to. */
+  const middlesY = slotList.map((slot) => slot.y);
   // Resizing also snaps to the frame's middle.
   const linesAcross = [50, ...linesX];
   const linesDown = [50, ...linesY];
@@ -433,7 +453,7 @@ function start(event: PointerEvent, index: number, hold: Hold): void {
     let y = Math.min(100, Math.max(0, widget.y + ((e.clientY - y0) / area.height) * 100));
     // Onto the frame's middle first, else in line with another widget's edge or middle.
     const across = snapTo(x, [0], [50], reachX) ?? snapTo(x, ownX, linesX, reachX);
-    const down = snapTo(y, [0], [50], reachY) ?? snapTo(y, ownY, linesY, reachY);
+    const down = snapTo(y, [0], [50, ...middlesY], reachY) ?? snapTo(y, ownY, linesY, reachY);
     if (across) x += across.shift;
     if (down) y += down.shift;
     snap.value = { x: across?.line ?? null, y: down?.line ?? null };
@@ -550,6 +570,36 @@ function key(event: KeyboardEvent, index: number): void {
   }
 }
 
+/**
+ * Arranges the widgets in the layout's slots (see the engine's layouts.ts), measured as they
+ * show on the picture, and gives them as a change.
+ */
+function arrange(): void {
+  const surface = layer.value;
+  if (!surface) return;
+  const area = surface.getBoundingClientRect();
+  const measured = new Map<number, { width: number; height: number }>();
+  for (const element of surface.querySelectorAll<HTMLElement>('[data-widget]')) {
+    const box = element.getBoundingClientRect();
+    measured.set(Number(element.dataset.widget), {
+      width: box.width / area.width,
+      height: box.height / area.height,
+    });
+  }
+  // Each widget at its normal size: what shows now, scaled back from its size (a chart's
+  // height from its own).
+  const atNormal = props.widgets.map((widget, k) => {
+    const box = measured.get(k) ?? { width: 0, height: 0 };
+    const height = widget.kind === 'chart' ? (widget.height ?? widget.size) : widget.size;
+    return { width: (box.width * 100) / widget.size, height: (box.height * 100) / height };
+  });
+  emit(
+    'change',
+    arrangeInLayout(props.widgets, slots.value, (_, k) => atNormal[k]!),
+  );
+}
+defineExpose({ arrange });
+
 /** Story-shaped frames (taller than 4:5) get the platforms' guides. */
 const story = computed(() => props.size.width / props.size.height < 0.8);
 </script>
@@ -572,6 +622,24 @@ const story = computed(() => props.size.width / props.size.height < 0.8);
       <span class="zone left" />
       <span class="zone right" />
     </div>
+    <!-- The layout's slots, faint, with what each is for. -->
+    <span
+      v-for="(slot, k) in slots"
+      :key="`slot-${k}`"
+      class="slot"
+      :class="slot.kind"
+      :style="{
+        left: `${slot.x - slot.width / 2}%`,
+        top: `${slot.y - slot.height / 2}%`,
+        width: `${slot.width}%`,
+        height: `${slot.height}%`,
+      }"
+      aria-hidden="true"
+    >
+      <span class="slot-name">{{
+        slot.kind === 'title' ? 'Title' : slot.kind === 'chart' ? 'Chart' : 'Stat'
+      }}</span>
+    </span>
     <span
       v-if="snap.x !== null"
       class="line across"
@@ -898,6 +966,25 @@ const story = computed(() => props.size.width / props.size.height < 0.8);
 .handle.edge.top {
   top: -7px;
   bottom: auto;
+}
+
+/* A layout's slot: a faint dashed box, its name small in its corner. */
+.slot {
+  position: absolute;
+  box-sizing: border-box;
+  border: 1px dashed rgb(120 200 255 / 55%);
+  border-radius: 4px;
+  background: rgb(120 200 255 / 6%);
+  pointer-events: none;
+}
+
+.slot-name {
+  position: absolute;
+  top: 1px;
+  left: 3px;
+  color: rgb(150 215 255 / 80%);
+  font-size: 0.5rem;
+  line-height: 1;
 }
 
 /* A center line the widget snapped to. */

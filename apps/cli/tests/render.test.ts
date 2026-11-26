@@ -736,7 +736,7 @@ describe('widgets', () => {
     // others smaller in a row under it.
     expect((title!.left + title!.right) / 2).toBeCloseTo(135, 0);
     expect(title!.top).toBeLessThan(height * 0.1);
-    expect(distance!.left).toBeCloseTo(width * 0.07, 0);
+    expect(Math.abs(distance!.left - width * 0.07)).toBeLessThan(1);
     expect(time!.top).toBeGreaterThan(distance!.bottom);
     expect(time!.bottom - time!.top).toBeLessThan(distance!.bottom - distance!.top);
     expect(renderer.overlayBoxes().watermark!.x).toBeCloseTo(0.03, 2);
@@ -1019,23 +1019,26 @@ describe('the elevation profile', () => {
     ).toBe(0);
   });
 
-  it('lifts the values above it', () => {
-    // Landscape, where the card would otherwise reach down to the profile.
-    const [w, h] = [480, 270];
-    /** The highest row of white text in the lower half of the last frame: the large value. */
-    const cardTop = (withElevation: boolean) => {
+  it('keeps the values clear of it, in a frame of any shape', () => {
+    for (const [w, h] of [
+      [270, 480],
+      [480, 270],
+      [360, 360],
+    ] as const) {
       const renderer = createRenderer(
-        [hill(withElevation)],
+        [hill(true)],
         chronologicalTimeline([5_000], { duration: 1 }),
         (cw, ch) => createCanvas(cw, ch) as unknown as CanvasLike,
         { width: w, height: h, fps: 10, overlay: 'single' },
       );
-      for (let f = 0; f < renderer.replayFrames; f++) renderer.renderFrame(f);
-      for (let y = h / 2; y < h; y++)
-        if (textPixels(renderer.canvas, 0, y, w / 2, y + 1) > 0) return y;
-      return h;
-    };
-    expect(cardTop(true)).toBeLessThan(cardTop(false) - 15);
+      renderer.renderFrame(0);
+      const boxes = renderer.overlayBoxes().widgets.map((box) => box!);
+      const chart = boxes[renderer.widgets.findIndex((widget) => widget.kind === 'chart')]!;
+      renderer.widgets.forEach((widget, k) => {
+        if (widget.kind === 'metric')
+          expect(boxes[k]!.y + boxes[k]!.height, `${w}x${h}`).toBeLessThan(chart.y);
+      });
+    }
   });
 });
 

@@ -63,7 +63,6 @@ export {
   hasUnit,
   labelTextOf,
   parseWidgets,
-  startingWidgets,
   valueLines,
   widgetName,
   widgetsText,
@@ -92,6 +91,15 @@ export {
   type IconName,
   type IconPart,
 } from './replay/icons.ts';
+export {
+  LAYOUTS,
+  LAYOUT_NAMES,
+  arrangeInLayout,
+  layoutSlots,
+  type LayoutName,
+  type LayoutSlot,
+  type SlotKind,
+} from './replay/layouts.ts';
 export {
   CHART_COLORS,
   CHART_ICON,

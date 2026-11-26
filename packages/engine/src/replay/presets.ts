@@ -17,7 +17,7 @@ export const PRESETS: Record<Preset, PresetDefinition> = {
   'all-at-once': {
     help: 'every activity starts at the same moment and moves at its real pace',
     activities: 'several',
-    settings: { group: 'all', 'group-pace': 'real', duration: '30' },
+    settings: { group: 'all', 'group-pace': 'real', duration: '30', layout: 'hero' },
   },
   recap: {
     help:
@@ -30,6 +30,7 @@ export const PRESETS: Record<Preset, PresetDefinition> = {
       'group-pace': 'fit',
       duration: '30',
       'totals-card': true,
+      layout: 'classic',
     },
   },
   'multiday-trip': {
@@ -41,12 +42,13 @@ export const PRESETS: Record<Preset, PresetDefinition> = {
       'group-pace': 'fit',
       duration: '45',
       camera: 'follow',
+      layout: 'classic',
     },
   },
   highlight: {
     help: 'for one activity: a 15-second clip, the camera following the route',
     activities: 'one',
-    settings: { duration: '15', camera: 'follow' },
+    settings: { duration: '15', camera: 'follow', layout: 'classic' },
   },
 };
 

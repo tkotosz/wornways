@@ -12,6 +12,7 @@ import { PRESETS, PRESET_NAMES, type Preset } from './presets.ts';
 import type { Grouping } from './plans.ts';
 import { METRICS, SINGLE_ONLY } from './metrics.ts';
 import type { Units } from './formats.ts';
+import { LAYOUTS, LAYOUT_NAMES, type LayoutName } from './layouts.ts';
 import { parseWidgets, type Widget } from './widgets.ts';
 
 export type RenderSettings = {
@@ -78,6 +79,8 @@ export type RenderSettings = {
   totalsWidgets: Widget[] | null;
   /** Distances, heights, speeds and temperatures in metric or imperial units. */
   units: Units;
+  /** Where the widgets start when none are set, and the guides shown while arranging them. */
+  layout: LayoutName;
 
   // Branding
   /** Whether the video ends with the Wornways card, after the replay. */
@@ -450,6 +453,20 @@ export const SETTINGS: readonly SettingDefinition[] = [
       'The values fade in in their order and count up.',
   },
   {
+    name: 'layout',
+    label: 'Layout',
+    group: 'look',
+    kind: { type: 'choice', choices: [...LAYOUT_NAMES] },
+    default: 'classic',
+    help:
+      'Where the widgets start when --widgets leaves them to the video, and the guides the web ' +
+      'app shows while they are arranged: ' +
+      LAYOUT_NAMES.map(
+        (name) => `${name} (${LAYOUTS[name].help.toLowerCase().replace(/\.$/, '')})`,
+      ).join('; ') +
+      '. Each preset has its own.',
+  },
+  {
     name: 'units',
     label: 'Units',
     group: 'look',
@@ -686,6 +703,7 @@ export function parseSettings(input: SettingsInput): RenderSettings {
     trimRadius: number('trim-radius'),
     camera: choice<RenderSettings['camera']>('camera'),
     units: choice<RenderSettings['units']>('units'),
+    layout: choice<RenderSettings['layout']>('layout'),
     map: flag('map'),
     title: text('title'),
     width,

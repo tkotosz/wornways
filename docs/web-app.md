@@ -204,7 +204,11 @@ drawing each. The editor's settings are remembered for the next visit.
   Shift), + and - resize it and Delete removes it. On a story-shaped frame, while a
   widget moves, hatched guides marked "Covered on Instagram" show what Instagram's own
   controls cover (Meta's ads guide: 14% at the top, 35% at the bottom, 6% at each side).
-  Under the picture, as in the other sections, a strip of chips: Add Text writes a new
+  Under the picture, as in the other sections, a strip of chips: Layout opens the layouts as
+  cards with a drawing of each one's slots; the one picked shows its slots on the picture as
+  faint dashed boxes while arranging (never in the video), the widgets snapping to their edges
+  and middles, and "Arrange the widgets in it" puts the title, the stats and a chart in its
+  slots, sized to fit. A preset picks its layout with it. Add Text writes a new
   text; Add Stat opens a sheet of the stats this video can show, grouped by what they
   measure (time, distance, speed, elevation, heart rate, power, cadence, temperature,
   calories, activities; a group only when the video has one of its values), each a tile with

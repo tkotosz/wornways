@@ -3,6 +3,7 @@
 // engine's settings table, so they offer the same settings as the command-line tool.
 
 import {
+  LAYOUT_NAMES,
   PRESETS,
   PRESET_NAMES,
   SETTINGS,
@@ -10,6 +11,7 @@ import {
   type ChartColor,
   type ChartKind,
   type LabelMode,
+  type LayoutName,
   type Metric,
   type MetricValue,
   type Preset,
@@ -143,7 +145,13 @@ export const playbackAdjustments = (
 };
 
 /** The settings that hold the widgets: over the replay, and on the totals card. */
-const WIDGET_SETTINGS = ['widgets', 'totals-widgets'];
+const WIDGET_SETTINGS = ['widgets', 'totals-widgets', 'layout'];
+
+/** The layout the widgets are arranged in: the one picked, else the preset's, else Classic. */
+export function layoutOf(adjustments: Adjustments, count: ActivityCount): LayoutName {
+  const picked = adjustments['layout'] ?? startingValue(adjustments, count, 'layout');
+  return LAYOUT_NAMES.includes(picked as LayoutName) ? (picked as LayoutName) : 'classic';
+}
 
 /** The adjustments without widgets: the video starts from the ones that suit it. */
 export const withoutWidgets = (adjustments: Adjustments): Adjustments =>

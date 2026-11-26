@@ -119,19 +119,32 @@ Trimmed exports default to the filename `replay.mp4`.
 
 ### Look
 
-| Setting           | CLI flag             | Values                                                                 | Default |
-| ----------------- | -------------------- | ---------------------------------------------------------------------- | ------- |
-| Camera            | `--camera`           | `zoom`, `fixed` or `follow`                                            | `zoom`  |
-| Street map        | `--map` / `--no-map` | on/off                                                                 | on      |
-| Frame size        | `--size`             | `WxH`, presets: story 1080x1920, square 1080x1080, landscape 1920x1080 | story   |
-| Frames per second | `--fps`              | 24, 30, 60                                                             | 30      |
-| Units             | `--units`            | `metric` or `imperial`                                                 | metric  |
+| Setting           | CLI flag             | Values                                                                      | Default                    |
+| ----------------- | -------------------- | --------------------------------------------------------------------------- | -------------------------- |
+| Camera            | `--camera`           | `zoom`, `fixed` or `follow`                                                 | `zoom`                     |
+| Street map        | `--map` / `--no-map` | on/off                                                                      | on                         |
+| Frame size        | `--size`             | `WxH`, presets: story 1080x1920, square 1080x1080, landscape 1920x1080      | story                      |
+| Frames per second | `--fps`              | 24, 30, 60                                                                  | 30                         |
+| Units             | `--units`            | `metric` or `imperial`                                                      | metric                     |
+| Layout            | `--layout`           | `classic`, `bottom-row`, `corner-grid`, `hero`, `side-column`, `story-safe` | the preset's, else classic |
 
 Units: metric tells distances in kilometers, heights in meters, speeds in km/h, paces in
 minutes per kilometer and temperatures in °C; imperial in miles, feet, mph, minutes per mile
 and °F. They apply to the values over the replay and on the totals card. Heart rate, power,
 cadence and calories have no unit to change. In the web app the setting is in the Overlay
 and the Ending sections. A value widget can also leave its unit out (`nounit`, see Widgets).
+
+Layout: where the widgets start when `--widgets` leaves them to the video, as slots for the
+title, the stats and a chart; in the web app also guides while the widgets are arranged
+(never drawn in the video). Classic: a large stat at the bottom left, three under it, a chart
+along the bottom. Bottom row: up to four stats side by side at the bottom, a chart over them.
+Corner grid: four stats two by two at the bottom left. Hero: a large stat in the middle at
+the bottom, three under it. Side column: the stats down the left side. Story safe: the title,
+a chart and the stats clear of what Instagram and TikTok cover on a story (the top 14%, the
+bottom 35%). The title goes in its slot at the top. The slots are planned on a story frame
+and keep their size in pixels on any other; a chart and the title keep their width. A stat is
+sized to fit its slot; a row of centered slots it does not fill is spread about its middle.
+Each preset has a layout: Highlight, Recap and Multiday trip Classic, All at once Hero.
 
 In the Frame section, choose a frame preset or enter a custom size such as `640x480`. Both
 dimensions must be positive even numbers. Available encoder sizes depend on the device.

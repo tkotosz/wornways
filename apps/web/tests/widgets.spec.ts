@@ -199,6 +199,36 @@ test('stretches a chart from its edges, the edge across in place, an edge snappi
   expect(moved.height).toBeCloseTo(taller.height, 0);
 });
 
+test('shows a layout as guides, and arranges the widgets in it', async ({ page, context }) => {
+  page.setDefaultTimeout(15_000);
+  await offlineMap(context);
+  await openOverlay(page);
+  // Recap starts in its own layout, its slots shown on the picture.
+  const chip = page.getByRole('button', { name: /^Layout: / });
+  await expect(chip).toHaveAccessibleName('Layout: Classic');
+  await expect(page.locator('.slot.stat')).toHaveCount(4);
+  // Another layout: its slots; Arrange puts the stats in them, side by side.
+  await chip.click();
+  const sheet = page.getByRole('dialog', { name: 'Layout' });
+  await sheet.getByRole('radio', { name: 'Bottom row' }).click();
+  await expect(page.locator('.slot.stat')).toHaveCount(4);
+  await sheet.getByRole('button', { name: 'Arrange the widgets in it' }).click();
+  await expect(sheet).toBeHidden();
+  await expect(chip).toHaveAccessibleName('Layout: Bottom row');
+  const slots = await page
+    .locator('.slot.stat')
+    .evaluateAll((elements) => elements.map((element) => element.getBoundingClientRect().top));
+  // The date and the stats in the row's slots: their middles at one height.
+  const middles = await Promise.all(
+    [1, 2, 3].map(async (k) => {
+      const box = (await outline(page, k).boundingBox())!;
+      return box.y + box.height / 2;
+    }),
+  );
+  expect(Math.max(...middles) - Math.min(...middles)).toBeLessThan(2);
+  expect(Math.min(...middles)).toBeGreaterThan(Math.min(...slots));
+});
+
 test('moves, resizes and removes a picked widget with the keyboard', async ({ page, context }) => {
   page.setDefaultTimeout(15_000);
   await offlineMap(context);
@@ -274,15 +304,14 @@ test('lines a moving widget up with the edges of the others, with a line', async
   const date = (await outline(page, 1).boundingBox())!;
   const start = await grip(page, 0);
   await drag(page, start, date.x + 4 - title.x, 120);
-  await expect(page.locator('.line.across')).toBeVisible();
+  // The line it snapped to: the date's edge or middle, or one of the layout's slots.
+  const line = page.locator('.line.across');
+  await expect(line).toBeVisible();
+  const at = (await line.boundingBox())!;
   await page.mouse.up();
-  // In line with the date: its left edge, its middle or its right edge, the nearest.
   const moved = (await outline(page, 0).boundingBox())!;
-  const lines = (box: { x: number; width: number }) => [
-    box.x,
-    box.x + box.width / 2,
-    box.x + box.width,
-  ];
-  const gaps = lines(moved).flatMap((edge) => lines(date).map((line) => Math.abs(edge - line)));
-  expect(Math.min(...gaps)).toBeLessThan(1);
+  const edges = [moved.x, moved.x + moved.width / 2, moved.x + moved.width];
+  expect(Math.min(...edges.map((edge) => Math.abs(edge - (at.x + at.width / 2))))).toBeLessThan(
+    1.5,
+  );
 });

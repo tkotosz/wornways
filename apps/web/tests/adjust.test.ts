@@ -164,15 +164,24 @@ describe('presets', () => {
   });
 
   it('keeps custom timing and camera settings independent for each selection size', () => {
+    // Custom starts from the preset's values, its layout too, which one and several share.
     const single = fineTuned({}, { ...playbackAdjustments({}, 'one'), camera: 'fixed' }, 'one');
-    expect(adjustSettings(single, 'one')).toEqual({ duration: '15', camera: 'fixed' });
-    expect(adjustSettings(single, 'several')).toEqual({ preset: 'all-at-once' });
+    expect(adjustSettings(single, 'one')).toEqual({
+      duration: '15',
+      camera: 'fixed',
+      layout: 'classic',
+    });
+    expect(adjustSettings(single, 'several')).toEqual({ preset: 'all-at-once', layout: 'classic' });
     const several = fineTuned(
       single,
       { ...playbackAdjustments(single, 'several'), duration: '22.5', camera: 'zoom' },
       'several',
     );
-    expect(adjustSettings(several, 'one')).toEqual({ duration: '15', camera: 'fixed' });
+    expect(adjustSettings(several, 'one')).toEqual({
+      duration: '15',
+      camera: 'fixed',
+      layout: 'classic',
+    });
     expect(adjustSettings(several, 'several')).toMatchObject({ duration: '22.5', camera: 'zoom' });
     // A preset picked starts that size's playback over, with nothing fine-tuned.
     const custom = withPreset(several, 'custom', 'several');
@@ -195,8 +204,9 @@ describe('presets', () => {
       share: 'even',
       'group-pace': 'fit',
       duration: '30',
-      // Custom starts from all of Recap's values, its totals card too.
+      // Custom starts from all of Recap's values, its totals card and layout too.
       'totals-card': true,
+      layout: 'classic',
     });
     expect(fineTuned(recap, { ...effective, camera: 'fixed' }, 'several')).toEqual({
       ...recap,

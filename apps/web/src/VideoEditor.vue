@@ -12,6 +12,7 @@
 // picked widget turns it into that widget's options (WidgetStrip); wide screens have that
 // strip under the picture.
 import {
+  LAYOUTS,
   METRICS,
   TOTALS_FIELDS,
   parseWidgets,
@@ -27,12 +28,14 @@ import {
   SECTIONS,
   WIDGET_PART_NAMES,
   countOf,
+  layoutOf,
   widgetLabel,
   type Adjustments,
   type Section,
   type WidgetPart,
 } from './adjust.ts';
 import AddWidget from './components/AddWidget.vue';
+import LayoutPicker from './components/LayoutPicker.vue';
 import FramePanel from './components/FramePanel.vue';
 import PlaybackPanel from './components/PlaybackPanel.vue';
 import PosterPreview from './components/PosterPreview.vue';
@@ -222,13 +225,25 @@ function writeText(text: string): void {
 /** The charts these activities can show, offered over the replay; none on the totals card. */
 const charts = computed(() => (board.value === 'overlay' ? (props.plan?.charts ?? []) : []));
 
-function useTool(tool: 'text' | 'values' | 'charts'): void {
+function useTool(tool: 'text' | 'values' | 'charts' | 'layout'): void {
   if (tool === 'text') {
     // A new text, written straight away; left empty, it goes again.
     editingText.value = addWidget({ kind: 'text', text: '', x: 50, y: 50, size: 100 });
   } else if (tool === 'values') {
     sheet.value = { name: 'values', label: board.value === 'totals' ? 'Totals' : 'Stats' };
-  } else sheet.value = { name: 'charts', label: 'Charts' };
+  } else if (tool === 'charts') sheet.value = { name: 'charts', label: 'Charts' };
+  else sheet.value = { name: 'layout', label: 'Layout' };
+}
+
+/** The layout the widgets over the replay are arranged in, its slots shown as guides. */
+const layout = computed(() => layoutOf(adjustments.value, countOf(props.activities)));
+/** The picture's editor, which measures the widgets to arrange them. */
+const editor = ref<InstanceType<typeof WidgetEditor> | null>(null);
+
+/** Puts the widgets in the layout's slots, and closes its sheet. */
+function arrangeInLayout(): void {
+  editor.value?.arrange();
+  sheet.value = null;
 }
 </script>
 
@@ -250,6 +265,7 @@ function useTool(tool: 'text' | 'values' | 'charts'): void {
         <template #layer="{ size }">
           <WidgetEditor
             v-if="board"
+            ref="editor"
             v-model:selected="selectedWidget"
             :widgets="widgets"
             :values="values"
@@ -257,6 +273,7 @@ function useTool(tool: 'text' | 'values' | 'charts'): void {
             :profiles="drawn?.profiles ?? {}"
             :size="size"
             :card="board === 'totals'"
+            :layout="board === 'overlay' ? layout : undefined"
             @change="setWidgets"
             @edit="editingText = $event"
           />
@@ -293,6 +310,7 @@ function useTool(tool: 'text' | 'values' | 'charts'): void {
         :card="board === 'totals'"
         :values="values"
         :charts="charts.length > 0"
+        :layout="board === 'overlay' ? LAYOUTS[layout].name : undefined"
         @done="selectedWidget = null"
         @tool="useTool"
         @edit="editingText = $event"
@@ -398,6 +416,7 @@ function useTool(tool: 'text' | 'values' | 'charts'): void {
           <template #layer="{ size }">
             <WidgetEditor
               v-if="board"
+              ref="editor"
               v-model:selected="selectedWidget"
               :widgets="widgets"
               :values="values"
@@ -405,6 +424,7 @@ function useTool(tool: 'text' | 'values' | 'charts'): void {
               :profiles="drawn?.profiles ?? {}"
               :size="size"
               :card="board === 'totals'"
+              :layout="board === 'overlay' ? layout : undefined"
               @change="setWidgets"
               @edit="editingText = $event"
             />
@@ -418,6 +438,7 @@ function useTool(tool: 'text' | 'values' | 'charts'): void {
             :card="board === 'totals'"
             :values="values"
             :charts="charts.length > 0"
+            :layout="board === 'overlay' ? LAYOUTS[layout].name : undefined"
             @done="selectedWidget = null"
             @tool="useTool"
             @edit="editingText = $event"
@@ -466,8 +487,14 @@ function useTool(tool: 'text' | 'values' | 'charts'): void {
 
   <!-- The setting being changed, on its own: from the phone's list, or a widget's. -->
   <SettingSheet v-if="sheet" :title="sheet.label" @close="sheet = null">
+    <LayoutPicker
+      v-if="sheet.name === 'layout'"
+      :layout="layout"
+      @pick="adjustments = { ...adjustments, layout: $event }"
+      @arrange="arrangeInLayout"
+    />
     <AddWidget
-      v-if="sheet.name === 'add-widget' || sheet.name === 'values' || sheet.name === 'charts'"
+      v-else-if="sheet.name === 'add-widget' || sheet.name === 'values' || sheet.name === 'charts'"
       :only="sheet.name === 'values' ? 'values' : sheet.name === 'charts' ? 'charts' : undefined"
       :widgets="widgets"
       :values="values"

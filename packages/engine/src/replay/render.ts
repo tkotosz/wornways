@@ -12,7 +12,8 @@ import {
   type ChartKind,
   type ChartProfile,
 } from './charts.ts';
-import { WIDGET_SIZE, startingWidgets, valueLines, type Widget } from './widgets.ts';
+import { WIDGET_SIZE, defaultLabel, valueLines, type Widget } from './widgets.ts';
+import { arrangeInLayout, layoutSlots, type LayoutName } from './layouts.ts';
 import { END_CARD_S, drawEndCard, endCardFrames } from './end-card.ts';
 import {
   AUTOMATIC_TOTALS,
@@ -196,6 +197,8 @@ export type RenderOptions = {
   fontFamily?: string;
   /** Distances, heights, speeds and temperatures in metric or imperial units. Default metric. */
   units?: Units;
+  /** Where the widgets start when none are set (see layouts.ts). Default classic. */
+  layout?: LayoutName;
 };
 
 export type Renderer = {
@@ -678,15 +681,32 @@ export function createRenderer(
   /** Each value as it stands at the end of the replay, for laying widgets out. */
   const finalValues = metricValues(timeline.duration, finished());
   const startValues = metricValues(0);
-  /** The widgets set, else the ones a video starts with. */
+  /**
+   * The widgets set, else the ones a video starts with, arranged in its layout: the title, the
+   * values that suit it (each with its icon), and for one activity with heights the elevation
+   * chart.
+   */
   const widgets: Widget[] =
     options.widgets ??
-    startingWidgets(
-      {
-        title: !!options.title,
-        metrics: defaultMetrics(kind).filter((m) => finalValues.has(m)),
-        elevationChart: kind === 'single' && hasElevation,
-      },
+    arrangeInLayout(
+      [
+        ...(options.title ? [{ kind: 'text', text: null, x: 50, y: 50, size: 100 } as Widget] : []),
+        ...defaultMetrics(kind)
+          .filter((m) => finalValues.has(m))
+          .map((metric): Widget => ({
+            kind: 'metric',
+            metric,
+            label: defaultLabel(metric),
+            icon: true,
+            x: 50,
+            y: 50,
+            size: 100,
+          })),
+        ...(kind === 'single' && hasElevation
+          ? [{ kind: 'chart', chart: 'elevation', x: 50, y: 50, size: 100 } as Widget]
+          : []),
+      ],
+      layoutSlots(options.layout ?? 'classic', { width: W, height: H }),
       // As wide as a value gets: at the finish, or at the start for one that shrinks, such as
       // a race's "25 still moving", which ends as "all finished".
       (widget) => {

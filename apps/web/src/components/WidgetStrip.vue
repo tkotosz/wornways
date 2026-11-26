@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // The chips for arranging widgets, in the strip under the picture (Overlay, and Ending with
-// the totals card). With no widget picked: adding a text, a stat or (over the replay) a
-// chart. With one picked, the strip is that widget's: Done lets it go; Edit writes a text's
+// the totals card). With no widget picked: over the replay the layout (its slots as guides,
+// and arranging the widgets in it); adding a text, a stat or (over the replay) a chart. With one picked, the strip is that widget's: Done lets it go; Edit writes a text's
 // text; Size, Label position (where a value's words are), Label text (what they say), Unit
 // (on or off, for a value that has one), Format (a time, date or clock time) and Color (a
 // chart's) open their sheet; Icon turns a value's icon on or off in place; Remove takes it off
@@ -32,12 +32,14 @@ const props = defineProps<{
   values: Map<Metric, MetricValue>;
   /** Whether charts are offered: over the replay, when the activities can show one. */
   charts: boolean;
+  /** The layout's name, over the replay; none on the totals card. */
+  layout?: string;
 }>();
 const emit = defineEmits<{
   /** Lets the picked widget go. */
   done: [];
-  /** Adds a text, or opens the values or the charts to add one. */
-  tool: [tool: 'text' | 'values' | 'charts'];
+  /** Adds a text, or opens the values, the charts or the layouts. */
+  tool: [tool: 'text' | 'values' | 'charts' | 'layout'];
   /** Writes the picked text widget's text. */
   edit: [index: number];
   /** Changes the picked widget in place, as its icon switch does. */
@@ -186,6 +188,17 @@ const format = computed(() => (picked.value ? formatOf(picked.value, props.card)
   </div>
   <div v-else class="setting-rows widget-chips">
     <slot name="before" />
+    <button
+      v-if="layout"
+      type="button"
+      class="setting-row"
+      :aria-label="`Layout: ${layout}`"
+      aria-haspopup="dialog"
+      @click="emit('tool', 'layout')"
+    >
+      <span>Layout</span>
+      <span class="value">{{ layout }}</span>
+    </button>
     <button
       type="button"
       class="setting-row"
