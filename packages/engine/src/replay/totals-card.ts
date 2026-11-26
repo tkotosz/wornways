@@ -527,21 +527,22 @@ export function drawTotalsCard(
     /** Draws the number, white, centered on `x` with its baseline at `y`, its icon before it. */
     const number = (y: number) => {
       ctx.fillStyle = 'rgba(255, 255, 255, 0.96)';
-      if (!icon) {
-        fitFont(entry.value, 700, size, width);
-        ctx.fillText(entry.value, x, y);
-        return;
-      }
-      // The icon and the number centered as the number ends, both smaller when too wide; the
-      // icon stays in place while the number counts up after it.
+      // Set by the number as it ends, both smaller when too wide, so nothing moves while it
+      // counts up: the icon at the left, the unit at the right, the number against the unit.
       ctx.font = `700 ${Math.round(size)}px ${fontFamily}`;
-      const k = Math.min(1, width / (iconRoom(size) + ctx.measureText(widest).width));
+      const room = (px: number) => (icon ? iconRoom(px) : 0);
+      const k = Math.min(1, width / (room(size) + ctx.measureText(widest).width));
       const fontSize = size * k;
       ctx.font = `700 ${Math.round(fontSize)}px ${fontFamily}`;
-      const left = x - (iconRoom(fontSize) + ctx.measureText(widest).width) / 2;
-      const textX = drawIconBefore(ctx, icon, left, y, fontSize);
-      ctx.textAlign = 'left';
-      ctx.fillText(entry.value, textX, y);
+      const full = room(fontSize) + ctx.measureText(widest).width;
+      const left = x - full / 2;
+      const right = left + full;
+      if (icon) drawIconBefore(ctx, icon, left, y, fontSize);
+      const digits = entry.value.startsWith(entry.number) ? entry.number : entry.value;
+      const unit = entry.value.slice(digits.length);
+      ctx.textAlign = 'right';
+      ctx.fillText(unit, right, y);
+      ctx.fillText(digits, right - ctx.measureText(unit).width, y);
       ctx.textAlign = 'center';
     };
     /** Draws the words, smaller in orange, centered on `x` with their baseline at `y`. */

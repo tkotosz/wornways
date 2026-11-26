@@ -12,7 +12,7 @@ import {
   type ChartKind,
   type ChartProfile,
 } from './charts.ts';
-import { WIDGET_SIZE, defaultLabel, valueLines, type Widget } from './widgets.ts';
+import { WIDGET_SIZE, defaultLabel, lineParts, valueLines, type Widget } from './widgets.ts';
 import { arrangeInLayout, layoutSlots, type LayoutName } from './layouts.ts';
 import { END_CARD_S, drawEndCard, endCardFrames } from './end-card.ts';
 import {
@@ -1271,14 +1271,27 @@ export function createRenderer(
       ctx.font = fontOf(600, VALUE_SIZE * scale);
       ctx.fillStyle = 'rgba(255, 255, 255, 0.94)';
       const baseline = top + VALUE_SIZE * scale * 0.95;
-      // The icon and the line set by the line at its widest, so neither moves while the number
-      // counts: the line starts at a fixed place, after the icon.
+      // Set by the line at its widest, so nothing moves while the number counts: the icon and
+      // the words before the number at the left, the unit and the words after it at the right,
+      // the number against the unit.
       const size = VALUE_SIZE * scale;
       const room = widget.icon ? iconRoom(size) : 0;
-      let textX = cx - (room + widestLine(widget, line)) / 2;
-      if (widget.icon) textX = drawIconBefore(ctx, iconOf(widget.metric), textX, baseline, size);
+      const width = room + widestLine(widget, line);
+      let left = cx - width / 2;
+      const right = left + width;
+      if (widget.icon) left = drawIconBefore(ctx, iconOf(widget.metric), left, baseline, size);
+      const { head, number, tail } = lineParts(
+        values.get(widget.metric)!,
+        widget.label,
+        widget.format,
+        widget.labelText,
+        widget.unit,
+      );
       ctx.textAlign = 'left';
-      ctx.fillText(line, textX, baseline);
+      ctx.fillText(head, left, baseline);
+      ctx.textAlign = 'right';
+      ctx.fillText(tail, right, baseline);
+      ctx.fillText(number, right - ctx.measureText(tail).width, baseline);
       ctx.textAlign = 'center';
       if (under) {
         ctx.font = fontOf(400, LABEL_SIZE * scale);

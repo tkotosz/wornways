@@ -686,7 +686,7 @@ describe('widgets', () => {
     expect(at(true)).toBeGreaterThan(at(false) * 1.2);
   });
 
-  it('keeps a value, and its icon, in place while its number counts, on every frame', () => {
+  it('keeps the icon at the left and the unit at the right while the number counts', () => {
     // A ride over 10 km, so the distance gains a digit as it counts.
     const long = route();
     for (let i = 0; i < long.points.length / STRIDE; i++) long.points[i * STRIDE] = 19 + i * 0.0012;
@@ -705,26 +705,31 @@ describe('widgets', () => {
           ],
         },
       );
-      /** The leftmost white pixel in the widget's band: where it starts. */
-      const leftmost = () => {
+      /** The leftmost and rightmost white pixels in the widget's band. */
+      const ends = () => {
         const context = renderer.canvas.getContext('2d') as Context2DLike;
         const { data } = context.getImageData(0, height * 0.45, width, height * 0.1);
         const row = width * 4;
-        let left = width;
+        let [left, right] = [width, 0];
         for (let i = 0; i < data.length; i += 4)
-          if (data[i]! > 200 && data[i + 1]! > 200 && data[i + 2]! > 200)
+          if (data[i]! > 200 && data[i + 1]! > 200 && data[i + 2]! > 200) {
             left = Math.min(left, (i % row) / 4);
-        return left;
+            right = Math.max(right, (i % row) / 4);
+          }
+        return { left, right };
       };
       const lefts = new Set<number>();
+      const rights = new Set<number>();
       for (let f = 0; f < renderer.replayFrames; f++) {
         renderer.renderFrame(f);
-        if (f > 0) lefts.add(leftmost());
+        if (f === 0) continue;
+        const { left, right } = ends();
+        lefts.add(left);
+        rights.add(right);
       }
-      // The icon does not move at all; a number without one starts where it did, its first
-      // digit's own shape aside (a 1 starts a pixel further in than a 9).
+      // The unit, at the right, does not move; nor does the icon, at the left.
+      expect([...rights], `icon ${icon}`).toHaveLength(1);
       if (icon) expect([...lefts]).toHaveLength(1);
-      else expect(Math.max(...lefts) - Math.min(...lefts)).toBeLessThanOrEqual(1);
     }
   });
 

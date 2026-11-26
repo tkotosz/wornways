@@ -97,6 +97,33 @@ export function valueLines(
   return { above: '', line: value, under: words };
 }
 
+/**
+ * A value widget's line in three parts, which together are `valueLines`' line: what comes
+ * before its number (its words, when they go before it), its number, and what comes after
+ * (its unit, and its words when they go after it). A widget keeps the first at its left and
+ * the last at its right, the number counting between them.
+ */
+export function lineParts(
+  shown: MetricValue,
+  mode: LabelMode,
+  format?: ValueFormat,
+  labelText?: string,
+  unit = true,
+): { head: string; number: string; tail: string } {
+  const text = (format && shown.formats?.[format]) || shown;
+  const value = unit ? text.value : text.number;
+  // The unit: what the value has after its number ("km" of "1,147 km"); none for one that is
+  // all number, such as a time.
+  const number = value.startsWith(text.number) ? text.number : value;
+  const after = value.slice(number.length);
+  const words = labelTextOf(shown, labelText, format);
+  return {
+    head: words && mode === 'before' ? `${words} ` : '',
+    number,
+    tail: after + (words && mode === 'after' ? ` ${words}` : ''),
+  };
+}
+
 /** The sizes a widget takes, in percent of its normal size. */
 export const WIDGET_SIZE = { min: 50, max: 250 } as const;
 
