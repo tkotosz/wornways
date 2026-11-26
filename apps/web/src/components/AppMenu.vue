@@ -1,9 +1,9 @@
 <script setup lang="ts">
 // The menu, from the ☰ button: a panel that slides in from the left over the dimmed screen.
 // At its top the name and the version; then switching the source (with the one in use),
-// installing the app where the browser can, About, reporting an issue on GitHub, the source
-// on GitHub, the licenses and the privacy policy. Back, Escape, a tap beside it or picking an
-// item closes it.
+// installing the app where the browser can, reporting an issue on GitHub, the source on
+// GitHub, the licenses, the privacy policy, and last, as usual, About. Back, Escape, a tap
+// beside it or picking an item closes it.
 import { computed, onMounted, ref } from 'vue';
 import type { Source } from '../messages.ts';
 import { isInstalled } from '../install.ts';
@@ -65,13 +65,6 @@ function tapped(event: MouseEvent): void {
           <span>Install app</span>
         </button>
         <hr />
-        <button type="button" class="item" @click="emit('about')">
-          <svg class="item-icon" viewBox="0 0 24 24" aria-hidden="true">
-            <circle cx="12" cy="12" r="9" />
-            <path d="M12 11v6M12 7.5v.5" />
-          </svg>
-          <span>About</span>
-        </button>
         <a class="item" :href="report" target="_blank" rel="noopener" @click="emit('close')">
           <svg class="item-icon" viewBox="0 0 24 24" aria-hidden="true">
             <path d="M5 20V4M5 4h11l-2 4 2 4H5" />
@@ -106,6 +99,13 @@ function tapped(event: MouseEvent): void {
           </svg>
           <span>Privacy policy</span>
         </a>
+        <button type="button" class="item" @click="emit('about')">
+          <svg class="item-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="12" cy="12" r="9" />
+            <path d="M12 11v6M12 7.5v.5" />
+          </svg>
+          <span>About</span>
+        </button>
       </nav>
     </div>
   </dialog>
