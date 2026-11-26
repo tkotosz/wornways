@@ -163,6 +163,23 @@ test('stretches a chart from its edges, an edge snapping to a guide line', async
   const tall = (await chart.boundingBox())!;
   expect(Math.abs(tall.y - middle)).toBeLessThan(1.5);
   expect(tall.width).toBeCloseTo(narrow.width, 0);
+
+  // Its bottom edge, up: lower again.
+  const bottom = (await page.getByTestId(`resize-height-bottom-${index}`).boundingBox())!;
+  await drag(page, { x: bottom.x + 5, y: bottom.y + 5 }, 0, -8);
+  await page.mouse.up();
+  await expect
+    .poll(async () => (await chart.boundingBox())!.height)
+    .toBeLessThan(tall.height - 10);
+  const taller = (await chart.boundingBox())!;
+
+  // Moved, it keeps its width and height.
+  await drag(page, { x: taller.x + taller.width / 3, y: taller.y + taller.height / 2 }, -20, -30);
+  await page.mouse.up();
+  await expect.poll(async () => (await chart.boundingBox())!.y).toBeLessThan(taller.y - 10);
+  const moved = (await chart.boundingBox())!;
+  expect(moved.width).toBeCloseTo(taller.width, 0);
+  expect(moved.height).toBeCloseTo(taller.height, 0);
 });
 
 test('moves, resizes and removes a picked widget with the keyboard', async ({ page, context }) => {

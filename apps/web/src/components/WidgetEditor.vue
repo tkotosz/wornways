@@ -338,7 +338,14 @@ function start(event: PointerEvent, index: number, hold: Hold): void {
     if (across) x += across.shift;
     if (down) y += down.shift;
     snap.value = { x: across?.line ?? null, y: down?.line ?? null };
-    moving.value = { index, x, y, size: widget.size };
+    // Moving keeps the size, a chart's height apart from its width included.
+    moving.value = {
+      index,
+      x,
+      y,
+      size: widget.size,
+      ...(widget.kind === 'chart' ? { height: height0 } : {}),
+    };
   };
   const end = (e: PointerEvent) => {
     if (!holding) return;
@@ -561,7 +568,7 @@ const story = computed(() => props.size.width / props.size.height < 0.8);
           aria-hidden="true"
           @pointerdown="start($event, index, 'size')"
         />
-        <!-- A chart's width from its right edge, its height from its top edge. -->
+        <!-- A chart's width from its right edge, its height from its top or bottom edge. -->
         <template v-if="widget.kind === 'chart'">
           <span
             class="handle edge width"
@@ -572,6 +579,12 @@ const story = computed(() => props.size.width / props.size.height < 0.8);
           <span
             class="handle edge height"
             :data-testid="`resize-height-${index}`"
+            aria-hidden="true"
+            @pointerdown="start($event, index, 'height')"
+          />
+          <span
+            class="handle edge height bottom"
+            :data-testid="`resize-height-bottom-${index}`"
             aria-hidden="true"
             @pointerdown="start($event, index, 'height')"
           />
@@ -772,7 +785,7 @@ const story = computed(() => props.size.width / props.size.height < 0.8);
   cursor: nwse-resize;
 }
 
-/* A chart's edge handles: in the middle of its right edge, and of its top edge. */
+/* A chart's edge handles: in the middle of its right edge, and of its top and bottom edges. */
 .handle.edge.width {
   top: calc(50% - 6px);
   right: -7px;
@@ -785,6 +798,11 @@ const story = computed(() => props.size.width / props.size.height < 0.8);
   right: calc(50% - 6px);
   bottom: auto;
   cursor: ns-resize;
+}
+
+.handle.edge.height.bottom {
+  top: auto;
+  bottom: -7px;
 }
 
 /* A center line the widget snapped to. */

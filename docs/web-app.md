@@ -193,7 +193,7 @@ drawing each. The editor's settings are remembered for the next visit.
   shown; a widget is removed only on purpose (Remove in the strip or its settings, or
   Delete), never by where it is dragged. Two fingers, or the corner handle, resize it (50 to
   250%), its letters keeping their shape; a chart also has a handle on its right edge for its
-  width and on its top edge for its height, each edge following the finger, and its Size
+  width and on its top and bottom edges for its height, each edge following the finger, and its Size
   sheet has a Width and a Height slider. While resizing, the edges that move snap to the
   frame's center lines and the other widgets' edges and middles, with the line shown, and
   the widget stays centered on its point. A tap on a picked text
