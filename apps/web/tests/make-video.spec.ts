@@ -550,11 +550,14 @@ test('offers heart rate and cadence for an activity that recorded them', async (
   await page.getByRole('button', { name: 'Add a widget' }).click();
   const add = page.getByRole('dialog', { name: 'Add a widget' });
   const tile = (name: string) => add.getByRole('button', { name: new RegExp(` ${name}$`) });
-  await expect(tile('Heart rate')).toHaveText(/bpm/);
-  await expect(tile('Max heart rate')).toHaveText(/bpm/);
-  await expect(tile('Cadence')).toHaveText(/rpm/);
+  for (const name of ['Average heart rate', 'Max heart rate', 'Current heart rate'])
+    await expect(tile(name)).toHaveText(/bpm/);
+  for (const name of ['Average cadence', 'Max cadence', 'Current cadence'])
+    await expect(tile(name)).toHaveText(/rpm/);
   // It recorded no power, temperature or calories.
-  for (const name of ['Power', 'Temperature', 'Calories']) await expect(tile(name)).toHaveCount(0);
+  for (const name of ['Average power', 'Max power', 'Average temperature', 'Calories'])
+    await expect(tile(name)).toHaveCount(0);
+  await expect(add.getByRole('region', { name: 'Power' })).toHaveCount(0);
 });
 
 test('shares the video where the browser can share files', async ({ page, context }) => {
@@ -764,10 +767,19 @@ test('sets up the video and its text, and keeps both for the next visit', async 
   await text.getByRole('slider', { name: 'Size' }).dispatchEvent('change');
   await text.getByRole('button', { name: 'Done' }).click();
   await expect(titleRow).toHaveAccessibleName('Text: Spring');
-  // A race offers every value to add, the dates and the pace too.
+  // A race offers every value to add, the dates and the average speed too.
   await page.getByRole('button', { name: 'Add a widget' }).click();
   const add = page.getByRole('dialog', { name: 'Add a widget' });
-  for (const name of ['Date', 'Pace', 'Top speed', 'Moving time', 'Days out', 'Longest activity'])
+  for (const name of [
+    'Date',
+    'Average speed',
+    'Top speed',
+    'Moving time',
+    'Days out',
+    'Longest activity',
+    'Longest time',
+    'Distance per activity',
+  ])
     await expect(add.getByRole('button', { name: new RegExp(` ${name}$`) })).toBeEnabled();
   await add.getByRole('button', { name: 'Done' }).click();
   await expect(page.getByRole('switch', { name: 'Show watermark' })).toBeChecked();

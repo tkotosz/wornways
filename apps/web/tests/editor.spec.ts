@@ -124,7 +124,7 @@ test('sets the widgets with the preset, and keeps them with the playback kept', 
   await page.getByRole('button', { name: 'Preset: Recap' }).click();
   await chooseStyle(page, 'All at once');
   await expect(onPicture.filter({ hasText: 'Mallorca' })).toHaveCount(0);
-  await expect(onPicture.filter({ hasText: 'all finished' })).toHaveCount(1);
+  await expect(onPicture.filter({ hasText: /all\s*finished/ })).toHaveCount(1);
 
   // Playback set by hand keeps them.
   await page.getByRole('button', { name: 'Add a text' }).click();
@@ -249,7 +249,7 @@ test.describe('the editor on a phone', () => {
     await page.keyboard.press('Enter');
     await expect(writing).toBeHidden();
     await expect(onPicture).toHaveCount(count + 1);
-    // Metrics come from a sheet of them alone; a new one shows its words as it usually does.
+    // Metrics come from a sheet of them alone; a new one has its words under it.
     await page.getByRole('button', { name: 'Add a metric' }).click();
     const values = page.getByRole('dialog', { name: 'Metrics' });
     await expect(values.getByRole('button', { name: /Elevation chart$/ })).toHaveCount(0);
@@ -257,14 +257,14 @@ test.describe('the editor on a phone', () => {
     await expect(values).toBeHidden();
     await expect(onPicture).toHaveCount(count + 2);
     const days = onPicture.last();
-    await expect(days).toContainText(/^\d+ days? out/);
-    // Its label mode, from its chip: under it.
-    await page.getByRole('button', { name: 'Label: Inline' }).click();
-    const label = page.getByRole('dialog', { name: 'Days out: label' });
-    await label.getByRole('radio', { name: /^Under/ }).click();
-    await label.getByRole('button', { name: 'Done' }).click();
-    await expect(page.getByRole('button', { name: 'Label: Under' })).toBeVisible();
     await expect(days.locator('.words')).toHaveText(/days? out/);
+    // Its label mode, from its chip: inline, after it.
+    await page.getByRole('button', { name: 'Label: Under' }).click();
+    const label = page.getByRole('dialog', { name: 'Days out: label' });
+    await label.getByRole('radio', { name: /^Inline/ }).click();
+    await label.getByRole('button', { name: 'Done' }).click();
+    await expect(page.getByRole('button', { name: 'Label: Inline' })).toBeVisible();
+    await expect(days).toContainText(/^\d+ days? out/);
     // Center puts it in the middle across; Remove takes it off.
     await page.getByRole('button', { name: 'Center it across' }).click();
     await expect

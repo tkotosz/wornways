@@ -298,9 +298,17 @@ describe('the values', () => {
     const sensorMetrics: Metric[] = [
       'heart-rate',
       'max-heart-rate',
+      'heart-rate-now',
       'power',
+      'max-power',
+      'power-now',
       'cadence',
+      'max-cadence',
+      'cadence-now',
       'temperature',
+      'min-temperature',
+      'max-temperature',
+      'temperature-now',
       'calories',
     ];
     const drawn = (track: Track, metric: Metric) => {
@@ -328,6 +336,20 @@ describe('the values', () => {
       expect(drawn(recordedRide, metric), metric).toBeGreaterThan(20);
       expect(drawn(route(), metric), metric).toBe(0);
     }
+  });
+
+  it('shows the values as one activity plays for one activity only, per activity for several', () => {
+    const inTurn = chronologicalTimeline([1_190, 1_190], { duration: 1 });
+    for (const metric of ['time-of-day', 'speed-now', 'elevation-now'] as Metric[]) {
+      expect(lastFrame({ widgets: valuesAt([metric]) }).bottomLeft, metric).toBeGreaterThan(20);
+      expect(severalLastFrame(inTurn, [metric]), metric).toBe(0);
+    }
+    for (const metric of ['longest-time', 'average-distance', 'biggest-climb'] as Metric[]) {
+      expect(severalLastFrame(inTurn, [metric]), metric).toBeGreaterThan(20);
+      expect(lastFrame({ widgets: valuesAt([metric]) }).bottomLeft, metric).toBe(0);
+    }
+    expect(lastFrame({ widgets: valuesAt(['lowest']) }).bottomLeft).toBeGreaterThan(20);
+    expect(severalLastFrame(inTurn, ['lowest'])).toBeGreaterThan(20);
   });
 
   it('shows the start time for a single activity only, and the top speed for any', () => {
@@ -600,15 +622,15 @@ describe('widgets', () => {
     const renderer = lastFrame({ watermark: true });
     expect(
       renderer.widgets.map((widget) => (widget.kind === 'metric' ? widget.metric : widget.kind)),
-    ).toEqual(['text', 'time', 'distance', 'date', 'elevation-chart']);
-    const [title, time, distance] = renderer.overlayBoxes().widgets.map((box) => edges(box!));
+    ).toEqual(['text', 'distance', 'time', 'elevation', 'elevation-chart']);
+    const [title, distance, time] = renderer.overlayBoxes().widgets.map((box) => edges(box!));
     // The title at the top in the middle; the first value large at the bottom left, the
-    // other smaller in a row under it.
+    // others smaller in a row under it.
     expect((title!.left + title!.right) / 2).toBeCloseTo(135, 0);
     expect(title!.top).toBeLessThan(height * 0.1);
-    expect(time!.left).toBeCloseTo(width * 0.07, 0);
-    expect(distance!.top).toBeGreaterThan(time!.bottom);
-    expect(distance!.bottom - distance!.top).toBeLessThan(time!.bottom - time!.top);
+    expect(distance!.left).toBeCloseTo(width * 0.07, 0);
+    expect(time!.top).toBeGreaterThan(distance!.bottom);
+    expect(time!.bottom - time!.top).toBeLessThan(distance!.bottom - distance!.top);
     expect(renderer.overlayBoxes().watermark!.x).toBeCloseTo(0.03, 2);
   });
 });

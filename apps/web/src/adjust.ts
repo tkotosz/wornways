@@ -384,17 +384,59 @@ export function saveAdjustments(adjustments: Adjustments): void {
 /** A value's name: its metric's, or a few words where the name alone would be unclear. */
 const METRIC_NAMES: Partial<Record<Metric, string>> = {
   moving: 'Moving time',
-  'top-speed': 'Top speed',
   start: 'Start time',
+  'time-of-day': 'Time of day',
+  'longest-time': 'Longest time',
+  longest: 'Longest activity',
+  'average-distance': 'Distance per activity',
+  pace: 'Average speed',
+  'top-speed': 'Top speed',
+  'speed-now': 'Current speed',
   elevation: 'Climbed',
   highest: 'Highest point',
-  days: 'Days out',
-  longest: 'Longest activity',
-  'heart-rate': 'Heart rate',
+  lowest: 'Lowest point',
+  'elevation-now': 'Current elevation',
+  'biggest-climb': 'Biggest climb',
+  'heart-rate': 'Average heart rate',
   'max-heart-rate': 'Max heart rate',
+  'heart-rate-now': 'Current heart rate',
+  power: 'Average power',
+  'max-power': 'Max power',
+  'power-now': 'Current power',
+  cadence: 'Average cadence',
+  'max-cadence': 'Max cadence',
+  'cadence-now': 'Current cadence',
+  temperature: 'Average temperature',
+  'min-temperature': 'Min temperature',
+  'max-temperature': 'Max temperature',
+  'temperature-now': 'Current temperature',
+  days: 'Days out',
 };
 export const metricName = (metric: Metric) =>
   METRIC_NAMES[metric] ?? metric.charAt(0).toUpperCase() + metric.slice(1);
+
+/**
+ * The values by what they measure, as the Metrics sheet groups them: each group's values side
+ * by side (the average, the highest, the value as one activity plays…).
+ */
+export const METRIC_GROUPS: { name: string; metrics: Metric[] }[] = [
+  { name: 'Time', metrics: ['time', 'moving', 'start', 'time-of-day', 'longest-time'] },
+  { name: 'Distance', metrics: ['distance', 'longest', 'average-distance'] },
+  { name: 'Speed', metrics: ['pace', 'top-speed', 'speed-now'] },
+  {
+    name: 'Elevation',
+    metrics: ['elevation', 'descent', 'highest', 'lowest', 'elevation-now', 'biggest-climb'],
+  },
+  { name: 'Heart rate', metrics: ['heart-rate', 'max-heart-rate', 'heart-rate-now'] },
+  { name: 'Power', metrics: ['power', 'max-power', 'power-now'] },
+  { name: 'Cadence', metrics: ['cadence', 'max-cadence', 'cadence-now'] },
+  {
+    name: 'Temperature',
+    metrics: ['temperature', 'min-temperature', 'max-temperature', 'temperature-now'],
+  },
+  { name: 'Energy', metrics: ['calories'] },
+  { name: 'Activities', metrics: ['count', 'days', 'date'] },
+];
 
 /** How a value's label modes are named: in the strip's chip and its sheet. */
 export const LABEL_MODE_NAMES: Record<LabelMode, string> = {

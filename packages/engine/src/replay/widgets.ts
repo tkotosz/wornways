@@ -26,21 +26,25 @@ export type Widget = { x: number; y: number; size: number } & (
   | { kind: 'elevation-chart' }
 );
 
-/** The values that have a short form of their own: an arrow, "avg", "best", "top". */
+/** The values that have a short form of their own: an arrow, "avg", "max", "best", "top". */
 const SHORT_FORMS: readonly Metric[] = [
   'top-speed',
   'elevation',
   'descent',
   'highest',
+  'lowest',
+  'biggest-climb',
   'longest',
   'heart-rate',
   'max-heart-rate',
   'power',
+  'max-power',
   'cadence',
+  'max-cadence',
   'temperature',
+  'min-temperature',
+  'max-temperature',
 ];
-/** The values that read as a number and its words on one line: "25 activities", "07:12 start". */
-const INLINE_BY_DEFAULT: readonly Metric[] = ['moving', 'start', 'count', 'days'];
 
 /** The label modes `metric` can take: the date has no words; only some have a short form. */
 export function labelModes(metric: Metric): LabelMode[] {
@@ -48,11 +52,9 @@ export function labelModes(metric: Metric): LabelMode[] {
   return LABEL_MODES.filter((mode) => mode !== 'short' || SHORT_FORMS.includes(metric));
 }
 
-/** The label mode a value starts with: its short form, its words inline, or none. */
+/** The label mode a value starts with: its words under it; the date has none. */
 export function defaultLabel(metric: Metric): LabelMode {
-  if (SHORT_FORMS.includes(metric)) return 'short';
-  if (INLINE_BY_DEFAULT.includes(metric)) return 'inline';
-  return 'off';
+  return metric === 'date' ? 'off' : 'under';
 }
 
 /** What a value widget writes: its line, and the words under it (empty for none). */

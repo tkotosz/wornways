@@ -21,14 +21,14 @@ describe('widgets as text', () => {
   it('is written and read back as the same widgets, a label mode only when not the usual', () => {
     const text = widgetsText(widgets);
     expect(text).toBe(
-      'text:"Mallorca, \\"the island\\""@50,8;text@50,50,140;distance@20.5,88,120;count:under@50,70;elevation-chart@50,93',
+      'text:"Mallorca, \\"the island\\""@50,8;text@50,50,140;distance:off@20.5,88,120;count@50,70;elevation-chart@50,93',
     );
     expect(parseWidgets(text, METRICS)).toEqual(widgets);
   });
 
   it('takes percent signs and spaces, and nothing for no widgets', () => {
     expect(parseWidgets(' time@10%, 20% ; ', METRICS)).toEqual([
-      { kind: 'metric', metric: 'time', label: 'off', x: 10, y: 20, size: 100 },
+      { kind: 'metric', metric: 'time', label: 'under', x: 10, y: 20, size: 100 },
     ]);
     expect(parseWidgets('', METRICS)).toEqual([]);
   });
@@ -49,12 +49,11 @@ describe('widgets as text', () => {
 });
 
 describe('label modes', () => {
-  it('start the way each value usually reads: a short form, the words inline, or none', () => {
-    expect(defaultLabel('elevation')).toBe('short');
-    expect(defaultLabel('heart-rate')).toBe('short');
-    expect(defaultLabel('count')).toBe('inline');
-    expect(defaultLabel('days')).toBe('inline');
-    expect(defaultLabel('distance')).toBe('off');
+  it('start with the words under the value, except the date, which has none', () => {
+    expect(defaultLabel('elevation')).toBe('under');
+    expect(defaultLabel('heart-rate')).toBe('under');
+    expect(defaultLabel('count')).toBe('under');
+    expect(defaultLabel('distance')).toBe('under');
     expect(defaultLabel('date')).toBe('off');
     expect(labelModes('elevation')).toEqual(['off', 'short', 'inline', 'under']);
     expect(labelModes('count')).toEqual(['off', 'inline', 'under']);

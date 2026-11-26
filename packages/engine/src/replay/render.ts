@@ -83,53 +83,93 @@ export interface CanvasLike {
 
 export type CanvasFactory = (width: number, height: number) => CanvasLike;
 
-/** A value the metrics card can show. */
 /**
- * A value the metrics card can show: the time so far (stops included) or moving, the
- * distance, the average pace, the top speed so far, the meters climbed or descended, the
- * highest point so far, the date, the start time (one activity), how many activities, the
- * days with an activity, or the longest activity so far.
+ * A value a widget can show, by what it measures:
+ * - time: the time so far, stops included (a race: its clock; several in turn: added up);
+ *   moving: the time moving; start: when one activity started; time-of-day: the clock time
+ *   as one activity plays; longest-time: the longest activity by time, of several
+ * - distance; longest: the longest activity by distance, of several; average-distance: the
+ *   distance per activity, of several
+ * - pace: the average speed (or pace on foot) while moving; top-speed: the fastest; speed-now:
+ *   the speed as one activity plays
+ * - elevation: the meters climbed; descent; highest and lowest: the highest and lowest point;
+ *   elevation-now: the elevation as one activity plays; biggest-climb: the most climbed in
+ *   one activity, of several
+ * - heart-rate, power, cadence, temperature: averages over time, each with its highest
+ *   (max-…), the temperature with its lowest (min-temperature), and each as one activity
+ *   plays (…-now)
+ * - calories; count: how many activities; days: the days with an activity; date
  */
 export type Metric =
   | 'time'
   | 'moving'
+  | 'start'
+  | 'time-of-day'
+  | 'longest-time'
   | 'distance'
+  | 'longest'
+  | 'average-distance'
   | 'pace'
   | 'top-speed'
+  | 'speed-now'
   | 'elevation'
   | 'descent'
   | 'highest'
-  | 'date'
-  | 'start'
-  | 'count'
-  | 'days'
-  | 'longest'
+  | 'lowest'
+  | 'elevation-now'
+  | 'biggest-climb'
   | 'heart-rate'
   | 'max-heart-rate'
+  | 'heart-rate-now'
   | 'power'
+  | 'max-power'
+  | 'power-now'
   | 'cadence'
+  | 'max-cadence'
+  | 'cadence-now'
   | 'temperature'
-  | 'calories';
+  | 'min-temperature'
+  | 'max-temperature'
+  | 'temperature-now'
+  | 'calories'
+  | 'count'
+  | 'days'
+  | 'date';
 export const METRICS: readonly Metric[] = [
   'time',
   'moving',
+  'start',
+  'time-of-day',
+  'longest-time',
   'distance',
+  'longest',
+  'average-distance',
   'pace',
   'top-speed',
+  'speed-now',
   'elevation',
   'descent',
   'highest',
-  'date',
-  'start',
-  'count',
-  'days',
-  'longest',
+  'lowest',
+  'elevation-now',
+  'biggest-climb',
   'heart-rate',
   'max-heart-rate',
+  'heart-rate-now',
   'power',
+  'max-power',
+  'power-now',
   'cadence',
+  'max-cadence',
+  'cadence-now',
   'temperature',
+  'min-temperature',
+  'max-temperature',
+  'temperature-now',
   'calories',
+  'count',
+  'days',
+  'date',
 ];
 
 /** A box of the frame, in fractions of its width and height, 0 to 1. */
@@ -179,6 +219,8 @@ export type RenderOptions = {
   movingLabel?: string;
   /** "single": one activity with its own elapsed time and distance as live stats. */
   overlay?: 'auto' | 'single';
+  /** Several activities grouped by day, as on a trip: they start with the day's values. */
+  byDay?: boolean;
   /**
    * What is drawn over the replay (see widgets.ts). Without it, the title at the top, the
    * values that suit the video at the bottom left (see `defaultMetrics`; a value the video
@@ -270,8 +312,11 @@ type MetricState = Pick<
   | 'climbed'
   | 'descended'
   | 'highest'
+  | 'lowest'
+  | 'elevationNow'
   | 'moved'
   | 'topSpeed'
+  | 'speedNow'
   | 'sensorsNow'
 >;
 
@@ -289,39 +334,89 @@ type Prepared = Projected & {
   descended: number;
   /** The highest elevation reached so far. */
   highest: number;
+  /** The lowest elevation reached so far. */
+  lowest: number;
+  /** The elevation where the head is. */
+  elevationNow: number;
   /** Seconds moving so far. */
   moved: number;
   /** The top speed so far, in meters per second. */
   topSpeed: number;
+  /** The speed where the head is, in meters per second. */
+  speedNow: number;
   /** Each recorded sensor channel's running sums so far (see `SensorSums`). */
-  sensorsNow: Partial<Record<SensorChannel, { total: number; time: number; max: number }>>;
+  sensorsNow: Partial<Record<SensorChannel, SensorNow>>;
   started: boolean;
   done: boolean;
   /** Video time at which the track finished drawing. */
   doneAt: number;
 };
 
+/** A sensor channel so far: its sums, highest and lowest, and the value where the head is. */
+type SensorNow = { total: number; time: number; max: number; min: number; now: number };
+
+/** A sensor channel's sums at point `i`. */
+const sensorAt = (sums: SensorSums, i: number): SensorNow => ({
+  total: sums.total[i]!,
+  time: sums.time[i]!,
+  max: sums.max[i]!,
+  min: sums.min[i]!,
+  now: sums.now[i]!,
+});
+
 /** A track's recorded sensor channels with their running sums. */
 const sensorEntries = (projected: Projected) =>
   Object.entries(projected.sensors) as [SensorChannel, SensorSums][];
 
+/** What each sensor value is: its channel's widget name, and which of its values. */
+const SENSOR_METRICS: [Metric, SensorChannel, 'average' | 'max' | 'min' | 'now'][] = [
+  ['heart-rate', 'heartRate', 'average'],
+  ['max-heart-rate', 'heartRate', 'max'],
+  ['heart-rate-now', 'heartRate', 'now'],
+  ['power', 'power', 'average'],
+  ['max-power', 'power', 'max'],
+  ['power-now', 'power', 'now'],
+  ['cadence', 'cadence', 'average'],
+  ['max-cadence', 'cadence', 'max'],
+  ['cadence-now', 'cadence', 'now'],
+  ['temperature', 'temperature', 'average'],
+  ['min-temperature', 'temperature', 'min'],
+  ['max-temperature', 'temperature', 'max'],
+  ['temperature-now', 'temperature', 'now'],
+];
+const SENSOR_WORDS: Record<SensorChannel, string> = {
+  heartRate: 'heart rate',
+  power: 'power',
+  cadence: 'cadence',
+  temperature: 'temperature',
+};
+
 /**
- * A sensor channel's text: heart rate, power, cadence (doubled into steps on foot) or
- * temperature, from its average over time or its highest value.
+ * A sensor value as a widget shows it: the number with its unit (cadence doubled into steps
+ * on foot), its words ("average heart rate", "max power", "heart rate" for the value as it
+ * plays), and its short form ("142 bpm avg"), the value alone as it plays.
  */
-/** A sensor value as a widget shows it: the number with its unit, and its words. */
-function sensorText(metric: Metric, value: number, onFoot: boolean): [string, string, string] {
+function sensorText(
+  channel: SensorChannel,
+  which: 'average' | 'max' | 'min' | 'now',
+  value: number,
+  onFoot: boolean,
+): [string, string, string] {
   const whole = Math.round(value);
-  if (metric === 'heart-rate') return [`${whole} bpm`, 'average heart rate', `${whole} bpm avg`];
-  if (metric === 'max-heart-rate') return [`${whole} bpm`, 'max heart rate', `${whole} bpm max`];
-  if (metric === 'power') return [`${whole} W`, 'average power', `${whole} W avg`];
-  if (metric === 'cadence') {
-    const steps = Math.round(value * 2);
-    return onFoot
-      ? [`${steps} spm`, 'average cadence', `${steps} spm avg`]
-      : [`${whole} rpm`, 'average cadence', `${whole} rpm avg`];
-  }
-  return [`${whole} °C`, 'average temperature', `${whole} °C avg`];
+  const shown =
+    channel === 'heartRate'
+      ? `${whole} bpm`
+      : channel === 'power'
+        ? `${whole} W`
+        : channel === 'cadence'
+          ? onFoot
+            ? `${Math.round(value * 2)} spm`
+            : `${whole} rpm`
+          : `${whole} °C`;
+  const words = SENSOR_WORDS[channel];
+  if (which === 'now') return [shown, words, shown];
+  const short = { average: 'avg', max: 'max', min: 'min' }[which];
+  return [shown, `${which === 'average' ? 'average' : which} ${words}`, `${shown} ${short}`];
 }
 
 type Rect = { x0: number; y0: number; x1: number; y1: number };
@@ -384,16 +479,22 @@ function paceText(onFoot: boolean, seconds: number, metres: number): string {
 }
 
 /**
- * What the overlay describes: one activity, a race of every activity on one clock, or
- * groups of activities one after another.
+ * What the overlay describes: one activity, a race of every activity on one clock, groups of
+ * activities one after another, or a trip, one day after another.
  */
-export type OverlayKind = 'single' | 'race' | 'groups';
+export type OverlayKind = 'single' | 'race' | 'groups' | 'days';
 
-/** The metrics a video shows when none are asked for, the first one large. */
+/**
+ * The metrics a video starts with, the first one large: one activity's distance, time and
+ * climb; a race's clock, who is still out and the distance; a recap's date, activities,
+ * distance and climb; a trip's day, distance, climb and time moving. A value the video
+ * cannot show (a climb without elevation) is left out.
+ */
 export function defaultMetrics(kind: OverlayKind): Metric[] {
-  if (kind === 'single') return ['time', 'distance', 'date'];
+  if (kind === 'single') return ['distance', 'time', 'elevation'];
   if (kind === 'race') return ['time', 'count', 'distance'];
-  return ['date', 'count', 'distance'];
+  if (kind === 'days') return ['date', 'distance', 'elevation', 'moving'];
+  return ['date', 'count', 'distance', 'elevation'];
 }
 
 export function createRenderer(
@@ -411,7 +512,13 @@ export function createRenderer(
   const [singular, plural] = options.countLabel ?? ['activity', 'activities'];
   const movingLabel = options.movingLabel ?? 'moving';
   const kind: OverlayKind =
-    options.overlay === 'single' ? 'single' : timeline.clock ? 'race' : 'groups';
+    options.overlay === 'single'
+      ? 'single'
+      : timeline.clock
+        ? 'race'
+        : options.byDay
+          ? 'days'
+          : 'groups';
   const unit = Math.min(W, H) / 1080; // scales strokes and type with the output size
   const withCalories = tracks.some((track) => track.calories !== undefined);
   // Pace is in minutes per kilometer only when every activity is on foot.
@@ -464,8 +571,11 @@ export function createRenderer(
     climbed: 0,
     descended: 0,
     highest: 0,
+    lowest: 0,
+    elevationNow: 0,
     moved: 0,
     topSpeed: 0,
+    speedNow: 0,
     sensorsNow: {},
     started: false,
     done: false,
@@ -761,13 +871,18 @@ export function createRenderer(
         tr.climbed = between(tr.climb);
         tr.descended = between(tr.descent);
         tr.highest = between(tr.top);
+        tr.lowest = between(tr.bottom);
+        tr.elevationNow = between(tr.elevation);
         tr.moved = between(tr.moving);
         tr.topSpeed = between(tr.fastest);
+        tr.speedNow = between(tr.speed);
         for (const [channel, sums] of sensorEntries(tr))
           tr.sensorsNow[channel] = {
             total: between(sums.total),
             time: between(sums.time),
             max: between(sums.max),
+            min: between(sums.min),
+            now: between(sums.now),
           };
         piece.push(tr.headX, tr.headY);
       } else {
@@ -777,10 +892,12 @@ export function createRenderer(
         tr.climbed = tr.climb[i];
         tr.descended = tr.descent[i];
         tr.highest = tr.top[i];
+        tr.lowest = tr.bottom[i];
+        tr.elevationNow = tr.elevation[i];
         tr.moved = tr.moving[i];
         tr.topSpeed = tr.fastest[i];
-        for (const [channel, sums] of sensorEntries(tr))
-          tr.sensorsNow[channel] = { total: sums.total[i], time: sums.time[i], max: sums.max[i] };
+        tr.speedNow = tr.speed[i];
+        for (const [channel, sums] of sensorEntries(tr)) tr.sensorsNow[channel] = sensorAt(sums, i);
         tr.done = true;
         tr.doneAt = t;
       }
@@ -856,8 +973,10 @@ export function createRenderer(
     let climbed = 0;
     let descended = 0;
     let highest = -Infinity;
+    let lowest = Infinity;
     let moved = 0;
     let longest = 0;
+    let biggestClimb = 0;
     let fastest = 0;
     const days = new Set<string>();
     let date = state[0]!.date;
@@ -868,28 +987,42 @@ export function createRenderer(
       metres += tr.metres;
       climbed += tr.climbed;
       descended += tr.descended;
-      if (tr.hasElevation) highest = Math.max(highest, tr.highest);
+      if (tr.hasElevation) {
+        highest = Math.max(highest, tr.highest);
+        lowest = Math.min(lowest, tr.lowest);
+      }
       moved += tr.moved;
       longest = Math.max(longest, tr.metres);
+      biggestClimb = Math.max(biggestClimb, tr.climbed);
       fastest = Math.max(fastest, tr.topSpeed);
       days.add(tr.date);
       date = tr.date;
     }
     const lastSecond = (track: Track) => track.points[track.points.length - 1];
+    /** Each activity's recorded time so far. */
+    const secondsOf = (k: number) => lastSecond(tracks[k]!) * timeline.progress(k, t);
     /** The activities' recorded time so far, added up. */
-    const secondsSoFar = () =>
-      tracks.reduce((sum, track, k) => sum + lastSecond(track) * timeline.progress(k, t), 0);
+    const secondsSoFar = () => tracks.reduce((sum, _, k) => sum + secondsOf(k), 0);
     const texts = new Map<Metric, MetricValue>();
     const set = (metric: Metric, value: string, label: string, short?: string) =>
       texts.set(metric, short === undefined ? { value, label } : { value, label, short });
+    // The average speed, or pace on foot, while moving, as Strava and the totals card give it.
+    set('pace', paceText(onFoot, moved, metres), onFoot ? 'average pace' : 'average speed');
     if (kind === 'single') {
-      // One activity: its own elapsed time and distance so far.
-      const elapsed = Math.floor(lastSecond(tracks[0]) * timeline.progress(0, t));
+      // One activity: its own elapsed time and distance so far, and where it is now.
+      const elapsed = Math.floor(secondsOf(0));
+      const track = tracks[0]!;
+      const now = state[0]!;
       set('time', clockText(elapsed), 'time');
       set('distance', `${(metres / 1000).toFixed(1)} km`, 'distance');
-      set('pace', paceText(onFoot, elapsed, metres), onFoot ? 'average pace' : 'average speed');
-      set('date', state[0]!.date, '');
-      set('start', timeFormat.format(tracks[0].startTime), 'start');
+      set('date', now.date, '');
+      set('start', timeFormat.format(track.startTime), 'start');
+      // The clock time as it plays: by the recorded clock, stops included.
+      const recorded = (track.elapsedSeconds ?? lastSecond(track)) * timeline.progress(0, t);
+      set('time-of-day', timeFormat.format(track.startTime + recorded * 1000), 'time of day');
+      const speed = topSpeed(onFoot, now.started ? now.speedNow : 0);
+      set('speed-now', `${speed.value} ${speed.unit}`, onFoot ? 'pace' : 'speed');
+      if (now.hasElevation) set('elevation-now', `${wholeNumber(now.elevationNow)} m`, 'elevation');
     } else if (timeline.clock) {
       // All at once: one shared clock, and how many are still out.
       set('time', clockText(Math.floor(timeline.clock(t))), 'time');
@@ -897,49 +1030,48 @@ export function createRenderer(
       else set('count', 'all', 'finished');
       set('distance', `${wholeNumber(metres / 1000)} km`, 'distance');
       set('date', datesSpanned, '');
-      set(
-        'pace',
-        paceText(onFoot, secondsSoFar(), metres),
-        onFoot ? 'average pace' : 'average speed',
-      );
     } else {
-      const seconds = secondsSoFar();
-      set('time', clockText(Math.floor(seconds)), 'time');
-      set('pace', paceText(onFoot, seconds, metres), onFoot ? 'average pace' : 'average speed');
+      set('time', clockText(Math.floor(secondsSoFar())), 'time');
       set('date', timeline.label?.(t) ?? date, '');
       set('count', String(started), started === 1 ? singular : plural);
       set('distance', `${wholeNumber(metres / 1000)} km`, 'distance');
     }
     set('moving', clockText(Math.floor(moved)), 'moving');
-    // Sensor channels: averages over time, the highest heart rate, and calories so far.
-    const sensorSums = new Map<SensorChannel, { total: number; time: number; max: number }>();
+    // Sensor channels: averages over time, the highest and lowest, and the value as one
+    // activity plays; calories so far.
+    const sensorSums = new Map<SensorChannel, SensorNow>();
     for (const tr of state) {
       if (!tr.started) continue;
-      for (const [channel, now] of Object.entries(tr.sensorsNow) as [
-        SensorChannel,
-        { total: number; time: number; max: number },
-      ][]) {
-        const sum = sensorSums.get(channel) ?? { total: 0, time: 0, max: 0 };
-        sensorSums.set(channel, {
-          total: sum.total + now.total,
-          time: sum.time + now.time,
-          max: Math.max(sum.max, now.max),
-        });
+      for (const [channel, now] of Object.entries(tr.sensorsNow) as [SensorChannel, SensorNow][]) {
+        const sum = sensorSums.get(channel);
+        sensorSums.set(
+          channel,
+          sum
+            ? {
+                total: sum.total + now.total,
+                time: sum.time + now.time,
+                max: Math.max(sum.max, now.max),
+                min: Math.min(sum.min, now.min),
+                now: now.now,
+              }
+            : { ...now },
+        );
       }
     }
-    const averages: [Metric, SensorChannel][] = [
-      ['heart-rate', 'heartRate'],
-      ['power', 'power'],
-      ['cadence', 'cadence'],
-      ['temperature', 'temperature'],
-    ];
-    for (const [metric, channel] of averages) {
+    for (const [metric, channel, which] of SENSOR_METRICS) {
       const sum = sensorSums.get(channel);
-      if (sum && sum.time > 0) set(metric, ...sensorText(metric, sum.total / sum.time, onFoot));
+      if (!sum || sum.time <= 0) continue;
+      if (which === 'now' && kind !== 'single') continue;
+      const value =
+        which === 'average'
+          ? sum.total / sum.time
+          : which === 'max'
+            ? sum.max
+            : which === 'min'
+              ? sum.min
+              : sum.now;
+      set(metric, ...sensorText(channel, which, value, onFoot));
     }
-    const heart = sensorSums.get('heartRate');
-    if (heart && heart.max > 0)
-      set('max-heart-rate', ...sensorText('max-heart-rate', heart.max, onFoot));
     if (withCalories)
       set(
         'calories',
@@ -957,6 +1089,13 @@ export function createRenderer(
       set('days', String(days.size), days.size === 1 ? 'day out' : 'days out');
       const km = wholeNumber(longest / 1000);
       set('longest', `${km} km`, 'longest', `longest ${km} km`);
+      const longestTime = Math.max(
+        0,
+        ...tracks.map((_, k) => (state[k]!.started ? secondsOf(k) : 0)),
+      );
+      set('longest-time', clockText(Math.floor(longestTime)), 'longest time');
+      const perActivity = started ? metres / started / 1000 : 0;
+      set('average-distance', `${perActivity.toFixed(1)} km`, `per ${singular}`);
     }
     if (hasElevation) {
       set('elevation', `${wholeNumber(climbed)} m`, 'climbed', `↑${wholeNumber(climbed)} m`);
@@ -968,6 +1107,15 @@ export function createRenderer(
           'highest point',
           `top ${wholeNumber(highest)} m`,
         );
+      if (Number.isFinite(lowest))
+        set('lowest', `${wholeNumber(lowest)} m`, 'lowest point', `low ${wholeNumber(lowest)} m`);
+      if (kind !== 'single')
+        set(
+          'biggest-climb',
+          `${wholeNumber(biggestClimb)} m`,
+          'biggest climb',
+          `↑${wholeNumber(biggestClimb)} m max`,
+        );
     }
     return texts;
   }
@@ -977,12 +1125,7 @@ export function createRenderer(
     return prepared.map((tr) => {
       const last = tr.count - 1;
       const sensorsNow: MetricState['sensorsNow'] = {};
-      for (const [channel, sums] of sensorEntries(tr))
-        sensorsNow[channel] = {
-          total: sums.total[last]!,
-          time: sums.time[last]!,
-          max: sums.max[last]!,
-        };
+      for (const [channel, sums] of sensorEntries(tr)) sensorsNow[channel] = sensorAt(sums, last);
       return {
         date: tr.date,
         hasElevation: tr.hasElevation,
@@ -992,8 +1135,11 @@ export function createRenderer(
         climbed: tr.climb[last]!,
         descended: tr.descent[last]!,
         highest: tr.top[last]!,
+        lowest: tr.bottom[last]!,
+        elevationNow: tr.elevation[last]!,
         moved: tr.moving[last]!,
         topSpeed: tr.fastest[last]!,
+        speedNow: tr.speed[last]!,
         sensorsNow,
       };
     });
@@ -1219,6 +1365,8 @@ export function createRenderer(
     let climbed = 0;
     let descended = 0;
     let highest = -Infinity;
+    let lowest = Infinity;
+    let biggestClimb = 0;
     let moving = 0;
     let longest = 0;
     let fastest = 0;
@@ -1228,25 +1376,30 @@ export function createRenderer(
       meters += tr.dist[last];
       climbed += tr.climb[last];
       descended += tr.descent[last];
-      if (tr.hasElevation) highest = Math.max(highest, tr.top[last]);
+      if (tr.hasElevation) {
+        highest = Math.max(highest, tr.top[last]);
+        lowest = Math.min(lowest, tr.bottom[last]);
+      }
+      biggestClimb = Math.max(biggestClimb, tr.climb[last]);
       moving += tr.moving[last];
       longest = Math.max(longest, tr.dist[last]);
     }
+    const elapsed = (track: Track) => track.elapsedSeconds ?? track.points[track.points.length - 1];
     return {
       activities: tracks.length,
       meters,
       movingSeconds: moving,
-      totalSeconds: tracks.reduce(
-        (sum, track) => sum + (track.elapsedSeconds ?? track.points[track.points.length - 1]),
-        0,
-      ),
+      totalSeconds: tracks.reduce((sum, track) => sum + elapsed(track), 0),
       climbed: hasElevation ? climbed : null,
       descended: hasElevation ? descended : null,
       highest: hasElevation ? highest : null,
+      lowest: hasElevation ? lowest : null,
+      biggestClimb: hasElevation ? biggestClimb : null,
       onFoot,
       dates: datesSpanned,
       days: new Set(prepared.map((tr) => tr.date)).size,
       longest,
+      longestSeconds: Math.max(...tracks.map(elapsed)),
       topSpeed: fastest,
       ...sensorTotals(),
       calories: withCalories ? tracks.reduce((sum, track) => sum + (track.calories ?? 0), 0) : null,
@@ -1265,16 +1418,24 @@ export function createRenderer(
       }
       return time > 0 ? total / time : null;
     };
-    const maxes = prepared.flatMap((tr) => {
-      const sums = tr.sensors.heartRate;
-      return sums ? [sums.max[tr.count - 1]] : [];
-    });
+    const extreme = (channel: SensorChannel, which: 'max' | 'min') => {
+      const values = prepared.flatMap((tr) => {
+        const sums = tr.sensors[channel];
+        return sums && sums.time[tr.count - 1]! > 0 ? [sums[which][tr.count - 1]!] : [];
+      });
+      if (!values.length) return null;
+      return which === 'max' ? Math.max(...values) : Math.min(...values);
+    };
     return {
       heartRate: average('heartRate'),
-      maxHeartRate: maxes.length ? Math.max(...maxes) : null,
+      maxHeartRate: extreme('heartRate', 'max'),
       power: average('power'),
+      maxPower: extreme('power', 'max'),
       cadence: average('cadence'),
+      maxCadence: extreme('cadence', 'max'),
       temperature: average('temperature'),
+      minTemperature: extreme('temperature', 'min'),
+      maxTemperature: extreme('temperature', 'max'),
     };
   };
   let totalsShown: Totals | null = null;

@@ -168,6 +168,7 @@ export async function prepareReplay(
     countLabel: words.count,
     movingLabel: words.moving,
     overlay: single ? 'single' : undefined,
+    byDay: !single && settings.group === 'day',
     widgets: settings.widgets ?? undefined,
     hideWidgets: options.hideWidgets,
     endPause: settings.endPause,

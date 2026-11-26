@@ -377,25 +377,29 @@ export const SETTINGS: readonly SettingDefinition[] = [
     kind: { type: 'text', valueName: 'widgets' },
     default: null,
     automatic:
-      'the title at the top, the values that suit the video at the bottom left, and for a ' +
-      'single activity the elevation chart along the bottom',
+      'the title at the top, the values that suit the video at the bottom left (one ' +
+      'activity: distance, time and the climb; a race: its clock, who is still out and the ' +
+      'distance; a recap: the date, the activities, the distance and the climb; days in ' +
+      'turn: the date, the distance, the climb and the time moving), and for a single ' +
+      'activity the elevation chart along the bottom',
     help:
       'What is drawn over the replay, each widget centered on a point in percent across and ' +
       'down, with a size in percent (50 to 250, 100 when left out), separated by ";": ' +
       'text:"Your text"@x,y,size (text@x,y for the title), a value such as distance@x,y,size, ' +
       'or elevation-chart@x,y,size. Later widgets are drawn over earlier ones; "" draws none. ' +
-      'A value takes a label mode after a colon, as count:under@x,y: off (the value alone), ' +
-      'short (its own short form: ↑1,200 m, 142 bpm avg, longest 124 km; for top-speed, ' +
-      'elevation, descent, highest, longest and the sensor values), inline (25 activities) or ' +
-      'under (the words on a line under it). Left out, a value shows its words as it usually ' +
-      'does: short where it has a short form, inline for moving, start, count and days, else ' +
-      'off. The date has no words. ' +
-      `The values: ${METRICS.join(', ')}. A value the video cannot show is left out: start is ` +
-      'for a single activity; count, days and longest for several activities; elevation, ' +
-      'descent and highest need recorded elevation. Pace and top speed are in minutes per ' +
-      'kilometer when every activity is on foot, else km/h; top speed is the fastest over ' +
-      '10 s. Heart rate, power, cadence, temperature and calories need an activity that ' +
-      'recorded them; cadence is steps per minute on foot.',
+      'A value takes a label mode after a colon, as count:off@x,y: off (the value alone), ' +
+      'short (its own short form: ↑1,200 m, 142 bpm avg, longest 124 km, where it has one), ' +
+      'inline (25 activities) or under (the words on a line under it). Left out, a value ' +
+      'has its words under it; the date has none. ' +
+      `The values: ${METRICS.join(', ')}. A value the video cannot show is left out: start, ` +
+      'time-of-day and the values as the activity plays (speed-now, elevation-now and the ' +
+      "sensors' -now) are for a single activity; count, days, longest, longest-time, " +
+      'average-distance and biggest-climb for several activities; the elevation values need ' +
+      'recorded elevation. Pace is the average while moving; pace and the speeds are in ' +
+      'minutes per kilometer when every activity is on foot, else km/h; top speed is the ' +
+      'fastest over 10 s, speed-now the speed over the last 10 s. Heart rate, power, cadence, ' +
+      'temperature and calories need an activity that recorded them; cadence is steps per ' +
+      'minute on foot.',
   },
   {
     name: 'totals-card',
@@ -419,8 +423,10 @@ export const SETTINGS: readonly SettingDefinition[] = [
       `(text@x,y for the title) and totals such as distance@x,y,size: ${TOTALS_FIELDS.join(', ')}. ` +
       'As totals: time is hours in total, moving hours moving, pace the average while moving, ' +
       'top-speed the fastest of any activity, date the days spanned, days the days with an ' +
-      'activity. A total the activities did not record (elevation, the sensors, calories) is ' +
-      'left out. The values fade in in their order and count up.',
+      'activity, longest-time the longest activity in hours, average-distance the kilometers ' +
+      'per activity, biggest-climb the most one activity climbed. A total the activities did ' +
+      'not record (elevation, the sensors, calories) is left out. The values fade in in their ' +
+      'order and count up.',
   },
 
   {

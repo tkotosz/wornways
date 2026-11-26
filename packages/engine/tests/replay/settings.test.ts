@@ -145,7 +145,7 @@ describe('parseSettings', () => {
     [{ 'elevation-profile': true }, 'elevation-profile: is not a setting'],
     [
       { widgets: 'speed@50,50' },
-      'widgets: "speed" is not a widget: text, elevation-chart or one of time, moving, distance, pace, top-speed, elevation, descent, highest, date, start, count, days, longest, heart-rate, max-heart-rate, power, cadence, temperature, calories at character 12',
+      'widgets: "speed" is not a widget: text, elevation-chart or one of time, moving, start, time-of-day, longest-time, distance, longest, average-distance, pace, top-speed, speed-now, elevation, descent, highest, lowest, elevation-now, biggest-climb, heart-rate, max-heart-rate, heart-rate-now, power, max-power, power-now, cadence, max-cadence, cadence-now, temperature, min-temperature, max-temperature, temperature-now, calories, count, days, date at character 12',
     ],
   ])('rejects %j', (input, message) => {
     expect(errorOf(input)).toBe(message);

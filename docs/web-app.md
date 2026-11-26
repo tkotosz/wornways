@@ -168,7 +168,8 @@ drawing each. The editor's settings are remembered for the next visit.
   finish.
 - **Overlay:** what is drawn over the replay, as widgets arranged on the still the way
   stickers are in a story editor: text (at first the title), one value each (a metric,
-  with its words as its label mode has them: none, a short form, after it or under it),
+  with its words under it at first; its label mode can also show none, a short form or
+  the words after it),
   and the
   elevation chart (when an activity recorded elevation). A video starts with the title at
   the top, the values that suit it at the bottom left (the first large, the others
@@ -195,8 +196,10 @@ drawing each. The editor's settings are remembered for the next visit.
   widget moves, hatched guides marked "Covered on Instagram" show what Instagram's own
   controls cover (Meta's ads guide: 14% at the top, 35% at the bottom, 6% at each side).
   Under the picture, as in the other sections, a strip of chips: Add Text writes a new
-  text; Add Metric opens a sheet of the metrics this video can show, each a tile with its
-  own number (calories a service gives on request are offered before they are known; a
+  text; Add Metric opens a sheet of the metrics this video can show, grouped by what they
+  measure (time, distance, speed, elevation, heart rate, power, cadence, temperature,
+  energy, activities; a group only when the video has one of its values), each a tile with
+  its own number (calories a service gives on request are offered before they are known; a
   value already on the picture is dimmed); the elevation chart's switch (offered only
   when an activity recorded elevation); and the watermark's, a fixed small mark at the
   bottom left on the map credit's line. A new widget comes in a free spot clear of the

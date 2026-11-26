@@ -1,18 +1,14 @@
 <script setup lang="ts">
 // The widgets that can be added: text, the elevation chart (when an activity recorded
-// elevation), and each value this video can show, as tiles with the video's own number.
+// elevation), and each value this video can show, as tiles with the video's own number,
+// grouped by what they measure (time, distance, speed, elevation, the sensors…); a group
+// shows only when the video has one of its values.
 // Calories a service gives only on request are offered before they are known.
 // A value already on the picture is dimmed; each shows once. A new widget comes in the
 // middle of the picture (the chart near the bottom).
-import {
-  METRICS,
-  defaultLabel,
-  type Metric,
-  type MetricValue,
-  type Widget,
-} from '@wornways/engine';
+import { defaultLabel, type Metric, type MetricValue, type Widget } from '@wornways/engine';
 import { computed } from 'vue';
-import { metricName } from '../adjust.ts';
+import { METRIC_GROUPS, metricName } from '../adjust.ts';
 
 const props = defineProps<{
   widgets: Widget[];
@@ -31,11 +27,14 @@ const used = computed(
   () =>
     new Set(props.widgets.flatMap((widget) => (widget.kind === 'metric' ? [widget.metric] : []))),
 );
-/** The values this video can show, in the usual order. */
-const offered = computed(() =>
-  METRICS.filter(
-    (metric) => props.values.has(metric) || (metric === 'calories' && props.hasCalories),
-  ),
+/** The values this video can show, by group; groups with none are left out. */
+const groups = computed(() =>
+  METRIC_GROUPS.map((group) => ({
+    ...group,
+    metrics: group.metrics.filter(
+      (metric) => props.values.has(metric) || (metric === 'calories' && props.hasCalories),
+    ),
+  })).filter((group) => group.metrics.length),
 );
 </script>
 
@@ -65,29 +64,31 @@ const offered = computed(() =>
         </button>
       </div>
     </template>
-    <h3 v-if="!valuesOnly" class="setting-rows-title">Metrics</h3>
-    <div class="tiles">
-      <button
-        v-for="metric in offered"
-        :key="metric"
-        type="button"
-        class="tile"
-        :disabled="used.has(metric)"
-        @click="
-          emit('add', {
-            kind: 'metric',
-            metric,
-            label: labels ? defaultLabel(metric) : 'under',
-            x: 50,
-            y: 50,
-            size: 100,
-          })
-        "
-      >
-        <b>{{ values.get(metric)?.value ?? 'kcal' }}</b>
-        <span>{{ metricName(metric) }}</span>
-      </button>
-    </div>
+    <section v-for="group in groups" :key="group.name" :aria-label="group.name">
+      <h3 class="setting-rows-title">{{ group.name }}</h3>
+      <div class="tiles">
+        <button
+          v-for="metric in group.metrics"
+          :key="metric"
+          type="button"
+          class="tile"
+          :disabled="used.has(metric)"
+          @click="
+            emit('add', {
+              kind: 'metric',
+              metric,
+              label: labels ? defaultLabel(metric) : 'under',
+              x: 50,
+              y: 50,
+              size: 100,
+            })
+          "
+        >
+          <b>{{ values.get(metric)?.value ?? 'kcal' }}</b>
+          <span>{{ metricName(metric) }}</span>
+        </button>
+      </div>
+    </section>
   </div>
 </template>
 
