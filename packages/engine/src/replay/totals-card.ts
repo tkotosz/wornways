@@ -12,7 +12,7 @@ import {
   dateSpan,
   defaultFormat,
   distanceUnit,
-  durationParts,
+  durationText,
   formatsOf,
   heightUnit,
   inDistanceUnits,
@@ -22,7 +22,14 @@ import {
   type Units,
   type ValueFormat,
 } from './formats.ts';
-import { METRICS, SINGLE_ONLY, type Metric, type MetricText, type MetricValue } from './metrics.ts';
+import {
+  METRICS,
+  SINGLE_ONLY,
+  numberOf,
+  type Metric,
+  type MetricText,
+  type MetricValue,
+} from './metrics.ts';
 import type { CanvasLike, Context2DLike } from './render.ts';
 import { sensorValueText } from './sensor-text.ts';
 import type { Widget } from './widgets.ts';
@@ -227,13 +234,19 @@ export function totalsValues(
   for (const field of TOTALS_FIELDS) {
     const shown = totalsEntry(totals, field, { f: 1, countLabel, units });
     if (!shown) continue;
-    const { value, label, name } = shown;
+    const { value, number, label, name } = shown;
     const formats: Partial<Record<ValueFormat, MetricText>> = {};
     for (const format of formatsOf(field)) {
       const entry = totalsEntry(totals, field, { f: 1, countLabel, units, format });
-      if (entry) formats[format] = { value: entry.value, label: entry.label };
+      if (entry) formats[format] = { value: entry.value, number: entry.number, label: entry.label };
     }
-    values.set(field, { value, label, name, ...(Object.keys(formats).length ? { formats } : {}) });
+    values.set(field, {
+      value,
+      number,
+      label,
+      name,
+      ...(Object.keys(formats).length ? { formats } : {}),
+    });
   }
   return values;
 }
@@ -244,8 +257,17 @@ const progress = (t: number, at: number, length: number) =>
   Math.min(1, Math.max(0, (t - at) / length));
 const wholeNumber = (n: number) => Math.round(n).toLocaleString('en-US');
 
-/** A value of the totals card as shown: its text and the label under it. */
-export type TotalsEntry = { field: TotalsField; value: string; label: string; name: string };
+/**
+ * A value of the totals card as shown: its number with the unit, its number alone, its words
+ * and its name.
+ */
+export type TotalsEntry = {
+  field: TotalsField;
+  value: string;
+  number: string;
+  label: string;
+  name: string;
+};
 
 /** The values of `fields` in their order, written their usual way (see `totalsEntry`). */
 export function totalsEntries(
@@ -259,8 +281,9 @@ export function totalsEntries(
 }
 
 /**
- * A value of the totals card with its label, in `units` and in `format` (else its usual one),
- * its number shown at a share `f` of its count-up; the pace, the top speed and the dates do not
+ * A value of the totals card, as a value widget over the replay shows it at the end ("312 km",
+ * "total distance"), in `units` and in `format` (else its usual one, for a time hours), its
+ * number shown at a share `f` of its count-up; the pace, the top speed and the dates do not
  * count up. Null for a value the activities did not record: the climb, the descent and the
  * elevations without elevation, the sensor values and calories without them.
  */
@@ -277,31 +300,22 @@ export function totalsEntry(
   const ride = countLabel[0];
   const timeFormat = TIME_FORMATS.includes(format as TimeFormat) ? (format as TimeFormat) : 'h';
   const dateFormat = DATE_FORMATS.includes(format as DateFormat) ? (format as DateFormat) : 'dmy';
-  /** A length of time as counted up so far, and its unit in words: "hours", "days" or none. */
-  const duration = (seconds: number) => {
-    const { value, unit } = durationParts(seconds * f, timeFormat);
-    return { value, unit: unit === 'h' ? 'hours' : unit };
-  };
+  const duration = (seconds: number) => durationText(seconds * f, timeFormat);
   const distance = (meters: number, decimals = 0) => {
     const value = inDistanceUnits(meters, units) * f;
-    return decimals ? value.toFixed(decimals) : wholeNumber(value);
+    return `${decimals ? value.toFixed(decimals) : wholeNumber(value)} ${distanceUnit(units)}`;
   };
-  const height = (meters: number) => wholeNumber(inHeightUnits(meters, units) * f);
-  const km = distanceUnit(units);
-  const m = heightUnit(units);
+  const height = (meters: number) =>
+    `${wholeNumber(inHeightUnits(meters, units) * f)} ${heightUnit(units)}`;
   const whole = (n: number) => wholeNumber(n * f);
-  const entry = (field: TotalsField, value: string, label: string, name: string): TotalsEntry => ({
-    field,
-    value,
-    label,
-    name,
-  });
-  /** Each activity's average, most and least: "62.5 / km avg per ride". */
+  const entry = (field: TotalsField, value: string, name: string, label = name.toLowerCase()) => [
+    { field, value, number: numberOf(field, value), label, name },
+  ];
+  /** Each activity's average, most and least: "62.5 km / avg distance per ride". */
   const perActivity = (
     field: TotalsField,
     values: number[] | null,
     text: (value: number) => string,
-    unit: string | ((value: number) => { value: string; unit: string }),
     what: string,
   ): TotalsEntry[] => {
     if (!values?.length) return [];
@@ -313,14 +327,7 @@ export function totalsEntry(
           ? Math.max(...values)
           : Math.min(...values);
     const name = `${which[0]!.toUpperCase()}${which.slice(1)} ${what} per activity`;
-    if (typeof unit === 'string')
-      return [entry(field, text(value), `${unit} ${which} per ${ride}`, name)];
-    // A time: its unit in the words, or "avg time per ride" for 54:38.
-    const shown = unit(value);
-    const words = shown.unit
-      ? `${shown.unit} ${which} per ${ride}`
-      : `${which} ${what} per ${ride}`;
-    return [entry(field, shown.value, words, name)];
+    return entry(field, text(value), name, `${which} ${what} per ${ride}`);
   };
   const sensor = (
     field: TotalsField,
@@ -330,78 +337,56 @@ export function totalsEntry(
     what: string,
   ): TotalsEntry[] => {
     if (value === null) return [];
-    const [number, unit] = sensorValueText(channel, value * f, totals.onFoot, units).split(' ');
     const name = `${which[0]!.toUpperCase()}${which.slice(1)} ${what}`;
-    return [entry(field, number!, `${unit} ${which} ${what}`, name)];
+    return entry(field, sensorValueText(channel, value * f, totals.onFoot, units), name);
   };
+  const speed = (shown: { value: string; unit: string }, which: 'Avg' | 'Max') =>
+    entry(
+      field,
+      `${shown.value} ${shown.unit}`,
+      `${which} ${shown.unit.startsWith('/') ? 'pace' : 'speed'}`,
+    );
   const entries = ((): TotalsEntry[] => {
     switch (field) {
       case 'count':
-        return [
-          entry(
-            field,
-            whole(totals.activities),
-            totals.activities === 1 ? countLabel[0] : countLabel[1],
-            'Total activities',
-          ),
-        ];
-      case 'time': {
-        const { value, unit } = duration(totals.totalSeconds);
-        return [entry(field, value, `${unit || 'time'} in total`, 'Total time')];
-      }
-      case 'moving': {
-        const { value, unit } = duration(totals.movingSeconds);
-        return [
-          entry(field, value, `${unit ? `${unit} ` : ''}moving in total`, 'Total moving time'),
-        ];
-      }
+        return entry(
+          field,
+          whole(totals.activities),
+          'Total activities',
+          totals.activities === 1 ? countLabel[0] : countLabel[1],
+        );
+      case 'time':
+        return entry(field, duration(totals.totalSeconds), 'Total time');
+      case 'moving':
+        return entry(field, duration(totals.movingSeconds), 'Total moving time');
       case 'avg-time':
       case 'max-time':
       case 'min-time':
-        return perActivity(field, totals.each.seconds, String, duration, 'time');
+        return perActivity(field, totals.each.seconds, duration, 'time');
       case 'distance':
-        return [entry(field, distance(totals.meters), `${km} in total`, 'Total distance')];
+        return entry(field, distance(totals.meters), 'Total distance');
       case 'avg-distance':
       case 'max-distance':
       case 'min-distance':
-        return perActivity(field, totals.each.meters, (v) => distance(v, 1), km, 'distance');
-      case 'avg-speed': {
-        const { value, unit } = averagePace(
-          totals.onFoot,
-          totals.movingSeconds,
-          totals.meters,
-          units,
-        );
-        return unit.startsWith('/')
-          ? [entry(field, value, `min${unit} avg pace`, 'Avg pace')]
-          : [entry(field, value, `${unit} avg speed`, 'Avg speed')];
-      }
-      case 'max-speed': {
-        const { value, unit } = topSpeed(totals.onFoot, totals.topSpeed, units);
-        return unit.startsWith('/')
-          ? [entry(field, value, `min${unit} max pace`, 'Max pace')]
-          : [entry(field, value, `${unit} max speed`, 'Max speed')];
-      }
+        return perActivity(field, totals.each.meters, (v) => distance(v, 1), 'distance');
+      case 'avg-speed':
+        return speed(averagePace(totals.onFoot, totals.movingSeconds, totals.meters, units), 'Avg');
+      case 'max-speed':
+        return speed(topSpeed(totals.onFoot, totals.topSpeed, units), 'Max');
       case 'climb':
-        return totals.climbed === null
-          ? []
-          : [entry(field, height(totals.climbed), `${m} climbed in total`, 'Total climb')];
+        return totals.climbed === null ? [] : entry(field, height(totals.climbed), 'Total climb');
       case 'descent':
         return totals.descended === null
           ? []
-          : [entry(field, height(totals.descended), `${m} descended in total`, 'Total descent')];
+          : entry(field, height(totals.descended), 'Total descent');
       case 'avg-climb':
       case 'max-climb':
       case 'min-climb':
-        return perActivity(field, totals.each.climbed, height, `${m} climbed`, 'climb');
+        return perActivity(field, totals.each.climbed, height, 'climb');
       case 'max-elevation':
-        return totals.highest === null
-          ? []
-          : [entry(field, height(totals.highest), `${m} max elevation`, 'Max elevation')];
+        return totals.highest === null ? [] : entry(field, height(totals.highest), 'Max elevation');
       case 'min-elevation':
-        return totals.lowest === null
-          ? []
-          : [entry(field, height(totals.lowest), `${m} min elevation`, 'Min elevation')];
+        return totals.lowest === null ? [] : entry(field, height(totals.lowest), 'Min elevation');
       case 'avg-heart-rate':
         return sensor(field, 'heartRate', totals.heartRate, 'avg', 'heart rate');
       case 'max-heart-rate':
@@ -425,26 +410,22 @@ export function totalsEntry(
       case 'calories':
         return totals.calories === null
           ? []
-          : [entry(field, whole(totals.calories), 'kcal in total', 'Total calories')];
+          : entry(field, `${whole(totals.calories)} kcal`, 'Total calories');
       case 'avg-calories':
       case 'max-calories':
       case 'min-calories':
-        return perActivity(field, totals.each.calories, whole, 'kcal', 'calories');
+        return perActivity(field, totals.each.calories, (v) => `${whole(v)} kcal`, 'calories');
       case 'days':
-        return [entry(field, whole(totals.days), totals.days === 1 ? 'day' : 'days', 'Days')];
+        return entry(field, whole(totals.days), 'Days', totals.days === 1 ? 'day' : 'days');
       case 'moving-days':
-        return [
-          entry(
-            field,
-            whole(totals.movingDays),
-            totals.movingDays === 1 ? 'moving day' : 'moving days',
-            'Moving days',
-          ),
-        ];
+        return entry(
+          field,
+          whole(totals.movingDays),
+          'Moving days',
+          totals.movingDays === 1 ? 'moving day' : 'moving days',
+        );
       case 'date':
-        return [
-          entry(field, dateSpan(totals.firstStart, totals.lastStart, dateFormat), 'dates', 'Date'),
-        ];
+        return entry(field, dateSpan(totals.firstStart, totals.lastStart, dateFormat), 'Date', '');
     }
   })();
   return entries[0] ?? null;
@@ -498,10 +479,11 @@ export function drawTotalsCard(
             })
           : null;
       if (!entry) return [];
-      // Its own words in place of the usual ones, which say the unit.
-      const label =
-        widget.kind === 'metric' && widget.labelText !== undefined ? widget.labelText : entry.label;
-      return [{ widget, text: '', entry: { ...entry, label } }];
+      // Its own words in place of the usual ones, and the number without its unit when asked.
+      if (widget.kind !== 'metric') return [];
+      const label = widget.labelText ?? entry.label;
+      const value = widget.unit === false ? entry.number : entry.value;
+      return [{ widget, text: '', entry: { ...entry, label, value } }];
     },
   );
   if (shown.length === 0) return;

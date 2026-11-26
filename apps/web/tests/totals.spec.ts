@@ -64,7 +64,8 @@ test('arranges the totals card as widgets: the title and the totals, then more',
   await expect(page.getByTestId('widget-0')).toContainText('2026');
   await expect(page.getByTestId('widget-1')).toContainText('25');
   await expect(page.getByTestId('widget-1')).toContainText('activities');
-  await expect(page.getByTestId('widget-4')).toContainText('m climbed');
+  await expect(page.getByTestId('widget-4')).toContainText('15,423 m');
+  await expect(page.getByTestId('widget-4')).toContainText('total climb');
 
   // Its strip adds a text or a total; there is no chart and no watermark on the card.
   await expect(page.getByRole('switch', { name: 'Elevation chart' })).toHaveCount(0);

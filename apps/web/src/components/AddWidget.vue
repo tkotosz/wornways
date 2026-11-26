@@ -18,8 +18,6 @@ const props = defineProps<{
   hasCalories: boolean;
   /** Only the values: text and the chart have tools of their own. */
   valuesOnly?: boolean;
-  /** Whether a value shows its words as it usually does; else under it, as on the totals card. */
-  labels: boolean;
 }>();
 const emit = defineEmits<{ add: [widget: Widget] }>();
 
@@ -77,7 +75,7 @@ const groups = computed(() =>
             emit('add', {
               kind: 'metric',
               metric,
-              label: defaultLabel(metric, !labels),
+              label: defaultLabel(metric),
               x: 50,
               y: 50,
               size: 100,

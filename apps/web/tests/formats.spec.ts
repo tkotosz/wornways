@@ -43,18 +43,18 @@ test('writes a time and a date as picked, over the replay and on the totals card
   await expect(date).toContainText(/^(Mon|Tue|Wed|Thu|Fri|Sat|Sun) \d+ [A-Z][a-z]+(?! \d)/);
   await page.getByRole('button', { name: '✓ Done' }).click();
 
-  // On the totals card a time is in hours until picked, its words saying so.
+  // On the totals card a time is in hours until picked.
   await openSection(page, 'Ending');
   await page.getByRole('switch', { name: 'Totals card' }).check();
   const onCard = moving;
-  await expect(onCard).toContainText('hours moving in total');
+  await expect(onCard.locator('.value')).toHaveText(/^\d+ h$/);
   await onCard.click();
   await page.getByRole('button', { name: 'Format: Hours' }).click();
   const card = page.getByRole('dialog', { name: 'Total moving time: format' });
-  await expect(card.getByRole('radio', { name: /^Days/ })).toContainText('days moving in total');
+  await expect(card.getByRole('radio', { name: /^Days/ })).toContainText(/\d\.\d days$/);
   await card.getByRole('radio', { name: /^h:mm / }).click();
   await card.getByRole('button', { name: 'Done' }).click();
-  await expect(onCard).toContainText(/\d+:\d\d\s*moving in total/);
+  await expect(onCard.locator('.value')).toHaveText(/^\d+:\d\d$/);
 });
 
 test('tells distances and heights in miles and feet when Imperial is picked', async ({
@@ -80,6 +80,20 @@ test('tells distances and heights in miles and feet when Imperial is picked', as
 
   // The totals card follows.
   await openSection(page, 'Ending');
-  await expect(distance).toContainText('mi in total');
-  await expect(climb).toContainText('ft climbed in total');
+  await expect(distance.locator('.value')).toHaveText('713 mi');
+  await expect(climb.locator('.value')).toHaveText('50,600 ft');
+
+  // A value's unit can be left out, the number alone, here or over the replay.
+  await distance.click();
+  await page.getByRole('button', { name: 'Unit: Shown' }).click();
+  const unit = page.getByRole('dialog', { name: 'Total distance: unit' });
+  await expect(unit.getByRole('radio', { name: /^Off/ })).toContainText('713');
+  await unit.getByRole('radio', { name: /^Off/ }).click();
+  await unit.getByRole('button', { name: 'Done' }).click();
+  await expect(distance.locator('.value')).toHaveText('713');
+  await expect(page.getByRole('button', { name: 'Unit: Off' })).toBeVisible();
+  // A count has no unit to leave out.
+  await page.getByRole('button', { name: '✓ Done' }).click();
+  await onPicture('Total activities').click();
+  await expect(page.getByRole('button', { name: /^Unit: / })).toHaveCount(0);
 });

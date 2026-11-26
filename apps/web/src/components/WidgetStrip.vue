@@ -2,10 +2,11 @@
 // The chips for arranging widgets, in the strip under the picture (Overlay, and Ending with
 // the totals card). With no widget picked: adding a text or a metric, and the elevation chart
 // on or off. With one picked, the strip is that widget's: Done lets it go; Edit writes a
-// text's text; Size, Label (where a value's words are, and what they say) and Format (a time,
-// date or clock time) open their sheet; Remove takes it off the picture. The section's own settings
+// text's text; Size, Label (where a value's words are, and what they say), Unit (shown or left
+// out, for a value that has one) and Format (a time, date or clock time) open their sheet;
+// Remove takes it off the picture. The section's own settings
 // stay in the slot, after the tools.
-import type { Widget } from '@wornways/engine';
+import { hasUnit, type Metric, type MetricValue, type Widget } from '@wornways/engine';
 import { computed } from 'vue';
 import { FORMAT_NAMES, LABEL_MODE_NAMES, formatOf } from '../adjust.ts';
 
@@ -14,6 +15,8 @@ const props = defineProps<{
   selected: number | null;
   /** The totals card's widgets: values are its totals, with no label modes and no chart. */
   card: boolean;
+  /** The values the widgets show, to tell which have a unit. */
+  values: Map<Metric, MetricValue>;
   /** The elevation chart: whether it is offered (an activity recorded elevation) and shown. */
   chart: { offered: boolean; shown: boolean };
 }>();
@@ -24,8 +27,8 @@ const emit = defineEmits<{
   tool: [tool: 'text' | 'values' | 'chart'];
   /** Writes the picked text widget's text. */
   edit: [index: number];
-  /** Opens the picked widget's size, label or format in a sheet. */
-  open: [index: number, what: 'size' | 'label' | 'format'];
+  /** Opens the picked widget's size, label, unit or format in a sheet. */
+  open: [index: number, what: 'size' | 'label' | 'unit' | 'format'];
   remove: [index: number];
 }>();
 
@@ -36,6 +39,14 @@ const picked = computed(() =>
 const labelChip = computed(() =>
   picked.value?.kind === 'metric' ? LABEL_MODE_NAMES[picked.value.label] : '',
 );
+/** Whether the picked value shows its unit, when it has one: null when it has none. */
+const unit = computed(() => {
+  const widget = picked.value;
+  if (widget?.kind !== 'metric') return null;
+  const value = props.values.get(widget.metric);
+  if (!value || !hasUnit(value, formatOf(widget, props.card) ?? undefined)) return null;
+  return widget.unit === false ? 'Off' : 'Shown';
+});
 /** The picked value's format, when it is a time, a date or a clock time. */
 const format = computed(() => (picked.value ? formatOf(picked.value, props.card) : null));
 </script>
@@ -75,6 +86,17 @@ const format = computed(() => (picked.value ? formatOf(picked.value, props.card)
     >
       <span>Label</span>
       <span class="value">{{ labelChip }}</span>
+    </button>
+    <button
+      v-if="unit"
+      type="button"
+      class="setting-row"
+      :aria-label="`Unit: ${unit}`"
+      aria-haspopup="dialog"
+      @click="emit('open', selected, 'unit')"
+    >
+      <span>Unit</span>
+      <span class="value">{{ unit }}</span>
     </button>
     <button
       v-if="format"

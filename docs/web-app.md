@@ -206,11 +206,12 @@ drawing each. The editor's settings are remembered for the next visit.
   middle. A picked widget turns the strip into its own chips: Done (lets it go), Edit
   (a text's text), Size (a sheet with a slider), Label (where a value's words go:
   off, before, after, above or under, each with how the value reads in it; and the words
-  themselves, its usual ones until edited, with a way back to them), Format (for a time, a date or a clock time: h:mm:ss, h:mm,
+  themselves, its usual ones until edited, with a way back to them), Unit (for a value
+  that has one: shown, or off for the number alone), Format (for a time, a date or a clock time: h:mm:ss, h:mm,
   hours or days; five ways to write a date; 24 or 12 hours; each with how the value reads
   in it) and Remove. After the widgets' tools the strip has
-  the units (metric or imperial, for every value of the video and its totals card) and the
-  watermark switch. On a wide screen the same strip is under the picture, and a list stays
+  the units (metric or imperial, for every value of the video and its totals card; also in
+  Ending) and the watermark switch. On a wide screen the same strip is under the picture, and a list stays
   beside it: "+ Add a widget" with the same palette, then a row per widget that opens all
   its settings, then the units and the watermark switch.
 - **Ending:** what comes after the replay: the end pause on the finished picture, the
@@ -221,10 +222,10 @@ drawing each. The editor's settings are remembered for the next visit.
   its words in orange). They are picked, moved, resized and removed as over the replay,
   and the strip has the same chips between the card's switch and the end card's: Add
   Text and Add Total (a sheet of the totals these activities have, each with its own
-  number); there is no chart or watermark on the card. A total's Label chip works as over
-  the replay: its words under it at first, or above it, before or after it (smaller and
-  orange on the number's line), or none, and what they say. A time or a date on the card has the Format chip too, its
-  words saying the unit ("hours moving in total"). The card's band behind them stays where the still drew it until it is drawn
+  number), and after them the units and the end card's switch; there is no chart or
+  watermark on the card. A total is written as over the replay ("1,147 km" over "total
+  distance") and has the same Label, Unit and Format chips; its words go under it at first,
+  or above it, before or after it (smaller and orange on the number's line), or none. The card's band behind them stays where the still drew it until it is drawn
   again; the video has it behind the widgets as they are.
 
 ## How it works

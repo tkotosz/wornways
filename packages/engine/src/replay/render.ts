@@ -16,7 +16,7 @@ import {
 import { drawWatermark } from './mark.ts';
 import { averagePace, isOnFoot, topSpeed } from './pace.ts';
 import { sensorValueText } from './sensor-text.ts';
-import type { Metric, MetricText, MetricValue } from './metrics.ts';
+import { numberOf, type Metric, type MetricText, type MetricValue } from './metrics.ts';
 import { calendarDay } from './plans.ts';
 import {
   CLOCK_FORMATS,
@@ -904,16 +904,19 @@ export function createRenderer(
     const texts = new Map<Metric, MetricValue>();
     /** A value with its name; its words are the name in lower case unless given. */
     const set = (metric: Metric, value: string, name: string, label = name.toLowerCase()) =>
-      texts.set(metric, { value, name, label });
+      texts.set(metric, { value, number: numberOf(metric, value), name, label });
     /** A value written in each of `formats`, the first its usual way, with its name. */
     const setFormats = <F extends ValueFormat>(
       metric: Metric,
       name: string,
       formats: readonly F[],
-      text: (format: F) => MetricText,
+      text: (format: F) => Omit<MetricText, 'number'>,
     ) => {
       const all: Partial<Record<ValueFormat, MetricText>> = {};
-      for (const format of formats) all[format] = text(format);
+      for (const format of formats) {
+        const shown = text(format);
+        all[format] = { ...shown, number: numberOf(metric, shown.value) };
+      }
       texts.set(metric, { ...all[formats[0]!]!, name, formats: all });
     };
     /** A length of time in each time format. */
@@ -1125,7 +1128,13 @@ export function createRenderer(
     }
     const value = values.get(widget.metric);
     if (!value) return { width: 0, height: 0 };
-    const { above, line, under } = valueLines(value, widget.label, widget.format, widget.labelText);
+    const { above, line, under } = valueLines(
+      value,
+      widget.label,
+      widget.format,
+      widget.labelText,
+      widget.unit,
+    );
     ctx.font = fontOf(600, VALUE_SIZE * scale);
     let width = ctx.measureText(line).width;
     let height = VALUE_SIZE * scale * 1.1;
@@ -1173,6 +1182,7 @@ export function createRenderer(
         widget.label,
         widget.format,
         widget.labelText,
+        widget.unit,
       );
       // Words above push the value down by their line.
       const top = above ? box.y0 + LABEL_SIZE * scale * 1.3 : box.y0;

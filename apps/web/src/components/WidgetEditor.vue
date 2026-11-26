@@ -75,7 +75,7 @@ function textOf(widget: Widget): { above: string; line: string; under: string } 
   if (widget.kind === 'metric') {
     const value = props.values.get(widget.metric);
     return value
-      ? valueLines(value, widget.label, widget.format, widget.labelText)
+      ? valueLines(value, widget.label, widget.format, widget.labelText, widget.unit)
       : { above: '', line: '…', under: widgetLabel(widget, props.values) };
   }
   return null;
@@ -91,7 +91,7 @@ function besideOf(widget: Widget): { before: string; number: string; after: stri
   const value = props.values.get(widget.metric);
   const words = value ? labelTextOf(value, widget.labelText, widget.format) : '';
   if (!value || !words) return null;
-  const number = valueLines(value, 'off', widget.format).line;
+  const number = valueLines(value, 'off', widget.format, undefined, widget.unit).line;
   return widget.label === 'before'
     ? { before: words, number, after: '' }
     : { before: '', number, after: words };

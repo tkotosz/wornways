@@ -1,13 +1,14 @@
 <script setup lang="ts">
 // One widget's settings: the text of a text widget (the title until another is written),
-// its size, where a value shows its words and what they say (`labels`: false on the totals
-// card, whose words say the unit), how a time, a date
-// or a clock time is written, and removing it from the picture. With `only`, just its size,
-// its label or its format, as the strip's chips open them.
+// its size, where a value shows its words and what they say, whether it shows its unit, how a
+// time, a date or a clock time is written (on the totals card, `card`, a time in hours unless
+// picked), and removing it from the picture. With `only`, just one of them, as the strip's
+// chips open them.
 import {
   WIDGET_SIZE,
   LABEL_MODES,
   formatsOf,
+  hasUnit,
   labelTextOf,
   valueLines,
   type LabelMode,
@@ -24,8 +25,8 @@ const props = defineProps<{
   widget: Widget;
   title: string;
   values: Map<Metric, MetricValue>;
-  labels: boolean;
-  only?: 'size' | 'label' | 'format';
+  card: boolean;
+  only?: 'size' | 'label' | 'unit' | 'format';
 }>();
 const emit = defineEmits<{ change: [widget: Widget]; remove: [] }>();
 
@@ -39,7 +40,9 @@ const modes = computed(() => {
   if (widget.kind !== 'metric') return [];
   const value = props.values.get(widget.metric);
   return LABEL_MODES.map((mode: LabelMode) => {
-    const lines = value ? valueLines(value, mode, widget.format, widget.labelText) : null;
+    const lines = value
+      ? valueLines(value, mode, widget.format, widget.labelText, widget.unit)
+      : null;
     return {
       mode,
       example: lines ? [lines.above, lines.line, lines.under].filter(Boolean).join(' / ') : '',
@@ -65,12 +68,25 @@ const formats = computed(() => {
     const text = value?.formats?.[format];
     return {
       format,
-      example: !text ? '' : props.labels ? text.value : `${text.value} / ${text.label}`,
+      example: text?.value ?? '',
     };
   });
 });
-const currentFormat = computed(() => formatOf(props.widget, !props.labels));
-const shows = (part: 'size' | 'label' | 'format') => !props.only || props.only === part;
+const currentFormat = computed(() => formatOf(props.widget, props.card));
+/** The value with its unit and without, when it has one; none otherwise. */
+const unitChoices = computed(() => {
+  const widget = props.widget;
+  if (widget.kind !== 'metric') return [];
+  const value = props.values.get(widget.metric);
+  const format = currentFormat.value ?? undefined;
+  if (!value || !hasUnit(value, format)) return [];
+  const text = (format && value.formats?.[format]) || value;
+  return [
+    { shown: true, name: 'Shown', example: text.value },
+    { shown: false, name: 'Off', example: text.number },
+  ];
+});
+const shows = (part: 'size' | 'label' | 'unit' | 'format') => !props.only || props.only === part;
 </script>
 
 <template>
@@ -127,6 +143,23 @@ const shows = (part: 'size' | 'label' | 'format') => !props.only || props.only =
       >
         Use the usual words, “{{ usualWords }}”
       </button>
+    </div>
+    <div v-if="shows('unit') && unitChoices.length" class="field">
+      <span id="widget-unit" class="label" :class="{ 'visually-hidden': only }">Unit</span>
+      <div class="modes" role="radiogroup" aria-labelledby="widget-unit">
+        <button
+          v-for="u in unitChoices"
+          :key="u.name"
+          type="button"
+          class="mode"
+          role="radio"
+          :aria-checked="(widget.kind === 'metric' && widget.unit !== false) === u.shown"
+          @click="set({ unit: u.shown ? undefined : false })"
+        >
+          <span>{{ u.name }}</span>
+          <span class="example">{{ u.example }}</span>
+        </button>
+      </div>
     </div>
     <div v-if="shows('format') && formats.length" class="field">
       <span id="widget-format" class="label" :class="{ 'visually-hidden': only }">Format</span>

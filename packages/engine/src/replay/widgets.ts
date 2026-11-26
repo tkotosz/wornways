@@ -5,8 +5,8 @@
 // its place while its value grows and shrinks during the replay. They are drawn in order,
 // the last on top.
 //
-// As text, a list is "name[:"text"|:label][:"words"][:format]@x,y[,size]" items separated by
-// ";", e.g. `text:"Mallorca"@50,8;distance:above:"so far"@20,88,120;moving:after:hm@50,70`.
+// As text, a list is "name[:"text"|:label][:"words"][:nounit][:format]@x,y[,size]" items
+// separated by ";", e.g. `text:"Mallorca"@50,8;distance:above:"so far"@20,88;moving:after:hm@50,70`.
 // A text widget without its own text shows the video's title; a value without a label mode
 // shows its words where that value usually does (`defaultLabel`), without words of its own
 // the value's usual ones, and without a format the usual way (`defaultFormat`, formats.ts).
@@ -29,18 +29,23 @@ export type Widget = { x: number; y: number; size: number } & (
       label: LabelMode;
       /** Its own words, in place of the value's usual ones; left out, the usual ones. */
       labelText?: string;
+      /** False to write the number without its unit ("1,147" for 1,147 km). */
+      unit?: boolean;
       /** How a time, date or clock time is written; left out, the value's usual way. */
       format?: ValueFormat;
     }
   | { kind: 'elevation-chart' }
 );
 
-/**
- * The label mode a value starts with: its words under it; over the replay the date, which has
- * none, off.
- */
-export function defaultLabel(metric: Metric, card = false): LabelMode {
-  return metric === 'date' && !card ? 'off' : 'under';
+/** The label mode a value starts with: its words under it; the date, which has none, off. */
+export function defaultLabel(metric: Metric): LabelMode {
+  return metric === 'date' ? 'off' : 'under';
+}
+
+/** Whether a value has a unit to leave out, in `format`: "1,147 km" has, "25" has not. */
+export function hasUnit(shown: MetricValue, format?: ValueFormat): boolean {
+  const text = (format && shown.formats?.[format]) || shown;
+  return text.number !== text.value;
 }
 
 /** A value widget's words: its own, else the value's usual ones in `format`. */
@@ -51,15 +56,18 @@ export function labelTextOf(shown: MetricValue, labelText?: string, format?: Val
 
 /**
  * What a value widget writes, in `format` where the value has it, with `labelText` for its
- * words when given: its line, and the smaller words above and under it (empty for none).
+ * words when given and without its unit when `unit` is false: its line, and the smaller words
+ * above and under it (empty for none).
  */
 export function valueLines(
   shown: MetricValue,
   mode: LabelMode,
   format?: ValueFormat,
   labelText?: string,
+  unit = true,
 ): { above: string; line: string; under: string } {
-  const value = ((format && shown.formats?.[format]) || shown).value;
+  const text = (format && shown.formats?.[format]) || shown;
+  const value = unit ? text.value : text.number;
   const words = labelTextOf(shown, labelText, format);
   if (!words || mode === 'off') return { above: '', line: value, under: '' };
   if (mode === 'before') return { above: '', line: `${words} ${value}`, under: '' };
@@ -77,14 +85,13 @@ export const widgetName = (widget: Widget) =>
 
 /**
  * Reads a list of widgets from its text form; an empty text is no widgets. `metrics` are
- * the metric names a value widget can take; `chart` whether the elevation chart is one and
- * `card` whether they are the totals card's, where a value starts with its words under it and
- * a time in hours. Throws an Error that says what is wrong.
+ * the metric names a value widget can take; `chart` whether the elevation chart is one.
+ * Throws an Error that says what is wrong.
  */
 export function parseWidgets(
   text: string,
   metrics: readonly string[],
-  { chart = true, card = false }: { chart?: boolean; card?: boolean } = {},
+  { chart = true }: { chart?: boolean } = {},
 ): Widget[] {
   const widgets: Widget[] = [];
   let i = 0;
@@ -117,15 +124,17 @@ export function parseWidgets(
     let own: string | null = null;
     let label: LabelMode | null = null;
     let labelText: string | null = null;
+    let noUnit = false;
     let format: ValueFormat | null = null;
     if (text[i] === ':' && metrics.includes(name)) {
-      // A value's label mode, its words in double quotes and its format, each once, in any
-      // order.
+      // A value's label mode, its words in double quotes, nounit and its format, each once,
+      // in any order.
       const modes = LABEL_MODES;
       const formats = formatsOf(name as Metric);
       const takes = [
         `the label mode ${modes.join(', ')}`,
         'its words in double quotes',
+        'nounit',
         ...(formats.length ? [`the format ${formats.join(', ')}`] : []),
       ];
       while (text[i] === ':') {
@@ -138,6 +147,7 @@ export function parseWidgets(
         while (i < text.length && /[a-z0-9]/.test(text[i]!)) i++;
         const token = text.slice(tokenStart, i);
         if (label === null && modes.includes(token as LabelMode)) label = token as LabelMode;
+        else if (token === 'nounit' && !noUnit) noUnit = true;
         else if (format === null && formats.includes(token as ValueFormat))
           format = token as ValueFormat;
         else fail(`"${name}" takes ${takes.join(', ')}, not "${token}"`);
@@ -167,8 +177,9 @@ export function parseWidgets(
       widgets.push({
         kind: 'metric',
         metric: name as Metric,
-        label: label ?? defaultLabel(name as Metric, card),
+        label: label ?? defaultLabel(name as Metric),
         ...(labelText === null ? {} : { labelText }),
+        ...(noUnit ? { unit: false } : {}),
         ...(format ? { format } : {}),
         x,
         y,
@@ -188,8 +199,9 @@ const round = (n: number) => Number(n.toFixed(1));
 const quote = (text: string) => `"${text.replace(/[\\"]/g, (c) => `\\${c}`)}"`;
 
 /**
- * A list of widgets in the text form `parseWidgets` reads, with the same `card`: a value's
- * label mode and format are written when not the value's usual ones.
+ * A list of widgets in the text form `parseWidgets` reads: a value's label mode and format are
+ * written when not the value's usual ones, on the totals card (`card`) a time's usual format
+ * being hours.
  */
 export function widgetsText(widgets: Widget[], { card = false }: { card?: boolean } = {}): string {
   return widgets
@@ -197,8 +209,9 @@ export function widgetsText(widgets: Widget[], { card = false }: { card?: boolea
       let text = '';
       if (widget.kind === 'text' && widget.text !== null) text = `:${quote(widget.text)}`;
       if (widget.kind === 'metric') {
-        if (widget.label !== defaultLabel(widget.metric, card)) text += `:${widget.label}`;
+        if (widget.label !== defaultLabel(widget.metric)) text += `:${widget.label}`;
         if (widget.labelText !== undefined) text += `:${quote(widget.labelText)}`;
+        if (widget.unit === false) text += ':nounit';
         if (widget.format && widget.format !== defaultFormat(widget.metric, card))
           text += `:${widget.format}`;
       }

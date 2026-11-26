@@ -122,8 +122,26 @@ export const SINGLE_ONLY = [
   'temperature-now',
 ] as const satisfies readonly Metric[];
 
-/** A value's text: its number with the unit, and its words. */
-export type MetricText = { value: string; label: string };
+/** A value's text: its number with the unit, its number alone, and its words. */
+export type MetricText = { value: string; number: string; label: string };
+
+/** The values written without a unit: counts, dates and clock times. */
+const UNITLESS: readonly Metric[] = [
+  'count',
+  'days',
+  'moving-days',
+  'date',
+  'start',
+  'time-of-day',
+];
+
+/**
+ * A value's number without its unit, which is its last word: "1,147" of "1,147 km", "5:32" of
+ * "5:32 /km", "2.3" of "2.3 days"; a time such as "54:38:25", a count, a date or a clock time
+ * is all number.
+ */
+export const numberOf = (metric: Metric, value: string): string =>
+  UNITLESS.includes(metric) ? value : value.replace(/ \S+$/, '');
 
 /**
  * A value as a widget shows it: its text in the usual format, its name for this video ("Total

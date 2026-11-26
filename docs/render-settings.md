@@ -131,7 +131,7 @@ Units: metric tells distances in kilometers, heights in meters, speeds in km/h, 
 minutes per kilometer and temperatures in °C; imperial in miles, feet, mph, minutes per mile
 and °F. They apply to the values over the replay and on the totals card. Heart rate, power,
 cadence and calories have no unit to change. In the web app the setting is in the Overlay
-section.
+and the Ending sections. A value widget can also leave its unit out (`nounit`, see Widgets).
 
 In the Frame section, choose a frame preset or enter a custom size such as `640x480`. Both
 dimensions must be positive even numbers. Available encoder sizes depend on the device.
@@ -172,7 +172,8 @@ A value shows its words in one of these label modes, written after a colon (`cou
 Without a mode, a value has its words under it; the date has none. Its words are its usual
 ones (see Values) unless it has its own, in double quotes after a colon:
 `climb:before:"↑"` writes "↑ 15,423 m", `distance:above:"so far"`, and `count:""` leaves the
-words out.
+words out. `nounit` writes the number without its unit, for a value that has one:
+`distance:nounit:"km in total"` writes "1,147" over "km in total".
 
 A time, a date or a clock time is also written in a format of its own, after a colon, alone
 or after the label mode (`moving:hm`, `moving:after:hm`):
@@ -299,14 +300,13 @@ Widgets): text, which without its own text shows the title, and totals for every
 named as the values of the metrics table are (any of them for several activities; none of
 the ones for one activity as it plays, and no elevation chart). Each is centered on its
 point, at a size from 50 to 250%. The text is drawn with the short orange rule under it; a
-total is its number large over its unit and what it is in orange: "312 / km in total",
-"15 / hours moving in total", "62.5 / km avg per ride", "178 / bpm max heart rate". A time
-or a date takes a format as over the replay; a time is in hours unless told otherwise, and
-its unit moves to the words: "0.6 / days moving in total", "14:30 / moving in total". A
-total takes a label mode and words of its own as over the replay (`distance:after:"km
-together"`). Under is its usual place; above, the words are over the number; before or
-after, they stay smaller and orange on the number's line. Its own words stay as written when
-the units or the format change. The
+total is written as a value widget writes it at the end of the replay, large over its words
+in orange: "312 km / total distance", "15 h / total moving time", "62.5 km / avg distance
+per ride", "178 bpm / max heart rate". A time or a date takes a format as over the replay; a
+time is in hours unless told otherwise. A total takes a label mode, words of its own and
+`nounit` as a value over the replay does (`distance:nounit:"km together"`). Under is its
+usual place; above, the words are over the number; before or after, they stay smaller and
+orange on the number's line. The
 values fade in in their order, one after another, and count up; the speeds and the dates
 appear without counting up, and the dates are drawn smaller. A total the activities did not
 record (the climb, the descent and the elevations without elevation, the sensor values,

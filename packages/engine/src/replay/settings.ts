@@ -394,7 +394,8 @@ export const SETTINGS: readonly SettingDefinition[] = [
       'before (total distance 1,147 km), after (25 activities), above or under (its words ' +
       'smaller, on a line above or under it). Left out, a value has its words under it; the ' +
       'date has none. Its own words, in double quotes after a colon, take the place of its ' +
-      'usual ones, as distance:above:"so far"@x,y; "" leaves them out. A time, a date or a ' +
+      'usual ones, as distance:above:"so far"@x,y; "" leaves them out. nounit writes the ' +
+      'number without its unit, as distance:nounit:"km"@x,y. A time, a date or a ' +
       'clock time also takes a format after a colon, as moving:hm@x,y or ' +
       'moving:after:hm@x,y: a time hms (54:38:25, the usual), hm (54:38), ' +
       'h (55 h) or d (2.3 days); the date dmy (8 May 2026, the usual), dm (8 May), wdm ' +
@@ -432,8 +433,9 @@ export const SETTINGS: readonly SettingDefinition[] = [
     help:
       'What the totals card shows, as --widgets is written: text:"Your text"@x,y,size ' +
       `(text@x,y for the title) and totals such as distance@x,y,size: ${TOTALS_FIELDS.join(', ')}. ` +
-      'A total takes a label mode as over the replay (under unless told otherwise) and words of ' +
-      'its own in place of its usual ones ("km in total"), as distance:above:"km together"@x,y. ' +
+      'A total is written as a value over the replay is at its end (312 km, total distance), ' +
+      'and takes a label mode, words of its own and nounit as one does, as ' +
+      'distance:above:"together"@x,y. ' +
       'As totals over every activity: count, time (hours, stops included), moving, distance, ' +
       'climb, descent and calories are added up; days are the calendar days from the first ' +
       'activity to the last, moving-days the days with an activity; avg-, max- and min- ' +
@@ -595,7 +597,7 @@ export function parseSettings(input: SettingsInput): RenderSettings {
   const widgetList = (
     name: string,
     metrics: readonly string[],
-    options: { chart: boolean; card: boolean },
+    options: { chart: boolean },
   ): Widget[] | null => {
     const value = text(name);
     if (value === null) return null;
@@ -686,9 +688,9 @@ export function parseSettings(input: SettingsInput): RenderSettings {
     width,
     height,
     fps: Number(choice('fps')),
-    widgets: widgetList('widgets', METRICS, { chart: true, card: false }),
+    widgets: widgetList('widgets', METRICS, { chart: true }),
     totalsCard: flag('totals-card'),
-    totalsWidgets: widgetList('totals-widgets', TOTALS_FIELDS, { chart: false, card: true }),
+    totalsWidgets: widgetList('totals-widgets', TOTALS_FIELDS, { chart: false }),
     endCard: flag('end-card'),
     watermark: flag('watermark'),
   };

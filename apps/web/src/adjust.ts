@@ -45,7 +45,8 @@ export const SECTIONS: { id: Section; label: string; panels: Panel[] }[] = [
   {
     id: 'ending',
     label: 'Ending',
-    panels: ['pause', 'totals', 'end-card'],
+    // The units again, for the totals card's values.
+    panels: ['pause', 'totals', 'units', 'end-card'],
   },
 ];
 

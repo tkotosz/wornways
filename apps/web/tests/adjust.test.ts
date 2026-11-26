@@ -62,9 +62,11 @@ describe('the settings offered', () => {
     expect(SECTIONS.find((s) => s.id === 'ending')!.panels).toEqual([
       'pause',
       'totals',
+      'units',
       'end-card',
     ]);
-    const panels = SECTIONS.flatMap((s) => s.panels);
+    // Each panel in one section, but the units, for the values over the replay and the card's.
+    const panels = SECTIONS.flatMap((s) => s.panels).filter((panel) => panel !== 'units');
     expect(new Set(panels).size).toBe(panels.length);
   });
 

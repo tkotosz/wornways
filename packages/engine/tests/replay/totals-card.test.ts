@@ -51,18 +51,36 @@ describe('totalsEntries', () => {
 
   it('shows the totals unless told otherwise, each named for what it is', () => {
     expect(totalsEntries(totals, 1, rides, AUTOMATIC_TOTALS, 'metric')).toEqual([
-      { field: 'count', value: '5', label: 'rides', name: 'Total activities' },
-      { field: 'distance', value: '312', label: 'km in total', name: 'Total distance' },
-      { field: 'moving', value: '15', label: 'hours moving in total', name: 'Total moving time' },
-      { field: 'climb', value: '4,210', label: 'm climbed in total', name: 'Total climb' },
+      { field: 'count', value: '5', number: '5', label: 'rides', name: 'Total activities' },
+      {
+        field: 'distance',
+        value: '312 km',
+        number: '312',
+        label: 'total distance',
+        name: 'Total distance',
+      },
+      {
+        field: 'moving',
+        value: '15 h',
+        number: '15',
+        label: 'total moving time',
+        name: 'Total moving time',
+      },
+      {
+        field: 'climb',
+        value: '4,210 m',
+        number: '4,210',
+        label: 'total climb',
+        name: 'Total climb',
+      },
     ]);
   });
 
   it('adds up the time with stops, the descent and the calories, and counts the days', () => {
     expect(shown(['time', 'descent', 'calories', 'days', 'moving-days'])).toEqual([
-      '18 / hours in total',
-      '4,105 / m descended in total',
-      '6,120 / kcal in total',
+      '18 h / total time',
+      '4,105 m / total descent',
+      '6,120 kcal / total calories',
       '6 / days',
       '4 / moving days',
     ]);
@@ -89,18 +107,18 @@ describe('totalsEntries', () => {
         'min-calories',
       ]),
     ).toEqual([
-      '3.6 / hours avg per ride',
-      '5.3 / hours max per ride',
-      '2.3 / hours min per ride',
-      '62.5 / km avg per ride',
-      '112.3 / km max per ride',
-      '20.0 / km min per ride',
-      '842 / m climbed avg per ride',
-      '1,830 / m climbed max per ride',
-      '200 / m climbed min per ride',
-      '1,224 / kcal avg per ride',
-      '2,200 / kcal max per ride',
-      '400 / kcal min per ride',
+      '3.6 h / avg time per ride',
+      '5.3 h / max time per ride',
+      '2.3 h / min time per ride',
+      '62.5 km / avg distance per ride',
+      '112.3 km / max distance per ride',
+      '20.0 km / min distance per ride',
+      '842 m / avg climb per ride',
+      '1,830 m / max climb per ride',
+      '200 m / min climb per ride',
+      '1,224 kcal / avg calories per ride',
+      '2,200 kcal / max calories per ride',
+      '400 kcal / min calories per ride',
     ]);
     const [max] = totalsEntries(totals, 1, rides, ['max-distance'], 'metric');
     expect(max!.name).toBe('Max distance per activity');
@@ -108,8 +126,8 @@ describe('totalsEntries', () => {
 
   it('tells the avg and max speed, or pace when every activity is on foot', () => {
     expect(shown(['avg-speed', 'max-speed'], totals, 0.2)).toEqual([
-      '21.5 / km/h avg speed',
-      '54.0 / km/h max speed',
+      '21.5 km/h / avg speed',
+      '54.0 km/h / max speed',
     ]);
     // 42.2 km in 3:30 moving: 4:59 per kilometer; 5 m/s is 3:20 per kilometer.
     const runs = {
@@ -120,15 +138,15 @@ describe('totalsEntries', () => {
       topSpeed: 5,
     };
     expect(shown(['avg-speed', 'max-speed'], runs)).toEqual([
-      '4:59 / min/km avg pace',
-      '3:20 / min/km max pace',
+      '4:59 /km / avg pace',
+      '3:20 /km / max pace',
     ]);
   });
 
   it('tells the max and min elevation', () => {
     expect(shown(['max-elevation', 'min-elevation'])).toEqual([
-      '1,445 / m max elevation',
-      '102 / m min elevation',
+      '1,445 m / max elevation',
+      '102 m / min elevation',
     ]);
   });
 
@@ -147,19 +165,19 @@ describe('totalsEntries', () => {
         'max-temperature',
       ]),
     ).toEqual([
-      '142 / bpm avg heart rate',
-      '178 / bpm max heart rate',
-      '62 / bpm min heart rate',
-      '212 / W avg power',
-      '640 / W max power',
-      '85 / rpm avg cadence',
-      '118 / rpm max cadence',
-      '21 / °C avg temperature',
-      '9 / °C min temperature',
-      '31 / °C max temperature',
+      '142 bpm / avg heart rate',
+      '178 bpm / max heart rate',
+      '62 bpm / min heart rate',
+      '212 W / avg power',
+      '640 W / max power',
+      '85 rpm / avg cadence',
+      '118 rpm / max cadence',
+      '21 °C / avg temperature',
+      '9 °C / min temperature',
+      '31 °C / max temperature',
     ]);
     // On foot, one leg's strides become steps per minute.
-    expect(shown(['avg-cadence'], { ...totals, onFoot: true })).toEqual(['169 / spm avg cadence']);
+    expect(shown(['avg-cadence'], { ...totals, onFoot: true })).toEqual(['169 spm / avg cadence']);
     const none = {
       ...totals,
       heartRate: null,
@@ -198,23 +216,23 @@ describe('totalsEntries', () => {
 
   it('shows the days spanned, and neither the dates nor the speed count up', () => {
     expect(shown(['date', 'avg-speed', 'distance'], totals, 0.2)).toEqual([
-      '18–22 Apr 2026 / dates',
-      '21.5 / km/h avg speed',
-      '62 / km in total',
+      '18–22 Apr 2026 / ',
+      '21.5 km/h / avg speed',
+      '62 km / total distance',
     ]);
   });
 
-  it('writes a time in hours unless told otherwise, the unit in its words', () => {
+  it('writes a time in hours unless told otherwise, or as picked', () => {
     const moving = (format?: 'hms' | 'hm' | 'h' | 'd') =>
       totalsEntry(totals, 'moving', { f: 1, countLabel: rides, units: 'metric', format });
-    expect(moving()).toMatchObject({ value: '15', label: 'hours moving in total' });
-    expect(moving('hms')).toMatchObject({ value: '14:30:00', label: 'moving in total' });
-    expect(moving('hm')).toMatchObject({ value: '14:30', label: 'moving in total' });
-    expect(moving('d')).toMatchObject({ value: '0.6', label: 'days moving in total' });
+    expect(moving()).toMatchObject({ value: '15 h', number: '15', label: 'total moving time' });
+    expect(moving('hms')).toMatchObject({ value: '14:30:00', number: '14:30:00' });
+    expect(moving('hm')).toMatchObject({ value: '14:30' });
+    expect(moving('d')).toMatchObject({ value: '0.6 days', number: '0.6' });
     const time = (format: 'hm' | 'h') =>
       totalsEntry(totals, 'time', { f: 1, countLabel: rides, units: 'metric', format });
-    expect(time('hm')).toMatchObject({ value: '18:00', label: 'time in total' });
-    expect(time('h')).toMatchObject({ value: '18', label: 'hours in total' });
+    expect(time('hm')).toMatchObject({ value: '18:00', label: 'total time' });
+    expect(time('h')).toMatchObject({ value: '18 h', label: 'total time' });
     const longest = totalsEntry(totals, 'max-time', {
       f: 1,
       countLabel: rides,
@@ -247,22 +265,26 @@ describe('totalsEntries', () => {
         'max-temperature',
       ]),
     ).toEqual([
-      '194 / mi in total',
-      '13,812 / ft climbed in total',
-      '38.8 / mi avg per ride',
-      '4,741 / ft max elevation',
-      '13.4 / mph avg speed',
-      '89 / °F max temperature',
+      '194 mi / total distance',
+      '13,812 ft / total climb',
+      '38.8 mi / avg distance per ride',
+      '4,741 ft / max elevation',
+      '13.4 mph / avg speed',
+      '89 °F / max temperature',
     ]);
     expect(imperial(['avg-speed'], { ...totals, onFoot: true })).toEqual([
-      '4:29 / min/mi avg pace',
+      '4:29 /mi / avg pace',
     ]);
   });
 
   it('gives the editor every format of a time and a date', () => {
     const values = totalsValues(totals, rides, 'metric');
-    expect(values.get('moving')).toMatchObject({ value: '15', name: 'Total moving time' });
-    expect(values.get('moving')!.formats!.hm).toEqual({ value: '14:30', label: 'moving in total' });
+    expect(values.get('moving')).toMatchObject({ value: '15 h', name: 'Total moving time' });
+    expect(values.get('moving')!.formats!.hm).toEqual({
+      value: '14:30',
+      number: '14:30',
+      label: 'total moving time',
+    });
     expect(values.get('date')!.formats!.mdy!.value).toBe('Apr 18–22, 2026');
     expect(values.get('distance')!.formats).toBeUndefined();
   });

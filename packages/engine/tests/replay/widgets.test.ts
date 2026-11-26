@@ -3,6 +3,7 @@ import { METRICS } from '../../src/replay/render.ts';
 import { TOTALS_FIELDS } from '../../src/replay/totals-card.ts';
 import {
   defaultLabel,
+  hasUnit,
   labelTextOf,
   parseWidgets,
   valueLines,
@@ -41,11 +42,14 @@ describe('widgets as text', () => {
     ['time@1,2,300', 'a size is from 50 to 250 percent, got 300'],
     [
       'distance:short@1,2',
-      '"distance" takes the label mode off, before, after, above, under, its words in double quotes, not "short"',
+      '"distance" takes the label mode off, before, after, above, under, its words in double quotes, nounit, not "short"',
     ],
     ['distance:"a":"b"@1,2', 'not ""'],
     ['distance:"open@1,2', 'the text has no closing double quote'],
-    ['moving:hm:hms@1,2', 'its words in double quotes, the format hms, hm, h, d, not "hms"'],
+    [
+      'moving:hm:hms@1,2',
+      'its words in double quotes, nounit, the format hms, hm, h, d, not "hms"',
+    ],
     ['elevation-chart:off@1,2', '"elevation-chart" takes no label mode'],
     ['text:"open@1,2', 'the text has no closing double quote'],
   ])('rejects %j', (text, message) => {
@@ -67,18 +71,19 @@ describe('formats', () => {
     // The usual format is not written.
     expect(widgetsText(parseWidgets('moving:hms@1,2', METRICS))).toBe('moving@1,2');
     // On the totals card a time is in hours unless told otherwise, and has no label mode.
-    const card = parseWidgets('moving:hm@1,2;time:h@1,2', TOTALS_FIELDS, { card: true });
+    const card = parseWidgets('moving:hm@1,2;time:h@1,2', TOTALS_FIELDS);
     expect(widgetsText(card, { card: true })).toBe('moving:hm@1,2;time@1,2');
   });
 
   it('writes a value in the format picked, with its words in that format', () => {
     const longest = {
       value: '5:15:00',
+      number: '5:15:00',
       label: 'max time per ride',
       name: 'Max time per activity',
       formats: {
-        hm: { value: '5:15', label: 'max time per ride' },
-        d: { value: '0.2 days', label: 'max time per ride' },
+        hm: { value: '5:15', number: '5:15', label: 'max time per ride' },
+        d: { value: '0.2 days', number: '0.2', label: 'max time per ride' },
       },
     };
     expect(valueLines(longest, 'under', 'hm')).toEqual({
@@ -96,7 +101,7 @@ describe('formats', () => {
 });
 
 describe('labels', () => {
-  const climbed = { value: '1,200 m', label: 'climbed', name: 'Climb' };
+  const climbed = { value: '1,200 m', number: '1,200', label: 'climbed', name: 'Climb' };
 
   it('start with the words under the value, except the date, which has none', () => {
     expect(defaultLabel('climb')).toBe('under');
@@ -128,6 +133,21 @@ describe('labels', () => {
     expect(labelTextOf(climbed, 'up')).toBe('up');
   });
 
+  it('leave out the unit when asked, for a value that has one', () => {
+    expect(valueLines(climbed, 'under', undefined, undefined, false)).toEqual({
+      above: '',
+      line: '1,200',
+      under: 'climbed',
+    });
+    expect(hasUnit(climbed)).toBe(true);
+    expect(hasUnit({ value: '25', number: '25', label: 'rides', name: 'Total activities' })).toBe(
+      false,
+    );
+    const widgets = parseWidgets('climb:nounit:"m up"@1,2;distance:after:nounit@1,2', METRICS);
+    expect(widgets.map((w) => (w.kind === 'metric' ? w.unit : null))).toEqual([false, false]);
+    expect(widgetsText(widgets)).toBe('climb:"m up":nounit@1,2;distance:after:nounit@1,2');
+  });
+
   it('write words of their own in double quotes, back as they were read', () => {
     const text = 'distance:above:"so \\"far\\""@20,80;climb:"↑":before@50,80;count:""@1,2';
     const widgets = parseWidgets(text, METRICS);
@@ -139,13 +159,13 @@ describe('labels', () => {
     expect(widgetsText(widgets)).toBe(
       'distance:above:"so \\"far\\""@20,80;climb:before:"↑"@50,80;count:""@1,2',
     );
-    // On the totals card too, where every value, the dates too, starts with its words under it.
+    // On the totals card too, where a value starts as over the replay.
     const text2 = 'distance:"km together"@1,2;moving:after@1,2;date@1,2';
-    const card = parseWidgets(text2, TOTALS_FIELDS, { card: true });
+    const card = parseWidgets(text2, TOTALS_FIELDS);
     expect(card.map((w) => (w.kind === 'metric' ? w.label : null))).toEqual([
       'under',
       'after',
-      'under',
+      'off',
     ]);
     expect(widgetsText(card, { card: true })).toBe(text2);
   });

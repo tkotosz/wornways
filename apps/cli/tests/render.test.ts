@@ -540,6 +540,7 @@ describe('the totals card', () => {
     ]);
     expect(values.get('count')).toEqual({
       value: '2',
+      number: '2',
       label: 'activities',
       name: 'Total activities',
     });
@@ -561,9 +562,10 @@ describe('the totals card', () => {
       { width: 270, height: 480, fps: 10, totalsCard: true },
     );
     const { values } = renderer.totalsCard();
-    expect(values.get('days')).toEqual({ value: '4', label: 'days', name: 'Days' });
+    expect(values.get('days')).toEqual({ value: '4', number: '4', label: 'days', name: 'Days' });
     expect(values.get('moving-days')).toEqual({
       value: '2',
+      number: '2',
       label: 'moving days',
       name: 'Moving days',
     });
@@ -663,6 +665,7 @@ describe('widgets', () => {
     });
     expect(renderer.finalValues.get('distance')).toEqual({
       value: '5.3 km',
+      number: '5.3',
       label: 'distance',
       name: 'Distance',
     });

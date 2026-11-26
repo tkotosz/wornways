@@ -74,7 +74,7 @@ const sheet = ref<{
   label: string;
   /** A widget's sheet: which widget, and only its size, label or format when a chip opened it. */
   widget?: number;
-  only?: 'size' | 'label' | 'format';
+  only?: 'size' | 'label' | 'unit' | 'format';
 } | null>(null);
 function openSetting(name: string, label: string): void {
   sheet.value = { name, label };
@@ -121,9 +121,7 @@ const widgets = computed<Widget[]>(() => {
   if (typeof set !== 'string')
     return (totals ? drawnTotals.value?.widgets : drawn.value?.widgets) ?? [];
   try {
-    return totals
-      ? parseWidgets(set, TOTALS_FIELDS, { chart: false, card: true })
-      : parseWidgets(set, METRICS);
+    return totals ? parseWidgets(set, TOTALS_FIELDS, { chart: false }) : parseWidgets(set, METRICS);
   } catch {
     return [];
   }
@@ -142,8 +140,8 @@ function setWidgets(list: Widget[]): void {
   adjustments.value = { ...adjustments.value, [widgetSetting.value]: text };
 }
 
-/** Opens a widget's settings in a sheet: all of them (the list), or its size, label or format. */
-function openWidget(index: number, only?: 'size' | 'label' | 'format'): void {
+/** Opens a widget's settings in a sheet: all of them (the list), or one part of them. */
+function openWidget(index: number, only?: 'size' | 'label' | 'unit' | 'format'): void {
   selectedWidget.value = index;
   const name = widgetLabel(widgets.value[index]!, values.value);
   const label = only ? `${name}: ${only}` : name;
@@ -289,6 +287,7 @@ function useTool(tool: 'text' | 'values' | 'chart'): void {
         :widgets="widgets"
         :selected="selectedWidget"
         :card="board === 'totals'"
+        :values="values"
         :chart="chart"
         @done="selectedWidget = null"
         @tool="useTool"
@@ -296,7 +295,8 @@ function useTool(tool: 'text' | 'values' | 'chart'): void {
         @open="openWidget"
         @remove="removeWidget"
       >
-        <!-- Ending: the pause and the card's switch, then its tools, then the end card. -->
+        <!-- Ending: the pause and the card's switch, then its tools, then the units and the
+             end card. -->
         <template v-if="board === 'totals'" #before>
           <SettingsGroups
             v-model="adjustments"
@@ -309,7 +309,7 @@ function useTool(tool: 'text' | 'values' | 'chart'): void {
         </template>
         <SettingsGroups
           v-model="adjustments"
-          :groups="board === 'totals' ? ['end-card'] : current.panels"
+          :groups="board === 'totals' ? ['units', 'end-card'] : current.panels"
           :count="countOf(activities)"
           :plan="plan"
           view="rows"
@@ -411,6 +411,7 @@ function useTool(tool: 'text' | 'values' | 'chart'): void {
             :widgets="widgets"
             :selected="selectedWidget"
             :card="board === 'totals'"
+            :values="values"
             :chart="chart"
             @done="selectedWidget = null"
             @tool="useTool"
@@ -466,7 +467,6 @@ function useTool(tool: 'text' | 'values' | 'chart'): void {
       :values="values"
       :has-elevation="board === 'overlay' && !!plan?.hasElevation"
       :has-calories="!!plan?.hasCalories"
-      :labels="board !== 'totals'"
       @add="addWidget"
     />
     <WidgetSettings
@@ -474,7 +474,7 @@ function useTool(tool: 'text' | 'values' | 'chart'): void {
       :widget="widgets[sheetWidget]!"
       :title="title"
       :values="values"
-      :labels="board !== 'totals'"
+      :card="board === 'totals'"
       :only="sheet.only"
       @change="changeWidget(sheetWidget, $event)"
       @remove="removeWidget(sheetWidget)"
