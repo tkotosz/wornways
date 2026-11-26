@@ -5,22 +5,21 @@
 // its place while its value grows and shrinks during the replay. They are drawn in order,
 // the last on top.
 //
-// As text, a list is "name[:"text"|:label][:format]@x,y[,size]" items separated by ";", e.g.
-// `text:"Mallorca"@50,8;distance@20,88,120;moving:inline:hm@50,70;elevation-chart@50,93`. A
-// text widget without its own text shows the video's title; a value without a label mode
-// shows its words the way that value usually does (`defaultLabel`), and one without a format
-// is written the usual way (`defaultFormat`, see formats.ts).
+// As text, a list is "name[:"text"|:label][:"words"][:format]@x,y[,size]" items separated by
+// ";", e.g. `text:"Mallorca"@50,8;distance:above:"so far"@20,88,120;moving:after:hm@50,70`.
+// A text widget without its own text shows the video's title; a value without a label mode
+// shows its words where that value usually does (`defaultLabel`), without words of its own
+// the value's usual ones, and without a format the usual way (`defaultFormat`, formats.ts).
 
 import { defaultFormat, formatsOf, type ValueFormat } from './formats.ts';
 import type { Metric, MetricValue } from './metrics.ts';
 
 /**
- * How a value shows its words: not at all ("1,147 km"), in a short form of its own
- * ("↑1,200 m", "142 bpm avg"), after the value on its line ("25 activities"), or on a line
- * under it.
+ * Where a value shows its words: not at all ("1,147 km"), before or after the value on its
+ * line ("total distance 1,147 km", "25 activities"), or smaller on a line above or under it.
  */
-export type LabelMode = 'off' | 'short' | 'inline' | 'under';
-export const LABEL_MODES: readonly LabelMode[] = ['off', 'short', 'inline', 'under'];
+export type LabelMode = 'off' | 'before' | 'after' | 'above' | 'under';
+export const LABEL_MODES: readonly LabelMode[] = ['off', 'before', 'after', 'above', 'under'];
 
 export type Widget = { x: number; y: number; size: number } & (
   | { kind: 'text'; text: string | null }
@@ -28,41 +27,42 @@ export type Widget = { x: number; y: number; size: number } & (
       kind: 'metric';
       metric: Metric;
       label: LabelMode;
+      /** Its own words, in place of the value's usual ones; left out, the usual ones. */
+      labelText?: string;
       /** How a time, date or clock time is written; left out, the value's usual way. */
       format?: ValueFormat;
     }
   | { kind: 'elevation-chart' }
 );
 
-/** Whether a value has a short form of its own: the climb's arrows, "avg", "max", "min". */
-const hasShortForm = (metric: Metric) =>
-  metric === 'climb' || metric === 'descent' || /^(avg|max|min)-/.test(metric);
-
-/** The label modes `metric` can take: the date has no words; only some have a short form. */
-export function labelModes(metric: Metric): LabelMode[] {
-  if (metric === 'date') return ['off'];
-  return LABEL_MODES.filter((mode) => mode !== 'short' || hasShortForm(metric));
-}
-
-/** The label mode a value starts with: its words under it; the date has none. */
+/** The label mode a value starts with: its words under it; the date, which has none, off. */
 export function defaultLabel(metric: Metric): LabelMode {
   return metric === 'date' ? 'off' : 'under';
 }
 
+/** A value widget's words: its own, else the value's usual ones in `format`. */
+export function labelTextOf(shown: MetricValue, labelText?: string, format?: ValueFormat): string {
+  if (labelText !== undefined) return labelText;
+  return ((format && shown.formats?.[format]) || shown).label;
+}
+
 /**
- * What a value widget writes, in `format` where the value has it: its line, and the words under
- * it (empty for none).
+ * What a value widget writes, in `format` where the value has it, with `labelText` for its
+ * words when given: its line, and the smaller words above and under it (empty for none).
  */
 export function valueLines(
   shown: MetricValue,
   mode: LabelMode,
   format?: ValueFormat,
-): { line: string; under: string } {
-  const value = (format && shown.formats?.[format]) || shown;
-  if (mode === 'short') return { line: value.short ?? value.value, under: '' };
-  if (mode === 'inline' && value.label) return { line: `${value.value} ${value.label}`, under: '' };
-  if (mode === 'under') return { line: value.value, under: value.label };
-  return { line: value.value, under: '' };
+  labelText?: string,
+): { above: string; line: string; under: string } {
+  const value = ((format && shown.formats?.[format]) || shown).value;
+  const words = labelTextOf(shown, labelText, format);
+  if (!words || mode === 'off') return { above: '', line: value, under: '' };
+  if (mode === 'before') return { above: '', line: `${words} ${value}`, under: '' };
+  if (mode === 'after') return { above: '', line: `${value} ${words}`, under: '' };
+  if (mode === 'above') return { above: words, line: value, under: '' };
+  return { above: '', line: value, under: words };
 }
 
 /** The sizes a widget takes, in percent of its normal size. */
@@ -88,6 +88,20 @@ export function parseWidgets(
   const fail = (why: string): never => {
     throw new Error(`${why} at character ${i + 1}`);
   };
+  /** Reads a text in double quotes, where a backslash keeps the next character as it is. */
+  const quoted = (): string => {
+    if (text[i] !== '"') fail('expected the text in double quotes');
+    i++;
+    let value = '';
+    while (i < text.length && text[i] !== '"') {
+      if (text[i] === '\\' && i + 1 < text.length) i++;
+      value += text[i];
+      i++;
+    }
+    if (text[i] !== '"') fail('the text has no closing double quote');
+    i++;
+    return value;
+  };
   const skipSpaces = () => {
     while (text[i] === ' ') i++;
   };
@@ -99,40 +113,36 @@ export function parseWidgets(
     const name = text.slice(nameStart, i);
     let own: string | null = null;
     let label: LabelMode | null = null;
+    let labelText: string | null = null;
     let format: ValueFormat | null = null;
-    if (text[i] === ':' && name !== 'text') {
-      // A value's label mode and its format, each once, in either order.
-      const modes = labels && metrics.includes(name) ? labelModes(name as Metric) : [];
-      const formats = metrics.includes(name) ? formatsOf(name as Metric) : [];
+    if (text[i] === ':' && metrics.includes(name)) {
+      // A value's label mode, its words in double quotes and its format, each once, in any
+      // order.
+      const modes = labels ? LABEL_MODES : [];
+      const formats = formatsOf(name as Metric);
       const takes = [
         ...(modes.length ? [`the label mode ${modes.join(', ')}`] : []),
+        'its words in double quotes',
         ...(formats.length ? [`the format ${formats.join(', ')}`] : []),
       ];
-      if (!takes.length) fail(`"${name}" takes no label mode`);
       while (text[i] === ':') {
         i++;
+        if (text[i] === '"' && labelText === null) {
+          labelText = quoted();
+          continue;
+        }
         const tokenStart = i;
         while (i < text.length && /[a-z0-9]/.test(text[i]!)) i++;
         const token = text.slice(tokenStart, i);
         if (label === null && modes.includes(token as LabelMode)) label = token as LabelMode;
         else if (format === null && formats.includes(token as ValueFormat))
           format = token as ValueFormat;
-        else fail(`"${name}" takes ${takes.join(' or ')}, not "${token}"`);
+        else fail(`"${name}" takes ${takes.join(', ')}, not "${token}"`);
       }
-    } else if (text[i] === ':') {
+    } else if (text[i] === ':' && name === 'text') {
       i++;
-      if (text[i] !== '"') fail('expected the text in double quotes');
-      i++;
-      let value = '';
-      while (i < text.length && text[i] !== '"') {
-        if (text[i] === '\\' && i + 1 < text.length) i++;
-        value += text[i];
-        i++;
-      }
-      if (text[i] !== '"') fail('the text has no closing double quote');
-      i++;
-      own = value;
-    }
+      own = quoted();
+    } else if (text[i] === ':') fail(`"${name}" takes no label mode`);
     if (text[i] !== '@') fail(`expected @ and a place after "${name}"`);
     i++;
     const placeStart = i;
@@ -155,6 +165,7 @@ export function parseWidgets(
         kind: 'metric',
         metric: name as Metric,
         label: label ?? (labels ? defaultLabel(name as Metric) : 'under'),
+        ...(labelText === null ? {} : { labelText }),
         ...(format ? { format } : {}),
         x,
         y,
@@ -170,6 +181,8 @@ export function parseWidgets(
 }
 
 const round = (n: number) => Number(n.toFixed(1));
+/** A text in double quotes, a quote or backslash in it kept with a backslash. */
+const quote = (text: string) => `"${text.replace(/[\\"]/g, (c) => `\\${c}`)}"`;
 
 /**
  * A list of widgets in the text form `parseWidgets` reads, with the same `labels` (none on the
@@ -182,10 +195,10 @@ export function widgetsText(
   return widgets
     .map((widget) => {
       let text = '';
-      if (widget.kind === 'text' && widget.text !== null)
-        text = `:"${widget.text.replace(/[\\"]/g, (c) => `\\${c}`)}"`;
+      if (widget.kind === 'text' && widget.text !== null) text = `:${quote(widget.text)}`;
       if (widget.kind === 'metric') {
         if (labels && widget.label !== defaultLabel(widget.metric)) text += `:${widget.label}`;
+        if (widget.labelText !== undefined) text += `:${quote(widget.labelText)}`;
         if (widget.format && widget.format !== defaultFormat(widget.metric, !labels))
           text += `:${widget.format}`;
       }

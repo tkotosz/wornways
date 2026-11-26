@@ -60,7 +60,7 @@ export {
   LABEL_MODES,
   WIDGET_SIZE,
   defaultLabel,
-  labelModes,
+  labelTextOf,
   parseWidgets,
   startingWidgets,
   valueLines,

@@ -159,21 +159,23 @@ table below, or `elevation-chart`. For example
 `text@50,6;distance@25,85,120;count:under@60,85;elevation-chart@50,94`. The title is also the
 one on the totals card.
 
-A value shows its words in one of these label modes, written after a colon (`count:under`):
+A value shows its words in one of these label modes, written after a colon (`count:after`):
 
-| Mode     | Shows                                                | Example             |
-| -------- | ---------------------------------------------------- | ------------------- |
-| `off`    | the value alone                                      | 1,147 km            |
-| `short`  | its own short form, for the values that have one     | ↑1,200 m            |
-| `inline` | the value with its words after it, on one line       | 25 activities       |
-| `under`  | the value, with its words smaller on a line under it | 1,147 km / distance |
+| Mode     | Shows                                                | Example                   |
+| -------- | ---------------------------------------------------- | ------------------------- |
+| `off`    | the value alone                                      | 1,147 km                  |
+| `before` | its words, then the value, on one line               | total distance 1,147 km   |
+| `after`  | the value, then its words, on one line               | 25 activities             |
+| `above`  | the value, with its words smaller on a line above it | total distance / 1,147 km |
+| `under`  | the value, with its words smaller on a line under it | 1,147 km / total distance |
 
-The short forms: `climb` (↑1,200 m), `descent` (↓980 m), and every `avg-`, `max-` and `min-`
-value, its number and the keyword ("142 bpm avg", "45.2 km/h max", "4 °C min", "62.5 km
-avg"). The date has no words. Without a mode, a value has its words under it.
+Without a mode, a value has its words under it; the date has none. Its words are its usual
+ones (see Values) unless it has its own, in double quotes after a colon:
+`climb:before:"↑"` writes "↑ 15,423 m", `distance:above:"so far"`, and `count:""` leaves the
+words out.
 
 A time, a date or a clock time is also written in a format of its own, after a colon, alone
-or after the label mode (`moving:hm`, `moving:inline:hm`):
+or after the label mode (`moving:hm`, `moving:after:hm`):
 
 | Values                                               | Format | Example     |
 | ---------------------------------------------------- | ------ | ----------- |
@@ -300,7 +302,9 @@ point, at a size from 50 to 250%. The text is drawn with the short orange rule u
 total is its number large over its unit and what it is in orange: "312 / km in total",
 "15 / hours moving in total", "62.5 / km avg per ride", "178 / bpm max heart rate". A time
 or a date takes a format as over the replay; a time is in hours unless told otherwise, and
-its unit moves to the words: "0.6 / days moving in total", "14:30 / moving in total". The
+its unit moves to the words: "0.6 / days moving in total", "14:30 / moving in total". A
+total takes words of its own as over the replay (`distance:"km together"`), always under it;
+they stay as written when the units or the format change. The
 values fade in in their order, one after another, and count up; the speeds and the dates
 appear without counting up, and the dates are drawn smaller. A total the activities did not
 record (the climb, the descent and the elevations without elevation, the sensor values,

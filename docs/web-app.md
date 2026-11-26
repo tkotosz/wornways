@@ -168,8 +168,8 @@ drawing each. The editor's settings are remembered for the next visit.
   finish.
 - **Overlay:** what is drawn over the replay, as widgets arranged on the still the way
   stickers are in a story editor: text (at first the title), one value each (a metric,
-  with its words under it at first; its label mode can also show none, a short form or
-  the words after it),
+  with its words under it at first; they can also go before, after or above it, or be left
+  out, and say words of its own),
   and the
   elevation chart (when an activity recorded elevation). A video starts with the title at
   the top, the values that suit it at the bottom left (the first large, the others
@@ -204,8 +204,9 @@ drawing each. The editor's settings are remembered for the next visit.
   when an activity recorded elevation); and the watermark's, a fixed small mark at the
   bottom left on the map credit's line. A new widget comes in a free spot clear of the
   middle. A picked widget turns the strip into its own chips: Done (lets it go), Edit
-  (a text's text), Size (a sheet with a slider), Label (a value's label mode, each with
-  how the value reads in it), Format (for a time, a date or a clock time: h:mm:ss, h:mm,
+  (a text's text), Size (a sheet with a slider), Label (where a value's words go:
+  off, before, after, above or under, each with how the value reads in it; and the words
+  themselves, its usual ones until edited, with a way back to them), Format (for a time, a date or a clock time: h:mm:ss, h:mm,
   hours or days; five ways to write a date; 24 or 12 hours; each with how the value reads
   in it) and Remove. After the widgets' tools the strip has
   the units (metric or imperial, for every value of the video and its totals card) and the
@@ -221,7 +222,7 @@ drawing each. The editor's settings are remembered for the next visit.
   and the strip has the same chips between the card's switch and the end card's: Add
   Text and Add Total (a sheet of the totals these activities have, each with its own
   number); there is no chart, watermark or label mode on the card, whose totals always
-  have their words under them. A time or a date on the card has the Format chip too, its
+  have their words under them, though its Label chip edits what they say. A time or a date on the card has the Format chip too, its
   words saying the unit ("hours moving in total"). The card's band behind them stays where the still drew it until it is drawn
   again; the video has it behind the widgets as they are.
 

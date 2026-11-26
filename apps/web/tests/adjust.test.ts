@@ -231,12 +231,12 @@ describe('presets', () => {
 
   it('starts afresh from settings saved by an earlier version, and keeps its own', () => {
     expect(fromEarlierVersions({ preset: 'custom', camera: 'fixed' })).toEqual({
-      'saved-with': 'widgets',
+      'saved-with': 'label-positions',
     });
     expect(fromEarlierVersions({ camera: 'fixed', 'saved-with': 'separate-playback' })).toEqual({
-      'saved-with': 'widgets',
+      'saved-with': 'label-positions',
     });
-    const now = { preset: 'custom', camera: 'fixed', 'saved-with': 'widgets' };
+    const now = { preset: 'custom', camera: 'fixed', 'saved-with': 'label-positions' };
     expect(fromEarlierVersions(now)).toEqual(now);
   });
 });

@@ -112,10 +112,6 @@ export type FrameBox = { x: number; y: number; width: number; height: number };
  */
 export type OverlayBoxes = { widgets: (FrameBox | null)[]; watermark?: FrameBox };
 
-/**
- * A value as a widget shows it: its number ("1,147 km"), its words ("distance", none for a
- * date), and for some a short form with the words folded in ("↑1,200 m").
- */
 export type RenderOptions = {
   width: number;
   height: number;
@@ -907,13 +903,8 @@ export function createRenderer(
     const caloriesOf = (k: number) => (tracks[k]!.calories ?? 0) * timeline.progress(k, t);
     const texts = new Map<Metric, MetricValue>();
     /** A value with its name; its words are the name in lower case unless given. */
-    const set = (metric: Metric, value: string, name: string, label?: string, short?: string) =>
-      texts.set(metric, {
-        value,
-        name,
-        label: label ?? name.toLowerCase(),
-        ...(short === undefined ? {} : { short }),
-      });
+    const set = (metric: Metric, value: string, name: string, label = name.toLowerCase()) =>
+      texts.set(metric, { value, name, label });
     /** A value written in each of `formats`, the first its usual way, with its name. */
     const setFormats = <F extends ValueFormat>(
       metric: Metric,
@@ -925,18 +916,12 @@ export function createRenderer(
       for (const format of formats) all[format] = text(format);
       texts.set(metric, { ...all[formats[0]!]!, name, formats: all });
     };
-    /** A length of time in each time format; per activity with its short form. */
-    const setTime = (
-      metric: Metric,
-      seconds: number,
-      name: string,
-      label = name.toLowerCase(),
-      which?: 'avg' | 'max' | 'min',
-    ) =>
-      setFormats(metric, name, TIME_FORMATS, (format) => {
-        const value = durationText(seconds, format);
-        return { value, label, ...(which ? { short: `${value} ${which}` } : {}) };
-      });
+    /** A length of time in each time format. */
+    const setTime = (metric: Metric, seconds: number, name: string, label = name.toLowerCase()) =>
+      setFormats(metric, name, TIME_FORMATS, (format) => ({
+        value: durationText(seconds, format),
+        label,
+      }));
     /** For several activities a plain value is their total: "Total distance". */
     const total = (name: string) => (several ? `Total ${name.toLowerCase()}` : name);
     /** A distance in kilometers or miles, whole or to a tenth. */
@@ -978,8 +963,8 @@ export function createRenderer(
         const put = (which: 'avg' | 'max' | 'min', value: number) => {
           const id = `${which}-${metric}` as const;
           const named = `${which[0]!.toUpperCase()}${which.slice(1)} ${name}`;
-          if (text === 'time') setTime(id, value, named, `${which} ${words}`, which);
-          else set(id, text(value), named, `${which} ${words}`, `${text(value)} ${which}`);
+          if (text === 'time') setTime(id, value, named, `${which} ${words}`);
+          else set(id, text(value), named, `${which} ${words}`);
         };
         put('avg', values.reduce((sum, v) => sum + v, 0) / values.length);
         put('max', Math.max(...values));
@@ -1014,20 +999,18 @@ export function createRenderer(
 
     // Speed: the average while moving, as Strava and the totals card give it, and the fastest.
     const pace = paceText(onFoot, moved, metres, units);
-    set('avg-speed', pace, onFoot ? 'Avg pace' : 'Avg speed', undefined, `${pace} avg`);
+    set('avg-speed', pace, onFoot ? 'Avg pace' : 'Avg speed');
     const top = topSpeed(onFoot, fastest, units);
     const topText = `${top.value} ${top.unit}`;
-    set('max-speed', topText, onFoot ? 'Max pace' : 'Max speed', undefined, `${topText} max`);
+    set('max-speed', topText, onFoot ? 'Max pace' : 'Max speed');
 
     // Elevation.
     if (hasElevation) {
       const m = heightText;
-      set('climb', m(climbed), total('Climb'), undefined, `↑${m(climbed)}`);
-      set('descent', m(descended), total('Descent'), undefined, `↓${m(descended)}`);
-      if (Number.isFinite(highest))
-        set('max-elevation', m(highest), 'Max elevation', undefined, `${m(highest)} max`);
-      if (Number.isFinite(lowest))
-        set('min-elevation', m(lowest), 'Min elevation', undefined, `${m(lowest)} min`);
+      set('climb', m(climbed), total('Climb'));
+      set('descent', m(descended), total('Descent'));
+      if (Number.isFinite(highest)) set('max-elevation', m(highest), 'Max elevation');
+      if (Number.isFinite(lowest)) set('min-elevation', m(lowest), 'Min elevation');
     }
 
     // The sensors: averages over time, the highest and lowest, and as one activity plays.
@@ -1063,13 +1046,7 @@ export function createRenderer(
               ? sum.min
               : sum.now;
       const text = sensorValueText(channel, value, onFoot, units);
-      set(
-        metric,
-        text,
-        sensorName(channel, which),
-        undefined,
-        which === 'now' ? undefined : `${text} ${which}`,
-      );
+      set(metric, text, sensorName(channel, which));
     }
 
     // Calories so far, each activity's share as it plays.
@@ -1148,13 +1125,15 @@ export function createRenderer(
     }
     const value = values.get(widget.metric);
     if (!value) return { width: 0, height: 0 };
-    const { line, under } = valueLines(value, widget.label, widget.format);
+    const { above, line, under } = valueLines(value, widget.label, widget.format, widget.labelText);
     ctx.font = fontOf(600, VALUE_SIZE * scale);
     let width = ctx.measureText(line).width;
     let height = VALUE_SIZE * scale * 1.1;
-    if (under) {
+    // The words above or under take a line of their own, smaller.
+    const words = above || under;
+    if (words) {
       ctx.font = fontOf(400, LABEL_SIZE * scale);
-      width = Math.max(width, ctx.measureText(under).width);
+      width = Math.max(width, ctx.measureText(words).width);
       height += LABEL_SIZE * scale * 1.3;
     }
     return { width, height };
@@ -1189,10 +1168,22 @@ export function createRenderer(
       ctx.fillStyle = 'rgba(255, 255, 255, 0.92)';
       ctx.fillText(widget.text ?? options.title ?? '', cx, box.y0 + TEXT_SIZE * scale);
     } else if (widget.kind === 'metric') {
-      const { line, under } = valueLines(values.get(widget.metric)!, widget.label, widget.format);
+      const { above, line, under } = valueLines(
+        values.get(widget.metric)!,
+        widget.label,
+        widget.format,
+        widget.labelText,
+      );
+      // Words above push the value down by their line.
+      const top = above ? box.y0 + LABEL_SIZE * scale * 1.3 : box.y0;
+      if (above) {
+        ctx.font = fontOf(400, LABEL_SIZE * scale);
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.66)';
+        ctx.fillText(above, cx, box.y0 + LABEL_SIZE * scale);
+      }
       ctx.font = fontOf(600, VALUE_SIZE * scale);
       ctx.fillStyle = 'rgba(255, 255, 255, 0.94)';
-      ctx.fillText(line, cx, box.y0 + VALUE_SIZE * scale * 0.95);
+      ctx.fillText(line, cx, top + VALUE_SIZE * scale * 0.95);
       if (under) {
         ctx.font = fontOf(400, LABEL_SIZE * scale);
         ctx.fillStyle = 'rgba(255, 255, 255, 0.66)';

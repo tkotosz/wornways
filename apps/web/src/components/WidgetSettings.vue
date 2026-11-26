@@ -5,8 +5,9 @@
 // its label or its format, as the strip's chips open them.
 import {
   WIDGET_SIZE,
+  LABEL_MODES,
   formatsOf,
-  labelModes,
+  labelTextOf,
   valueLines,
   type LabelMode,
   type Metric,
@@ -34,15 +35,22 @@ function set(changed: Partial<Widget>): void {
 /** The label modes the value can take, each with how the value reads in it. */
 const modes = computed(() => {
   const widget = props.widget;
-  if (!props.labels || widget.kind !== 'metric' || widget.metric === 'date') return [];
+  if (!props.labels || widget.kind !== 'metric') return [];
   const value = props.values.get(widget.metric);
-  return labelModes(widget.metric).map((mode: LabelMode) => {
-    const lines = value ? valueLines(value, mode, widget.format) : null;
+  return LABEL_MODES.map((mode: LabelMode) => {
+    const lines = value ? valueLines(value, mode, widget.format, widget.labelText) : null;
     return {
       mode,
-      example: lines ? [lines.line, lines.under].filter(Boolean).join(' / ') : '',
+      example: lines ? [lines.above, lines.line, lines.under].filter(Boolean).join(' / ') : '',
     };
   });
+});
+/** The value's usual words, in its format: what its own words take the place of. */
+const usualWords = computed(() => {
+  const widget = props.widget;
+  if (widget.kind !== 'metric') return '';
+  const value = props.values.get(widget.metric);
+  return value ? labelTextOf(value, undefined, widget.format) : '';
 });
 /**
  * The formats the value can be written in, each with how it reads: the value alone over the
@@ -85,7 +93,7 @@ const shows = (part: 'size' | 'label' | 'format') => !props.only || props.only =
       </button>
     </div>
     <div v-if="shows('label') && widget.kind === 'metric' && modes.length" class="field">
-      <span id="widget-label" class="label" :class="{ 'visually-hidden': only }">Label</span>
+      <span id="widget-label" class="label">Position</span>
       <div class="modes" role="radiogroup" aria-labelledby="widget-label">
         <button
           v-for="m in modes"
@@ -100,6 +108,24 @@ const shows = (part: 'size' | 'label' | 'format') => !props.only || props.only =
           <span class="example">{{ m.example }}</span>
         </button>
       </div>
+    </div>
+    <div v-if="shows('label') && widget.kind === 'metric'" class="field">
+      <span id="widget-words" class="label">Label text</span>
+      <input
+        type="text"
+        aria-labelledby="widget-words"
+        :value="widget.labelText ?? usualWords"
+        :placeholder="usualWords ? `No words (usually “${usualWords}”)` : 'No words'"
+        @input="set({ labelText: ($event.target as HTMLInputElement).value })"
+      />
+      <button
+        v-if="widget.labelText !== undefined && widget.labelText !== usualWords"
+        type="button"
+        class="link"
+        @click="set({ labelText: undefined })"
+      >
+        Use the usual words, “{{ usualWords }}”
+      </button>
     </div>
     <div v-if="shows('format') && formats.length" class="field">
       <span id="widget-format" class="label" :class="{ 'visually-hidden': only }">Format</span>

@@ -377,7 +377,7 @@ export function loadAdjustments(): Adjustments {
  * are not carried over: the app starts afresh instead, as its settings have changed.
  */
 const SAVED_WITH = 'saved-with';
-const THIS_VERSION = 'widgets';
+const THIS_VERSION = 'label-positions';
 
 /** The adjustments as stored, when this version saved them; else a fresh start. */
 export function fromEarlierVersions(adjustments: Adjustments): Adjustments {
@@ -483,8 +483,9 @@ export const METRIC_GROUPS: { name: string; metrics: Metric[] }[] = [
 /** How a value's label modes are named: in the strip's chip and its sheet. */
 export const LABEL_MODE_NAMES: Record<LabelMode, string> = {
   off: 'Off',
-  short: 'Short',
-  inline: 'Inline',
+  before: 'Before',
+  after: 'After',
+  above: 'Above',
   under: 'Under',
 };
 

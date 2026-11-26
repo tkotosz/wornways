@@ -495,7 +495,11 @@ export function drawTotalsCard(
               format: widget.format,
             })
           : null;
-      return entry ? [{ widget, text: '', entry }] : [];
+      if (!entry) return [];
+      // Its own words in place of the usual ones, which say the unit.
+      const label =
+        widget.kind === 'metric' && widget.labelText !== undefined ? widget.labelText : entry.label;
+      return [{ widget, text: '', entry: { ...entry, label } }];
     },
   );
   if (shown.length === 0) return;

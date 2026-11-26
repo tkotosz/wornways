@@ -68,14 +68,14 @@ const unit = computed(
   () => (Math.min(props.size.width, props.size.height) / 1080 / props.size.width) * 100,
 );
 
-/** The text a widget shows: its line and the words under it; nothing for the chart. */
-function textOf(widget: Widget): { line: string; under: string } | null {
-  if (widget.kind === 'text') return { line: widget.text ?? props.title, under: '' };
+/** The text a widget shows: its line and the words above and under it; nothing for the chart. */
+function textOf(widget: Widget): { above: string; line: string; under: string } | null {
+  if (widget.kind === 'text') return { above: '', line: widget.text ?? props.title, under: '' };
   if (widget.kind === 'metric') {
     const value = props.values.get(widget.metric);
     return value
-      ? valueLines(value, widget.label, widget.format)
-      : { line: '…', under: widgetLabel(widget, props.values) };
+      ? valueLines(value, widget.label, widget.format, widget.labelText)
+      : { above: '', line: '…', under: widgetLabel(widget, props.values) };
   }
   return null;
 }
@@ -382,6 +382,7 @@ const story = computed(() => props.size.width / props.size.height < 0.8);
         class="metric"
         :class="{ dates: widget.metric === 'date' }"
       >
+        <span v-if="textOf(widget)!.above" class="words">{{ textOf(widget)!.above }}</span>
         <span class="value">{{ textOf(widget)!.line }}</span>
         <span v-if="textOf(widget)!.under" class="words">{{ textOf(widget)!.under }}</span>
       </span>

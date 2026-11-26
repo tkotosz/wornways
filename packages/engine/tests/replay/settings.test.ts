@@ -64,7 +64,7 @@ describe('parseSettings', () => {
     );
     // A total always has its words under it; the start time is for a single activity.
     expect(() => parseSettings({ 'totals-widgets': 'distance:off@30,50' })).toThrow(
-      '"distance" takes no label mode',
+      '"distance" takes its words in double quotes, not "off"',
     );
     expect(() => parseSettings({ 'totals-widgets': 'start@50,50' })).toThrow('is not a widget');
   });

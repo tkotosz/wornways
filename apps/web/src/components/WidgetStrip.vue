@@ -2,8 +2,8 @@
 // The chips for arranging widgets, in the strip under the picture (Overlay, and Ending with
 // the totals card). With no widget picked: adding a text or a metric, and the elevation chart
 // on or off. With one picked, the strip is that widget's: Done lets it go; Edit writes a
-// text's text; Size, Label and Format (a time, date or clock time) open their sheet; Remove
-// takes it off the picture. The section's own settings
+// text's text; Size, Label (where a value's words are, and what they say) and Format (a time,
+// date or clock time) open their sheet; Remove takes it off the picture. The section's own settings
 // stay in the slot, after the tools.
 import type { Widget } from '@wornways/engine';
 import { computed } from 'vue';
@@ -32,6 +32,14 @@ const emit = defineEmits<{
 const picked = computed(() =>
   props.selected === null ? null : (props.widgets[props.selected] ?? null),
 );
+/**
+ * The picked value's label chip: where its words are, or on the totals card, where they are
+ * always under it, that its words can be edited.
+ */
+const labelChip = computed(() => {
+  if (picked.value?.kind !== 'metric') return '';
+  return props.card ? 'Edit' : LABEL_MODE_NAMES[picked.value.label];
+});
 /** The picked value's format, when it is a time, a date or a clock time. */
 const format = computed(() => (picked.value ? formatOf(picked.value, props.card) : null));
 </script>
@@ -62,15 +70,15 @@ const format = computed(() => (picked.value ? formatOf(picked.value, props.card)
       <span class="value">{{ picked.size }}%</span>
     </button>
     <button
-      v-if="picked.kind === 'metric' && !card && picked.metric !== 'date'"
+      v-if="picked.kind === 'metric'"
       type="button"
       class="setting-row"
-      :aria-label="`Label: ${LABEL_MODE_NAMES[picked.label]}`"
+      :aria-label="`Label: ${labelChip}`"
       aria-haspopup="dialog"
       @click="emit('open', selected, 'label')"
     >
       <span>Label</span>
-      <span class="value">{{ LABEL_MODE_NAMES[picked.label] }}</span>
+      <span class="value">{{ labelChip }}</span>
     </button>
     <button
       v-if="format"

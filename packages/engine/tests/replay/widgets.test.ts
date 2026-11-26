@@ -3,7 +3,7 @@ import { METRICS } from '../../src/replay/render.ts';
 import { TOTALS_FIELDS } from '../../src/replay/totals-card.ts';
 import {
   defaultLabel,
-  labelModes,
+  labelTextOf,
   parseWidgets,
   valueLines,
   widgetsText,
@@ -39,14 +39,13 @@ describe('widgets as text', () => {
     ['time@1', 'expected x,y or x,y,size in percent after "time@" at character 7'],
     ['time@120,2', 'a place is from 0 to 100 percent, got 120,2'],
     ['time@1,2,300', 'a size is from 50 to 250 percent, got 300'],
-    ['distance:"x"@1,2', '"distance" takes the label mode off, inline, under, not ""'],
-    ['distance:short@1,2', '"distance" takes the label mode off, inline, under, not "short"'],
     [
-      'date:under@1,2',
-      '"date" takes the label mode off or the format dmy, dm, wdm, mdy, iso, not "under"',
+      'distance:short@1,2',
+      '"distance" takes the label mode off, before, after, above, under, its words in double quotes, not "short"',
     ],
-    ['moving:hm:hms@1,2', '"moving" takes the label mode off, inline, under or the format'],
-    ['distance:hm@1,2', '"distance" takes the label mode off, inline, under, not "hm"'],
+    ['distance:"a":"b"@1,2', 'not ""'],
+    ['distance:"open@1,2', 'the text has no closing double quote'],
+    ['moving:hm:hms@1,2', 'its words in double quotes, the format hms, hm, h, d, not "hms"'],
     ['elevation-chart:off@1,2', '"elevation-chart" takes no label mode'],
     ['text:"open@1,2', 'the text has no closing double quote'],
   ])('rejects %j', (text, message) => {
@@ -56,10 +55,10 @@ describe('widgets as text', () => {
 
 describe('formats', () => {
   it('takes a time, date or clock format after the label mode, or alone, and writes it back', () => {
-    const text = 'moving:inline:hm@20,80;date:dm@50,8;start:12h@50,20;time@10,10';
+    const text = 'moving:after:hm@20,80;date:dm@50,8;start:12h@50,20;time@10,10';
     const widgets = parseWidgets(text, METRICS);
     expect(widgets.map((w) => (w.kind === 'metric' ? [w.label, w.format] : null))).toEqual([
-      ['inline', 'hm'],
+      ['after', 'hm'],
       ['off', 'dm'],
       ['under', '12h'],
       ['under', undefined],
@@ -72,44 +71,76 @@ describe('formats', () => {
     expect(widgetsText(card, { labels: false })).toBe('moving:hm@1,2;time@1,2');
   });
 
-  it('writes a value in the format picked, its words and short form with it', () => {
+  it('writes a value in the format picked, with its words in that format', () => {
     const longest = {
       value: '5:15:00',
       label: 'max time per ride',
-      short: '5:15:00 max',
       name: 'Max time per activity',
       formats: {
-        hm: { value: '5:15', label: 'max time per ride', short: '5:15 max' },
-        d: { value: '0.2 days', label: 'max time per ride', short: '0.2 days max' },
+        hm: { value: '5:15', label: 'max time per ride' },
+        d: { value: '0.2 days', label: 'max time per ride' },
       },
     };
     expect(valueLines(longest, 'under', 'hm')).toEqual({
+      above: '',
       line: '5:15',
       under: 'max time per ride',
     });
-    expect(valueLines(longest, 'short', 'd')).toEqual({ line: '0.2 days max', under: '' });
-    expect(valueLines(longest, 'off')).toEqual({ line: '5:15:00', under: '' });
+    expect(valueLines(longest, 'after', 'd')).toEqual({
+      above: '',
+      line: '0.2 days max time per ride',
+      under: '',
+    });
+    expect(valueLines(longest, 'off')).toEqual({ above: '', line: '5:15:00', under: '' });
   });
 });
 
-describe('label modes', () => {
+describe('labels', () => {
+  const climbed = { value: '1,200 m', label: 'climbed', name: 'Climb' };
+
   it('start with the words under the value, except the date, which has none', () => {
     expect(defaultLabel('climb')).toBe('under');
     expect(defaultLabel('avg-heart-rate')).toBe('under');
-    expect(defaultLabel('count')).toBe('under');
-    expect(defaultLabel('distance')).toBe('under');
     expect(defaultLabel('date')).toBe('off');
-    // A short form for the climb's arrows and the avg, max and min values.
-    expect(labelModes('climb')).toEqual(['off', 'short', 'inline', 'under']);
-    expect(labelModes('max-power')).toEqual(['off', 'short', 'inline', 'under']);
-    expect(labelModes('count')).toEqual(['off', 'inline', 'under']);
   });
 
-  it('write a value alone, in its short form, with its words after it or under it', () => {
-    const climbed = { value: '1,200 m', label: 'climbed', short: '↑1,200 m', name: 'Climb' };
-    expect(valueLines(climbed, 'off')).toEqual({ line: '1,200 m', under: '' });
-    expect(valueLines(climbed, 'short')).toEqual({ line: '↑1,200 m', under: '' });
-    expect(valueLines(climbed, 'inline')).toEqual({ line: '1,200 m climbed', under: '' });
-    expect(valueLines(climbed, 'under')).toEqual({ line: '1,200 m', under: 'climbed' });
+  it('put the words before, after, above or under the value, or leave them out', () => {
+    const lines = (mode: Parameters<typeof valueLines>[1]) => valueLines(climbed, mode);
+    expect(lines('off')).toEqual({ above: '', line: '1,200 m', under: '' });
+    expect(lines('before')).toEqual({ above: '', line: 'climbed 1,200 m', under: '' });
+    expect(lines('after')).toEqual({ above: '', line: '1,200 m climbed', under: '' });
+    expect(lines('above')).toEqual({ above: 'climbed', line: '1,200 m', under: '' });
+    expect(lines('under')).toEqual({ above: '', line: '1,200 m', under: 'climbed' });
+  });
+
+  it('take words of their own in place of the usual ones, and none for an empty text', () => {
+    expect(valueLines(climbed, 'before', undefined, '↑')).toEqual({
+      above: '',
+      line: '↑ 1,200 m',
+      under: '',
+    });
+    expect(valueLines(climbed, 'under', undefined, '')).toEqual({
+      above: '',
+      line: '1,200 m',
+      under: '',
+    });
+    expect(labelTextOf(climbed)).toBe('climbed');
+    expect(labelTextOf(climbed, 'up')).toBe('up');
+  });
+
+  it('write words of their own in double quotes, back as they were read', () => {
+    const text = 'distance:above:"so \\"far\\""@20,80;climb:"↑":before@50,80;count:""@1,2';
+    const widgets = parseWidgets(text, METRICS);
+    expect(widgets.map((w) => (w.kind === 'metric' ? [w.label, w.labelText] : null))).toEqual([
+      ['above', 'so "far"'],
+      ['before', '↑'],
+      ['under', ''],
+    ]);
+    expect(widgetsText(widgets)).toBe(
+      'distance:above:"so \\"far\\""@20,80;climb:before:"↑"@50,80;count:""@1,2',
+    );
+    // On the totals card too, where the words are always under.
+    const card = parseWidgets('distance:"km together"@1,2', TOTALS_FIELDS, { labels: false });
+    expect(widgetsText(card, { labels: false })).toBe('distance:"km together"@1,2');
   });
 });

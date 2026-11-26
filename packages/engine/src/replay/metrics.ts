@@ -122,8 +122,8 @@ export const SINGLE_ONLY = [
   'temperature-now',
 ] as const satisfies readonly Metric[];
 
-/** A value's text: its number with the unit, its words, and its short form where it has one. */
-export type MetricText = { value: string; label: string; short?: string };
+/** A value's text: its number with the unit, and its words. */
+export type MetricText = { value: string; label: string };
 
 /**
  * A value as a widget shows it: its text in the usual format, its name for this video ("Total

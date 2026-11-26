@@ -390,12 +390,13 @@ export const SETTINGS: readonly SettingDefinition[] = [
       'down, with a size in percent (50 to 250, 100 when left out), separated by ";": ' +
       'text:"Your text"@x,y,size (text@x,y for the title), a value such as distance@x,y,size, ' +
       'or elevation-chart@x,y,size. Later widgets are drawn over earlier ones; "" draws none. ' +
-      'A value takes a label mode after a colon, as count:off@x,y: off (the value alone), ' +
-      'short (its own short form: ↑1,200 m, 142 bpm avg, 45 km/h max; for the climb, the ' +
-      'descent and the avg-, max- and min- values), inline (25 activities) or under (the ' +
-      'words on a line under it). Left out, a value has its words under it; the date has ' +
-      'none. A time, a date or a clock time also takes a format after a colon, as ' +
-      'moving:hm@x,y or moving:inline:hm@x,y: a time hms (54:38:25, the usual), hm (54:38), ' +
+      'A value takes a label mode after a colon, as count:after@x,y: off (the value alone), ' +
+      'before (total distance 1,147 km), after (25 activities), above or under (its words ' +
+      'smaller, on a line above or under it). Left out, a value has its words under it; the ' +
+      'date has none. Its own words, in double quotes after a colon, take the place of its ' +
+      'usual ones, as distance:above:"so far"@x,y; "" leaves them out. A time, a date or a ' +
+      'clock time also takes a format after a colon, as moving:hm@x,y or ' +
+      'moving:after:hm@x,y: a time hms (54:38:25, the usual), hm (54:38), ' +
       'h (55 h) or d (2.3 days); the date dmy (8 May 2026, the usual), dm (8 May), wdm ' +
       '(Fri 8 May), mdy (May 8, 2026) or iso (2026-05-08); start and time-of-day 24h (06:42, ' +
       'the usual) or 12h (6:42 AM). ' +
@@ -431,6 +432,8 @@ export const SETTINGS: readonly SettingDefinition[] = [
     help:
       'What the totals card shows, as --widgets is written: text:"Your text"@x,y,size ' +
       `(text@x,y for the title) and totals such as distance@x,y,size: ${TOTALS_FIELDS.join(', ')}. ` +
+      'A total has its words under it, its usual ones ("km in total") unless it has its own, ' +
+      'as distance:"km together"@x,y. ' +
       'As totals over every activity: count, time (hours, stops included), moving, distance, ' +
       'climb, descent and calories are added up; days are the calendar days from the first ' +
       'activity to the last, moving-days the days with an activity; avg-, max- and min- ' +
