@@ -608,6 +608,26 @@ test('shares the video where the browser can share files', async ({ page, contex
   expect(size).toBeGreaterThan(10_000);
 });
 
+test("says when the place filter's map cannot be loaded, and keeps the place to type", async ({
+  page,
+}) => {
+  page.setDefaultTimeout(15_000);
+  // The map's file is not there, as for a page opened before the app was updated.
+  await page.route(/\/assets\/PlacePicker-.*\.js$/, (route) => route.fulfill({ status: 404 }));
+  await page.goto('/');
+  await addFiles(page, 'morning-ride.fit', 'trail-run.tcx');
+  await toActivities(page);
+  await pickPeriod(page);
+  await page.getByLabel('Starts near a place').check();
+  const start = page.getByTestId('start-near');
+  await expect(start.getByTestId('map-unavailable')).toContainText('The map could not be loaded');
+  await expect(start.getByRole('button', { name: 'Reload' })).toBeVisible();
+  await start.getByLabel('Start place').fill('10, 10');
+  await expect(page.getByRole('alert')).toHaveText(
+    'None of these activities starts near the chosen place.',
+  );
+});
+
 test('sets a start place as typed, from the current location or on the map', async ({
   page,
   context,

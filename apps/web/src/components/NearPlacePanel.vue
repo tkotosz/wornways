@@ -6,9 +6,19 @@ import { defineAsyncComponent, onBeforeUnmount, onMounted, ref, watch } from 'vu
 import type { NearChoice } from '../choice.ts';
 import type { EngineClient } from '../engine-client.ts';
 import ExactNumber from './ExactNumber.vue';
+import MapUnavailable from './MapUnavailable.vue';
 
-// The map is a large library, so it is loaded only when a panel shows.
-const PlacePicker = defineAsyncComponent(() => import('./PlacePicker.vue'));
+// The map is a large library, so it is loaded only when a panel shows. Its file can fail to
+// come (a network hiccup is tried again once); when it does not come, the panel says so, with
+// a way to reload, instead of showing nothing where the map should be.
+const PlacePicker = defineAsyncComponent({
+  loader: () => import('./PlacePicker.vue'),
+  errorComponent: MapUnavailable,
+  onError(_error, retry, fail, attempts) {
+    if (attempts <= 1) retry();
+    else fail();
+  },
+});
 
 const props = defineProps<{
   engine: EngineClient;
