@@ -20,7 +20,7 @@ import {
   type ValueFormat,
   type Widget,
 } from '@wornways/engine';
-import { computed } from 'vue';
+import { computed, reactive } from 'vue';
 import {
   COLOR_NAMES,
   FORMAT_NAMES,
@@ -117,6 +117,16 @@ const sizeParts = computed(() => {
     },
   ];
 });
+/**
+ * The sizes while a slider is dragged, shown at once; the widget takes one when the slider is
+ * let go, as the other sliders do.
+ */
+const dragged = reactive(new Map<string, number>());
+function commit(part: { label: string; set: (value: number) => void }): void {
+  const value = dragged.get(part.label);
+  dragged.delete(part.label);
+  if (value !== undefined) part.set(value);
+}
 const shows = (part: WidgetPart) => !props.only || props.only === part;
 </script>
 
@@ -261,15 +271,16 @@ const shows = (part: WidgetPart) => !props.only || props.only === part;
           :min="WIDGET_SIZE.min"
           :max="WIDGET_SIZE.max"
           step="5"
-          :value="part.value"
+          :value="dragged.get(part.label) ?? part.value"
           :aria-label="part.label"
-          @change="part.set(Number(($event.target as HTMLInputElement).value))"
+          @input="dragged.set(part.label, Number(($event.target as HTMLInputElement).value))"
+          @change="commit(part)"
         />
         <ExactNumber
           :label="`Exact ${part.label.toLowerCase()} (%)`"
           :min="WIDGET_SIZE.min"
           :max="WIDGET_SIZE.max"
-          :value="part.value"
+          :value="dragged.get(part.label) ?? part.value"
           unit="%"
           @change="part.set($event)"
         />

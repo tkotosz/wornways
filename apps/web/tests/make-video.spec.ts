@@ -784,6 +784,8 @@ test('sets up the video and its text, and keeps both for the next visit', async 
   await expect(text.getByRole('textbox', { name: 'Text' })).toHaveValue('27 Apr – 2 May 2026');
   await text.getByRole('textbox', { name: 'Text' }).fill('Spring');
   await text.getByRole('slider', { name: 'Size' }).fill('150');
+  // The number beside it follows the slider while it is dragged.
+  await expect(text.getByRole('spinbutton', { name: 'Exact size (%)' })).toHaveValue('150');
   await text.getByRole('slider', { name: 'Size' }).dispatchEvent('change');
   await text.getByRole('button', { name: 'Done' }).click();
   await expect(titleRow).toHaveAccessibleName('Text: Spring');
