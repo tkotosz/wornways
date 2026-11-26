@@ -64,7 +64,8 @@ function tapped(event: MouseEvent): void {
 /* Docked: the height of the window under the top bar, over the section's settings. */
 .sheet.docked {
   position: fixed;
-  inset: var(--top-bar-height, 0px) 0 0 auto;
+  /* Over the settings column: at the window's right, or the editor's when it is narrower. */
+  inset: var(--top-bar-height, 0px) max(0px, (100vw - var(--studio-width)) / 2 + 1px) 0 auto;
   z-index: 5;
   width: var(--inspector-width);
   height: auto;

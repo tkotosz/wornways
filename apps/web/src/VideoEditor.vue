@@ -558,11 +558,18 @@ function arrangeInLayout(): void {
 <style scoped>
 /* Wide screens: the window under the top bar, in three columns that each scroll by
    themselves: the sections, the picture with its tools, the settings. */
+/* On a very wide window, no wider than --studio-width, in the middle, with a line each side,
+   so the picture and its settings stay close. */
 .studio {
   display: grid;
   flex: 1;
   grid-template-columns: 5.5rem minmax(0, 1fr) var(--inspector-width);
+  box-sizing: border-box;
+  width: 100%;
+  max-width: var(--studio-width);
   min-height: 0;
+  margin-inline: auto;
+  border-inline: 1px solid var(--line);
 }
 
 .rail {
