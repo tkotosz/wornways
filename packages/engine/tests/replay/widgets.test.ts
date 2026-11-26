@@ -6,7 +6,6 @@ import {
   defaultLabel,
   hasUnit,
   labelTextOf,
-  lineParts,
   parseWidgets,
   valueLines,
   widgetsText,
@@ -123,24 +122,6 @@ describe('labels', () => {
     expect(lines('after')).toEqual({ above: '', line: '1,200 m climbed', under: '' });
     expect(lines('above')).toEqual({ above: 'climbed', line: '1,200 m', under: '' });
     expect(lines('under')).toEqual({ above: '', line: '1,200 m', under: 'climbed' });
-  });
-
-  it('split a line into what goes before the number, the number, and the unit after it', () => {
-    expect(lineParts(climbed, 'under')).toEqual({ head: '', number: '1,200', tail: ' m' });
-    expect(lineParts(climbed, 'after')).toEqual({ head: '', number: '1,200', tail: ' m climbed' });
-    expect(lineParts(climbed, 'before', undefined, 'up')).toEqual({
-      head: 'up ',
-      number: '1,200',
-      tail: ' m',
-    });
-    expect(lineParts(climbed, 'off', undefined, undefined, false)).toEqual({
-      head: '',
-      number: '1,200',
-      tail: '',
-    });
-    // All number: a time.
-    const time = { value: '1:19:40', number: '1:19:40', label: 'time', name: 'Time' };
-    expect(lineParts(time, 'off')).toEqual({ head: '', number: '1:19:40', tail: '' });
   });
 
   it('take words of their own in place of the usual ones, and none for an empty text', () => {

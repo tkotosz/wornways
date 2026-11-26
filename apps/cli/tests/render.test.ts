@@ -686,7 +686,7 @@ describe('widgets', () => {
     expect(at(true)).toBeGreaterThan(at(false) * 1.2);
   });
 
-  it('keeps the icon at the left and the unit at the right while the number counts', () => {
+  it('keeps a value still while its number counts: equal digits, from a fixed place', () => {
     // A ride over 10 km, so the distance gains a digit as it counts.
     const long = route();
     for (let i = 0; i < long.points.length / STRIDE; i++) long.points[i * STRIDE] = 19 + i * 0.0012;
@@ -727,9 +727,12 @@ describe('widgets', () => {
         lefts.add(left);
         rights.add(right);
       }
-      // The unit, at the right, does not move; nor does the icon, at the left.
-      expect([...rights], `icon ${icon}`).toHaveLength(1);
+      // The icon does not move; a number without one starts where it did, its first digit's
+      // own shape aside. Its digits all as wide, the unit after it moves only when the
+      // number gains a digit, at 10 km.
       if (icon) expect([...lefts]).toHaveLength(1);
+      else expect(Math.max(...lefts) - Math.min(...lefts)).toBeLessThanOrEqual(2);
+      expect([...rights].length, `icon ${icon}`).toBeLessThanOrEqual(2);
     }
   });
 

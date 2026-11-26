@@ -12,7 +12,8 @@ import {
   type ChartKind,
   type ChartProfile,
 } from './charts.ts';
-import { WIDGET_SIZE, defaultLabel, lineParts, valueLines, type Widget } from './widgets.ts';
+import { WIDGET_SIZE, defaultLabel, valueLines, type Widget } from './widgets.ts';
+import { fillTabular, tabularWidth } from './tabular.ts';
 import { arrangeInLayout, layoutSlots, type LayoutName } from './layouts.ts';
 import { END_CARD_S, drawEndCard, endCardFrames } from './end-card.ts';
 import {
@@ -683,8 +684,6 @@ export function createRenderer(
 
   /** Each value widget's line at its widest, in its font. */
   const widestLines = new Map<Widget, number>();
-  /** The widest digit of each font. */
-  const widestDigits = new Map<string, string>();
   /** Each value as it stands at the end of the replay, for laying widgets out. */
   const finalValues = metricValues(timeline.duration, finished());
   const startValues = metricValues(0);
@@ -1208,20 +1207,10 @@ export function createRenderer(
   }
 
   /**
-   * How wide a value widget's line can get while its number counts, the context's font set to
-   * its value's: its line at the start and at the end, and `line` now, each with every digit
-   * as the font's widest, so no number in between is wider.
+   * How wide a value widget's line gets, with tabular figures, the context's font set to its
+   * value's: at the start, at the end, or now, the widest (a count gains a digit, or loses one).
    */
   function widestLine(widget: Widget & { kind: 'metric' }, line: string): number {
-    let digit = widestDigits.get(ctx.font);
-    if (digit === undefined) {
-      digit = [...'0123456789'].reduce((a, b) =>
-        ctx.measureText(b).width > ctx.measureText(a).width ? b : a,
-      );
-      widestDigits.set(ctx.font, digit);
-    }
-    const wide = digit;
-    const widest = (text: string) => ctx.measureText(text.replace(/[0-9]/g, wide)).width;
     let known = widestLines.get(widget);
     if (known === undefined) {
       known = 0;
@@ -1229,11 +1218,11 @@ export function createRenderer(
         const value = values.get(widget.metric);
         if (!value) continue;
         const lines = valueLines(value, widget.label, widget.format, widget.labelText, widget.unit);
-        known = Math.max(known, widest(lines.line));
+        known = Math.max(known, tabularWidth(ctx, lines.line));
       }
       widestLines.set(widget, known);
     }
-    return Math.max(known, widest(line));
+    return Math.max(known, tabularWidth(ctx, line));
   }
 
   /**
@@ -1271,28 +1260,14 @@ export function createRenderer(
       ctx.font = fontOf(600, VALUE_SIZE * scale);
       ctx.fillStyle = 'rgba(255, 255, 255, 0.94)';
       const baseline = top + VALUE_SIZE * scale * 0.95;
-      // Set by the line at its widest, so nothing moves while the number counts: the icon and
-      // the words before the number at the left, the unit and the words after it at the right,
-      // the number against the unit.
+      // Its digits all as wide, as a counter's are, so the number keeps its width while it
+      // counts; the line set from a fixed place after the icon, by its widest, so neither
+      // moves, the unit right after the number.
       const size = VALUE_SIZE * scale;
       const room = widget.icon ? iconRoom(size) : 0;
-      const width = room + widestLine(widget, line);
-      let left = cx - width / 2;
-      const right = left + width;
+      let left = cx - (room + widestLine(widget, line)) / 2;
       if (widget.icon) left = drawIconBefore(ctx, iconOf(widget.metric), left, baseline, size);
-      const { head, number, tail } = lineParts(
-        values.get(widget.metric)!,
-        widget.label,
-        widget.format,
-        widget.labelText,
-        widget.unit,
-      );
-      ctx.textAlign = 'left';
-      ctx.fillText(head, left, baseline);
-      ctx.textAlign = 'right';
-      ctx.fillText(tail, right, baseline);
-      ctx.fillText(number, right - ctx.measureText(tail).width, baseline);
-      ctx.textAlign = 'center';
+      fillTabular(ctx, line, left, baseline);
       if (under) {
         ctx.font = fontOf(400, LABEL_SIZE * scale);
         ctx.fillStyle = 'rgba(255, 255, 255, 0.66)';

@@ -8,6 +8,7 @@
 
 import { averagePace, topSpeed } from './pace.ts';
 import { drawIconBefore, iconOf, iconRoom, type IconName } from './icons.ts';
+import { fillTabular, tabularWidth } from './tabular.ts';
 import {
   DATE_FORMATS,
   TIME_FORMATS,
@@ -527,23 +528,17 @@ export function drawTotalsCard(
     /** Draws the number, white, centered on `x` with its baseline at `y`, its icon before it. */
     const number = (y: number) => {
       ctx.fillStyle = 'rgba(255, 255, 255, 0.96)';
-      // Set by the number as it ends, both smaller when too wide, so nothing moves while it
-      // counts up: the icon at the left, the unit at the right, the number against the unit.
+      // Its digits all as wide, set from a fixed place by the number as it ends (both smaller
+      // when too wide), so nothing moves while it counts up: the icon, then the number and
+      // its unit right after it.
       ctx.font = `700 ${Math.round(size)}px ${fontFamily}`;
       const room = (px: number) => (icon ? iconRoom(px) : 0);
-      const k = Math.min(1, width / (room(size) + ctx.measureText(widest).width));
+      const k = Math.min(1, width / (room(size) + tabularWidth(ctx, widest)));
       const fontSize = size * k;
       ctx.font = `700 ${Math.round(fontSize)}px ${fontFamily}`;
-      const full = room(fontSize) + ctx.measureText(widest).width;
-      const left = x - full / 2;
-      const right = left + full;
-      if (icon) drawIconBefore(ctx, icon, left, y, fontSize);
-      const digits = entry.value.startsWith(entry.number) ? entry.number : entry.value;
-      const unit = entry.value.slice(digits.length);
-      ctx.textAlign = 'right';
-      ctx.fillText(unit, right, y);
-      ctx.fillText(digits, right - ctx.measureText(unit).width, y);
-      ctx.textAlign = 'center';
+      let left = x - (room(fontSize) + tabularWidth(ctx, widest)) / 2;
+      if (icon) left = drawIconBefore(ctx, icon, left, y, fontSize);
+      fillTabular(ctx, entry.value, left, y);
     };
     /** Draws the words, smaller in orange, centered on `x` with their baseline at `y`. */
     const words = (y: number) => {
@@ -583,8 +578,9 @@ export function drawTotalsCard(
     const wordsFont = (k: number) => `500 ${Math.round(labelSize * k)}px ${fontFamily}`;
     const measure = (k: number) => {
       ctx.font = numberFont(k);
-      // Laid out by the number as it ends, so nothing moves while it counts up.
-      const n = ctx.measureText(widest).width;
+      // Laid out by the number as it ends, its digits all as wide, so nothing moves while it
+      // counts up.
+      const n = tabularWidth(ctx, widest);
       ctx.font = wordsFont(k);
       const w = ctx.measureText(entry.label).width;
       return { n, w, space: labelSize * k * 0.35, room: icon ? iconRoom(size * k) : 0 };
@@ -601,7 +597,7 @@ export function drawTotalsCard(
     ctx.textAlign = 'left';
     ctx.font = numberFont(k);
     ctx.fillStyle = 'rgba(255, 255, 255, 0.96)';
-    ctx.fillText(entry.value, numberX, y);
+    fillTabular(ctx, entry.value, numberX, y);
     ctx.font = wordsFont(k);
     ctx.fillStyle = 'rgba(255, 176, 102, 0.9)';
     ctx.fillText(entry.label, wordsX, y);

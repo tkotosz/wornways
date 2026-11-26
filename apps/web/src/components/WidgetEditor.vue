@@ -814,6 +814,8 @@ const story = computed(() => props.size.width / props.size.height < 0.8);
 
 .metric .value {
   display: block;
+  /* Its digits all as wide, as the video draws them. */
+  font-variant-numeric: tabular-nums;
   font-size: calc(var(--unit) * 52 * var(--size) * 1cqw);
   line-height: 1.1;
 }
