@@ -345,9 +345,11 @@ const presetName = computed(() =>
     : null,
 );
 const store = computed(() => {
-  if (chosen.value === 'files') return 'Files on this device';
-  if (chosen.value === 'strava' && stravaConnected.value) return 'Strava connection';
-  if (chosen.value === 'rwgps' && rwgps.connected.value) return 'Ride with GPS connection';
+  if (chosen.value === 'files') return { label: 'Files on this device', caption: 'Files' };
+  if (chosen.value === 'strava' && stravaConnected.value)
+    return { label: 'Strava connection', caption: 'Connection' };
+  if (chosen.value === 'rwgps' && rwgps.connected.value)
+    return { label: 'Ride with GPS connection', caption: 'Connection' };
   return null;
 });
 

@@ -39,7 +39,8 @@ after that the top bar opens any of them, at any time.
 └──────────────────────────────────────────────────────────────────────────┘
 ```
 
-**The top bar.** At the left, icons without captions, to leave room on a phone; each tells
+**The top bar.** At the left, icons with a short caption under each, the same whatever is
+set (Menu, Activities, Files or Connection, Preset), so the bar keeps its width; each tells
 screen readers what it opens and what is set: the menu (☰); the activities, with how many
 the video shows as a badge ("Activities: 25"); what the source keeps on the device (files,
 or a service's connection; not for the demo); and the preset ("Preset: Recap"). At the
@@ -47,7 +48,7 @@ right, Render, the main button. Before activities are chosen, the activities and
 icons and Render are disabled.
 
 **The menu** slides in from the left over the dimmed screen: the mark, the name and the
-version, "Your files stay on this device", then Switch source (with the source in use),
+version, then Switch source (with the source in use),
 Install app (where offered, see Install), About (what the app is, its license, the source
 on GitHub and the licenses) and the privacy policy, a page of its own. Back, Escape, a tap
 beside it or picking an item closes it.

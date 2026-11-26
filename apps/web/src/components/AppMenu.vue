@@ -39,7 +39,6 @@ function tapped(event: MouseEvent): void {
           <span class="version" data-testid="version" :title="version">{{ version }}</span>
         </span>
       </div>
-      <p class="promise">Your files stay on this device</p>
 
       <nav aria-label="Menu items">
         <button type="button" class="item" @click="emit('source')">
@@ -121,6 +120,7 @@ function tapped(event: MouseEvent): void {
   display: flex;
   align-items: center;
   gap: 0.6rem;
+  margin-bottom: 1rem;
   padding: 0.25rem 0.7rem;
 }
 
@@ -156,12 +156,6 @@ function tapped(event: MouseEvent): void {
   line-height: 0.75rem;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.promise {
-  margin: 0.6rem 0.7rem 1rem;
-  color: var(--muted);
-  font-size: 0.8rem;
 }
 
 .item {
