@@ -75,22 +75,19 @@ test('arranges the totals card as widgets: the totals without the title, then mo
   await totals.getByRole('button', { name: / Moving days$/ }).click();
   await expect(onCard).toHaveCount(5);
   await expect(page.getByTestId('widget-4')).toContainText('moving day');
-  // Picked, a total's words go where its label chip puts them, in words of its own.
-  await page.getByRole('button', { name: 'Label position: Under' }).click();
-  const label = page.getByRole('dialog', { name: 'Moving days: label position' });
+  // Picked, its settings open beside the picture: its words go where its label position puts
+  // them, in words of its own.
+  const picked = page.getByRole('dialog', { name: 'Moving days' });
+  const label = picked.getByRole('radiogroup', { name: 'Label position' });
+  await expect(label.getByRole('radio', { name: /^Under/ })).toBeChecked();
   await label.getByRole('radio', { name: /^After/ }).click();
   await expect(page.getByTestId('widget-4').locator('.words.beside.after')).toHaveText(
     /moving days?/,
   );
   await label.getByRole('radio', { name: /^Above/ }).click();
   await expect(page.getByTestId('widget-4').locator('.words.above')).toHaveText(/moving days?/);
-  await label.getByRole('button', { name: 'Done' }).click();
-  await expect(page.getByRole('button', { name: 'Label position: Above' })).toBeVisible();
-  await page.getByRole('button', { name: /^Label text: / }).click();
-  const text = page.getByRole('dialog', { name: 'Moving days: label text' });
-  await text.getByRole('textbox', { name: 'Label text' }).fill('days on the bike');
+  await picked.getByRole('textbox', { name: 'Label text' }).fill('days on the bike');
   await expect(page.getByTestId('widget-4')).toContainText('days on the bike');
-  await text.getByRole('button', { name: 'Done' }).click();
   await page.getByRole('button', { name: '✓ Done' }).click();
   await page.getByRole('button', { name: 'Add a text' }).click();
   await page.keyboard.type('What a spring');

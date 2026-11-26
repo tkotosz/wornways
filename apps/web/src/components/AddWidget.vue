@@ -1,9 +1,8 @@
 <script setup lang="ts">
-// The widgets that can be added: text, the charts (`charts`: the ones these activities can
-// show, each with its icon in its color), and each value this video can show, as tiles with
-// the video's own number, grouped by what they measure (time, distance, speed, elevation, the
-// sensors…); a group shows only when the video has one of its values. With `only`, just the
-// values or just the charts, as the strip's chips open them.
+// The widgets that can be added, as the strip's chips open them (`only`): the charts (the ones
+// these activities can show, each with its icon in its color), or each value this video can
+// show, as tiles with the video's own number, grouped by what they measure (time, distance,
+// speed, elevation, the sensors…); a group shows only when the video has one of its values.
 // Calories a service gives only on request are offered before they are known.
 // A value or a chart already on the picture is dimmed; each shows once. A new widget comes in
 // the middle of the picture (a chart along the bottom).
@@ -28,8 +27,8 @@ const props = defineProps<{
   charts: ChartKind[];
   /** Whether calories can be shown, also before they are fetched. */
   hasCalories: boolean;
-  /** Only the values, or only the charts. */
-  only?: 'values' | 'charts';
+  /** The values, or the charts. */
+  only: 'values' | 'charts';
 }>();
 const emit = defineEmits<{ add: [widget: Widget] }>();
 
@@ -53,21 +52,7 @@ const groups = computed(() =>
 
 <template>
   <div class="add-widget">
-    <template v-if="!only">
-      <h3 class="setting-rows-title">Text</h3>
-      <div class="tiles">
-        <button
-          type="button"
-          class="tile"
-          @click="emit('add', { kind: 'text', text: 'Your text', x: 50, y: 50, size: 100 })"
-        >
-          <b aria-hidden="true">Aa</b>
-          <span>Text</span>
-        </button>
-      </div>
-    </template>
-    <section v-if="only !== 'values' && charts.length" aria-label="Charts">
-      <h3 v-if="!only" class="setting-rows-title">Charts</h3>
+    <section v-if="only === 'charts' && charts.length" aria-label="Charts">
       <div class="tiles">
         <button
           v-for="chart in charts"

@@ -371,9 +371,9 @@ test('fetches calories only for a video that shows them, and keeps them', async 
 
   // Offered before any is known, and not asked for until added to the picture.
   expect(mock.calories).toEqual([]);
-  await page.getByRole('button', { name: 'Add a widget' }).click();
+  await page.getByRole('button', { name: 'Add a stat' }).click();
   await page
-    .getByRole('dialog', { name: 'Add a widget' })
+    .getByRole('dialog', { name: 'Stats' })
     .getByRole('button', { name: / Calories$/ })
     .click();
   const calories = page.getByRole('button', { name: /^Calories/ });

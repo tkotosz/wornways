@@ -28,7 +28,7 @@ function outside(event: MouseEvent): void {
 </script>
 
 <template>
-  <div class="text-editor" role="dialog" aria-label="Text" @click="outside">
+  <div class="text-editor" role="dialog" aria-label="Write the text" @click="outside">
     <input
       ref="input"
       v-model="value"

@@ -15,6 +15,8 @@
   --accent: #ff8a2a;
   --accent-strong: #ff5a1f;
   --danger: #ff8a80;
+  /* Wide screens: the editor's settings column, and a setting opened in its place. */
+  --inspector-width: clamp(18rem, 26vw, 24rem);
   color-scheme: dark;
   font-family: 'Inter', system-ui, sans-serif;
   background: var(--background);

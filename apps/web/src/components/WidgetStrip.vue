@@ -5,7 +5,9 @@
 // text; Size, Label position (where a value's words are), Label text (what they say), Unit
 // (on or off, for a value that has one), Format (a time, date or clock time) and Color (a
 // chart's) open their sheet; Icon turns a value's icon on or off in place; Remove takes it off
-// the picture. The section's own settings stay in the slot, after the tools.
+// the picture. The section's own settings stay in the slot, after the tools. Wide screens
+// (`beside`): a picked widget's settings open beside the picture, so the strip only lets it
+// go and says where they are.
 import {
   defaultChartColor,
   hasUnit,
@@ -20,6 +22,7 @@ import {
   FORMAT_NAMES,
   LABEL_MODE_NAMES,
   formatOf,
+  widgetLabel,
   type WidgetPart,
 } from '../adjust.ts';
 
@@ -36,6 +39,8 @@ const props = defineProps<{
   layout: string;
   /** Whether the layout's slots show as guides. */
   guides: boolean;
+  /** Whether a picked widget's settings show beside the picture, not in the strip. */
+  beside?: boolean;
 }>();
 const emit = defineEmits<{
   /** Lets the picked widget go. */
@@ -90,7 +95,16 @@ const format = computed(() => (picked.value ? formatOf(picked.value, props.card)
 </script>
 
 <template>
-  <div v-if="picked && selected !== null" class="setting-rows widget-chips">
+  <div v-if="picked && selected !== null && beside" class="setting-rows widget-chips">
+    <button type="button" class="setting-row done" @click="emit('done')">
+      <span class="value">✓ Done</span>
+    </button>
+    <p class="beside muted">
+      {{ widgetLabel(picked, values) }}: its settings are at the right. Drag it to move it; pull its
+      handles to resize it.
+    </p>
+  </div>
+  <div v-else-if="picked && selected !== null" class="setting-rows widget-chips">
     <button type="button" class="setting-row done" @click="emit('done')">
       <span class="value">✓ Done</span>
     </button>
@@ -273,6 +287,12 @@ const format = computed(() => (picked.value ? formatOf(picked.value, props.card)
 .setting-row.done .value {
   color: #1a110b;
   font-weight: 700;
+}
+
+.beside {
+  align-self: center;
+  margin: 0;
+  font-size: 0.85rem;
 }
 
 .setting-row.remove .value {

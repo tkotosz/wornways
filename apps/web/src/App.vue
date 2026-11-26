@@ -792,20 +792,19 @@ onMounted(() => {
   text-align: center;
 }
 
-/* Phones: the editor is a screen that does not scroll; the top bar and it share the window. */
-@media (max-width: 760px) {
-  .app.editing {
-    height: 100dvh;
-    overflow: hidden;
-  }
+/* The editor is a screen that does not scroll; the top bar and it share the window. */
+.app.editing {
+  height: 100dvh;
+  overflow: hidden;
+}
 
-  .app.editing .main {
-    display: flex;
-    flex: 1;
-    flex-direction: column;
-    min-height: 0;
-    padding: 0;
-  }
+.app.editing .main {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  max-width: none;
+  min-height: 0;
+  padding: 0;
 }
 
 .about-copy {

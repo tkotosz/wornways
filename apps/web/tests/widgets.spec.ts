@@ -118,7 +118,7 @@ test('resizes a widget from its corner, and edits a text widget from a tap', asy
 
   // A tap on the picked text widget writes its text over the whole screen; Enter finishes.
   await outline(page, 0).click({ position: { x: 10, y: 6 } });
-  const writing = page.getByRole('dialog', { name: 'Text' });
+  const writing = page.getByRole('dialog', { name: 'Write the text' });
   await writing.getByRole('textbox', { name: 'Text' }).fill('Mallorca');
   await page.keyboard.press('Enter');
   await expect(writing).toBeHidden();
@@ -135,9 +135,9 @@ test('stretches a chart from its edges, the edge across in place, an edge snappi
   page.setDefaultTimeout(15_000);
   await offlineMap(context);
   await openOverlay(page);
-  await page.getByRole('button', { name: 'Add a widget' }).click();
+  await page.getByRole('button', { name: 'Add a chart' }).click();
   await page
-    .getByRole('dialog', { name: 'Add a widget' })
+    .getByRole('dialog', { name: 'Charts' })
     .getByRole('button', { name: 'Elevation chart' })
     .click();
   const chart = page.getByRole('button', { name: /^Elevation chart on the picture/ });
@@ -159,7 +159,9 @@ test('stretches a chart from its edges, the edge across in place, an edge snappi
   await expect.poll(async () => (await chart.boundingBox())!.x).toBeLessThan(narrowed.x - 15);
   const widened = (await chart.boundingBox())!;
   expect(widened.x + widened.width).toBeCloseTo(narrowed.x + narrowed.width, 0);
-  await expect(page.getByRole('button', { name: /^Size: \d+ × 100%$/ })).toBeVisible();
+  await expect(
+    page.getByRole('dialog', { name: 'Elevation chart' }).getByRole('slider', { name: 'Height' }),
+  ).toHaveValue('100');
 
   // Its top edge, up to just below the frame's middle: it snaps onto it, with the line shown.
   // Moved first to 56% down, clear of the other widgets.
@@ -271,11 +273,11 @@ test('moves, resizes and removes a picked widget with the keyboard', async ({ pa
   await outline(page, 1).focus();
   await page.keyboard.press('Shift+ArrowUp');
   await page.keyboard.press('+');
-  await page.getByRole('button', { name: /^Date: / }).click();
+  // Picked, its settings are open beside the picture.
   await expect(page.getByRole('dialog', { name: 'Date' }).getByRole('slider')).not.toHaveValue(
     '100',
   );
-  await page.keyboard.press('Escape');
+  await page.getByRole('dialog', { name: 'Date' }).getByRole('button', { name: 'Done' }).click();
   await outline(page, 1).focus();
   await page.keyboard.press('Delete');
   await expect(page.getByRole('button', { name: /^Date: / })).toHaveCount(0);
@@ -293,10 +295,11 @@ test('adds a widget clear of Play, and Play steps aside while a widget is picked
   await outline(page, 0).click({ position: { x: 10, y: 6 } });
   await expect(play).toHaveCount(0);
 
-  await page.getByRole('button', { name: 'Add a widget' }).click();
+  await page.getByRole('button', { name: '✓ Done' }).click();
+  await page.getByRole('button', { name: 'Add a stat' }).click();
   await page
-    .getByRole('dialog', { name: 'Add a widget' })
-    .getByRole('button', { name: 'Text' })
+    .getByRole('dialog', { name: 'Stats' })
+    .getByRole('button', { name: / Max speed$/ })
     .click();
   await expect(outline(page, 4)).toBeVisible();
   const frame = (await page.getByTestId('preview').locator('.frame').boundingBox())!;

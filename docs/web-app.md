@@ -142,9 +142,14 @@ connection ended asks to connect again.
 things are decided; the bar shows where the person is, so the screen has no title of its
 own. The bar opens any section, in any order, since every setting has a default. The
 section open last is kept while the app is open, also while popups open and close. One
-live preview stays while the sections change (see Preview). On wide screens it sits beside
-the settings and the page scrolls, under the top bar. On phones the editor is a screen that
-does not scroll, laid out like photo and video editors: under the top bar the preview
+live preview stays while the sections change (see Preview). On wide screens the editor is
+a screen that does not scroll, in three columns under the top bar: the sections on a rail at
+the left, each with its drawing; in the middle the preview, as large as the column allows,
+with the video's frame and length under it; at the right the open section's settings, the
+column scrolling by itself. A setting opened on its own (a layout, the stats or charts to
+add, a picked widget's settings) takes the settings' place at the right, with Done, and
+Escape closes it; the picture stays free to work on, and changes show on it as they are
+made. On phones the editor is a screen that does not scroll, laid out like photo and video editors: under the top bar the preview
 alone, with no lines around it, as large as the room allows; under it the open section's
 settings as one strip of chips that scrolls sideways, a chip per setting with its name
 small over its value ("Grouping" over "Day"), so the picture keeps most of the screen. A
@@ -234,9 +239,11 @@ drawing each. The editor's settings are remembered for the next visit.
   hours or days; five ways to write a date; 24 or 12 hours; each with how the value reads
   in it) and Remove. After the widgets' tools the strip has
   the units (metric or imperial, for every value of the video and its totals card; also in
-  Ending) and the watermark switch. On a wide screen the same strip is under the picture, and a list stays
-  beside it: "+ Add a widget" with the same palette, then a row per widget that opens all
-  its settings, then the units and the watermark switch.
+  Ending) and the watermark switch. On a wide screen the widgets' tools are under the
+  picture, in one row that keeps its height, so the picture keeps its size; a picked widget
+  shows all its settings at the right at once, and the row under the picture only lets it
+  go. With none picked, the settings at the right list the widgets, a row each that picks
+  it, then the units and the watermark switch.
 - **Ending:** what comes after the replay: the end pause on the finished picture, the
   totals card (for one activity or several; on for Recap) and the end card. When the
   video has the totals card, the picture is the finished card, drawn without its widgets,

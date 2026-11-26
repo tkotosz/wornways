@@ -27,8 +27,9 @@ function dropDraft(): void {
 // small and at a low frame rate, and plays it in place of the picture, with a bar to move to
 // any moment. Where things are arranged on the still (`editing`), it opens on the still and
 // Edit goes back to it from the draft. For the ending the draft starts, and loops back to,
-// shortly before the replay ends (`seconds`), so the cards being arranged come at once. It stays in view beside the settings on wide screens
-// and sits above them on phones, where only the picture shows. While editing, the `layer`
+// shortly before the replay ends (`seconds`), so the cards being arranged come at once. The
+// picture is as large as the room it is given allows; on wide screens the video's frame and
+// length are under it, on phones only the picture shows. While editing, the `layer`
 // slot is drawn over the still, with the frame's size. With `bare`, the still is drawn
 // without its widgets, for an editor in the slot that draws them itself: a change to the
 // widgets then draws nothing again. Each still is told (`drawn`, with its scene): the widgets
@@ -164,19 +165,6 @@ const frame = computed(() => {
   }
 });
 const aspect = computed(() => `${frame.value.width} / ${frame.value.height}`);
-const SHAPES: Record<string, string> = {
-  '9:16': 'Story 9:16',
-  '1:1': 'Square 1:1',
-  '16:9': 'Landscape 16:9',
-};
-/** "Story 9:16" for a named shape, else the size. */
-const shape = computed(() => {
-  const { width, height } = frame.value;
-  if (width === height) return SHAPES['1:1'];
-  if (width * 16 === height * 9) return SHAPES['9:16'];
-  if (width * 9 === height * 16) return SHAPES['16:9'];
-  return `${width} × ${height}`;
-});
 
 async function draw(): Promise<void> {
   const task = props.engine.makePoster(props.settings, props.scene, props.bare);
@@ -236,11 +224,6 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="preview" data-testid="preview">
-    <div class="heading">
-      <span class="dot" aria-hidden="true" />
-      Live preview
-      <span class="shape">{{ shape }}</span>
-    </div>
     <div class="fit">
       <div class="frame" :style="{ aspectRatio: aspect, '--ratio': frame.width / frame.height }">
         <video
@@ -305,49 +288,24 @@ onBeforeUnmount(() => {
       Playing a quick draft at {{ shownDraft.width }} × {{ shownDraft.height }} and
       {{ shownDraft.fps }} fps. The video is made in full on Export.
     </p>
-    <p v-else-if="url && !drafting" class="caption muted hint">
-      {{ scene === 'ending' ? 'How the video ends.' : 'The finished picture.' }} Press play to see
-      it move.
-    </p>
   </div>
 </template>
 
 <style scoped>
-/* A box; the step around it keeps it in view. */
+/* The picture as large as fits both the width and the height it is given, keeping the video's
+   shape; the lines under it below. */
 .preview {
-  padding: 0.9rem;
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  background: var(--panel);
-}
-
-.heading {
   display: flex;
-  align-items: center;
-  gap: 0.45rem;
-  margin-bottom: 0.8rem;
-  color: var(--muted);
-  font-size: 0.65rem;
-  font-weight: 700;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
+  flex-direction: column;
+  height: 100%;
 }
 
-.dot {
-  width: 0.45rem;
-  height: 0.45rem;
-  border-radius: 50%;
-  background: var(--accent);
-  box-shadow: 0 0 0 4px rgba(255, 138, 42, 0.15);
-}
-
-.shape {
-  margin-left: auto;
-  color: var(--text);
-  font-weight: 500;
-  letter-spacing: 0;
-  text-transform: none;
-  font-size: 0.75rem;
+.fit {
+  flex: 1 1 0;
+  min-height: 0;
+  container-type: size;
+  display: grid;
+  place-items: center;
 }
 
 .caption {
@@ -357,18 +315,12 @@ onBeforeUnmount(() => {
 }
 
 .frame {
+  width: min(100cqw, 100cqh * var(--ratio));
   position: relative;
   overflow: hidden;
   border: 1px solid var(--line);
   border-radius: 12px;
   background: #050608;
-}
-
-/* As tall as the page around it allows (`--preview-height`, set where it sits), keeping the
-   video's shape; as wide as its box when that is less. */
-.frame {
-  width: min(100%, calc(var(--preview-height, 100vh) * var(--ratio)));
-  margin-inline: auto;
 }
 
 .frame img,
@@ -454,34 +406,10 @@ onBeforeUnmount(() => {
   text-align: center;
 }
 
-/* Phones: only the picture, as large as the height it is given allows (the room above the
-   settings); the lines around it would take that room. */
+/* Phones: only the picture; the lines under it would take its room. */
 @media (max-width: 760px) {
-  .preview {
-    display: flex;
-    flex-direction: column;
-    height: 100%;
-    padding: 0;
-    border: 0;
-    background: none;
-  }
-
-  .heading,
   .caption {
     display: none;
-  }
-
-  .fit {
-    flex: 1 1 0;
-    min-height: 0;
-    container-type: size;
-    display: grid;
-    place-items: center;
-  }
-
-  /* As wide as fits both the width and the height, keeping the video's shape. */
-  .frame {
-    width: min(100cqw, 100cqh * var(--ratio));
   }
 }
 </style>

@@ -4,13 +4,14 @@
 // ends. One preview stays in view while the sections change. Where things are arranged on
 // the picture (Overlay, Ending), it opens on a still; Play shows the draft and Edit goes back.
 // The sections are opened from the section bar, in any order.
-// Wide screens: the section bar on top, the preview beside the settings; the page scrolls.
+// Wide screens: a screen that does not scroll, in three columns: the sections on a rail, the
+// preview with the widgets' tools under it, and the section's settings, where a setting
+// opened on its own, or a picked widget's settings, take their place.
 // Phones: a screen that does not scroll, as photo and video editors are laid out, under the
 // app's top bar: the preview takes most of it; under it, the open section's settings as one
 // strip of chips that scrolls sideways, each opening its setting in a sheet; the sections
 // along the bottom. Where widgets are arranged, the strip starts with adding them, and a
-// picked widget turns it into that widget's options (WidgetStrip); wide screens have that
-// strip under the picture.
+// picked widget turns it into that widget's options (WidgetStrip).
 import {
   CARD_LAYOUT_NAMES,
   LAYOUTS,
@@ -26,7 +27,7 @@ import {
   type SettingsInput,
   type Widget,
 } from '@wornways/engine';
-import { computed, onBeforeUnmount, ref } from 'vue';
+import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import {
   SECTIONS,
   WIDGET_PART_NAMES,
@@ -44,6 +45,7 @@ import FramePanel from './components/FramePanel.vue';
 import PlaybackPanel from './components/PlaybackPanel.vue';
 import PosterPreview from './components/PosterPreview.vue';
 import SettingSheet from './components/SettingSheet.vue';
+import SectionIcon from './components/SectionIcon.vue';
 import SettingsGroups from './components/SettingsGroups.vue';
 import TextEditor from './components/TextEditor.vue';
 import WidgetEditor from './components/WidgetEditor.vue';
@@ -97,7 +99,7 @@ function openSetting(name: string, label: string): void {
 }
 
 // Overlay and Ending: widgets arranged on the still (WidgetEditor) and from the strip under it
-// (WidgetStrip), over the replay or on the totals card; on wide screens also listed beside it.
+// (WidgetStrip), over the replay or on the totals card; on wide screens also listed at the right.
 /**
  * What the last still of the replay told: its widgets, the values the video can show and the
  * charts' shapes, for drawing the widgets over the bare still.
@@ -162,6 +164,28 @@ function openWidget(index: number, only?: WidgetPart): void {
   const name = widgetLabel(widgets.value[index]!, values.value);
   const label = only ? `${name}: ${WIDGET_PART_NAMES[only].toLowerCase()}` : name;
   sheet.value = { name: 'widget', label, widget: index, ...(only ? { only } : {}) };
+}
+
+/**
+ * Wide screens: a picked widget's settings, all of them, open beside the picture as soon as
+ * it is picked, on the picture or in the list, and close when it is let go. After the change
+ * is in, so a widget just added is in the list.
+ */
+watch(
+  selectedWidget,
+  (index) => {
+    if (phone.value) return;
+    if (index === null) {
+      if (sheet.value?.name === 'widget') sheet.value = null;
+    } else if (sheetWidget.value !== index && widgets.value[index]) openWidget(index);
+  },
+  { flush: 'post' },
+);
+
+/** A sheet closed. Wide screens: a widget's lets the widget go too. */
+function closeSheet(): void {
+  if (!phone.value && sheet.value?.name === 'widget') selectedWidget.value = null;
+  sheet.value = null;
 }
 
 /** The widget a widget sheet is about. */
@@ -375,125 +399,106 @@ function arrangeInLayout(): void {
         :aria-current="s.id === section ? 'step' : undefined"
         @click="open(s.id)"
       >
-        <!-- A line drawing for each: a phone's frame, play, a folded map, text on a
-             picture, a finish flag. -->
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          <template v-if="s.id === 'frame'">
-            <rect x="7" y="3" width="10" height="18" rx="2" />
-            <path d="M3 8v8M21 8v8" />
-          </template>
-          <template v-else-if="s.id === 'playback'">
-            <circle cx="12" cy="12" r="9" />
-            <path d="M10 8.5v7l6-3.5z" />
-          </template>
-          <template v-else-if="s.id === 'map'">
-            <path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2z" />
-            <path d="M9 4v14M15 6v14" />
-          </template>
-          <template v-else-if="s.id === 'overlay'">
-            <rect x="3" y="4" width="18" height="16" rx="2" />
-            <path d="M7 8h7M7 16h4" />
-          </template>
-          <path v-else d="M5 21V4h11l-2 4 2 4H5" />
-        </svg>
+        <SectionIcon :section="s.id" />
         {{ s.label }}
       </button>
     </nav>
   </section>
 
-  <!-- Wide screens. -->
-  <section v-else class="design">
-    <!-- The section bar says where the person is; the heading is for screen readers. -->
+  <!-- Wide screens: the sections on a rail at the left, the picture in the middle with the
+       widgets' tools under it, and the open section's settings at the right; a setting opened
+       on its own, or a picked widget's, takes their place. -->
+  <section v-else class="studio">
     <h1 class="visually-hidden">Design your video</h1>
-    <nav class="sections-bar" aria-label="Sections">
+    <nav class="rail" aria-label="Sections">
       <button
         v-for="s in SECTIONS"
         :key="s.id"
         type="button"
-        class="chip"
         :aria-current="s.id === section ? 'step' : undefined"
         @click="open(s.id)"
       >
+        <SectionIcon :section="s.id" />
         {{ s.label }}
       </button>
     </nav>
 
-    <div class="layout">
-      <div class="stage" :class="{ 'with-strip': board }">
-        <PosterPreview
-          :engine="engine"
-          :settings="settings"
-          :seconds="plan?.seconds"
-          :scene="section === 'ending' ? 'ending' : 'replay'"
-          :editing="section === 'overlay' || section === 'ending'"
-          :hide-play="board !== null && selectedWidget !== null"
-          :bare="section === 'overlay' || section === 'ending'"
-          @drawn="onDrawn"
-        >
-          <template #layer="{ size }">
-            <WidgetEditor
-              v-if="board"
-              ref="editor"
-              v-model:selected="selectedWidget"
-              :widgets="widgets"
-              :values="values"
-              :title="title"
-              :profiles="drawn?.profiles ?? {}"
-              :size="size"
-              :card="board === 'totals'"
-              :layout="layout"
-              :guides="guides"
-              @change="setWidgets"
-              @edit="editingText = $event"
-            />
-          </template>
-        </PosterPreview>
-        <!-- Adding widgets, or the picked one's options, under the picture. -->
-        <div v-if="board" class="setting-strip board-strip" role="region" aria-label="Widgets">
-          <WidgetStrip
-            :widgets="widgets"
-            :selected="selectedWidget"
-            :card="board === 'totals'"
-            :values="values"
-            :charts="charts.length > 0"
-            :layout="LAYOUTS[layout].name"
-            :guides="guides"
-            @done="selectedWidget = null"
-            @tool="useTool"
-            @edit="editingText = $event"
-            @open="openWidget"
-            @change="changeWidget"
-            @remove="removeWidget"
-          />
-        </div>
-      </div>
-      <div class="settings">
-        <FramePanel v-if="section === 'frame'" v-model="adjustments" />
-        <PlaybackPanel
-          v-else-if="section === 'playback'"
-          v-model="adjustments"
-          :activities="activities"
-          :plan="plan"
-        />
-        <template v-else>
-          <WidgetList
+    <div class="stage">
+      <PosterPreview
+        class="picture"
+        :engine="engine"
+        :settings="settings"
+        :seconds="plan?.seconds"
+        :scene="section === 'ending' ? 'ending' : 'replay'"
+        :editing="section === 'overlay' || section === 'ending'"
+        :hide-play="board !== null && selectedWidget !== null"
+        :bare="section === 'overlay' || section === 'ending'"
+        @drawn="onDrawn"
+      >
+        <template #layer="{ size }">
+          <WidgetEditor
             v-if="board"
-            class="widget-panel"
+            ref="editor"
+            v-model:selected="selectedWidget"
             :widgets="widgets"
             :values="values"
             :title="title"
-            :selected="selectedWidget"
-            @add="sheet = { name: 'add-widget', label: 'Add a widget' }"
-            @open="openWidget($event)"
-          />
-          <SettingsGroups
-            v-model="adjustments"
-            :groups="current.panels"
-            :count="countOf(activities)"
+            :profiles="drawn?.profiles ?? {}"
+            :size="size"
+            :card="board === 'totals'"
+            :layout="layout"
+            :guides="guides"
+            @change="setWidgets"
+            @edit="editingText = $event"
           />
         </template>
+      </PosterPreview>
+      <!-- The widgets' tools under the picture; a picked widget's settings are at the right. -->
+      <div v-if="board" class="setting-strip board-strip" role="region" aria-label="Widgets">
+        <WidgetStrip
+          :widgets="widgets"
+          :selected="selectedWidget"
+          :card="board === 'totals'"
+          :values="values"
+          :charts="charts.length > 0"
+          :layout="LAYOUTS[layout].name"
+          :guides="guides"
+          beside
+          @done="selectedWidget = null"
+          @tool="useTool"
+          @edit="editingText = $event"
+          @open="openWidget"
+          @change="changeWidget"
+          @remove="removeWidget"
+        />
       </div>
     </div>
+
+    <aside class="inspector" :aria-label="`${current.label} settings`">
+      <h2 class="inspector-title">{{ current.label }}</h2>
+      <FramePanel v-if="section === 'frame'" v-model="adjustments" />
+      <PlaybackPanel
+        v-else-if="section === 'playback'"
+        v-model="adjustments"
+        :activities="activities"
+        :plan="plan"
+      />
+      <template v-else>
+        <WidgetList
+          v-if="board"
+          :widgets="widgets"
+          :values="values"
+          :title="title"
+          :selected="selectedWidget"
+          @open="selectedWidget = $event"
+        />
+        <SettingsGroups
+          v-model="adjustments"
+          :groups="current.panels"
+          :count="countOf(activities)"
+        />
+      </template>
+    </aside>
   </section>
 
   <!-- A text widget's text, written over the whole screen. -->
@@ -503,8 +508,9 @@ function arrangeInLayout(): void {
     @done="writeText"
   />
 
-  <!-- The setting being changed, on its own: from the phone's list, or a widget's. -->
-  <SettingSheet v-if="sheet" :title="sheet.label" @close="sheet = null">
+  <!-- The setting being changed, on its own: from the phone's strip, or a widget's. Wide
+       screens: in the place of the section's settings at the right, the picture still free. -->
+  <SettingSheet v-if="sheet" :title="sheet.label" :docked="!phone" @close="closeSheet">
     <LayoutPicker
       v-if="sheet.name === 'layout'"
       :layout="layout"
@@ -513,8 +519,8 @@ function arrangeInLayout(): void {
       @arrange="arrangeInLayout"
     />
     <AddWidget
-      v-else-if="sheet.name === 'add-widget' || sheet.name === 'values' || sheet.name === 'charts'"
-      :only="sheet.name === 'values' ? 'values' : sheet.name === 'charts' ? 'charts' : undefined"
+      v-else-if="sheet.name === 'values' || sheet.name === 'charts'"
+      :only="sheet.name"
       :widgets="widgets"
       :values="values"
       :charts="charts"
@@ -550,59 +556,84 @@ function arrangeInLayout(): void {
 </template>
 
 <style scoped>
-/* Wide screens: the sections as a row of pills, the open one filled. */
-.sections-bar {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.4rem;
-  margin: 0 0 1.25rem;
-}
-
-.sections-bar .chip[aria-current='step'] {
-  border-color: var(--accent);
-  color: #1a110b;
-  background: var(--accent);
-}
-
-/* The preview beside the settings, kept in view below the app's top bar while they scroll. */
-.layout {
+/* Wide screens: the window under the top bar, in three columns that each scroll by
+   themselves: the sections, the picture with its tools, the settings. */
+.studio {
   display: grid;
-  grid-template-columns: 17rem 1fr;
-  gap: 1.5rem;
-  align-items: start;
+  flex: 1;
+  grid-template-columns: 5.5rem minmax(0, 1fr) var(--inspector-width);
+  min-height: 0;
 }
 
-/* The picture as tall as fits under the top bar, with the sections bar, the preview's
-   heading and caption and the widgets' strip (where there is one) in view. */
-.layout .stage {
-  --preview-height: calc(100dvh - var(--top-bar-height, 0px) - 13rem);
-
-  position: sticky;
-  top: calc(var(--top-bar-height, 0px) + 1.5rem);
-  min-width: 0;
-}
-
-.layout .stage.with-strip {
-  --preview-height: calc(100dvh - var(--top-bar-height, 0px) - 17rem);
-}
-
-/* Wide screens: the widgets' strip under the picture. */
-.board-strip {
-  margin-top: 0.6rem;
-}
-
-/* The widgets in a box like the settings panels. */
-.widget-panel {
-  padding: 0 1.2rem 0.6rem;
-  border-radius: 14px;
-  background: var(--panel);
-}
-
-.settings {
+.rail {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: 0.25rem;
+  padding: 0.9rem 0.5rem;
+  border-right: 1px solid var(--line);
+  overflow-y: auto;
+}
+
+.rail button {
+  display: grid;
+  justify-items: center;
+  gap: 0.3rem;
+  padding: 0.65rem 0;
+  border: 0;
+  border-radius: 10px;
+  color: var(--muted);
+  background: none;
+  font: inherit;
+  font-size: 0.75rem;
+}
+
+.rail button:hover {
+  color: var(--text);
+}
+
+.rail button[aria-current] {
+  color: var(--accent);
+  background: rgb(255 138 42 / 10%);
+  font-weight: 600;
+}
+
+/* The picture as large as the column allows, the tools under it. */
+.studio .stage {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
   min-width: 0;
+  min-height: 0;
+  padding: 1.2rem 1.5rem;
+}
+
+.studio .picture {
+  flex: 1 1 0;
+  height: auto;
+  min-height: 0;
+}
+
+/* The tools in one row under the picture, sideways when they do not fit; as high whatever it
+   holds, so the picture keeps its size when a widget is picked or let go. */
+.board-strip {
+  flex: none;
+  align-items: center;
+  justify-content: safe center;
+  height: 3.6rem;
+}
+
+.inspector {
+  min-height: 0;
+  padding: 0 1.2rem 1.5rem;
+  border-left: 1px solid var(--line);
+  background: var(--panel);
+  overflow-y: auto;
+}
+
+.inspector-title {
+  margin: 0;
+  padding: 1rem 0 0.3rem;
+  font-size: 1.05rem;
 }
 
 /* Phones: the rest of the screen under the app's top bar. */

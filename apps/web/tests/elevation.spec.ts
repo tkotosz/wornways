@@ -60,9 +60,9 @@ test('offers no elevation chart where there is no elevation', async ({ page, con
   await openSection(page, 'Overlay');
   await expect(page.getByRole('button', { name: /^Time: / })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Elevation chart', exact: true })).toHaveCount(0);
-  await page.getByRole('button', { name: 'Add a widget' }).click();
-  const add = page.getByRole('dialog', { name: 'Add a widget' });
-  await expect(add.getByRole('button', { name: 'Text' })).toBeVisible();
+  await page.getByRole('button', { name: 'Add a chart' }).click();
+  const add = page.getByRole('dialog', { name: 'Charts' });
+  await expect(add.getByRole('button', { name: 'Speed chart' })).toBeVisible();
   await expect(add.getByRole('button', { name: 'Elevation chart' })).toHaveCount(0);
 });
 
@@ -91,9 +91,9 @@ test('starts several activities without the elevation chart, which can be added'
   const onPicture = page.getByRole('button', { name: /^Elevation chart on the picture/ });
   await expect(page.getByRole('button', { name: /^Race time: / })).toBeVisible();
   await expect(chart).toHaveCount(0);
-  await page.getByRole('button', { name: 'Add a widget' }).click();
+  await page.getByRole('button', { name: 'Add a chart' }).click();
   await page
-    .getByRole('dialog', { name: 'Add a widget' })
+    .getByRole('dialog', { name: 'Charts' })
     .getByRole('button', { name: 'Elevation chart' })
     .click();
   await expect(chart).toBeVisible();

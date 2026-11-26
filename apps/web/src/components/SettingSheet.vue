@@ -1,16 +1,24 @@
 <script setup lang="ts">
 // One setting on its own. Phones: a sheet that comes up from the bottom of the screen, over
 // the settings list; the top of the picture stays in view, and changes show on it as they
-// are made. Wide screens: a dialog. Done, Escape or a tap outside closes it.
+// are made. Done, Escape or a tap outside closes it. Wide screens (`docked`): a panel in the
+// place of the section's settings, at the right under the top bar, that leaves the picture
+// free to work on; Done or Escape closes it.
 import { onMounted, ref, useId } from 'vue';
 
-defineProps<{ title: string }>();
+const props = defineProps<{ title: string; docked?: boolean }>();
 const emit = defineEmits<{ close: [] }>();
 
 const titleId = useId();
 const dialog = ref<HTMLDialogElement | null>(null);
 
-onMounted(() => dialog.value?.showModal());
+onMounted(() => {
+  if (!props.docked) return dialog.value?.showModal();
+  // Docked, it leaves the focus where it was: on the picked widget, or the text being written.
+  const focused = document.activeElement;
+  dialog.value?.show();
+  if (focused instanceof HTMLElement) focused.focus({ preventScroll: true });
+});
 
 /** A tap on the backdrop lands on the dialog itself, outside the sheet's content. */
 function tapped(event: MouseEvent): void {
@@ -22,9 +30,11 @@ function tapped(event: MouseEvent): void {
   <dialog
     ref="dialog"
     class="sheet"
+    :class="{ docked }"
     :aria-labelledby="titleId"
     @close="emit('close')"
     @click="tapped"
+    @keydown.esc="dialog?.close()"
   >
     <div class="content">
       <header class="head">
@@ -51,14 +61,20 @@ function tapped(event: MouseEvent): void {
   box-shadow: 0 -10px 30px rgb(0 0 0 / 50%);
 }
 
-/* Wide screens: a dialog in the middle of the window. */
-@media (min-width: 761px) {
-  .sheet {
-    width: min(32rem, calc(100% - 2rem));
-    margin: auto;
-    border: 1px solid var(--line);
-    border-radius: 16px;
-  }
+/* Docked: the height of the window under the top bar, over the section's settings. */
+.sheet.docked {
+  position: fixed;
+  inset: var(--top-bar-height, 0px) 0 0 auto;
+  z-index: 5;
+  width: var(--inspector-width);
+  height: auto;
+  max-height: none;
+  margin: 0;
+  border: 0;
+  border-left: 1px solid var(--line);
+  border-radius: 0;
+  box-shadow: none;
+  overflow-y: auto;
 }
 
 .sheet::backdrop {

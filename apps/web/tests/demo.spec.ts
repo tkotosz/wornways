@@ -108,8 +108,8 @@ test('follows the guide to a highlight of the long ride', async ({ page }) => {
   // values per activity cannot.
   await openSection(page, 'Overlay');
   await expect(page.getByRole('button', { name: 'Elevation chart', exact: true })).toBeVisible();
-  await page.getByRole('button', { name: 'Add a widget' }).click();
-  const add = page.getByRole('dialog', { name: 'Add a widget' });
+  await page.getByRole('button', { name: 'Add a stat' }).click();
+  const add = page.getByRole('dialog', { name: 'Stats' });
   const tile = (name: string) => add.getByRole('button', { name: new RegExp(` ${name}$`) });
   await expect(tile('Climb')).toBeDisabled();
   for (const name of [

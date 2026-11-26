@@ -204,17 +204,17 @@ function valueText(setting: SettingDefinition): string {
 .groups {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
   min-width: 0;
 }
 
+/* Wide screens: the groups one under another in the settings column, a line between them;
+   each setting's label over its control. */
 .group {
   display: flex;
   flex-direction: column;
   gap: 1rem;
-  padding: 1rem 1.2rem;
-  border-radius: 14px;
-  background: var(--panel);
+  padding: 1rem 0;
+  border-top: 1px solid var(--line);
 }
 
 .group h2 {
@@ -228,13 +228,7 @@ function valueText(setting: SettingDefinition): string {
 
 .setting {
   display: grid;
-  grid-template-columns: 9rem 1fr;
-  gap: 0.8rem;
-  align-items: start;
-}
-
-.label {
-  padding-top: 0.4rem;
+  gap: 0.4rem;
 }
 
 .chips {
@@ -295,22 +289,11 @@ function valueText(setting: SettingDefinition): string {
   font-size: 0.85rem;
 }
 
-@media (max-width: 600px) {
-  .setting {
-    grid-template-columns: 1fr;
-    gap: 0.4rem;
-  }
-}
-
 /* One setting alone, in a sheet that names it: no box, heading or label, the control at
    full width with its explanation under it. */
 .groups.one .group {
   padding: 0;
-  background: none;
-}
-
-.groups.one .setting {
-  grid-template-columns: 1fr;
+  border: 0;
 }
 
 .groups.one .label {

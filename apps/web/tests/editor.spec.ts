@@ -232,7 +232,7 @@ test.describe('the editor on a phone', () => {
     const done = page.getByRole('button', { name: '✓ Done' });
     // A text is written over the whole screen, and a tap outside the text finishes, there only.
     await page.getByRole('button', { name: 'Add a text' }).click();
-    const writing = page.getByRole('dialog', { name: 'Text' });
+    const writing = page.getByRole('dialog', { name: 'Write the text' });
     await expect(writing.getByRole('textbox', { name: 'Text' })).toBeFocused();
     await page.keyboard.type('Mallorca');
     await writing.click({ position: { x: 20, y: 760 } });

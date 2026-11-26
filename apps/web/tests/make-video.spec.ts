@@ -547,8 +547,8 @@ test('offers heart rate and cadence for an activity that recorded them', async (
   await openSection(page, 'Overlay');
   await expectSection(page, 'Overlay');
   // The values it can show, as tiles with its own numbers, to add to the picture.
-  await page.getByRole('button', { name: 'Add a widget' }).click();
-  const add = page.getByRole('dialog', { name: 'Add a widget' });
+  await page.getByRole('button', { name: 'Add a stat' }).click();
+  const add = page.getByRole('dialog', { name: 'Stats' });
   const tile = (name: string) => add.getByRole('button', { name: new RegExp(` ${name}$`) });
   for (const name of ['Avg heart rate', 'Max heart rate', 'Min heart rate', 'Current heart rate'])
     await expect(tile(name)).toHaveText(/bpm/);
@@ -790,8 +790,8 @@ test('sets up the video and its text, and keeps both for the next visit', async 
   await text.getByRole('button', { name: 'Done' }).click();
   await expect(titleRow).toHaveAccessibleName('Text: Spring');
   // A race offers every value to add, the dates and the speeds too, each named for what it is.
-  await page.getByRole('button', { name: 'Add a widget' }).click();
-  const add = page.getByRole('dialog', { name: 'Add a widget' });
+  await page.getByRole('button', { name: 'Add a stat' }).click();
+  const add = page.getByRole('dialog', { name: 'Stats' });
   for (const name of [
     'Date',
     'Avg speed',
