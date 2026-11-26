@@ -79,6 +79,16 @@ export async function chooseStyle(page: Page, name?: string) {
   await cards.first().click();
 }
 
+/** Picks another preset from the top bar. */
+export async function pickPreset(page: Page, name: string) {
+  await page.getByRole('button', { name: /^Preset: / }).click();
+  await chooseStyle(page, name);
+}
+
+/** The preset cards offered in the preset popup, by name. */
+export const presetCards = (page: Page) =>
+  presetPopup(page).getByRole('button', { name: /^(All at once|Recap|Multiday trip|Highlight)/ });
+
 /**
  * Opens the editor on the demo's activities of all time, playing as the preset named (else
  * the first one offered).

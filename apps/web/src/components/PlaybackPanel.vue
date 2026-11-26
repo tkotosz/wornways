@@ -1,27 +1,23 @@
 <script setup lang="ts">
-// How the routes play. A preset is enough; the video's length and Fine-tune playback change
-// its values, which makes it Custom. A summary tells what will play.
+// How the routes play, past the preset (picked from the top bar): the video's length and
+// Fine-tune playback change the preset's values, which makes it Custom. A summary tells what
+// will play.
 import { SETTINGS } from '@wornways/engine';
 import { computed, ref } from 'vue';
 import {
   PLAYBACK_PANELS,
   PRESET_LABELS,
-  PRESET_LINES,
   countOf,
   fineTuned,
   playbackAdjustments,
-  presetChoices,
   presetOf,
   resetPlayback,
   settingHint,
   valueOf,
-  withPreset,
   type Adjustments,
-  type PresetChoice,
 } from '../adjust.ts';
 import ExactNumber from './ExactNumber.vue';
 import PacingLine from './PacingLine.vue';
-import PresetDrawing from './PresetDrawing.vue';
 import SettingsGroups from './SettingsGroups.vue';
 import type { PlanReport } from '../messages.ts';
 
@@ -29,9 +25,9 @@ const props = defineProps<{
   activities: number;
   plan: PlanReport | null;
   /**
-   * Phones: `rows` lists the style, the length and Fine-tune's settings, a row each, and
-   * `open` asks for one to be shown alone (`only`: "style", "length" or a setting's name),
-   * in a sheet. Without either, all of them, with Fine-tune folded.
+   * Phones: `rows` lists the length and Fine-tune's settings, a row each, and `open` asks
+   * for one to be shown alone (`only`: "length" or a setting's name), in a sheet. Without
+   * either, all of them, with Fine-tune folded.
    */
   view?: 'rows';
   only?: string;
@@ -42,10 +38,6 @@ const emit = defineEmits<{ open: [name: string, label: string] }>();
 /** One activity gets its own presets; several get the others. */
 const count = computed(() => countOf(props.activities));
 const preset = computed(() => presetOf(adjustments.value, count.value));
-
-function pick(picked: PresetChoice): void {
-  adjustments.value = withPreset(adjustments.value, picked, count.value);
-}
 
 /** The adjustments as changed below: a change to a value the preset sets makes it Custom. */
 const tuned = computed({
@@ -75,16 +67,6 @@ const fineTuneOpen = ref(false);
     <button
       type="button"
       class="setting-row"
-      :aria-label="`Style: ${PRESET_LABELS[preset]}`"
-      aria-haspopup="dialog"
-      @click="emit('open', 'style', 'Style')"
-    >
-      <span>Style</span>
-      <span class="value">{{ PRESET_LABELS[preset] }}</span>
-    </button>
-    <button
-      type="button"
-      class="setting-row"
       :aria-label="`Length: ${duration} s`"
       aria-haspopup="dialog"
       @click="emit('open', 'length', 'Length')"
@@ -110,7 +92,7 @@ const fineTuneOpen = ref(false);
 
   <!-- One of Fine-tune's settings alone, in a sheet. -->
   <SettingsGroups
-    v-else-if="only && only !== 'style' && only !== 'length'"
+    v-else-if="only && only !== 'length'"
     v-model="tuned"
     :groups="PLAYBACK_PANELS"
     :count="count"
@@ -118,26 +100,6 @@ const fineTuneOpen = ref(false);
   />
 
   <div v-else class="settings">
-    <h2 v-if="!only" class="kicker">Playback style</h2>
-    <div v-if="!only || only === 'style'" class="presets" role="radiogroup" aria-label="Preset">
-      <button
-        v-for="name in presetChoices(count)"
-        :key="name"
-        type="button"
-        role="radio"
-        class="preset"
-        :aria-checked="preset === name"
-        @click="pick(name)"
-      >
-        <PresetDrawing class="drawing" :preset="name" />
-        <span class="text">
-          <strong>{{ PRESET_LABELS[name] }}</strong>
-          <span class="muted">{{ PRESET_LINES[name] }}</span>
-        </span>
-        <span v-if="preset === name" class="check" aria-hidden="true">✓</span>
-      </button>
-    </div>
-
     <div v-if="!only || only === 'length'" class="length">
       <div class="length-head">
         <div>
@@ -226,77 +188,9 @@ const fineTuneOpen = ref(false);
   min-width: 0;
 }
 
-.kicker {
-  margin: 0 0 0.8rem;
-  color: var(--muted);
-  font-size: 0.75rem;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-}
-
 .small {
   margin: 0.15rem 0 0;
   font-size: 0.8rem;
-}
-
-.presets {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
-  gap: 0.8rem;
-  margin-bottom: 1.2rem;
-}
-
-/* A card: the drawing above, the name and its line under it, a check when picked. */
-.preset {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 0.8rem;
-  padding: 1.1rem;
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  color: var(--text);
-  background: var(--panel);
-  text-align: left;
-  font: inherit;
-}
-
-.preset[aria-checked='true'] {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 1px var(--accent);
-  background: linear-gradient(160deg, rgba(255, 138, 42, 0.1), var(--panel));
-}
-
-.drawing {
-  width: 4.2rem;
-}
-
-.text {
-  display: flex;
-  flex-direction: column;
-  gap: 0.3rem;
-  padding-right: 1.4rem;
-}
-
-.text .muted {
-  font-size: 0.82rem;
-}
-
-.check {
-  position: absolute;
-  top: 0.9rem;
-  right: 0.9rem;
-  display: grid;
-  place-items: center;
-  width: 1.4rem;
-  height: 1.4rem;
-  border-radius: 50%;
-  color: #1a110b;
-  background: var(--accent);
-  font-size: 0.8rem;
-  font-weight: 800;
 }
 
 .length {
@@ -389,23 +283,6 @@ const fineTuneOpen = ref(false);
 
 .fine-tune .link {
   margin: 0 0.8rem 0.8rem;
-}
-
-/* Phones: the cards as rows, the drawing beside the text. */
-@media (max-width: 600px) {
-  .presets {
-    grid-template-columns: 1fr;
-  }
-
-  .preset {
-    flex-direction: row;
-    align-items: center;
-  }
-
-  .drawing {
-    flex: none;
-    width: 3.4rem;
-  }
 }
 
 .reset {

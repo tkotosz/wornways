@@ -78,7 +78,7 @@ function pick(preset: PresetChoice): void {
         <span class="go" aria-hidden="true">›</span>
       </button>
     </div>
-    <p class="muted later">You can change it later here, or under Playback › Style.</p>
+    <p class="muted later">You can change it later from Preset in the top bar.</p>
   </AppPopup>
 </template>
 

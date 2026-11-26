@@ -1,6 +1,13 @@
 import { expect, test } from '@playwright/test';
 import { offlineMap } from './offline-map.ts';
-import { openDemo, openSection, pickPeriod, pickSource, useActivities } from './popups.ts';
+import {
+  openDemo,
+  openSection,
+  pickPeriod,
+  pickPreset,
+  pickSource,
+  useActivities,
+} from './popups.ts';
 
 test('turns the totals card on for Recap, and leaves the switch to the person', async ({
   page,
@@ -10,7 +17,6 @@ test('turns the totals card on for Recap, and leaves the switch to the person', 
   await offlineMap(context);
   await openDemo(page);
 
-  const presets = page.getByRole('radiogroup', { name: 'Preset' });
   const totals = page.getByTestId('group-totals').getByRole('switch', { name: 'Totals card' });
   /** Goes to Ending, where the switch is, and back to Playback. */
   const toEnding = () => openSection(page, 'Ending');
@@ -21,9 +27,8 @@ test('turns the totals card on for Recap, and leaves the switch to the person', 
   await expect(totals).not.toBeChecked();
 
   // Recap: on.
-  await toPlayback();
-  await presets.getByRole('radio', { name: /Recap/ }).click();
-  await toEnding();
+  await pickPreset(page, 'Recap');
+  await expect(totals).toBeChecked();
   await expect(totals).toBeChecked();
 
   // A change of length makes it Custom, which starts from Recap's values: still on.
@@ -35,9 +40,7 @@ test('turns the totals card on for Recap, and leaves the switch to the person', 
   await expect(totals).toBeChecked();
 
   // Switched off under Recap, it stays off.
-  await toPlayback();
-  await presets.getByRole('radio', { name: /Recap/ }).click();
-  await toEnding();
+  await pickPreset(page, 'Recap');
   await totals.click();
   await expect(totals).not.toBeChecked();
   await toPlayback();

@@ -10,7 +10,10 @@ import {
   openMenu,
   openSection,
   pickPeriod,
+  pickPreset,
   pickSource,
+  presetCards,
+  presetPopup,
   render,
   renderPopup,
   switchSource,
@@ -712,24 +715,22 @@ test('sets up the video and its text, and keeps both for the next visit', async 
   await openSection(page, 'Playback');
   const chip = (name: string) => page.getByRole('button', { name, exact: true });
   const slider = (name: string) => page.getByRole('slider', { name });
-  const preset = (name: string) => page.getByRole('radio', { name: new RegExp(`^${name}`) });
 
   // Playback: the first preset, All at once, at first, with a summary telling
   // what it plays. Recap: 30 s, less 0.4 s before and 0.3 s after the activities.
   const pacing = page.getByTestId('pacing');
   const summary = page.getByTestId('replay-summary');
-  await expect(page.getByRole('radio').first()).toHaveAccessibleName(/^All at once/);
-  await expect(preset('All at once')).toHaveAttribute('aria-checked', 'true');
+  await expect(page.getByRole('button', { name: 'Preset: All at once' })).toBeVisible();
   await expect(summary).toHaveText('30 seconds · All at once');
-  await preset('Recap').click();
+  await pickPreset(page, 'Recap');
   await expect(summary).toHaveText('30 seconds · Recap');
   await expect(pacing).toHaveText('This video: 2 activities, 14.7 s each.');
-  await preset('Multiday trip').click();
+  await pickPreset(page, 'Multiday trip');
   await expect(summary).toHaveText('45 seconds · Multiday trip');
   await expect(pacing).toHaveText(
     /^This video: 2 days \(2 activities\), [\d.]+–[\d.]+ s each, following each activity in turn\.$/,
   );
-  await preset('All at once').click();
+  await pickPreset(page, 'All at once');
   await expect(pacing).toHaveText('This video: a race of all 2 activities, each at its real pace.');
 
   // Fine-tune playback opens below, starting from the preset's values; changing one of
@@ -739,7 +740,7 @@ test('sets up the video and its text, and keeps both for the next visit', async 
   await expect(chip('Real pace')).toHaveAttribute('aria-pressed', 'true');
   await chip('Activity').click();
   await expect(summary).toHaveText('30 seconds · Custom playback');
-  await expect(page.getByRole('radio', { checked: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Preset: Custom' })).toBeVisible();
   await expect(pacing).toHaveText('This video: 2 activities, 14.7 s each.');
   // Overlap: the second starts when the first is half drawn, so each stays on screen longer.
   await slider('Overlap').fill('50');
@@ -840,12 +841,18 @@ test('offers Highlight for a single activity, and the other presets for several'
   // One activity: a Highlight, without asking.
   await useActivities(page);
   await openSection(page, 'Playback');
-  const presets = page.getByRole('radio');
-  const preset = (name: string) => page.getByRole('radio', { name: new RegExp(`^${name}`) });
+  const preset = (name: string) => page.getByRole('button', { name: `Preset: ${name}` });
+  /** The presets offered, from the top bar. */
+  const offered = async () => {
+    await page.getByRole('button', { name: /^Preset: / }).click();
+    const names = await presetCards(page).allInnerTexts();
+    await presetPopup(page).getByRole('button', { name: 'Close' }).click();
+    return names.map((text) => text.split('\n')[0]);
+  };
 
   // One activity: Highlight, a 15-second clip.
-  await expect(presets).toHaveCount(1);
-  await expect(preset('Highlight')).toHaveAttribute('aria-checked', 'true');
+  expect(await offered()).toEqual(['Highlight']);
+  await expect(preset('Highlight')).toBeVisible();
   await expect(page.getByTestId('pacing')).toHaveText(
     'One activity plays at its own pace, in 15 s; grouping does not apply.',
   );
@@ -854,7 +861,7 @@ test('offers Highlight for a single activity, and the other presets for several'
   const follows = camera.getByRole('button', { name: 'Follows', exact: true });
   await expect(follows).toHaveAttribute('aria-pressed', 'true');
   await camera.getByRole('button', { name: 'Fixed', exact: true }).click();
-  await expect(preset('Highlight')).toHaveAttribute('aria-checked', 'false');
+  await expect(preset('Custom')).toBeVisible();
   await follows.click();
   await expect(follows).toHaveAttribute('aria-pressed', 'true');
   await page.getByRole('button', { name: /Fine-tune playback/ }).click();
@@ -865,8 +872,8 @@ test('offers Highlight for a single activity, and the other presets for several'
   await useActivities(page);
   await chooseStyle(page);
   await openSection(page, 'Playback');
-  await expect(presets).toHaveCount(3);
-  await expect(preset('All at once')).toHaveAttribute('aria-checked', 'true');
+  expect(await offered()).toEqual(['All at once', 'Recap', 'Multiday trip']);
+  await expect(preset('All at once')).toBeVisible();
   await page.getByRole('button', { name: /Fine-tune playback/ }).click();
   await expect(camera.getByRole('button', { name: 'Zooms out' })).toHaveAttribute(
     'aria-pressed',
@@ -877,7 +884,7 @@ test('offers Highlight for a single activity, and the other presets for several'
   await page.getByTestId('group-timing').getByRole('button', { name: 'Day', exact: true }).click();
   await expect(page.getByTestId('replay-summary')).toContainText('Custom playback');
   await page.getByRole('button', { name: 'Reset playback to defaults' }).click();
-  await expect(preset('All at once')).toHaveAttribute('aria-checked', 'true');
+  await expect(preset('All at once')).toBeVisible();
   await expect(camera.getByRole('button', { name: 'Zooms out' })).toHaveAttribute(
     'aria-pressed',
     'true',

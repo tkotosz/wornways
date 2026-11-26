@@ -121,7 +121,7 @@ connection ended asks to connect again.
 5. **Preset.** "How should it play?": the presets these activities can take as cards (the
    drawing, the name and its line), and "Keep my own playback" when the playback was set by
    hand. Asked for a new kind of selection, none is picked; opened from the top bar, the one
-   in use is marked. Playback › Style in the editor changes it too. A preset sets the widgets
+   in use is marked. It is the only place the preset is picked. A preset sets the widgets
    too: another preset than the one in use starts them again from the ones that suit its
    video, over the replay and on the totals card, as does a change to a single activity;
    the preset in use picked again, and "Keep my own playback", keep them.
@@ -153,17 +153,16 @@ drawing each. The editor's settings are remembered for the next visit.
 - **Frame:** the aspect ratio (Story, Square or Landscape, for where the video will be
   posted, or a custom size) and the frame rate (24, 30 or 60 fps). It comes first
   because the shape decides how everything else looks.
-- **Playback:** how the routes play, as a preset: All at once (picked at first), Recap
-  or Multiday trip for several activities; Highlight (a 15-second clip of the
-  activity) for a single one. Each remembers its own choice. Each preset is a card with
-  a small looping drawing of how activities move in it. Under the cards, the video's
-  length, then a summary of the replay ("30 seconds · Recap" and a line telling what it
-  plays, e.g. "12 months (312 activities), 2.3 s each" or "a race of all 24
+- **Playback:** how the routes play, past the preset picked from the top bar (All at
+  once, picked at first, Recap or Multiday trip for several activities; Highlight, a
+  15-second clip of the activity, for a single one; each remembers its own choice): the
+  video's length, then a summary of the replay ("30 seconds · Recap" and a line telling
+  what it plays, e.g. "12 months (312 activities), 2.3 s each" or "a race of all 24
   activities, each at its real pace"), then **Fine-tune playback**, folded at first:
   grouping, time share, group pace, overlap, drawing pace and the camera, built from
   the settings table, starting from the preset's values. Changing the length or one of
-  the preset's values makes it Custom ("Custom playback"), and no card is picked;
-  picking a card goes back to that preset.
+  the preset's values makes it Custom ("Custom playback", and "Preset: Custom" in the top
+  bar); picking a preset again goes back to it.
 - **Map:** the street map, and the replay privacy that hides each route's start and
   finish.
 - **Overlay:** what is drawn over the replay, as widgets arranged on the still the way

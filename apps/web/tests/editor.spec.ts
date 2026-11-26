@@ -54,7 +54,7 @@ test('asks for the preset for a new kind of selection, and keeps it for more or 
   await expect(chooser).toBeHidden();
   await expect(page.getByRole('button', { name: 'Preset: Recap' })).toBeVisible();
   await openSection(page, 'Playback');
-  await expect(page.getByRole('radio', { name: /^Recap/ })).toHaveAttribute('aria-checked', 'true');
+  await expect(page.getByTestId('replay-summary')).toContainText('Recap');
 
   // Fewer activities, still several: back to editing, the preset kept.
   await openActivities(page);
