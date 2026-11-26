@@ -18,8 +18,11 @@
 // orange rule under it, without the shadow.
 import {
   WIDGET_SIZE,
+  chartColors,
+  iconOf,
   labelTextOf,
   valueLines,
+  type ChartKind,
   type Metric,
   type MetricValue,
   type Widget,
@@ -34,8 +37,8 @@ const props = defineProps<{
   values: Map<Metric, MetricValue>;
   /** The video's title, which a text widget without its own text shows. */
   title: string;
-  /** The climb profile's shape, heights from 0 to 1, for the elevation chart. */
-  profile: number[] | null;
+  /** Each chart's shape, values from 0 to 1, for the charts on the picture. */
+  profiles: Partial<Record<ChartKind, number[]>>;
   /** The video's frame, in pixels: the widgets are sized as the engine sizes them in it. */
   size: { width: number; height: number };
   /** Whether the widgets are the totals card's, drawn as the card draws them. */
@@ -98,15 +101,15 @@ function besideOf(widget: Widget): { before: string; number: string; after: stri
     : { before: '', number, after: words };
 }
 
-/** The chart's outline over its box, 100 wide and 100 high, as the engine draws it. */
-const chartPath = computed(() => {
-  const shape = props.profile;
+/** A chart's outline over its box, 100 wide and 100 high, as the engine draws it. */
+function chartPath(chart: ChartKind): string {
+  const shape = props.profiles[chart];
   if (!shape || shape.length < 2) return '';
   const points = shape.map(
     (v, k) => `${((k / (shape.length - 1)) * 100).toFixed(2)},${(100 - (14 + 86 * v)).toFixed(2)}`,
   );
   return `M0,100 L${points.join(' L')} L100,100 Z`;
-});
+}
 
 /** How near a line, in pixels on the screen, a widget's edge or middle snaps to it. */
 const SNAP_PX = 7;
@@ -401,7 +404,7 @@ const story = computed(() => props.size.width / props.size.height < 0.8);
         :class="{ dates: widget.metric === 'date' }"
       >
         <span v-if="besideOf(widget)" class="value">
-          <StatIcon v-if="widget.icon" :metric="widget.metric" />
+          <StatIcon v-if="widget.icon" :icon="iconOf(widget.metric)" />
           <span v-if="besideOf(widget)!.before" class="words beside before">{{
             besideOf(widget)!.before
           }}</span>
@@ -413,23 +416,31 @@ const story = computed(() => props.size.width / props.size.height < 0.8);
         <template v-else>
           <span v-if="textOf(widget)!.above" class="words above">{{ textOf(widget)!.above }}</span>
           <span class="value"
-            ><StatIcon v-if="widget.icon" :metric="widget.metric" />{{ textOf(widget)!.line }}</span
+            ><StatIcon v-if="widget.icon" :icon="iconOf(widget.metric)" />{{
+              textOf(widget)!.line
+            }}</span
           >
           <span v-if="textOf(widget)!.under" class="words">{{ textOf(widget)!.under }}</span>
         </template>
       </span>
-      <svg v-else class="chart" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+      <svg
+        v-else-if="widget.kind === 'chart'"
+        class="chart"
+        viewBox="0 0 100 100"
+        preserveAspectRatio="none"
+        aria-hidden="true"
+      >
         <defs>
-          <linearGradient id="chart-fill" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0" stop-color="rgb(255 138 42 / 55%)" />
-            <stop offset="1" stop-color="rgb(255 138 42 / 12%)" />
+          <linearGradient :id="`chart-fill-${widget.chart}`" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" :stop-color="`rgba(${chartColors(widget.chart).fill}, 0.55)`" />
+            <stop offset="1" :stop-color="`rgba(${chartColors(widget.chart).fill}, 0.12)`" />
           </linearGradient>
         </defs>
-        <path :d="chartPath" fill="url(#chart-fill)" />
+        <path :d="chartPath(widget.chart)" :fill="`url(#chart-fill-${widget.chart})`" />
         <path
-          :d="chartPath"
+          :d="chartPath(widget.chart)"
           fill="none"
-          stroke="#ff8a2a"
+          :stroke="`rgb(${chartColors(widget.chart).line})`"
           stroke-width="1.5"
           vector-effect="non-scaling-stroke"
         />

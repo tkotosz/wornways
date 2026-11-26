@@ -3,6 +3,7 @@
 // may send progress for it before that.
 
 import type {
+  ChartKind,
   FrequentPlace,
   Grouping,
   Metric,
@@ -163,8 +164,8 @@ export type Poster = {
   widgets: Widget[];
   /** Each value this video can show, as it stands at the end. */
   values: [Metric, MetricValue][];
-  /** The climb profile's shape, heights from 0 to 1; null without recorded elevation. */
-  profile: number[] | null;
+  /** The shape of each chart the activities can show, values from 0 to 1. */
+  profiles: Partial<Record<ChartKind, number[]>>;
   /** For the ending, when the totals card shows: its widgets and each total it can show. */
   totals: { widgets: Widget[]; values: [Metric, MetricValue][] } | null;
 };
@@ -175,6 +176,8 @@ export type PlanReport = {
   privacyOmitted: number;
   title: string;
   hasElevation: boolean;
+  /** The charts the activities can show: the speed, and the ones some recorded. */
+  charts: ChartKind[];
   /** The sensor channels some selected activity recorded, such as heart rate. */
   sensors: SensorChannel[];
   /** Whether some selected activity gives its calories. */

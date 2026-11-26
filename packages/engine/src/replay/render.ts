@@ -1,6 +1,12 @@
 import { drawBasemap, type Basemap, type MapLabel, type Tile } from '../map/basemap.ts';
 import { levelsFor, mapLevelViews, type CameraPath, type LevelWindow } from './camera.ts';
-import { drawElevationProfile, elevationProfile } from './elevation-profile.ts';
+import {
+  chartProfile,
+  chartProfiles,
+  drawChart,
+  type ChartKind,
+  type ChartProfile,
+} from './charts.ts';
 import { WIDGET_SIZE, startingWidgets, valueLines, type Widget } from './widgets.ts';
 import { END_CARD_S, drawEndCard, endCardFrames } from './end-card.ts';
 import {
@@ -222,10 +228,10 @@ export type Renderer = {
   /** Each value this video can show, as it stands at the end of the replay. */
   readonly finalValues: Map<Metric, MetricValue>;
   /**
-   * The climb profile's shape, for drawing it elsewhere: `samples` heights from 0 (its
-   * lowest) to 1 (its highest); null when no activity recorded elevation.
+   * The shape of each chart the activities can show, for drawing it elsewhere: `samples`
+   * values from 0 (its lowest) to 1 (its highest).
    */
-  profileShape(samples: number): number[] | null;
+  profileShapes(samples: number): Partial<Record<ChartKind, number[]>>;
 };
 
 /** Where an activity stands, for the values: as drawn so far, or at the end. */
@@ -686,13 +692,13 @@ export function createRenderer(
       ...widget,
       size: clamp(Math.round(widget.size), WIDGET_SIZE.min, WIDGET_SIZE.max),
     }));
-  // The climb profile, sampled for the widest a chart is drawn.
-  const profile = widgets.some((widget) => widget.kind === 'elevation-chart')
-    ? elevationProfile(
-        tracks,
-        Math.round(Math.min(600, Math.max(50, (W - 2 * margin) / (3 * unit)))),
-      )
-    : null;
+  // The charts' profiles, each sampled for the widest a chart is drawn; null for one the
+  // activities have nothing for.
+  const chartSamples = Math.round(Math.min(600, Math.max(50, (W - 2 * margin) / (3 * unit))));
+  const profiles = new Map<ChartKind, ChartProfile | null>();
+  for (const widget of widgets)
+    if (widget.kind === 'chart' && !profiles.has(widget.chart))
+      profiles.set(widget.chart, chartProfile(tracks, chartSamples, widget.chart));
 
   const headFade = 0.35; // seconds a head dot lingers after its track finishes
   const headRadius = 15 * unit;
@@ -1120,7 +1126,7 @@ export function createRenderer(
     values: Map<Metric, MetricValue>,
   ): { width: number; height: number } {
     const scale = widget.size / 100;
-    if (widget.kind === 'elevation-chart')
+    if (widget.kind === 'chart')
       return { width: Math.min(W, (W - 2 * margin) * scale), height: CHART_HEIGHT * scale };
     if (widget.kind === 'text') {
       const text = widget.text ?? options.title ?? '';
@@ -1210,11 +1216,12 @@ export function createRenderer(
         ctx.fillStyle = 'rgba(255, 255, 255, 0.66)';
         ctx.fillText(under, cx, box.y0 + VALUE_SIZE * scale * 1.1 + LABEL_SIZE * scale);
       }
-    } else if (profile) {
+    } else if (widget.kind === 'chart' && profiles.get(widget.chart)) {
       ctx.shadowColor = 'rgba(0, 0, 0, 0)';
-      drawElevationProfile(
+      drawChart(
         ctx,
-        profile,
+        widget.chart,
+        profiles.get(widget.chart)!,
         { x: box.x0, y: box.y0, width: box.x1 - box.x0, height: box.y1 - box.y0 },
         prepared.map((tr) => ({
           meters: tr.started ? tr.metres : 0,
@@ -1237,7 +1244,7 @@ export function createRenderer(
     /** Where text widgets sit, with room around: place names fade under them. */
     const room = 10 * unit;
     const textBoxes = layout.flatMap((box, k) =>
-      box && widgets[k]!.kind !== 'elevation-chart'
+      box && widgets[k]!.kind !== 'chart'
         ? [{ x0: box.x0 - room, y0: box.y0 - room, x1: box.x1 + room, y1: box.y1 + room }]
         : [],
     );
@@ -1524,11 +1531,16 @@ export function createRenderer(
       values: totalsValues(totals(), [singular, plural], units) as Map<Metric, MetricValue>,
     }),
     finalValues,
-    profileShape(samples: number) {
-      const shape = hasElevation ? elevationProfile(tracks, samples) : null;
-      if (!shape) return null;
-      const span = shape.high - shape.low || 1;
-      return [...shape.elevation].map((meters) => (meters - shape.low) / span);
+    profileShapes(samples: number) {
+      const shapes: Partial<Record<ChartKind, number[]>> = {};
+      for (const [chart, shape] of Object.entries(chartProfiles(tracks, samples)) as [
+        ChartKind,
+        ChartProfile,
+      ][]) {
+        const span = shape.high - shape.low || 1;
+        shapes[chart] = [...shape.values].map((value) => (value - shape.low) / span);
+      }
+      return shapes;
     },
     skipTo(index: number): void {
       // The end card is drawn over the replay's last frame, so it cannot be skipped to.

@@ -148,7 +148,7 @@ describe('parseSettings', () => {
     [{ 'elevation-profile': true }, 'elevation-profile: is not a setting'],
     [
       { widgets: 'speed@50,50' },
-      `widgets: "speed" is not a widget: text, elevation-chart or one of ${METRICS.join(', ')} at character 12`,
+      `widgets: "speed" is not a widget: text, elevation-chart, heart-rate-chart, power-chart, speed-chart, cadence-chart or one of ${METRICS.join(', ')} at character 12`,
     ],
   ])('rejects %j', (input, message) => {
     expect(errorOf(input)).toBe(message);

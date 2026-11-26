@@ -219,6 +219,14 @@ as the route's head does. An activity without recorded elevation is bridged by a
 line between the heights around it; with no elevation at all there is no chart. A climb of
 less than 60 m is drawn against a 60 m range, so flat looks flat.
 
+The other charts are drawn the same way along the distance, so the same spot on each is the
+same place on the route, each in its own color: `heart-rate-chart` red, `power-chart`
+yellow, `speed-chart` blue (worked out from the distance and the recorded time between
+points) and `cadence-chart` green; elevation stays orange. Heart rate, power and cadence
+need an activity that recorded them; a chart with nothing to show is left out. Each is
+smoothed so it reads at a glance, power the most, and drawn against a least range of
+30 bpm, 100 W, 3 m/s or 20 rpm.
+
 ### Values
 
 What a value widget can show, by what it measures, with the name the app gives it. A

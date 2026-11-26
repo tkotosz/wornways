@@ -289,14 +289,17 @@ test.describe('the editor on a phone', () => {
     await expect(page.getByRole('button', { name: 'Center it across' })).toHaveCount(0);
     await page.getByRole('button', { name: 'Remove from the picture' }).click();
     await expect(onPicture).toHaveCount(count + 1);
-    // The chart and the watermark turn on and off.
-    const chart = page.getByRole('switch', { name: 'Elevation chart' });
-    await expect(chart).not.toBeChecked();
-    await chart.click();
-    await expect(chart).toBeChecked();
+    // Charts come from a sheet of them: added, one is on the picture and dimmed in the sheet.
+    await page.getByRole('button', { name: 'Add a chart' }).click();
+    const charts = page.getByRole('dialog', { name: 'Charts' });
+    await charts.getByRole('button', { name: 'Speed chart' }).click();
     await expect(onPicture).toHaveCount(count + 2);
-    await chart.click();
-    await expect(onPicture).toHaveCount(count + 1);
+    await expect(page.getByRole('button', { name: /^Speed chart on the picture/ })).toBeVisible();
+    await page.getByRole('button', { name: '✓ Done' }).click();
+    await page.getByRole('button', { name: 'Add a chart' }).click();
+    await expect(charts.getByRole('button', { name: 'Speed chart' })).toBeDisabled();
+    await page.keyboard.press('Escape');
+    // The watermark turns on and off.
     const mark = page.getByRole('switch', { name: 'Show watermark' });
     await expect(mark).toBeChecked();
     await mark.click();

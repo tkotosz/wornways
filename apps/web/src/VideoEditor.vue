@@ -16,6 +16,7 @@ import {
   TOTALS_FIELDS,
   parseWidgets,
   widgetsText,
+  type ChartKind,
   type Metric,
   type MetricValue,
   type SettingsInput,
@@ -92,12 +93,12 @@ function openSetting(name: string, label: string): void {
 // (WidgetStrip), over the replay or on the totals card; on wide screens also listed beside it.
 /**
  * What the last still of the replay told: its widgets, the values the video can show and the
- * climb profile's shape, for drawing the widgets over the bare still.
+ * charts' shapes, for drawing the widgets over the bare still.
  */
 const drawn = ref<{
   widgets: Widget[];
   values: Map<Metric, MetricValue>;
-  profile: number[] | null;
+  profiles: Partial<Record<ChartKind, number[]>>;
 } | null>(null);
 /** What the still of the ending told of the totals card; null when the video has none. */
 const drawnTotals = ref<{ widgets: Widget[]; values: Map<Metric, MetricValue> } | null>(null);
@@ -105,7 +106,7 @@ function onDrawn(poster: Poster, scene: PosterScene): void {
   drawn.value = {
     widgets: poster.widgets,
     values: new Map(poster.values),
-    profile: poster.profile,
+    profiles: poster.profiles,
   };
   if (scene === 'ending')
     drawnTotals.value = poster.totals
@@ -163,10 +164,14 @@ const sheetWidget = computed(() =>
 
 /**
  * Where a new widget goes: of a few spots clear of the middle, where Play sits, the one
- * furthest from the widgets already there; the chart keeps its place near the bottom.
+ * furthest from the widgets already there; a chart goes along the bottom.
  */
 function freeSpot(widget: Widget): Widget {
-  if (widget.kind === 'elevation-chart') return widget;
+  // A chart goes along the bottom, above the charts already there.
+  if (widget.kind === 'chart') {
+    const below = widgets.value.filter((w) => w.kind === 'chart').length;
+    return { ...widget, y: Math.max(20, widget.y - 9 * below) };
+  }
   const spots = [
     { x: 50, y: 28 },
     { x: 50, y: 70 },
@@ -214,25 +219,16 @@ function writeText(text: string): void {
   else if (widget?.kind === 'text') changeWidget(index, { ...widget, text });
 }
 
-/** The elevation chart in the strip: offered over the replay when an activity has heights. */
-const chart = computed(() => ({
-  offered: board.value === 'overlay' && !!props.plan?.hasElevation,
-  shown: widgets.value.some((widget) => widget.kind === 'elevation-chart'),
-}));
+/** The charts these activities can show, offered over the replay; none on the totals card. */
+const charts = computed(() => (board.value === 'overlay' ? (props.plan?.charts ?? []) : []));
 
-function useTool(tool: 'text' | 'values' | 'chart'): void {
+function useTool(tool: 'text' | 'values' | 'charts'): void {
   if (tool === 'text') {
     // A new text, written straight away; left empty, it goes again.
     editingText.value = addWidget({ kind: 'text', text: '', x: 50, y: 50, size: 100 });
   } else if (tool === 'values') {
     sheet.value = { name: 'values', label: board.value === 'totals' ? 'Totals' : 'Stats' };
-  } else {
-    // A switch: the strip stays as it is, so the new chart is not picked.
-    const at = widgets.value.findIndex((widget) => widget.kind === 'elevation-chart');
-    if (at >= 0) removeWidget(at);
-    else addWidget({ kind: 'elevation-chart', x: 50, y: 88, size: 100 });
-    selectedWidget.value = null;
-  }
+  } else sheet.value = { name: 'charts', label: 'Charts' };
 }
 </script>
 
@@ -258,7 +254,7 @@ function useTool(tool: 'text' | 'values' | 'chart'): void {
             :widgets="widgets"
             :values="values"
             :title="title"
-            :profile="drawn?.profile ?? null"
+            :profiles="drawn?.profiles ?? {}"
             :size="size"
             :card="board === 'totals'"
             @change="setWidgets"
@@ -296,7 +292,7 @@ function useTool(tool: 'text' | 'values' | 'chart'): void {
         :selected="selectedWidget"
         :card="board === 'totals'"
         :values="values"
-        :chart="chart"
+        :charts="charts.length > 0"
         @done="selectedWidget = null"
         @tool="useTool"
         @edit="editingText = $event"
@@ -406,7 +402,7 @@ function useTool(tool: 'text' | 'values' | 'chart'): void {
               :widgets="widgets"
               :values="values"
               :title="title"
-              :profile="drawn?.profile ?? null"
+              :profiles="drawn?.profiles ?? {}"
               :size="size"
               :card="board === 'totals'"
               @change="setWidgets"
@@ -421,7 +417,7 @@ function useTool(tool: 'text' | 'values' | 'chart'): void {
             :selected="selectedWidget"
             :card="board === 'totals'"
             :values="values"
-            :chart="chart"
+            :charts="charts.length > 0"
             @done="selectedWidget = null"
             @tool="useTool"
             @edit="editingText = $event"
@@ -471,11 +467,11 @@ function useTool(tool: 'text' | 'values' | 'chart'): void {
   <!-- The setting being changed, on its own: from the phone's list, or a widget's. -->
   <SettingSheet v-if="sheet" :title="sheet.label" @close="sheet = null">
     <AddWidget
-      v-if="sheet.name === 'add-widget' || sheet.name === 'values'"
-      :values-only="sheet.name === 'values'"
+      v-if="sheet.name === 'add-widget' || sheet.name === 'values' || sheet.name === 'charts'"
+      :only="sheet.name === 'values' ? 'values' : sheet.name === 'charts' ? 'charts' : undefined"
       :widgets="widgets"
       :values="values"
-      :has-elevation="board === 'overlay' && !!plan?.hasElevation"
+      :charts="charts"
       :has-calories="!!plan?.hasCalories"
       @add="addWidget"
     />

@@ -80,7 +80,7 @@ export async function makePoster(
     boxes,
     widgets: renderer.widgets,
     values: [...renderer.finalValues],
-    profile: renderer.profileShape(120),
+    profiles: renderer.profileShapes(120),
     totals: totalsCard
       ? (({ widgets, values }) => ({ widgets, values: [...values] }))(renderer.totalsCard())
       : null,

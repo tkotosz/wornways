@@ -1,6 +1,6 @@
 // What is drawn over the replay: widgets placed anywhere on the frame, as stickers are in a
 // story editor. A widget is a line of text (the title, at first), one value (a metric), or
-// the elevation chart. Each sits centered on a point of the frame, in percent of its width
+// a chart (elevation, heart rate, power, speed or cadence). Each sits centered on a point of the frame, in percent of its width
 // across and of its height down, at a size in percent of its normal size; centered, it keeps
 // its place while its value grows and shrinks during the replay. They are drawn in order,
 // the last on top.
@@ -11,6 +11,7 @@
 // shows its words where that value usually does (`defaultLabel`), without words of its own
 // the value's usual ones, and without a format the usual way (`defaultFormat`, formats.ts).
 
+import { CHART_KINDS, type ChartKind } from './charts.ts';
 import { defaultFormat, formatsOf, type ValueFormat } from './formats.ts';
 import type { Metric, MetricValue } from './metrics.ts';
 
@@ -36,7 +37,7 @@ export type Widget = { x: number; y: number; size: number } & (
       /** How a time, date or clock time is written; left out, the value's usual way. */
       format?: ValueFormat;
     }
-  | { kind: 'elevation-chart' }
+  | { kind: 'chart'; chart: ChartKind }
 );
 
 /** The label mode a value starts with: its words under it; the date, which has none, off. */
@@ -81,13 +82,18 @@ export function valueLines(
 /** The sizes a widget takes, in percent of its normal size. */
 export const WIDGET_SIZE = { min: 50, max: 250 } as const;
 
-/** A widget's name in the text form: "text", "elevation-chart" or the metric's. */
+/** A widget's name in the text form: "text", a chart's ("heart-rate-chart") or the metric's. */
 export const widgetName = (widget: Widget) =>
-  widget.kind === 'metric' ? widget.metric : widget.kind;
+  widget.kind === 'metric'
+    ? widget.metric
+    : widget.kind === 'chart'
+      ? `${widget.chart}-chart`
+      : widget.kind;
 
 /**
  * Reads a list of widgets from its text form; an empty text is no widgets. `metrics` are
- * the metric names a value widget can take; `chart` whether the elevation chart is one.
+ * the metric names a value widget can take; `chart` whether the charts are widgets (not on the
+ * totals card).
  * Throws an Error that says what is wrong.
  */
 export function parseWidgets(
@@ -176,8 +182,14 @@ export function parseWidgets(
     if (size < WIDGET_SIZE.min || size > WIDGET_SIZE.max)
       fail(`a size is from ${WIDGET_SIZE.min} to ${WIDGET_SIZE.max} percent, got ${size}`);
     if (name === 'text') widgets.push({ kind: 'text', text: own, x, y, size });
-    else if (name === 'elevation-chart' && chart)
-      widgets.push({ kind: 'elevation-chart', x, y, size });
+    else if (chart && CHART_KINDS.some((kind) => name === `${kind}-chart`))
+      widgets.push({
+        kind: 'chart',
+        chart: name.slice(0, -'-chart'.length) as ChartKind,
+        x,
+        y,
+        size,
+      });
     else if (metrics.includes(name))
       widgets.push({
         kind: 'metric',
@@ -193,7 +205,7 @@ export function parseWidgets(
       });
     else
       fail(
-        `"${name}" is not a widget: text, ${chart ? 'elevation-chart or ' : ''}one of ${metrics.join(', ')}`,
+        `"${name}" is not a widget: text, ${chart ? `${CHART_KINDS.map((kind) => `${kind}-chart`).join(', ')} or ` : ''}one of ${metrics.join(', ')}`,
       );
     i++; // past the ";"
   }
@@ -243,7 +255,7 @@ export function startingWidgets(
 ): Widget[] {
   const margin = 7;
   const top = 5;
-  const chart: Widget = { kind: 'elevation-chart', x: 50, y: 0, size: 100 };
+  const chart: Widget = { kind: 'chart', chart: 'elevation', x: 50, y: 0, size: 100 };
   const chartSize = measure(chart);
   chart.y = 98.8 - 3.2 - (chartSize.height * 100) / 2;
   /** The lowest the bottom row's text may reach: above the chart when it shows. */

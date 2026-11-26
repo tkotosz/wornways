@@ -173,7 +173,8 @@ drawing each. The editor's settings are remembered for the next visit.
   with its words under it at first; they can also go before, after or above it, or be left
   out, and say words of its own),
   and the
-  elevation chart (when an activity recorded elevation). A video starts with the title at
+  charts (elevation, heart rate, power, speed or cadence, along the distance, each in its
+  own color; when the activities can show it). A video starts with the title at
   the top, the values that suit it at the bottom left (the first large, the others
   smaller in a row under it), and, for a single activity, the chart along the bottom. Each widget is centered on its point
   of the frame, so it keeps its place while its value changes during the replay; text has
@@ -202,8 +203,9 @@ drawing each. The editor's settings are remembered for the next visit.
   measure (time, distance, speed, elevation, heart rate, power, cadence, temperature,
   calories, activities; a group only when the video has one of its values), each a tile with
   its own number (calories a service gives on request are offered before they are known; a
-  value already on the picture is dimmed); the elevation chart's switch (offered only
-  when an activity recorded elevation); and the watermark's, a fixed small mark at the
+  value already on the picture is dimmed); Add Chart, a sheet of the charts these
+  activities can show (elevation, heart rate, power, speed and cadence, each with its icon
+  in its color; one on the picture is dimmed); and the watermark's, a fixed small mark at the
   bottom left on the map credit's line. A new widget comes in a free spot clear of the
   middle. A picked widget turns the strip into its own chips: Done (lets it go), Edit
   (a text's text), Size (a sheet with a slider), Label position (where a value's

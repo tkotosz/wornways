@@ -18,13 +18,14 @@ describe('widgets as text', () => {
     { kind: 'text', text: null, x: 50, y: 50, size: 140 },
     { kind: 'metric', metric: 'distance', label: 'off', x: 20.5, y: 88, size: 120 },
     { kind: 'metric', metric: 'count', label: 'under', x: 50, y: 70, size: 100 },
-    { kind: 'elevation-chart', x: 50, y: 93, size: 100 },
+    { kind: 'chart', chart: 'elevation', x: 50, y: 93, size: 100 },
+    { kind: 'chart', chart: 'heart-rate', x: 50, y: 85, size: 100 },
   ];
 
   it('is written and read back as the same widgets, a label mode only when not the usual', () => {
     const text = widgetsText(widgets);
     expect(text).toBe(
-      'text:"Mallorca, \\"the island\\""@50,8;text@50,50,140;distance:off@20.5,88,120;count@50,70;elevation-chart@50,93',
+      'text:"Mallorca, \\"the island\\""@50,8;text@50,50,140;distance:off@20.5,88,120;count@50,70;elevation-chart@50,93;heart-rate-chart@50,85',
     );
     expect(parseWidgets(text, METRICS)).toEqual(widgets);
   });

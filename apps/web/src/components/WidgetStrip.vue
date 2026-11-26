@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // The chips for arranging widgets, in the strip under the picture (Overlay, and Ending with
-// the totals card). With no widget picked: adding a text or a stat, and the elevation chart
-// on or off. With one picked, the strip is that widget's: Done lets it go; Edit writes a
+// the totals card). With no widget picked: adding a text, a stat or (over the replay) a
+// chart. With one picked, the strip is that widget's: Done lets it go; Edit writes a
 // text's text; Size, Label position (where a value's words are), Label text (what they say),
 // Unit (on or off, for a value that has one) and Format (a time, date or clock time) open
 // their sheet; Icon turns a value's icon on or off in place; Remove takes it off the picture. The section's own settings
@@ -17,14 +17,14 @@ const props = defineProps<{
   card: boolean;
   /** The values the widgets show, to tell which have a unit. */
   values: Map<Metric, MetricValue>;
-  /** The elevation chart: whether it is offered (an activity recorded elevation) and shown. */
-  chart: { offered: boolean; shown: boolean };
+  /** Whether charts are offered: over the replay, when the activities can show one. */
+  charts: boolean;
 }>();
 const emit = defineEmits<{
   /** Lets the picked widget go. */
   done: [];
-  /** Adds a text, opens the values, or turns the chart on or off. */
-  tool: [tool: 'text' | 'values' | 'chart'];
+  /** Adds a text, or opens the values or the charts to add one. */
+  tool: [tool: 'text' | 'values' | 'charts'];
   /** Writes the picked text widget's text. */
   edit: [index: number];
   /** Changes the picked widget in place, as its icon switch does. */
@@ -174,18 +174,17 @@ const format = computed(() => (picked.value ? formatOf(picked.value, props.card)
       <span>Add</span>
       <span class="value">{{ card ? 'Total' : 'Stat' }}</span>
     </button>
-    <label v-if="chart.offered" class="setting-row">
-      <span>Elevation chart</span>
-      <span class="switch">
-        <input
-          type="checkbox"
-          role="switch"
-          aria-label="Elevation chart"
-          :checked="chart.shown"
-          @change="emit('tool', 'chart')"
-        />
-      </span>
-    </label>
+    <button
+      v-if="charts"
+      type="button"
+      class="setting-row"
+      aria-label="Add a chart"
+      aria-haspopup="dialog"
+      @click="emit('tool', 'charts')"
+    >
+      <span>Add</span>
+      <span class="value">Chart</span>
+    </button>
     <slot />
   </div>
 </template>

@@ -1,11 +1,11 @@
 <script setup lang="ts">
-// A stat's icon as the engine draws it in front of the value (see the engine's icons.ts), as
-// SVG in the text's color: its parts filled or stroked on a 24 by 24 grid.
-import { ICONS, iconOf, type Metric } from '@wornways/engine';
+// One of the stats' icons as the engine draws it in front of a value (see the engine's
+// icons.ts), as SVG in the text's color: its parts filled or stroked on a 24 by 24 grid.
+import { ICONS, type IconName } from '@wornways/engine';
 import { computed } from 'vue';
 
-const props = defineProps<{ metric: Metric }>();
-const parts = computed(() => ICONS[iconOf(props.metric)]);
+const props = defineProps<{ icon: IconName }>();
+const parts = computed(() => ICONS[props.icon]);
 </script>
 
 <template>

@@ -92,6 +92,7 @@ export {
   type IconName,
   type IconPart,
 } from './replay/icons.ts';
+export { CHART_KINDS, chartColors, chartsOf, type ChartKind } from './replay/charts.ts';
 export { distanceM, mercatorX, mercatorY } from './track/geo.ts';
 export { MVT_LINE, decodeMvt, type MvtFeature, type MvtLayer } from './map/mvt.ts';
 export { fitView, trackArea, type View } from './replay/view.ts';

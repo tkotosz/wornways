@@ -730,7 +730,7 @@ describe('widgets', () => {
     const renderer = lastFrame({ watermark: true });
     expect(
       renderer.widgets.map((widget) => (widget.kind === 'metric' ? widget.metric : widget.kind)),
-    ).toEqual(['text', 'distance', 'time', 'climb', 'elevation-chart']);
+    ).toEqual(['text', 'distance', 'time', 'climb', 'chart']);
     const [title, distance, time] = renderer.overlayBoxes().widgets.map((box) => edges(box!));
     // The title at the top in the middle; the first value large at the bottom left, the
     // others smaller in a row under it.
@@ -897,6 +897,15 @@ describe('the elevation profile', () => {
     return count;
   }
 
+  it('draws the heart rate chart in red, and only for an activity that recorded it', () => {
+    const chart: Widget[] = [{ kind: 'chart', chart: 'heart-rate', x: 50, y: 93, size: 100 }];
+    const beating = hill(true);
+    const count = beating.points.length / STRIDE;
+    beating.sensors = { heartRate: Float32Array.from({ length: count }, (_, i) => 110 + i) };
+    expect(orangeAtTheBottom(beating, chart)).toBeGreaterThan(200);
+    expect(orangeAtTheBottom(hill(true), chart)).toBe(0);
+  });
+
   it('shows under a single activity with elevation, unless the widgets leave it out', () => {
     expect(orangeAtTheBottom(hill(true))).toBeGreaterThan(200);
     expect(orangeAtTheBottom(hill(true), [])).toBe(0);
@@ -940,7 +949,9 @@ describe('the elevation profile', () => {
   it('is left out for an activity without elevation', () => {
     expect(orangeAtTheBottom(hill(false))).toBe(0);
     expect(
-      orangeAtTheBottom(hill(false), [{ kind: 'elevation-chart', x: 50, y: 93, size: 100 }]),
+      orangeAtTheBottom(hill(false), [
+        { kind: 'chart', chart: 'elevation', x: 50, y: 93, size: 100 },
+      ]),
     ).toBe(0);
   });
 

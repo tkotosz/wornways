@@ -1,29 +1,42 @@
 <script setup lang="ts">
-// The widgets that can be added: text, the elevation chart (when an activity recorded
-// elevation), and each value this video can show, as tiles with the video's own number,
-// grouped by what they measure (time, distance, speed, elevation, the sensors…); a group
-// shows only when the video has one of its values.
+// The widgets that can be added: text, the charts (`charts`: the ones these activities can
+// show, each with its icon in its color), and each value this video can show, as tiles with
+// the video's own number, grouped by what they measure (time, distance, speed, elevation, the
+// sensors…); a group shows only when the video has one of its values. With `only`, just the
+// values or just the charts, as the strip's chips open them.
 // Calories a service gives only on request are offered before they are known.
-// A value already on the picture is dimmed; each shows once. A new widget comes in the
-// middle of the picture (the chart near the bottom).
-import { defaultLabel, type Metric, type MetricValue, type Widget } from '@wornways/engine';
+// A value or a chart already on the picture is dimmed; each shows once. A new widget comes in
+// the middle of the picture (a chart along the bottom).
+import {
+  chartColors,
+  defaultLabel,
+  type ChartKind,
+  type Metric,
+  type MetricValue,
+  type Widget,
+} from '@wornways/engine';
 import { computed } from 'vue';
-import { METRIC_GROUPS, metricName } from '../adjust.ts';
+import { CHARTS, METRIC_GROUPS, metricName } from '../adjust.ts';
+import StatIcon from './StatIcon.vue';
 
 const props = defineProps<{
   widgets: Widget[];
   values: Map<Metric, MetricValue>;
-  hasElevation: boolean;
+  /** The charts these activities can show; none on the totals card. */
+  charts: ChartKind[];
   /** Whether calories can be shown, also before they are fetched. */
   hasCalories: boolean;
-  /** Only the values: text and the chart have tools of their own. */
-  valuesOnly?: boolean;
+  /** Only the values, or only the charts. */
+  only?: 'values' | 'charts';
 }>();
 const emit = defineEmits<{ add: [widget: Widget] }>();
 
 const used = computed(
   () =>
     new Set(props.widgets.flatMap((widget) => (widget.kind === 'metric' ? [widget.metric] : []))),
+);
+const usedCharts = computed(
+  () => new Set(props.widgets.flatMap((widget) => (widget.kind === 'chart' ? [widget.chart] : []))),
 );
 /** The values this video can show, by group; groups with none are left out. */
 const groups = computed(() =>
@@ -38,8 +51,8 @@ const groups = computed(() =>
 
 <template>
   <div class="add-widget">
-    <template v-if="!valuesOnly">
-      <h3 class="setting-rows-title">Text and chart</h3>
+    <template v-if="!only">
+      <h3 class="setting-rows-title">Text</h3>
       <div class="tiles">
         <button
           type="button"
@@ -49,20 +62,31 @@ const groups = computed(() =>
           <b aria-hidden="true">Aa</b>
           <span>Text</span>
         </button>
-        <button
-          v-if="hasElevation"
-          type="button"
-          class="tile"
-          @click="emit('add', { kind: 'elevation-chart', x: 50, y: 88, size: 100 })"
-        >
-          <svg viewBox="0 0 32 16" aria-hidden="true">
-            <path d="M1 15 6 9l4 3 6-8 5 6 4-3 6 8z" />
-          </svg>
-          <span>Elevation chart</span>
-        </button>
       </div>
     </template>
-    <section v-for="group in groups" :key="group.name" :aria-label="group.name">
+    <section v-if="only !== 'values' && charts.length" aria-label="Charts">
+      <h3 v-if="!only" class="setting-rows-title">Charts</h3>
+      <div class="tiles">
+        <button
+          v-for="chart in charts"
+          :key="chart"
+          type="button"
+          class="tile"
+          :disabled="usedCharts.has(chart)"
+          @click="emit('add', { kind: 'chart', chart, x: 50, y: 88, size: 100 })"
+        >
+          <b :style="{ color: `rgb(${chartColors(chart).line})` }">
+            <StatIcon :icon="CHARTS[chart].icon" />
+          </b>
+          <span>{{ CHARTS[chart].name }}</span>
+        </button>
+      </div>
+    </section>
+    <section
+      v-for="group in only === 'charts' ? [] : groups"
+      :key="group.name"
+      :aria-label="group.name"
+    >
       <h3 class="setting-rows-title">{{ group.name }}</h3>
       <div class="tiles">
         <button
@@ -136,12 +160,9 @@ const groups = computed(() =>
   font-size: 0.72rem;
 }
 
-.tile svg {
-  width: 2rem;
-  height: 1rem;
-  fill: rgba(255, 138, 42, 0.45);
-  stroke: var(--accent);
-  stroke-width: 1.2;
-  stroke-linejoin: round;
+.tile b .stat-icon {
+  width: 1.5rem;
+  height: 1.5rem;
+  margin: 0;
 }
 </style>

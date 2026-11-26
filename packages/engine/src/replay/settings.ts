@@ -389,7 +389,10 @@ export const SETTINGS: readonly SettingDefinition[] = [
       'What is drawn over the replay, each widget centered on a point in percent across and ' +
       'down, with a size in percent (50 to 250, 100 when left out), separated by ";": ' +
       'text:"Your text"@x,y,size (text@x,y for the title), a value such as distance@x,y,size, ' +
-      'or elevation-chart@x,y,size. Later widgets are drawn over earlier ones; "" draws none. ' +
+      'or a chart, the activities end to end along their distance: elevation-chart, ' +
+      'heart-rate-chart, power-chart, speed-chart or cadence-chart@x,y,size (one an activity ' +
+      'recorded nothing for is left out). Later widgets are drawn over earlier ones; "" draws ' +
+      'none. ' +
       'A value takes a label mode after a colon, as count:after@x,y: off (the value alone), ' +
       'before (total distance 1,147 km), after (25 activities), above or under (its words ' +
       'smaller, on a line above or under it). Left out, a value has its words under it; the ' +

@@ -73,10 +73,13 @@ test('plays a draft of the video in the preview, and edits on a still', async ({
   await openSection(page, 'Ending');
   await preview.getByRole('button', { name: 'Play preview' }).click();
   await expect(preview.getByTestId('preview-video')).toBeVisible();
-  const at = await preview
-    .getByTestId('preview-video')
-    .evaluate((element) => (element as unknown as { currentTime: number }).currentTime);
-  expect(at).toBeGreaterThan(seconds - 6);
+  await expect
+    .poll(() =>
+      preview
+        .getByTestId('preview-video')
+        .evaluate((element) => (element as unknown as { currentTime: number }).currentTime),
+    )
+    .toBeGreaterThan(seconds - 6);
   await expect(preview.getByRole('status')).toHaveCount(0);
   await preview.getByRole('button', { name: 'Edit', exact: true }).click();
   await expect(preview.getByTestId('preview-video')).toHaveCount(0);
