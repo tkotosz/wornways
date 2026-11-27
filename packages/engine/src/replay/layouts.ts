@@ -45,7 +45,7 @@ export type SlotKind = 'title' | 'stat' | 'chart';
 
 /**
  * A slot on a frame, in percent of it: its middle and its size; and whether a widget sits in
- * its middle or against its left or right edge.
+ * its middle or against its left edge.
  */
 export type LayoutSlot = {
   kind: SlotKind;
@@ -53,7 +53,7 @@ export type LayoutSlot = {
   y: number;
   width: number;
   height: number;
-  align: 'left' | 'center' | 'right';
+  align: 'left' | 'center';
 };
 
 /**
@@ -64,7 +64,7 @@ export type LayoutSlot = {
 type PlannedSlot = Omit<LayoutSlot, 'align'> & {
   across: 'left' | 'middle' | 'right';
   down: 'top' | 'middle' | 'bottom';
-  align?: LayoutSlot['align'];
+  align?: 'left' | 'center';
   /** Runs across the frame (the title, a chart along it): keeps its width in percent. */
   spans?: boolean;
 };
@@ -97,7 +97,7 @@ const stat = (
   width: number,
   height: number,
   across: PlannedSlot['across'],
-  align: LayoutSlot['align'] = across === 'left' ? 'left' : 'center',
+  align: 'left' | 'center' = across === 'left' ? 'left' : 'center',
   down: PlannedSlot['down'] = 'bottom',
 ): PlannedSlot => ({ kind: 'stat', x, y, width, height, across, down, align });
 
@@ -246,13 +246,12 @@ export const LAYOUTS: Record<LayoutName, { name: string; help: string; slots: Pl
   },
   'hero-pair': {
     name: 'Hero pair',
-    help: 'The title at the top; one large stat in the middle at the bottom, two smaller under it, split at the middle; a chart along the bottom.',
+    help: 'The title at the top; one large stat in the middle at the bottom, two smaller under it; a chart along the bottom.',
     slots: [
       title,
       stat(50, 79.5, 60, 7.5, 'middle'),
-      // The two either side of the middle, 10% apart, whatever their widths.
-      stat(31, 87.5, 28, 4.6, 'middle', 'right'),
-      stat(69, 87.5, 28, 4.6, 'middle', 'left'),
+      stat(35, 87.5, 28, 4.6, 'middle'),
+      stat(65, 87.5, 28, 4.6, 'middle'),
       bottomChart,
     ],
   },
@@ -323,21 +322,20 @@ const sized = (size: number) =>
   Math.round(Math.min(WIDGET_SIZE.max, Math.max(WIDGET_SIZE.min, size)));
 
 /**
- * The stat slots `count` stats take: the first ones, a row that is not full, unless its slots
- * are against their left edges, spread evenly about the row's middle with the stats centered,
- * so two stats in a row of three, or one of a pair split at the middle, sit balanced.
+ * The stat slots `count` stats take: the first ones, a row of centered slots that is not full
+ * spread evenly about the row's middle, so two stats in a row of three sit balanced.
  */
 function statSlotsFor(slots: LayoutSlot[], count: number): LayoutSlot[] {
   const taken = slots.slice(0, count);
   return taken.map((slot) => {
-    if (slot.align === 'left') return slot;
+    if (slot.align !== 'center') return slot;
     const row = slots.filter((other) => Math.abs(other.y - slot.y) < 0.01);
     const used = taken.filter((other) => Math.abs(other.y - slot.y) < 0.01);
     if (used.length === row.length || row.length < 2) return slot;
     const step = (row.at(-1)!.x - row[0]!.x) / (row.length - 1);
     const middle = (row[0]!.x + row.at(-1)!.x) / 2;
     const at = used.indexOf(slot);
-    return { ...slot, x: middle + (at - (used.length - 1) / 2) * step, align: 'center' as const };
+    return { ...slot, x: middle + (at - (used.length - 1) / 2) * step };
   });
 }
 
@@ -386,12 +384,7 @@ export function arrangeInLayout(
     }
     const size = sized(Math.min(slot.width / w, slot.height / h) * 100);
     const width = (w * size) / 100;
-    const x =
-      slot.align === 'left'
-        ? slot.x - slot.width / 2 + width / 2
-        : slot.align === 'right'
-          ? slot.x + slot.width / 2 - width / 2
-          : slot.x;
+    const x = slot.align === 'left' ? slot.x - slot.width / 2 + width / 2 : slot.x;
     return { ...widget, x, y: slot.y, size };
   });
 }

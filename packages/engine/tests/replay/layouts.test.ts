@@ -122,27 +122,6 @@ describe('arranging in a layout', () => {
     expect(distance!.x - (20 * size) / 100 / 2).toBeCloseTo(7, 0);
   });
 
-  it('splits Hero pair at the middle, whatever the two widths', () => {
-    // The first stat 20% wide at its normal size, the second 10%, the third 30%.
-    const widths = [0.2, 0.1, 0.3];
-    const [, narrow, wide] = arrangeInLayout(
-      [stat('time'), stat('distance'), stat('climb')],
-      layoutSlots('hero-pair', story),
-      (_, k) => ({ width: widths[k]!, height: 0.04 }),
-    );
-    const half = (widget: Widget, width: number) => (width * widget.size) / 100 / 2;
-    // The left one ends 5% before the middle, the right one starts 5% after it.
-    expect(narrow!.x + half(narrow!, 10)).toBeCloseTo(45);
-    expect(wide!.x - half(wide!, 30)).toBeCloseTo(55);
-    // Alone under the large stat, the one is centered.
-    const [, alone] = arrangeInLayout(
-      [stat('time'), stat('distance')],
-      layoutSlots('hero-pair', story),
-      measure,
-    );
-    expect(alone!.x).toBeCloseTo(50);
-  });
-
   it('balances a row it does not fill, and leaves a widget without a slot as it was', () => {
     const arranged = arrangeInLayout(
       [stat('distance'), stat('time'), stat('climb')],
