@@ -3,7 +3,8 @@
 // At its top the name and the version; then switching the source (with the one in use),
 // installing the app where the browser can, reporting an issue on GitHub, the source on
 // GitHub, the licenses, the privacy policy, and last, as usual, About. Back, Escape, a tap
-// beside it or picking an item closes it.
+// beside it or picking an item closes it. On a wide screen Switch source is in the top bar,
+// and here only while a popup covers the bar.
 import { computed, onMounted, ref } from 'vue';
 import type { Source } from '../messages.ts';
 import { isInstalled } from '../install.ts';
@@ -16,6 +17,8 @@ const props = defineProps<{
   source: Source | null;
   /** Whether Install app is offered: by the browser, or as steps on an iPhone or iPad. */
   install: boolean;
+  /** Whether the top bar's Source button is in reach (no popup over it). */
+  sourceInBar: boolean;
 }>();
 const emit = defineEmits<{ close: []; source: []; about: []; install: [] }>();
 
@@ -50,7 +53,12 @@ function tapped(event: MouseEvent): void {
       </div>
 
       <nav aria-label="Menu items">
-        <button type="button" class="item" @click="emit('source')">
+        <button
+          type="button"
+          class="item"
+          :class="{ 'in-bar': sourceInBar }"
+          @click="emit('source')"
+        >
           <SourceIcon v-if="source" class="item-icon" :source="source" />
           <span v-else class="item-icon" />
           <span>
@@ -241,5 +249,14 @@ hr {
   margin: 0.5rem 0.7rem;
   border: 0;
   border-top: 1px solid var(--line);
+}
+
+/* Wide screens: Switch source is in the top bar; with it goes the line, when nothing else
+   is above it. */
+@media (min-width: 761px) {
+  .in-bar,
+  .in-bar + hr {
+    display: none;
+  }
 }
 </style>

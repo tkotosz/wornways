@@ -584,11 +584,13 @@ onMounted(() => {
   <div class="app" :class="{ editing: showsEditor }">
     <div ref="topBar" class="bar">
       <TopBar
+        :source="chosen"
         :activities="editing ? chosenIds.length : null"
         :store="store"
         :preset="presetName"
         :can-render="editing"
         @menu="menuOpen = true"
+        @switch="popup = 'source'"
         @activities="popup = 'activities'"
         @store="openStore(false)"
         @preset="openPreset"
@@ -711,6 +713,7 @@ onMounted(() => {
     :version="version"
     :source="chosen"
     :install="!!installOffer || appleInstallHelp"
+    :source-in-bar="popup === null"
     @close="menuOpen = false"
     @source="switchSource"
     @about="openPage('about')"

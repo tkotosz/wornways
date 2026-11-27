@@ -11,10 +11,17 @@ export function pickSource(page: Page, source: Source) {
 }
 
 /**
- * Opens the list of sources from the menu: the top bar's, or that of a popup that cannot close
- * yet.
+ * Opens the list of sources: on a wide screen from the top bar's Source button, else from the
+ * menu (the top bar's, or that of a popup that cannot close yet).
  */
 export async function switchSource(page: Page) {
+  const popup = page.locator('dialog[open]');
+  await expect(popup.or(page.getByRole('navigation', { name: 'Sections' })).first()).toBeVisible();
+  const inBar = page.getByTestId('top-bar').getByRole('button', { name: /^Source/ });
+  if (!(await popup.count()) && (await inBar.isVisible())) {
+    await inBar.click();
+    return;
+  }
   await openMenu(page);
   await page.getByRole('button', { name: /^Switch source/ }).click();
 }

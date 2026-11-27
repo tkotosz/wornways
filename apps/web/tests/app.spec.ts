@@ -5,6 +5,20 @@ import { openDemo, openMenu, pickSource, switchSource } from './popups.ts';
 test.describe('on a phone', () => {
   test.use({ viewport: { width: 390, height: 780 }, isMobile: true, hasTouch: true });
 
+  test('switches the source from the menu, which shows the one in use', async ({
+    page,
+    context,
+  }) => {
+    page.setDefaultTimeout(15_000);
+    await offlineMap(context);
+    await openDemo(page);
+    await expect(page.getByTestId('top-bar').getByRole('button', { name: /^Source/ })).toBeHidden();
+    await openMenu(page);
+    await expect(page.getByRole('button', { name: /^Switch source/ })).toContainText('Demo');
+    await page.getByRole('button', { name: /^Switch source/ }).click();
+    await expect(page.getByRole('dialog', { name: 'Choose a source' })).toBeVisible();
+  });
+
   test('starts with the sources, which stay until there is something to edit', async ({ page }) => {
     await page.goto('/');
     const sources = page.getByRole('dialog', { name: 'Choose a source' });
@@ -63,12 +77,18 @@ test('shows the version in the menu', async ({ page }) => {
   );
 });
 
-test('switches the source from the menu, which shows the one in use', async ({ page, context }) => {
+test('switches the source from the top bar, which shows the one in use', async ({
+  page,
+  context,
+}) => {
   page.setDefaultTimeout(15_000);
   await offlineMap(context);
   await openDemo(page);
+  const bar = page.getByTestId('top-bar');
+  await expect(bar.getByRole('button', { name: 'Source: Demo' })).toContainText('Demo');
+  // On a wide screen the menu leaves it to the bar.
   await openMenu(page);
-  await expect(page.getByRole('button', { name: /^Switch source/ })).toContainText('Demo');
+  await expect(page.getByRole('button', { name: /^Switch source/ })).toBeHidden();
   await page.keyboard.press('Escape');
 
   // The list marks the source in use, and closes back to editing.

@@ -45,10 +45,15 @@ screen readers what it opens and what is set: the menu (☰); the activities, wi
 the video shows as a badge ("Activities: 25"); what the source keeps on the device (files,
 or a service's connection; not for the demo); and the preset ("Preset: Recap"). At the
 right, Render, the main button. Before activities are chosen, the activities and preset
-icons and Render are disabled.
+icons and Render are disabled. On a wide screen the bar is as wide as the editor under it:
+the mark and the name first, then each caption beside its icon, and after Menu the source in
+use ("Source: Strava"), which opens the list of sources; the source's and the preset's names
+follow their captions, and the activities' count follows theirs. Up to 1200 px the name and
+those two names are left out, so the bar fits.
 
 **The menu** slides in from the left over the dimmed screen: the mark, the name and the
-version, then Switch source (with the source in use),
+version, then Switch source (with the source in use; on a wide screen only while a popup
+covers the top bar, which has it otherwise),
 Install app (where offered, see Install), Report an issue (GitHub's new-issue page, with a
 form for a bug and one for an idea, the version and the kind of device filled in; GitHub asks
 to sign in first), Source on GitHub, Licenses, the privacy policy (a page of its own) and,
