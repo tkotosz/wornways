@@ -404,7 +404,7 @@ test('shows the tracks downloaded while Strava is the source', async ({ page }) 
   await expectSection(page, 'Frame');
 
   const connection = page.getByRole('dialog', { name: 'Strava connection' });
-  await page.getByRole('button', { name: 'Strava connection' }).click();
+  await page.getByRole('button', { name: 'Source: Strava' }).click();
   await expect(page.getByTestId('downloaded-count')).toHaveText(
     '1 activity downloaded to this device',
   );
@@ -423,7 +423,7 @@ test('shows the tracks downloaded while Strava is the source', async ({ page }) 
   await expect(page.getByRole('checkbox', { name: 'Strava test ride' })).toBeChecked();
   await useActivities(page);
   await expectSection(page, 'Frame');
-  await page.getByRole('button', { name: 'Strava connection' }).click();
+  await page.getByRole('button', { name: 'Source: Strava' }).click();
   await expect(page.getByTestId('downloaded')).toContainText('Strava test ride');
   expect(mock.tracks.filter((id) => id === rideId)).toHaveLength(1);
 });

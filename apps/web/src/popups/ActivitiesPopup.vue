@@ -73,7 +73,7 @@ const usable = computed(
       <button v-if="manage" type="button" class="link" @click="emit('store')">
         {{ manage }}
       </button>
-      <button type="button" class="link" @click="emit('switch')">Change source</button>
+      <button type="button" class="link" @click="emit('switch')">Switch source</button>
     </p>
     <DemoGuide v-if="source === 'demo'" />
     <ActivityFilters

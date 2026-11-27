@@ -384,22 +384,12 @@ watch(settings, () => {
 });
 watch([library, source], () => (video.value = null));
 
-/**
- * The top bar: the preset in use, and what the source keeps on this device, for every source:
- * the files, the demo's activities, or a service's connection (to connect again when it ended).
- */
+/** The top bar: the preset in use. */
 const presetName = computed(() =>
   editing.value
     ? PRESET_LABELS[presetOf(adjustments.value, countOf(chosenIds.value.length))]
     : null,
 );
-const store = computed(() => {
-  if (chosen.value === 'files') return { label: 'Files on this device', caption: 'Files' };
-  if (chosen.value === 'demo') return { label: 'Demo files', caption: 'Files' };
-  if (chosen.value === 'strava') return { label: 'Strava connection', caption: 'Connection' };
-  if (chosen.value === 'rwgps') return { label: 'Ride with GPS connection', caption: 'Connection' };
-  return null;
-});
 /** Whether the service in use is connected; one that is not opens connecting again. */
 const serviceConnected = computed(
   () =>
@@ -424,7 +414,16 @@ watch(popup, (now, before) => {
   if (now !== 'store') storeFromActivities.value = false;
 });
 
+/**
+ * The source's page, from the top bar's Source (or Manage in the activities popup): what it
+ * keeps on this device, and Switch source. A service's connection that ended opens connecting
+ * again; before any source, the list of sources.
+ */
 function openStore(fromActivities: boolean): void {
+  if (chosen.value === null) {
+    popup.value = 'source';
+    return;
+  }
   if ((chosen.value === 'strava' || chosen.value === 'rwgps') && !serviceConnected.value) {
     popup.value = 'connect';
     return;
@@ -534,12 +533,6 @@ function openPreset(): void {
   popup.value = 'preset';
 }
 
-/** Switch source, from the menu: the list of sources takes the menu's place. */
-function switchSource(): void {
-  menuOpen.value = false;
-  popup.value = 'source';
-}
-
 function openPage(name: 'about' | 'install'): void {
   menuOpen.value = false;
   if (name === 'install' && installOffer.value) void install();
@@ -603,13 +596,11 @@ onMounted(() => {
       <TopBar
         :source="chosen"
         :activities="editing ? chosenIds.length : null"
-        :store="store"
         :preset="presetName"
         :can-render="editing"
         @menu="menuOpen = true"
-        @switch="popup = 'source'"
         @activities="popup = 'activities'"
-        @store="openStore(false)"
+        @source="openStore(false)"
         @preset="openPreset"
         @render="popup = 'render'"
       />
@@ -682,6 +673,7 @@ onMounted(() => {
       @menu="menuOpen = true"
       @next="popup = 'activities'"
       @changed="library = $event"
+      @switch="popup = 'source'"
       @disconnect="chosen === 'strava' ? disconnectStrava() : disconnectRideWithGps()"
     />
     <ActivitiesPopup
@@ -729,11 +721,8 @@ onMounted(() => {
   <AppMenu
     v-if="menuOpen"
     :version="version"
-    :source="chosen"
     :install="!!installOffer || appleInstallHelp"
-    :source-in-bar="popup === null"
     @close="menuOpen = false"
-    @source="switchSource"
     @about="openPage('about')"
     @install="openPage('install')"
   />

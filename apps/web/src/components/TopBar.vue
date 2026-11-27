@@ -1,13 +1,13 @@
 <script setup lang="ts">
 // The bar over the editor: at the left, icons that open what is set up around the video (the
-// menu, the activities, what the source keeps on this device, the preset); at the right,
-// Render. Each icon has a short caption under it, the same whatever is set, so the bar keeps
-// its width; it tells screen readers what it opens and what is set ("Activities: 12",
-// "Preset: Recap"). Wide screens: the name first, then the source in use (which opens the
-// list of sources, in the menu on a phone), each caption beside its icon, the source's and
-// the preset's names after their captions and the activities' count after theirs, all lined
-// up with the editor under the bar (no wider than it). Up to 1200 px the name keeps only its
-// mark and the source's and preset's names are left out and the icons sit closer, so the bar fits.
+// menu; the source, its page with what it keeps on this device and Switch source; the
+// activities; the preset); at the right, Render. Each icon has a short caption under it, the
+// same whatever is set, so the bar keeps its width; it tells screen readers what it opens and
+// what is set ("Source: Strava", "Activities: 12", "Preset: Recap"). Wide screens: the name
+// first, each caption beside its icon, the source's and the preset's names after their
+// captions and the activities' count after theirs, all lined up with the editor under the bar
+// (no wider than it). Up to 1000 px the name keeps only its mark, the source's and preset's
+// names are left out and the icons sit closer, so the bar fits.
 import type { Source } from '../messages.ts';
 import { SOURCE_NAMES } from '../sources.ts';
 import SourceIcon from './SourceIcon.vue';
@@ -17,17 +17,14 @@ defineProps<{
   source: Source | null;
   /** How many activities the video shows; null before any are chosen. */
   activities: number | null;
-  /** What the source keeps on this device, when it keeps anything: its name and caption. */
-  store: { label: string; caption: string } | null;
   /** The preset's name; null before activities are chosen. */
   preset: string | null;
   canRender: boolean;
 }>();
 const emit = defineEmits<{
   menu: [];
-  switch: [];
+  source: [];
   activities: [];
-  store: [];
   preset: [];
   render: [];
 }>();
@@ -48,7 +45,7 @@ const emit = defineEmits<{
         type="button"
         class="icon source"
         :aria-label="source === null ? 'Source' : `Source: ${SOURCE_NAMES[source]}`"
-        @click="emit('switch')"
+        @click="emit('source')"
       >
         <SourceIcon v-if="source" class="source-glyph" :source="source" />
         <span v-else class="source-glyph" />
@@ -72,20 +69,6 @@ const emit = defineEmits<{
           <span v-if="activities !== null" class="badge" aria-hidden="true">{{ activities }}</span>
         </span>
         <span class="caption" aria-hidden="true">Activities</span>
-      </button>
-      <button
-        v-if="store"
-        type="button"
-        class="icon"
-        :aria-label="store.label"
-        @click="emit('store')"
-      >
-        <!-- A folder with an arrow into it. -->
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-          <path d="M12 16v-5M9.5 13.5 12 16l2.5-2.5" />
-        </svg>
-        <span class="caption" aria-hidden="true">{{ store.caption }}</span>
       </button>
       <button
         type="button"
@@ -123,9 +106,8 @@ const emit = defineEmits<{
   gap: 0.1rem;
 }
 
-/* The name, the source, and the source's and preset's names, on wide screens only. */
+/* The name, and the source's and preset's names, on wide screens only. */
 .brand,
-.icon.source,
 .value {
   display: none;
 }
@@ -162,6 +144,14 @@ const emit = defineEmits<{
   stroke-width: 1.8;
   stroke-linecap: round;
   stroke-linejoin: round;
+}
+
+/* The source's drawing, as tall as the other icons, in a box as wide. */
+.source-glyph {
+  display: flex;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
 }
 
 .caption {
@@ -219,12 +209,8 @@ const emit = defineEmits<{
     padding-inline: 1rem;
   }
 
-  .brand,
-  .icon.source {
-    display: flex;
-  }
-
   .brand {
+    display: flex;
     align-items: center;
     gap: 0.55rem;
     margin-right: 0.9rem;
@@ -261,9 +247,7 @@ const emit = defineEmits<{
     height: 1.35rem;
   }
 
-  /* The source's drawing, as tall as the other icons, in a box as wide. */
   .source-glyph {
-    justify-content: center;
     width: 1.35rem;
     height: 1.35rem;
   }
@@ -299,8 +283,8 @@ const emit = defineEmits<{
   }
 }
 
-/* Up to 1200 px: the mark without the name, the captions without the names after them. */
-@media (min-width: 761px) and (max-width: 1200px) {
+/* Up to 1000 px: the mark without the name, the captions without the names after them. */
+@media (min-width: 761px) and (max-width: 1000px) {
   .wordmark,
   .value {
     display: none;

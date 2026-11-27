@@ -40,23 +40,20 @@ after that the top bar opens any of them, at any time.
 ```
 
 **The top bar.** At the left, icons with a short caption under each, the same whatever is
-set (Menu, Activities, Files or Connection, Preset), so the bar keeps its width; each tells
-screen readers what it opens and what is set: the menu (☰); the activities, with how many
-the video shows as a badge ("Activities: 25"); what the source keeps on the device, for
-every source (the files; the demo's made-up activities, listed but not deleted; or a
-service's connection, which opens connecting again once it ended); and the preset
-("Preset: Recap"). At the
-right, Render, the main button. Before activities are chosen, the activities and preset
-icons and Render are disabled. On a wide screen the bar is as wide as the editor under it:
-the mark and the name first, then each caption beside its icon, and after Menu the source in
-use ("Source: Strava"), which opens the list of sources; the source's and the preset's names
-follow their captions, and the activities' count follows theirs. Up to 1200 px the name and
+set (Menu, Source, Activities, Preset), so the bar keeps its width; each tells screen
+readers what it opens and what is set: the menu (☰); the source, with its own drawing
+("Source: Strava"), which opens its page (Stored on this device, below: the files, the
+demo's made-up activities, listed but not deleted, or a service's connection, which opens
+connecting again once it ended) with Switch source; the activities, with how many the video
+shows as a badge ("Activities: 25"); and the preset ("Preset: Recap"). At the right,
+Render, the main button. Before activities are chosen, the activities and preset icons and
+Render are disabled. On a wide screen the bar is as wide as the editor under it: the mark
+and the name first, then each caption beside its icon; the source's and the preset's names
+follow their captions, and the activities' count follows theirs. Up to 1000 px the name and
 those two names are left out, so the bar fits.
 
 **The menu** slides in from the left over the dimmed screen: the mark, the name and the
-version, then Switch source (with the source in use; on a wide screen only while a popup
-covers the top bar, which has it otherwise),
-Install app (where offered, see Install), Report an issue (GitHub's new-issue page, with a
+version, then Install app (where offered, see Install), Report an issue (GitHub's new-issue page, with a
 form for a bug and one for an idea, the version and the kind of device filled in; GitHub asks
 to sign in first), Source on GitHub, Licenses, the privacy policy (a page of its own) and,
 last, About (what the app is, its license, the source on GitHub and the licenses). Back, Escape, a tap
@@ -97,12 +94,13 @@ connection ended asks to connect again.
 2. **Connect.** Strava or Ride with GPS, when picked and not connected: what the connection
    allows and the service's own Connect button, which leaves for its sign-in page and comes
    back to the activities, with the privacy policy linked; Switch source picks another one.
-3. **Stored on this device.** For files: a drop zone and file and folder pickers, a report of
+3. **Stored on this device**, the source's page, with Switch source in its footer. For files: a drop zone and file and folder pickers, a report of
    what the last import added and what could not be read (closable), "How to get your
    files" (instructions for exporting an account or a single activity from Strava or
    Garmin), and the library as a grid with a header row (date, name, sport, distance) and a
    delete button per row ("Delete saved activities" removes them all, after a
-   confirmation). For Strava and Ride with GPS: the connection with a Disconnect button,
+   confirmation). For the demo: its made-up activities in the same grid, without delete
+   buttons, since they come with the app. For Strava and Ride with GPS: the connection with a Disconnect button,
    and the activities whose tracks are downloaded to this device, in the same grid, each
    deletable ("Delete downloaded tracks" removes them all; a deleted track is downloaded
    again when a video needs it). Disconnecting the source in use asks to connect again. On
@@ -112,7 +110,7 @@ connection ended asks to connect again.
    ticked). The files' choice is remembered for the next visit, the services' for the tab,
    and the demo's starts fresh. Above the filters, the source
    in use, with links to manage what it keeps ("Manage files", "Manage connection") and to
-   change it. The filters (the "Which activities" settings): period with shortcuts and a
+   switch it ("Switch source"). The filters (the "Which activities" settings): period with shortcuts and a
    calendar for custom days, sports (offered only when the period has them, with "All"),
    and two place filters, "Starts near a place" and "Ends near a place". Each opens its own
    panel, where the place is set in one field: a place clicked on the map shown under it

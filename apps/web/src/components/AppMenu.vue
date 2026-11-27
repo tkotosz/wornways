@@ -1,26 +1,19 @@
 <script setup lang="ts">
 // The menu, from the ☰ button: a panel that slides in from the left over the dimmed screen.
-// At its top the name and the version; then switching the source (with the one in use),
-// installing the app where the browser can, reporting an issue on GitHub, the source on
-// GitHub, the licenses, the privacy policy, and last, as usual, About. Back, Escape, a tap
-// beside it or picking an item closes it. On a wide screen Switch source is in the top bar,
-// and here only while a popup covers the bar.
+// At its top the name and the version; then installing the app where the browser can,
+// reporting an issue on GitHub, the source on GitHub, the licenses, the privacy policy, and
+// last, as usual, About. Back, Escape, a tap beside it or picking an item closes it.
+// Switching the source is on the source's page, from the top bar's Source.
 import { computed, onMounted, ref } from 'vue';
-import type { Source } from '../messages.ts';
 import { isInstalled } from '../install.ts';
 import { deviceSummary, reportUrl } from '../report.ts';
-import { SOURCE_NAMES } from '../sources.ts';
-import SourceIcon from './SourceIcon.vue';
 
 const props = defineProps<{
   version: string;
-  source: Source | null;
   /** Whether Install app is offered: by the browser, or as steps on an iPhone or iPad. */
   install: boolean;
-  /** Whether the top bar's Source button is in reach (no popup over it). */
-  sourceInBar: boolean;
 }>();
-const emit = defineEmits<{ close: []; source: []; about: []; install: [] }>();
+const emit = defineEmits<{ close: []; about: []; install: [] }>();
 
 const dialog = ref<HTMLDialogElement | null>(null);
 const report = computed(() =>
@@ -53,26 +46,13 @@ function tapped(event: MouseEvent): void {
       </div>
 
       <nav aria-label="Menu items">
-        <button
-          type="button"
-          class="item"
-          :class="{ 'in-bar': sourceInBar }"
-          @click="emit('source')"
-        >
-          <SourceIcon v-if="source" class="item-icon" :source="source" />
-          <span v-else class="item-icon" />
-          <span>
-            Switch source
-            <small>{{ source ? SOURCE_NAMES[source] : 'None chosen yet' }}</small>
-          </span>
-        </button>
         <button v-if="install" type="button" class="item" @click="emit('install')">
           <svg class="item-icon" viewBox="0 0 24 24" aria-hidden="true">
             <path d="M12 4v11M7.5 10.5 12 15l4.5-4.5M5 19h14" />
           </svg>
           <span>Install app</span>
         </button>
-        <hr />
+        <hr v-if="install" />
         <a class="item" :href="report" target="_blank" rel="noopener" @click="emit('close')">
           <svg class="item-icon" viewBox="0 0 24 24" aria-hidden="true">
             <path d="M5 20V4M5 4h11l-2 4 2 4H5" />
@@ -249,14 +229,5 @@ hr {
   margin: 0.5rem 0.7rem;
   border: 0;
   border-top: 1px solid var(--line);
-}
-
-/* Wide screens: Switch source is in the top bar; with it goes the line, when nothing else
-   is above it. */
-@media (min-width: 761px) {
-  .in-bar,
-  .in-bar + hr {
-    display: none;
-  }
 }
 </style>

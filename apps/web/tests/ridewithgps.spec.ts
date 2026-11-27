@@ -128,7 +128,7 @@ test('uses Ride with GPS trips as the source, fetching tracks only when needed',
   // the copy.
   const kept = new Set(fetched).size;
   const connection = page.getByRole('dialog', { name: 'Ride with GPS connection' });
-  await page.getByRole('button', { name: 'Ride with GPS connection' }).click();
+  await page.getByRole('button', { name: 'Source: Ride with GPS' }).click();
   await expect(page.getByTestId('downloaded-count')).toHaveText(
     `${kept} activities downloaded to this device`,
   );
@@ -148,7 +148,7 @@ test('uses Ride with GPS trips as the source, fetching tracks only when needed',
   expect(fetched.length).toBeGreaterThan(beforeAgain);
 
   // Disconnecting stays with Ride with GPS, ready to connect again.
-  await page.getByRole('button', { name: 'Ride with GPS connection' }).click();
+  await page.getByRole('button', { name: 'Source: Ride with GPS' }).click();
   await page.getByRole('button', { name: 'Disconnect Ride with GPS' }).click();
   const connect = page.getByRole('dialog', { name: 'Connect Ride with GPS' });
   await expect(connect.getByRole('link', { name: 'Connect Ride with GPS' })).toBeVisible();

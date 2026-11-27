@@ -44,7 +44,7 @@ test('tries the demo, makes a video of it, and stores nothing on this device', a
   await expect(count).toContainText('1 of 25 activities selected');
   await useActivities(page);
   // The demo's files list its made-up activities, which cannot be deleted.
-  await page.getByTestId('top-bar').getByRole('button', { name: 'Demo files' }).click();
+  await page.getByTestId('top-bar').getByRole('button', { name: 'Source: Demo' }).click();
   const demoFiles = page.getByRole('dialog', { name: 'Demo files' });
   await expect(demoFiles.getByTestId('demo-count')).toHaveText('25 made-up activities');
   await expect(demoFiles.getByRole('button', { name: /^Delete/ })).toHaveCount(0);

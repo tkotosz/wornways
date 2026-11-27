@@ -3,7 +3,8 @@
 // can be deleted. Strava and Ride with GPS: the connection, which can be ended, and the
 // tracks downloaded for videos (fetched again when needed). The demo: its made-up activities,
 // which cannot be deleted. On the way to the editor (the files source with nothing added
-// yet), "Choose activities" goes on once there are some.
+// yet), "Choose activities" goes on once there are some. Opened from the top bar's Source, it
+// is the source's page: Switch source picks another one.
 import { computed, onMounted, ref } from 'vue';
 import ActivityGrid from '../components/ActivityGrid.vue';
 import AddFiles from '../components/AddFiles.vue';
@@ -33,6 +34,7 @@ const emit = defineEmits<{
   next: [];
   changed: [library: ActivitySummary[]];
   disconnect: [];
+  switch: [];
 }>();
 
 const title = computed(() => {
@@ -154,8 +156,10 @@ async function remove(ids: string[] | 'all'): Promise<void> {
       />
     </template>
 
-    <template v-if="flow" #footer>
+    <template #footer>
+      <button type="button" class="secondary" @click="emit('switch')">Switch source</button>
       <button
+        v-if="flow"
         type="button"
         class="primary"
         :disabled="source === 'files' && !library.length"
