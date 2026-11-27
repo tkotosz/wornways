@@ -43,8 +43,12 @@ test('tries the demo, makes a video of it, and stores nothing on this device', a
   await page.getByTestId('chosen').getByText('Easy run').click();
   await expect(count).toContainText('1 of 25 activities selected');
   await useActivities(page);
-  // The demo keeps nothing on this device: no files or connection to manage.
-  await expect(page.getByRole('button', { name: 'Files on this device' })).toHaveCount(0);
+  // The demo's files list its made-up activities, which cannot be deleted.
+  await page.getByTestId('top-bar').getByRole('button', { name: 'Demo files' }).click();
+  const demoFiles = page.getByRole('dialog', { name: 'Demo files' });
+  await expect(demoFiles.getByTestId('demo-count')).toHaveText('25 made-up activities');
+  await expect(demoFiles.getByRole('button', { name: /^Delete/ })).toHaveCount(0);
+  await demoFiles.getByRole('button', { name: 'Close' }).click();
   await render(page);
   await expect(page.getByTestId('result')).toBeVisible({ timeout: 150_000 });
   await expect(page.getByText('could not be loaded')).toHaveCount(0);

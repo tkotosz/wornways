@@ -42,8 +42,10 @@ after that the top bar opens any of them, at any time.
 **The top bar.** At the left, icons with a short caption under each, the same whatever is
 set (Menu, Activities, Files or Connection, Preset), so the bar keeps its width; each tells
 screen readers what it opens and what is set: the menu (☰); the activities, with how many
-the video shows as a badge ("Activities: 25"); what the source keeps on the device (files,
-or a service's connection; not for the demo); and the preset ("Preset: Recap"). At the
+the video shows as a badge ("Activities: 25"); what the source keeps on the device, for
+every source (the files; the demo's made-up activities, listed but not deleted; or a
+service's connection, which opens connecting again once it ended); and the preset
+("Preset: Recap"). At the
 right, Render, the main button. Before activities are chosen, the activities and preset
 icons and Render are disabled. On a wide screen the bar is as wide as the editor under it:
 the mark and the name first, then each caption beside its icon, and after Menu the source in

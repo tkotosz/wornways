@@ -1,8 +1,9 @@
 <script setup lang="ts">
 // What the source keeps on this device. Files: adding files, and the saved activities, which
 // can be deleted. Strava and Ride with GPS: the connection, which can be ended, and the
-// tracks downloaded for videos (fetched again when needed). On the way to the editor (the
-// files source with nothing added yet), "Choose activities" goes on once there are some.
+// tracks downloaded for videos (fetched again when needed). The demo: its made-up activities,
+// which cannot be deleted. On the way to the editor (the files source with nothing added
+// yet), "Choose activities" goes on once there are some.
 import { computed, onMounted, ref } from 'vue';
 import ActivityGrid from '../components/ActivityGrid.vue';
 import AddFiles from '../components/AddFiles.vue';
@@ -16,10 +17,11 @@ import { SOURCE_NAMES } from '../sources.ts';
 
 const props = defineProps<{
   engine: EngineClient;
-  source: 'files' | 'strava' | 'rwgps';
+  source: 'files' | 'demo' | 'strava' | 'rwgps';
   closable: boolean;
   /** On the way to the editor: the popup goes on to the activities. */
   flow: boolean;
+  /** The files on this device, or the demo's activities. */
   library: ActivitySummary[];
   /** When the Strava connection ends. */
   stravaUntil: number | null;
@@ -33,9 +35,11 @@ const emit = defineEmits<{
   disconnect: [];
 }>();
 
-const title = computed(() =>
-  props.source === 'files' ? 'Files on this device' : `${SOURCE_NAMES[props.source]} connection`,
-);
+const title = computed(() => {
+  if (props.source === 'files') return 'Files on this device';
+  if (props.source === 'demo') return 'Demo files';
+  return `${SOURCE_NAMES[props.source]} connection`;
+});
 
 const error = ref('');
 const confirmingDeleteAll = ref(false);
@@ -43,34 +47,44 @@ const confirmingDeleteAll = ref(false);
 /** The tracks a service keeps on this device, read from the stored copies. */
 const downloaded = ref<ActivitySummary[]>([]);
 onMounted(async () => {
-  if (props.source !== 'files')
+  if (props.source === 'strava' || props.source === 'rwgps')
     downloaded.value = await props.engine.downloaded(props.source).catch(() => []);
 });
 
-const held = computed(() =>
-  props.source === 'files'
-    ? {
-        rows: props.library,
-        heading: `${countText(props.library.length, 'activity', 'activities')} on this device`,
-        deleteAll: 'Delete saved activities',
-        testId: 'library',
-        countId: 'activity-count',
-      }
-    : {
-        rows: downloaded.value,
-        heading: `${countText(downloaded.value.length, 'activity', 'activities')} downloaded to this device`,
-        deleteAll: 'Delete downloaded tracks',
-        testId: 'downloaded',
-        countId: 'downloaded-count',
-      },
-);
+/** What is listed under the source's screen; the demo's activities cannot be deleted. */
+const held = computed(() => {
+  if (props.source === 'files')
+    return {
+      rows: props.library,
+      heading: `${countText(props.library.length, 'activity', 'activities')} on this device`,
+      deleteAll: 'Delete saved activities',
+      testId: 'library',
+      countId: 'activity-count',
+    };
+  if (props.source === 'demo')
+    return {
+      rows: props.library,
+      heading: countText(props.library.length, 'made-up activity', 'made-up activities'),
+      deleteAll: null,
+      testId: 'demo-activities',
+      countId: 'demo-count',
+    };
+  return {
+    rows: downloaded.value,
+    heading: `${countText(downloaded.value.length, 'activity', 'activities')} downloaded to this device`,
+    deleteAll: 'Delete downloaded tracks',
+    testId: 'downloaded',
+    countId: 'downloaded-count',
+  };
+});
 
 /** Deletes files from the library, or tracks a service keeps (fetched again when needed). */
 async function remove(ids: string[] | 'all'): Promise<void> {
   error.value = '';
   try {
     if (props.source === 'files') emit('changed', await props.engine.deleteActivities(ids));
-    else downloaded.value = await props.engine.forgetDownloaded(props.source, ids);
+    else if (props.source !== 'demo')
+      downloaded.value = await props.engine.forgetDownloaded(props.source, ids);
   } catch (caught) {
     error.value = caught instanceof Error ? caught.message : String(caught);
   } finally {
@@ -88,6 +102,13 @@ async function remove(ids: string[] | 'all'): Promise<void> {
       </p>
       <AddFiles :engine="engine" @changed="emit('changed', $event)" />
       <GettingFiles />
+    </div>
+
+    <div v-else-if="source === 'demo'" class="screen" data-testid="demo-source">
+      <p class="muted">
+        Made-up activities in Mallorca, for trying the app. They come with it, so they cannot be
+        deleted.
+      </p>
     </div>
 
     <div v-else class="screen" :data-testid="`${source}-source`">
@@ -112,18 +133,22 @@ async function remove(ids: string[] | 'all'): Promise<void> {
     <template v-if="held.rows.length">
       <div class="library-head">
         <h3 :data-testid="held.countId">{{ held.heading }}</h3>
-        <span v-if="confirmingDeleteAll" class="confirm">
-          Delete all of them?
-          <button type="button" class="danger" @click="remove('all')">Delete all</button>
-          <button type="button" class="link" @click="confirmingDeleteAll = false">Keep them</button>
-        </span>
-        <button v-else type="button" class="link" @click="confirmingDeleteAll = true">
-          {{ held.deleteAll }}
-        </button>
+        <template v-if="held.deleteAll">
+          <span v-if="confirmingDeleteAll" class="confirm">
+            Delete all of them?
+            <button type="button" class="danger" @click="remove('all')">Delete all</button>
+            <button type="button" class="link" @click="confirmingDeleteAll = false">
+              Keep them
+            </button>
+          </span>
+          <button v-else type="button" class="link" @click="confirmingDeleteAll = true">
+            {{ held.deleteAll }}
+          </button>
+        </template>
       </div>
       <ActivityGrid
         :rows="held.rows"
-        mode="delete"
+        :mode="held.deleteAll ? 'delete' : 'list'"
         :test-id="held.testId"
         @delete="remove([$event])"
       />

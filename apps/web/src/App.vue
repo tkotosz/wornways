@@ -384,7 +384,10 @@ watch(settings, () => {
 });
 watch([library, source], () => (video.value = null));
 
-/** The top bar: the preset in use, and what the source keeps on this device. */
+/**
+ * The top bar: the preset in use, and what the source keeps on this device, for every source:
+ * the files, the demo's activities, or a service's connection (to connect again when it ended).
+ */
 const presetName = computed(() =>
   editing.value
     ? PRESET_LABELS[presetOf(adjustments.value, countOf(chosenIds.value.length))]
@@ -392,11 +395,21 @@ const presetName = computed(() =>
 );
 const store = computed(() => {
   if (chosen.value === 'files') return { label: 'Files on this device', caption: 'Files' };
-  if (chosen.value === 'strava' && stravaConnected.value)
-    return { label: 'Strava connection', caption: 'Connection' };
-  if (chosen.value === 'rwgps' && rwgps.connected.value)
-    return { label: 'Ride with GPS connection', caption: 'Connection' };
+  if (chosen.value === 'demo') return { label: 'Demo files', caption: 'Files' };
+  if (chosen.value === 'strava') return { label: 'Strava connection', caption: 'Connection' };
+  if (chosen.value === 'rwgps') return { label: 'Ride with GPS connection', caption: 'Connection' };
   return null;
+});
+/** Whether the service in use is connected; one that is not opens connecting again. */
+const serviceConnected = computed(
+  () =>
+    (chosen.value === 'strava' && stravaConnected.value) ||
+    (chosen.value === 'rwgps' && rwgps.connected.value),
+);
+/** From the activities popup: managing the files, or a connection still open. */
+const manage = computed(() => {
+  if (chosen.value === 'files') return 'Manage files';
+  return serviceConnected.value ? 'Manage connection' : null;
 });
 
 // The choice as it was when the activities popup opened: closing it without taking the
@@ -412,6 +425,10 @@ watch(popup, (now, before) => {
 });
 
 function openStore(fromActivities: boolean): void {
+  if ((chosen.value === 'strava' || chosen.value === 'rwgps') && !serviceConnected.value) {
+    popup.value = 'connect';
+    return;
+  }
   popup.value = 'store';
   storeFromActivities.value = fromActivities;
 }
@@ -651,13 +668,14 @@ onMounted(() => {
     />
     <StorePopup
       v-else-if="
-        popup === 'store' && (chosen === 'files' || chosen === 'strava' || chosen === 'rwgps')
+        popup === 'store' &&
+        (chosen === 'files' || chosen === 'demo' || chosen === 'strava' || chosen === 'rwgps')
       "
       :engine="engine"
       :source="chosen"
       :closable="popupClosable"
       :flow="!editing || storeFromActivities"
-      :library="library"
+      :library="chosen === 'demo' ? demo.rows.value : library"
       :strava-until="stravaUntil"
       :busy="chosen === 'strava' ? stravaBusy : chosen === 'rwgps' ? rwgps.busy.value : ''"
       @close="closePopup"
@@ -680,7 +698,7 @@ onMounted(() => {
       :matching="matching"
       :notice="source === 'rwgps' ? rwgps.notice.value : stravaNotice"
       :can-retry="strava && (!stravaReady || sourceRows.length === 0)"
-      :manage="store ? (chosen === 'files' ? 'Manage files' : 'Manage connection') : null"
+      :manage="manage"
       @close="closePopup"
       @menu="menuOpen = true"
       @switch="popup = 'source'"
