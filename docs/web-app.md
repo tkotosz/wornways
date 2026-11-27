@@ -93,8 +93,11 @@ connection ended asks to connect again.
    Ride with GPS's until it is disconnected. Picking the demo loads its activities.
 2. **Connect.** Strava or Ride with GPS, when picked and not connected: what the connection
    allows and the service's own Connect button, which leaves for its sign-in page and comes
-   back to the activities, with the privacy policy linked; Switch source picks another one.
-3. **Stored on this device**, the source's page, with Switch source in its footer. For files: a drop zone and file and folder pickers, a report of
+   back to the activities, with the privacy policy linked. At the top, as on the source's
+   page, the source ("Not connected") with Switch source beside it.
+3. **Stored on this device**, the source's page. At its top a card with the source in use:
+   its drawing, its name, "In use" (for Strava, until when it is connected), and Switch
+   source beside them, which opens the list of sources. For files: a drop zone and file and folder pickers, a report of
    what the last import added and what could not be read (closable), "How to get your
    files" (instructions for exporting an account or a single activity from Strava or
    Garmin), and the library as a grid with a header row (date, name, sport, distance) and a

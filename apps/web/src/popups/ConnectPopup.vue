@@ -1,10 +1,12 @@
 <script setup lang="ts">
 // Connecting Strava or Ride with GPS, when it is picked and not connected: what the
 // connection allows, and the service's own Connect button, which leaves for its sign-in page
-// and comes back to choosing the activities. Switch source picks another one instead.
+// and comes back to choosing the activities. At the top the source, with Switch source beside
+// it to pick another one instead.
 import { computed, ref } from 'vue';
 import AppPopup from '../components/AppPopup.vue';
 import LoadingStatus from '../components/LoadingStatus.vue';
+import SourceCard from '../components/SourceCard.vue';
 import { rememberStravaState } from '../strava-auth.ts';
 import { SOURCE_NAMES } from '../sources.ts';
 import { CONNECT_URL } from '../use-ridewithgps.ts';
@@ -36,6 +38,7 @@ function authorize(event: MouseEvent): void {
 
 <template>
   <AppPopup :title="title" :closable="closable" @close="emit('close')" @menu="emit('menu')">
+    <SourceCard :source="source" note="Not connected" @switch="emit('switch')" />
     <div v-if="source === 'strava'" class="screen" data-testid="strava-source">
       <LoadingStatus v-if="busy" :text="busy" />
       <template v-else>
@@ -90,10 +93,6 @@ function authorize(event: MouseEvent): void {
 
     <p v-if="error" class="error" role="alert">{{ error }}</p>
     <p v-if="storageError" class="error" role="alert">{{ storageError }}</p>
-
-    <template #footer>
-      <button type="button" class="secondary" @click="emit('switch')">Switch source</button>
-    </template>
   </AppPopup>
 </template>
 

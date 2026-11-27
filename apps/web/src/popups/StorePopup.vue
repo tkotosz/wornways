@@ -4,13 +4,14 @@
 // tracks downloaded for videos (fetched again when needed). The demo: its made-up activities,
 // which cannot be deleted. On the way to the editor (the files source with nothing added
 // yet), "Choose activities" goes on once there are some. Opened from the top bar's Source, it
-// is the source's page: Switch source picks another one.
+// is the source's page: at its top the source in use, with Switch source beside it.
 import { computed, onMounted, ref } from 'vue';
 import ActivityGrid from '../components/ActivityGrid.vue';
 import AddFiles from '../components/AddFiles.vue';
 import AppPopup from '../components/AppPopup.vue';
 import GettingFiles from '../components/GettingFiles.vue';
 import LoadingStatus from '../components/LoadingStatus.vue';
+import SourceCard from '../components/SourceCard.vue';
 import type { EngineClient } from '../engine-client.ts';
 import { countText, timeText } from '../format.ts';
 import type { ActivitySummary } from '../messages.ts';
@@ -42,6 +43,13 @@ const title = computed(() => {
   if (props.source === 'demo') return 'Demo files';
   return `${SOURCE_NAMES[props.source]} connection`;
 });
+
+/** Under the source's name: that it is in use, and how it stands. */
+const note = computed(() =>
+  props.source === 'strava' && props.stravaUntil
+    ? `In use · until ${timeText(props.stravaUntil)}`
+    : 'In use',
+);
 
 const error = ref('');
 const confirmingDeleteAll = ref(false);
@@ -97,6 +105,7 @@ async function remove(ids: string[] | 'all'): Promise<void> {
 
 <template>
   <AppPopup :title="title" :closable="closable" @close="emit('close')" @menu="emit('menu')">
+    <SourceCard :source="source" :note="note" @switch="emit('switch')" />
     <div v-if="source === 'files'" class="screen" data-testid="files-source">
       <p class="muted">
         FIT, GPX or TCX files, a folder, or an export ZIP. Activities are saved on this device for
@@ -156,10 +165,8 @@ async function remove(ids: string[] | 'all'): Promise<void> {
       />
     </template>
 
-    <template #footer>
-      <button type="button" class="secondary" @click="emit('switch')">Switch source</button>
+    <template v-if="flow" #footer>
       <button
-        v-if="flow"
         type="button"
         class="primary"
         :disabled="source === 'files' && !library.length"
