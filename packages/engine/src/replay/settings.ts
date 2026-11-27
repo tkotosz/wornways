@@ -7,10 +7,19 @@
 import { sportSlug } from '../import/index-csv.ts';
 import type { LatLon } from '../track/places.ts';
 import { END_CARD_S } from './end-card.ts';
-import { AUTOMATIC_TOTALS, TOTALS_CARD_S, TOTALS_FIELDS, type TotalsField } from './totals-card.ts';
+import { TOTALS_CARD_S, TOTALS_FIELDS } from './totals-card.ts';
 import { PRESETS, PRESET_NAMES, type Preset } from './presets.ts';
 import type { Grouping } from './plans.ts';
-import { METRICS, POSITIONS, type Metric, type Position } from './render.ts';
+import { METRICS, SINGLE_ONLY } from './metrics.ts';
+import type { Units } from './formats.ts';
+import {
+  CARD_LAYOUT_NAMES,
+  LAYOUTS,
+  LAYOUT_NAMES,
+  type CardLayoutName,
+  type OverlayLayoutName,
+} from './layouts.ts';
+import { parseWidgets, type Widget } from './widgets.ts';
 
 export type RenderSettings = {
   // Which activities
@@ -57,35 +66,29 @@ export type RenderSettings = {
   // Look
   camera: 'zoom' | 'fixed' | 'follow';
   map: boolean;
-  /**
-   * Whether the video shows the activities' climb profile along the bottom; null: on for a
-   * single activity, off for several.
-   */
-  elevationProfile: boolean | null;
   width: number;
   height: number;
   fps: number;
 
-  // Title
-  /** null: a title made from the selection; empty: no title. */
+  // What is drawn
+  /**
+   * The video's title, which a text widget without its own text shows, over the replay and
+   * on the totals card; null: a title made from the selection; empty: no title.
+   */
   title: string | null;
-  titlePosition: Position;
-  /** Size of the title in percent of the normal size. */
-  titleSize: number;
-
-  // Metrics card
-  /** Whether the values over the map are shown. */
-  metrics: boolean;
-  /** The values in order, the first one large; null: what suits the video. */
-  metricsFields: Metric[] | null;
-  metricsPosition: Position;
-  /** Size of the metrics card in percent of the normal size. */
-  metricsSize: number;
+  /** What is drawn over the replay; null: the widgets a video starts with. */
+  widgets: Widget[] | null;
 
   /** Whether a video of several activities shows their totals after the replay. */
   totalsCard: boolean;
-  /** The totals card's values in order; null: every one, in the usual order. */
-  totalsFields: TotalsField[] | null;
+  /** What the totals card shows; null: the title and the usual totals. */
+  totalsWidgets: Widget[] | null;
+  /** Distances, heights, speeds and temperatures in metric or imperial units. */
+  units: Units;
+  /** Where the widgets start when none are set, and the guides shown while arranging them. */
+  layout: OverlayLayoutName;
+  /** The same for the totals card's values. */
+  totalsLayout: CardLayoutName;
 
   // Branding
   /** Whether the video ends with the Wornways card, after the replay. */
@@ -100,6 +103,7 @@ export type NearPlace = { place: LatLon; radius: number };
 export type SettingKind =
   | { type: 'switch' }
   | { type: 'number'; min: number; max: number; unit: string }
+  /** One of `choices`. */
   | { type: 'choice'; choices: readonly string[] }
   /** Free text; `valueName` names the value in help, e.g. "id". */
   | { type: 'text'; valueName: string }
@@ -112,8 +116,7 @@ export type SettingKind =
   /** A frame size: WxH or the name of a preset. */
   | { type: 'size' };
 
-export type SettingGroup =
-  'activities' | 'timing' | 'privacy' | 'look' | 'title' | 'metrics' | 'brand';
+export type SettingGroup = 'activities' | 'timing' | 'privacy' | 'look' | 'title' | 'brand';
 
 export const GROUP_LABELS: Record<SettingGroup, string> = {
   activities: 'Which activities',
@@ -121,7 +124,6 @@ export const GROUP_LABELS: Record<SettingGroup, string> = {
   privacy: 'Replay privacy',
   look: 'Look',
   title: 'Title',
-  metrics: 'Metrics card',
   brand: 'Branding',
 };
 
@@ -356,17 +358,6 @@ export const SETTINGS: readonly SettingDefinition[] = [
     help: 'Draw the street map under the routes.',
   },
   {
-    name: 'elevation-profile',
-    label: 'Elevation profile',
-    group: 'look',
-    kind: { type: 'switch' },
-    default: null,
-    automatic: 'on for a single activity, off for several',
-    help:
-      'The climb profile along the bottom: the activities end to end, with a dot moving ' +
-      'along each one being drawn. Only with recorded elevation.',
-  },
-  {
     name: 'size',
     label: 'Frame size',
     group: 'look',
@@ -392,65 +383,50 @@ export const SETTINGS: readonly SettingDefinition[] = [
     automatic: 'made from the selection',
     help: 'Title of the video; "" for none.',
   },
-  {
-    name: 'title-position',
-    label: 'Title position',
-    group: 'title',
-    kind: { type: 'choice', choices: POSITIONS },
-    default: 'top-center',
-    help:
-      'Where the title sits: a row (top, middle or bottom) and a side. Where it would meet the ' +
-      'metrics card, the two stack, the title first.',
-  },
-  {
-    name: 'title-size',
-    label: 'Title size',
-    group: 'title',
-    kind: { type: 'number', min: 50, max: 200, unit: '%' },
-    default: '100',
-    help: 'Size of the title, in percent of the normal size.',
-  },
 
   {
-    name: 'metrics',
-    label: 'Show card',
-    group: 'metrics',
-    kind: { type: 'switch' },
-    default: true,
-    help: 'Show the metrics card: the values over the map.',
-  },
-  {
-    name: 'metrics-fields',
-    label: 'Values',
-    group: 'metrics',
-    kind: { type: 'list', choices: METRICS },
+    name: 'widgets',
+    label: 'Widgets',
+    group: 'look',
+    kind: { type: 'text', valueName: 'widgets' },
     default: null,
-    automatic: 'what suits the video',
+    automatic:
+      'the title at the top, the values that suit the video at the bottom left (one ' +
+      'activity: distance, time and the climb; a race: its clock, who is still out and the ' +
+      'distance; a recap: the date, the activities, the distance and the climb; days in ' +
+      'turn: the date, the distance, the climb and the time moving), and for a single ' +
+      'activity the elevation chart along the bottom',
     help:
-      `Values to show, the first one large: ${METRICS.join(', ')}. A value the video ` +
-      'cannot show is left out: start is for a single activity; count, days and longest ' +
-      'for several activities; elevation, descent and highest need recorded elevation. ' +
-      'Pace and top speed are in minutes per kilometer when every activity is on foot, else ' +
-      'km/h; top speed is the fastest over 10 s. Heart rate, power, cadence, temperature and ' +
-      'calories need an activity that recorded them; cadence is steps per minute on foot.',
+      'What is drawn over the replay, each widget centered on a point in percent across and ' +
+      'down, with a size in percent (50 to 250, 100 when left out), separated by ";": ' +
+      'text:"Your text"@x,y,size (text@x,y for the title), a value such as distance@x,y,size, ' +
+      'or a chart, the activities end to end along their distance: elevation-chart, ' +
+      'heart-rate-chart, power-chart, speed-chart or cadence-chart@x,y,size (one an activity ' +
+      'recorded nothing for is left out). Later widgets are drawn over earlier ones; "" draws ' +
+      'none. ' +
+      'A value takes a label mode after a colon, as count:after@x,y: off (the value alone), ' +
+      'before (total distance 1,147 km), after (25 activities), above or under (its words ' +
+      'smaller, on a line above or under it). Left out, a value has its words under it; the ' +
+      'date has none. Its own words, in double quotes after a colon, take the place of its ' +
+      'usual ones, as distance:above:"so far"@x,y; "" leaves them out. nounit writes the ' +
+      'number without its unit, as distance:nounit:"km"@x,y. A time, a date or a ' +
+      'clock time also takes a format after a colon, as moving:hm@x,y or ' +
+      'moving:after:hm@x,y: a time hms (54:38:25, the usual), hm (54:38), ' +
+      'h (55 h) or d (2.3 days); the date dmy (8 May 2026, the usual), dm (8 May), wdm ' +
+      '(Fri 8 May), mdy (May 8, 2026) or iso (2026-05-08); start and time-of-day 24h (06:42, ' +
+      'the usual) or 12h (6:42 AM). ' +
+      `The values: ${METRICS.join(', ')}. For several activities a plain value is ` +
+      'their total (time, moving, distance, climb, descent, calories); avg-, max- and min- ' +
+      'time, distance, climb and calories are per activity; the speeds, elevations and ' +
+      'sensors are over every activity together. A value the video cannot show is left out: ' +
+      `${SINGLE_ONLY.join(', ')} are for a single activity; count, days, moving-days and the ` +
+      'per-activity ' +
+      'values for several; the elevation values need recorded elevation. The average speed ' +
+      'is over the moving time; speeds are minutes per kilometer when every activity is on ' +
+      'foot, else km/h; max-speed is the fastest over 10 s, speed-now the speed over the ' +
+      'last 10 s. The sensor values and calories need an activity that recorded them; ' +
+      'cadence is steps per minute on foot.',
   },
-  {
-    name: 'metrics-position',
-    label: 'Position',
-    group: 'metrics',
-    kind: { type: 'choice', choices: POSITIONS },
-    default: 'bottom-left',
-    help: 'Where the metrics card sits: a row (top, middle or bottom) and a side.',
-  },
-  {
-    name: 'metrics-size',
-    label: 'Card size',
-    group: 'metrics',
-    kind: { type: 'number', min: 50, max: 200, unit: '%' },
-    default: '100',
-    help: 'Size of the metrics card, in percent of the normal size.',
-  },
-
   {
     name: 'totals-card',
     label: 'Totals card',
@@ -458,23 +434,70 @@ export const SETTINGS: readonly SettingDefinition[] = [
     kind: { type: 'switch' },
     default: false,
     help:
-      `For several activities: their totals after the replay (${TOTALS_CARD_S} s more): ` +
-      'activities, kilometers, hours moving and meters climbed. On with the recap preset.',
+      `The totals after the replay (${TOTALS_CARD_S} s more): for several activities the ` +
+      'activities, the distance, the moving time and the climb; for one the distance, the ' +
+      'moving time and the climb. On with the recap preset.',
   },
   {
-    name: 'totals-fields',
-    label: 'Totals',
+    name: 'totals-layout',
+    label: 'Totals card layout',
     group: 'look',
-    kind: { type: 'list', choices: TOTALS_FIELDS },
-    default: null,
-    automatic: AUTOMATIC_TOTALS.join(', '),
+    kind: { type: 'choice', choices: [...CARD_LAYOUT_NAMES] },
+    default: 'grid-2x2',
     help:
-      `Values the totals card shows, in this order: ${TOTALS_FIELDS.join(', ')}. The same ` +
-      'values as the metrics card, as totals: time is hours in total, moving hours moving, ' +
-      'pace the average while moving, top-speed the fastest of any activity, date the days ' +
-      'spanned, days the days with an activity. ' +
-      'Elevation, descent and highest are left out when no activity recorded elevation, the ' +
-      'heart rate, power, cadence, temperature and calories when none recorded them.',
+      "Where the totals card's values start when --totals-widgets leaves them to the video, " +
+      'and the guides the web app shows while they are arranged: ' +
+      CARD_LAYOUT_NAMES.map(
+        (name) => `${name} (${LAYOUTS[name].help.toLowerCase().replace(/\.$/, '')})`,
+      ).join('; ') +
+      '.',
+  },
+  {
+    name: 'totals-widgets',
+    label: 'Totals card widgets',
+    group: 'look',
+    kind: { type: 'text', valueName: 'widgets' },
+    default: null,
+    automatic: 'activities, distance, moving time and climb, without the title',
+    help:
+      'What the totals card shows, as --widgets is written: text:"Your text"@x,y,size ' +
+      `(text@x,y for the title) and totals such as distance@x,y,size: ${TOTALS_FIELDS.join(', ')}. ` +
+      'A total is written as a value over the replay is at its end (312 km, total distance), ' +
+      'and takes a label mode, words of its own and nounit as one does, as ' +
+      'distance:above:"together"@x,y. ' +
+      'As totals over every activity: count, time (hours, stops included), moving, distance, ' +
+      'climb, descent and calories are added up; days are the calendar days from the first ' +
+      'activity to the last, moving-days the days with an activity; avg-, max- and min- ' +
+      'time, distance, climb and calories are per activity; the speeds, elevations and ' +
+      'sensors are over every activity together; date is the days spanned. A total the ' +
+      'activities did not ' +
+      'record (elevation, the sensors, calories) is left out. A time, a date or a clock ' +
+      'time takes a format as over the replay; a time is in hours unless told otherwise. ' +
+      'The values fade in in their order and count up.',
+  },
+  {
+    name: 'layout',
+    label: 'Layout',
+    group: 'look',
+    kind: { type: 'choice', choices: [...LAYOUT_NAMES] },
+    default: 'classic',
+    help:
+      'Where the widgets start when --widgets leaves them to the video, and the guides the web ' +
+      'app shows while they are arranged: ' +
+      LAYOUT_NAMES.map(
+        (name) => `${name} (${LAYOUTS[name].help.toLowerCase().replace(/\.$/, '')})`,
+      ).join('; ') +
+      '. Each preset has its own.',
+  },
+  {
+    name: 'units',
+    label: 'Units',
+    group: 'look',
+    kind: { type: 'choice', choices: ['metric', 'imperial'] },
+    default: 'metric',
+    help:
+      'metric: kilometers, meters, km/h, minutes per kilometer and °C. imperial: miles, feet, ' +
+      'mph, minutes per mile and °F. For the values over the replay and on the totals card.',
   },
 
   {
@@ -601,13 +624,6 @@ export function parseSettings(input: SettingsInput): RenderSettings {
     if (typeof value !== 'boolean') throw new SettingsError(name, 'is a switch and takes no value');
     return value;
   };
-  /** A switch with no fixed default: on, off, or null to leave it to the video. */
-  const optionalFlag = (name: string): boolean | null => {
-    const value = valueOf(name);
-    if (value === null) return null;
-    if (typeof value !== 'boolean') throw new SettingsError(name, 'is a switch and takes no value');
-    return value;
-  };
   const number = (name: string): number => {
     const kind = definition(name).kind;
     if (kind.type !== 'number') throw new Error(`"${name}" is not a number setting`);
@@ -619,6 +635,20 @@ export function parseSettings(input: SettingsInput): RenderSettings {
         `expects a number from ${kind.min} to ${kind.max}, got "${value}"`,
       );
     return n;
+  };
+  /** The widgets, or null when left to the other settings. */
+  const widgetList = (
+    name: string,
+    metrics: readonly string[],
+    options: { chart: boolean },
+  ): Widget[] | null => {
+    const value = text(name);
+    if (value === null) return null;
+    try {
+      return parseWidgets(value, metrics, options);
+    } catch (error) {
+      throw new SettingsError(name, error instanceof Error ? error.message : String(error));
+    }
   };
   const choice = <T extends string>(name: string): T => {
     const kind = definition(name).kind;
@@ -667,23 +697,6 @@ export function parseSettings(input: SettingsInput): RenderSettings {
   if (minDistanceKm !== null && maxDistanceKm !== null && minDistanceKm > maxDistanceKm)
     throw new SettingsError('max-distance', 'is below the minimum distance');
 
-  /** A list of fixed values in the order given, each once; null when the list is not given. */
-  const choiceList = <T extends string>(name: string): T[] | null => {
-    const kind = definition(name).kind;
-    if (kind.type !== 'list' || !kind.choices)
-      throw new Error(`"${name}" is not a list of choices`);
-    const listText = text(name);
-    if (listText === null) return null;
-    const values = listText.split(',').map((value) => value.trim().toLowerCase());
-    const unknown = values.find((value) => !kind.choices!.includes(value));
-    if (listText.trim() === '' || unknown !== undefined)
-      throw new SettingsError(
-        name,
-        `expects values from ${kind.choices.join(', ')}, got "${unknown ?? listText}"`,
-      );
-    return [...new Set(values)] as T[];
-  };
-
   /** A place filter: its place and radius, or null when no place is given. */
   const near = (place: string, radius: string): NearPlace | null => {
     const placeText = text(place);
@@ -712,20 +725,17 @@ export function parseSettings(input: SettingsInput): RenderSettings {
     endPause: number('end-pause'),
     trimRadius: number('trim-radius'),
     camera: choice<RenderSettings['camera']>('camera'),
+    units: choice<RenderSettings['units']>('units'),
+    layout: choice<RenderSettings['layout']>('layout'),
+    totalsLayout: choice<RenderSettings['totalsLayout']>('totals-layout'),
     map: flag('map'),
-    elevationProfile: optionalFlag('elevation-profile'),
     title: text('title'),
-    titlePosition: choice<Position>('title-position'),
-    titleSize: number('title-size'),
     width,
     height,
     fps: Number(choice('fps')),
-    metrics: flag('metrics'),
-    metricsFields: choiceList<Metric>('metrics-fields'),
-    metricsPosition: choice<Position>('metrics-position'),
-    metricsSize: number('metrics-size'),
+    widgets: widgetList('widgets', METRICS, { chart: true }),
     totalsCard: flag('totals-card'),
-    totalsFields: choiceList<TotalsField>('totals-fields'),
+    totalsWidgets: widgetList('totals-widgets', TOTALS_FIELDS, { chart: false }),
     endCard: flag('end-card'),
     watermark: flag('watermark'),
   };

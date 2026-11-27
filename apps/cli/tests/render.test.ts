@@ -1,8 +1,10 @@
 import { createCanvas } from '@napi-rs/canvas';
 import { describe, expect, it } from 'vitest';
 import {
+  ICONS,
   chronologicalTimeline,
   createRenderer,
+  drawIcon,
   raceTimeline,
   parseSettings,
   planReplay,
@@ -10,9 +12,11 @@ import {
   STRIDE,
   type CanvasLike,
   type Metric,
+  type Widget,
   type Context2DLike,
   type RenderOptions,
   type Track,
+  type IconName,
 } from '@wornways/engine';
 
 /** A 5 km loop-free route heading north-east, one point every 10 s. */
@@ -183,7 +187,7 @@ describe('a route with more points than a zoom level can show', () => {
       [track],
       chronologicalTimeline([5_000], { duration: seconds }),
       (w, h) => createCanvas(w, h) as unknown as CanvasLike,
-      { width, height, fps, camera, metrics: [], ...options },
+      { width, height, fps, camera, widgets: [], ...options },
     );
     for (let f = 0; f < renderer.replayFrames; f++) renderer.renderFrame(f);
     return heatPixels(renderer.canvas, width, height);
@@ -223,9 +227,12 @@ function textPixels(canvas: CanvasLike, x0: number, y0: number, x1: number, y1: 
   return count;
 }
 
-describe('the metrics card', () => {
+describe('the values', () => {
   const width = 270;
   const height = 480;
+  /** Value widgets at the bottom left, as the video starts them. */
+  const valuesAt = (metrics: Metric[]): Widget[] =>
+    metrics.map((metric) => ({ kind: 'metric', metric, label: 'under', x: 25, y: 90, size: 100 }));
 
   /** Text pixels in the top-right and the bottom-left of the last frame. */
   function lastFrame(options: Partial<RenderOptions>) {
@@ -249,8 +256,10 @@ describe('the metrics card', () => {
     expect(frame.topRight).toBe(0);
   });
 
-  it('moves to the chosen corner', () => {
-    const frame = lastFrame({ metricsPosition: 'top-right' });
+  it('sits where its widget is placed', () => {
+    const frame = lastFrame({
+      widgets: [{ kind: 'metric', metric: 'time', label: 'under', x: 75, y: 7, size: 100 }],
+    });
 
     expect(frame.topRight).toBeGreaterThan(20);
     expect(frame.bottomLeft).toBe(0);
@@ -265,36 +274,56 @@ describe('the metrics card', () => {
       [route(), second],
       timeline,
       (w, h) => createCanvas(w, h) as unknown as CanvasLike,
-      { width, height, fps: 10, metrics },
+      { width, height, fps: 10, widgets: valuesAt(metrics) },
     );
     for (let f = 0; f < renderer.frameCount; f++) renderer.renderFrame(f);
     return textPixels(renderer.canvas, 0, height * 0.8, width / 2, height);
   }
 
-  it('shows the pace for several activities, in turn or in a race, and the dates in a race', () => {
+  it('shows the avg speed for several activities, in turn or in a race, and the dates in a race', () => {
     const inTurn = chronologicalTimeline([1_190, 1_190], { duration: 1 });
     const race = raceTimeline([1_190, 1_190], { duration: 1 });
-    expect(severalLastFrame(inTurn, ['pace'])).toBeGreaterThan(20);
-    expect(severalLastFrame(race, ['pace'])).toBeGreaterThan(20);
+    expect(severalLastFrame(inTurn, ['avg-speed'])).toBeGreaterThan(20);
+    expect(severalLastFrame(race, ['avg-speed'])).toBeGreaterThan(20);
     expect(severalLastFrame(race, ['date'])).toBeGreaterThan(20);
   });
 
-  it('shows the moving time, the descent, the highest point, the days and the longest', () => {
+  it('shows the moving time, the descent, the max elevation, the days and the max distance', () => {
     const inTurn = chronologicalTimeline([1_190, 1_190], { duration: 1 });
-    for (const metric of ['moving', 'descent', 'highest', 'days', 'longest'] as Metric[])
+    const shown: Metric[] = [
+      'moving',
+      'descent',
+      'max-elevation',
+      'days',
+      'moving-days',
+      'max-distance',
+    ];
+    for (const metric of shown)
       expect(severalLastFrame(inTurn, [metric]), metric).toBeGreaterThan(20);
-    // One activity: its moving time, but no days or longest, which would only repeat it.
-    expect(lastFrame({ metrics: ['moving'] }).bottomLeft).toBeGreaterThan(20);
-    expect(lastFrame({ metrics: ['days', 'longest'] }).bottomLeft).toBe(0);
+    // One activity: its moving time, but no days or values per activity, which would only
+    // repeat it.
+    expect(lastFrame({ widgets: valuesAt(['moving']) }).bottomLeft).toBeGreaterThan(20);
+    expect(
+      lastFrame({ widgets: valuesAt(['days', 'moving-days', 'max-distance']) }).bottomLeft,
+    ).toBe(0);
   });
 
   it('shows the sensor values and calories of an activity that recorded them, and only then', () => {
     const sensorMetrics: Metric[] = [
-      'heart-rate',
+      'avg-heart-rate',
       'max-heart-rate',
-      'power',
-      'cadence',
-      'temperature',
+      'min-heart-rate',
+      'heart-rate-now',
+      'avg-power',
+      'max-power',
+      'power-now',
+      'avg-cadence',
+      'max-cadence',
+      'cadence-now',
+      'avg-temperature',
+      'min-temperature',
+      'max-temperature',
+      'temperature-now',
       'calories',
     ];
     const drawn = (track: Track, metric: Metric) => {
@@ -302,7 +331,7 @@ describe('the metrics card', () => {
         [track],
         chronologicalTimeline([1_190], { duration: 1 }),
         (w, h) => createCanvas(w, h) as unknown as CanvasLike,
-        { width, height, fps: 10, overlay: 'single', metrics: [metric] },
+        { width, height, fps: 10, overlay: 'single', widgets: valuesAt([metric]) },
       );
       for (let f = 0; f < renderer.frameCount; f++) renderer.renderFrame(f);
       return textPixels(renderer.canvas, 0, height * 0.8, width / 2, height);
@@ -324,23 +353,42 @@ describe('the metrics card', () => {
     }
   });
 
-  it('shows the start time for a single activity only, and the top speed for any', () => {
+  it('shows the values as one activity plays for one activity only, per activity for several', () => {
     const inTurn = chronologicalTimeline([1_190, 1_190], { duration: 1 });
-    expect(lastFrame({ metrics: ['start'] }).bottomLeft).toBeGreaterThan(20);
-    expect(severalLastFrame(inTurn, ['start'])).toBe(0);
-    expect(lastFrame({ metrics: ['top-speed'] }).bottomLeft).toBeGreaterThan(20);
-    expect(severalLastFrame(inTurn, ['top-speed'])).toBeGreaterThan(20);
+    for (const metric of ['time-of-day', 'speed-now', 'elevation-now'] as Metric[]) {
+      expect(lastFrame({ widgets: valuesAt([metric]) }).bottomLeft, metric).toBeGreaterThan(20);
+      expect(severalLastFrame(inTurn, [metric]), metric).toBe(0);
+    }
+    for (const metric of [
+      'avg-time',
+      'max-time',
+      'min-time',
+      'avg-distance',
+      'min-distance',
+      'avg-climb',
+      'max-climb',
+      'min-climb',
+    ] as Metric[]) {
+      expect(severalLastFrame(inTurn, [metric]), metric).toBeGreaterThan(20);
+      expect(lastFrame({ widgets: valuesAt([metric]) }).bottomLeft, metric).toBe(0);
+    }
+    expect(lastFrame({ widgets: valuesAt(['min-elevation']) }).bottomLeft).toBeGreaterThan(20);
+    expect(severalLastFrame(inTurn, ['min-elevation'])).toBeGreaterThan(20);
   });
 
-  it('is left out when it has no values', () => {
-    const frame = lastFrame({ metrics: [] });
+  it('shows the start time for a single activity only, and the max speed for any', () => {
+    const inTurn = chronologicalTimeline([1_190, 1_190], { duration: 1 });
+    expect(lastFrame({ widgets: valuesAt(['start']) }).bottomLeft).toBeGreaterThan(20);
+    expect(severalLastFrame(inTurn, ['start'])).toBe(0);
+    expect(lastFrame({ widgets: valuesAt(['max-speed']) }).bottomLeft).toBeGreaterThan(20);
+    expect(severalLastFrame(inTurn, ['max-speed'])).toBeGreaterThan(20);
+  });
+
+  it('is left out when no widget shows one', () => {
+    const frame = lastFrame({ widgets: [] });
 
     expect(frame.bottomLeft).toBe(0);
     expect(frame.topRight).toBe(0);
-  });
-
-  it('grows with the text size', () => {
-    expect(lastFrame({ metricsScale: 2 }).bottomLeft).toBeGreaterThan(lastFrame({}).bottomLeft * 2);
   });
 });
 
@@ -408,7 +456,7 @@ describe('rendering a replay', () => {
 
 describe('the totals card', () => {
   /** The last frame of a video of two activities with the totals card, as raw pixels. */
-  function lastTotalsFrame(totalsFields?: RenderOptions['totalsFields']) {
+  function lastTotalsFrame(totalsWidgets?: RenderOptions['totalsWidgets']) {
     const second = route();
     second.id = 'second';
     second.startTime += 86_400_000;
@@ -416,22 +464,114 @@ describe('the totals card', () => {
       [route(), second],
       chronologicalTimeline([5_000, 5_000], { duration: 1 }),
       (w, h) => createCanvas(w, h) as unknown as CanvasLike,
-      { width: 270, height: 480, fps: 10, totalsCard: true, totalsFields },
+      { width: 270, height: 480, fps: 10, totalsCard: true, totalsWidgets },
     );
     for (let f = 0; f < renderer.frameCount; f++) renderer.renderFrame(f);
     const ctx = renderer.canvas.getContext('2d') as Context2DLike;
     return Buffer.from(ctx.getImageData(0, 0, 270, 480).data);
   }
 
-  it('shows every value unless told otherwise, and only the values picked when told', () => {
+  it('draws the finished totals card or end card over the last frame, for a still', () => {
+    const second = route();
+    second.id = 'second';
+    second.startTime += 86_400_000;
+    const still = (card?: 'totals' | 'end') => {
+      const renderer = createRenderer(
+        [route(), second],
+        chronologicalTimeline([5_000, 5_000], { duration: 1 }),
+        (w, h) => createCanvas(w, h) as unknown as CanvasLike,
+        { width: 270, height: 480, fps: 10, totalsCard: true, endCard: true },
+      );
+      for (let f = 0; f < renderer.replayFrames; f++) renderer.renderFrame(f);
+      if (card) renderer.drawFinishedCard(card);
+      const ctx = renderer.canvas.getContext('2d') as Context2DLike;
+      return Buffer.from(ctx.getImageData(0, 0, 270, 480).data);
+    };
+    const last = still();
+    // The totals card is the last frame of the video with the totals card and no end card.
+    expect(still('totals').equals(lastTotalsFrame())).toBe(true);
+    expect(still('totals').equals(last)).toBe(false);
+    expect(still('end').equals(last)).toBe(false);
+  });
+
+  it('shows the usual totals unless told otherwise, and the widgets given when told', () => {
     const automatic = lastTotalsFrame();
-    expect(lastTotalsFrame(['count', 'distance', 'moving', 'elevation']).equals(automatic)).toBe(
+    const distance = {
+      kind: 'metric',
+      metric: 'distance',
+      label: 'under',
+      x: 50,
+      y: 50,
+      size: 100,
+    } as const;
+    const count = {
+      kind: 'metric',
+      metric: 'count',
+      label: 'under',
+      x: 50,
+      y: 30,
+      size: 100,
+    } as const;
+    expect(lastTotalsFrame([distance]).equals(automatic)).toBe(false);
+    expect(lastTotalsFrame([distance, count]).equals(lastTotalsFrame([count, distance]))).toBe(
       true,
     );
-    expect(lastTotalsFrame(['distance']).equals(automatic)).toBe(false);
-    expect(lastTotalsFrame(['time', 'count']).equals(lastTotalsFrame(['count', 'time']))).toBe(
+    expect(lastTotalsFrame([distance]).equals(lastTotalsFrame([{ ...distance, y: 60 }]))).toBe(
       false,
     );
+    expect(lastTotalsFrame([distance]).equals(lastTotalsFrame([{ ...distance, size: 150 }]))).toBe(
+      false,
+    );
+  });
+
+  it('reports the widgets it starts with, which draw the same card when given', () => {
+    const second = route();
+    second.id = 'second';
+    second.startTime += 86_400_000;
+    const renderer = createRenderer(
+      [route(), second],
+      chronologicalTimeline([5_000, 5_000], { duration: 1 }),
+      (w, h) => createCanvas(w, h) as unknown as CanvasLike,
+      { width: 270, height: 480, fps: 10, totalsCard: true },
+    );
+    const { widgets, values } = renderer.totalsCard();
+    expect(widgets.map((w) => (w.kind === 'metric' ? w.metric : w.kind))).toEqual([
+      'count',
+      'distance',
+      'moving',
+      'climb',
+    ]);
+    expect(values.get('count')).toEqual({
+      value: '2',
+      number: '2',
+      label: 'activities',
+      name: 'Total activities',
+    });
+    expect(lastTotalsFrame(widgets).equals(lastTotalsFrame())).toBe(true);
+  });
+
+  it('counts the days from the first activity to the last, and the days with one', () => {
+    // Two activities on one day and one three days later: four days, two with an activity.
+    const later = (id: string, days: number) => {
+      const track = route();
+      track.id = id;
+      track.startTime += days * 86_400_000;
+      return track;
+    };
+    const renderer = createRenderer(
+      [route(), later('same-day', 0.01), later('three-days-on', 3)],
+      chronologicalTimeline([5_000, 5_000, 5_000], { duration: 1 }),
+      (w, h) => createCanvas(w, h) as unknown as CanvasLike,
+      { width: 270, height: 480, fps: 10, totalsCard: true },
+    );
+    const { values } = renderer.totalsCard();
+    expect(values.get('days')).toEqual({ value: '4', number: '4', label: 'days', name: 'Days' });
+    expect(values.get('moving-days')).toEqual({
+      value: '2',
+      number: '2',
+      label: 'moving days',
+      name: 'Moving days',
+    });
   });
 });
 
@@ -439,103 +579,217 @@ describe('the title', () => {
   const width = 270;
   const height = 480;
 
-  /** Text pixels in each quarter band of the last frame: top and bottom, left and right. */
+  it('sits at the top in the middle unless told otherwise', () => {
+    const renderer = createRenderer(
+      [route()],
+      chronologicalTimeline([5_000], { duration: 1 }),
+      (w, h) => createCanvas(w, h) as unknown as CanvasLike,
+      { width, height, fps: 10, overlay: 'single', title: 'Morning' },
+    );
+    for (let f = 0; f < renderer.frameCount; f++) renderer.renderFrame(f);
+    const left = textPixels(renderer.canvas, 0, 0, width / 2, height * 0.2);
+    const right = textPixels(renderer.canvas, width / 2, 0, width, height * 0.2);
+
+    // Centered: about as much of the text on either side of the middle.
+    expect(left).toBeGreaterThan(10);
+    expect(right).toBeGreaterThan(10);
+    expect(Math.abs(left - right)).toBeLessThan((left + right) * 0.2);
+  });
+});
+
+describe('widgets', () => {
+  const width = 270;
+  const height = 480;
+
   function lastFrame(options: Partial<RenderOptions>) {
     const renderer = createRenderer(
       [route()],
       chronologicalTimeline([5_000], { duration: 1 }),
       (w, h) => createCanvas(w, h) as unknown as CanvasLike,
-      { width, height, fps: 10, overlay: 'single', title: 'Morning', metrics: [], ...options },
+      { width, height, fps: 10, overlay: 'single', title: 'Morning', ...options },
     );
     for (let f = 0; f < renderer.frameCount; f++) renderer.renderFrame(f);
-    const band = (x: number, y: number) =>
-      textPixels(renderer.canvas, x, y, x + width / 2, y + height * 0.2);
-    return {
-      topLeft: band(0, 0),
-      topRight: band(width / 2, 0),
-      bottomLeft: band(0, height * 0.8),
-      bottomRight: band(width / 2, height * 0.8),
-    };
+    return renderer;
   }
+  /** A box in pixels: left, top, right and bottom edges. */
+  const edges = (box: { x: number; y: number; width: number; height: number }) => ({
+    left: box.x * width,
+    top: box.y * height,
+    right: (box.x + box.width) * width,
+    bottom: (box.y + box.height) * height,
+  });
 
-  it('sits at the top in the middle unless told otherwise', () => {
-    const frame = lastFrame({});
-
-    // Centered: about as much of the text on either side of the middle.
-    expect(frame.topLeft).toBeGreaterThan(10);
-    expect(frame.topRight).toBeGreaterThan(10);
-    expect(Math.abs(frame.topLeft - frame.topRight)).toBeLessThan(
-      (frame.topLeft + frame.topRight) * 0.2,
+  it('draws each widget centered on its point, inside the box it reports, and nothing else', () => {
+    const renderer = lastFrame({
+      widgets: [
+        { kind: 'text', text: null, x: 50, y: 20, size: 100 },
+        { kind: 'metric', metric: 'distance', label: 'under', x: 30, y: 60, size: 150 },
+      ],
+    });
+    const [title, distance] = renderer.overlayBoxes().widgets.map((box) => edges(box!));
+    expect((title!.left + title!.right) / 2).toBeCloseTo(135, 0);
+    expect((title!.top + title!.bottom) / 2).toBeCloseTo(96, 0);
+    expect((distance!.left + distance!.right) / 2).toBeCloseTo(81, 0);
+    expect((distance!.top + distance!.bottom) / 2).toBeCloseTo(288, 0);
+    const inside = [title!, distance!].reduce(
+      (sum, box) =>
+        sum +
+        textPixels(
+          renderer.canvas,
+          Math.floor(box.left),
+          Math.floor(box.top),
+          Math.ceil(box.right),
+          Math.ceil(box.bottom),
+        ),
+      0,
     );
-    expect(frame.bottomLeft + frame.bottomRight).toBe(0);
+    expect(inside).toBeGreaterThan(40);
+    expect(textPixels(renderer.canvas, 0, 0, width, height)).toBe(inside);
   });
 
-  it('sits at the top left when told', () => {
-    const frame = lastFrame({ titlePosition: 'top-left' });
-
-    expect(frame.topLeft).toBeGreaterThan(20);
-    expect(frame.topRight + frame.bottomLeft + frame.bottomRight).toBe(0);
+  it('grows with its size', () => {
+    const at = (size: number) =>
+      edges(
+        lastFrame({
+          widgets: [{ kind: 'metric', metric: 'time', label: 'under', x: 50, y: 50, size }],
+        }).overlayBoxes().widgets[0]!,
+      );
+    const normal = at(100);
+    const double = at(200);
+    expect(double.right - double.left).toBeCloseTo((normal.right - normal.left) * 2, -1);
   });
 
-  it('moves to the chosen corner and grows with its size', () => {
-    const right = lastFrame({ titlePosition: 'bottom-right' });
+  it('shows a value with the words under it, and leaves out one the video cannot show', () => {
+    const renderer = lastFrame({
+      widgets: [
+        { kind: 'metric', metric: 'distance', label: 'under', x: 50, y: 50, size: 100 },
+        { kind: 'metric', metric: 'count', label: 'under', x: 50, y: 80, size: 100 },
+      ],
+    });
+    expect(renderer.finalValues.get('distance')).toEqual({
+      value: '5.3 km',
+      number: '5.3',
+      label: 'distance',
+      name: 'Distance',
+    });
+    // A single activity has no count.
+    expect(renderer.overlayBoxes().widgets[1]).toBeNull();
+  });
 
-    expect(right.bottomRight).toBeGreaterThan(20);
-    expect(right.topLeft).toBe(0);
-    expect(lastFrame({ titlePosition: 'bottom-right', titleScale: 2 }).bottomRight).toBeGreaterThan(
-      right.bottomRight * 2,
+  it('draws an icon in front of a value when asked, which makes its box wider', () => {
+    const at = (icon: boolean) =>
+      lastFrame({
+        widgets: [
+          { kind: 'metric', metric: 'distance', label: 'off', icon, x: 50, y: 50, size: 100 },
+        ],
+      }).overlayBoxes().widgets[0]!.width;
+    expect(at(true)).toBeGreaterThan(at(false) * 1.2);
+  });
+
+  it('keeps a value still while its number counts: equal digits, from a fixed place', () => {
+    // A ride over 10 km, so the distance gains a digit as it counts.
+    const long = route();
+    for (let i = 0; i < long.points.length / STRIDE; i++) long.points[i * STRIDE] = 19 + i * 0.0012;
+    for (const icon of [true, false]) {
+      const renderer = createRenderer(
+        [long],
+        chronologicalTimeline([5_000], { duration: 3 }),
+        (w, h) => createCanvas(w, h) as unknown as CanvasLike,
+        {
+          width,
+          height,
+          fps: 10,
+          overlay: 'single',
+          widgets: [
+            { kind: 'metric', metric: 'distance', label: 'off', icon, x: 50, y: 50, size: 150 },
+          ],
+        },
+      );
+      /** The leftmost and rightmost white pixels in the widget's band. */
+      const ends = () => {
+        const context = renderer.canvas.getContext('2d') as Context2DLike;
+        const { data } = context.getImageData(0, height * 0.45, width, height * 0.1);
+        const row = width * 4;
+        let [left, right] = [width, 0];
+        for (let i = 0; i < data.length; i += 4)
+          if (data[i]! > 200 && data[i + 1]! > 200 && data[i + 2]! > 200) {
+            left = Math.min(left, (i % row) / 4);
+            right = Math.max(right, (i % row) / 4);
+          }
+        return { left, right };
+      };
+      const lefts = new Set<number>();
+      const rights = new Set<number>();
+      for (let f = 0; f < renderer.replayFrames; f++) {
+        renderer.renderFrame(f);
+        if (f === 0) continue;
+        const { left, right } = ends();
+        lefts.add(left);
+        rights.add(right);
+      }
+      // The icon does not move; a number without one starts where it did, its first digit's
+      // own shape aside. Its digits all as wide, the unit after it moves only when the
+      // number gains a digit, at 10 km.
+      if (icon) expect([...lefts]).toHaveLength(1);
+      else expect(Math.max(...lefts) - Math.min(...lefts)).toBeLessThanOrEqual(2);
+      expect([...rights].length, `icon ${icon}`).toBeLessThanOrEqual(2);
+    }
+  });
+
+  it('draws every icon', () => {
+    const canvas = createCanvas(40, 40) as unknown as CanvasLike;
+    const context = canvas.getContext('2d') as Context2DLike;
+    for (const icon of Object.keys(ICONS) as IconName[]) {
+      context.fillStyle = '#000';
+      context.fillRect(0, 0, 40, 40);
+      context.fillStyle = '#fff';
+      drawIcon(context, icon, 4, 4, 32);
+      expect(textPixels(canvas, 0, 0, 40, 40), icon).toBeGreaterThan(40);
+    }
+  });
+
+  it('writes a time, the date and the start in every format, and the units asked for', () => {
+    const metric = lastFrame({});
+    const time = metric.finalValues.get('time')!;
+    expect(time.value).toBe('0:19:50');
+    expect(time.formats).toMatchObject({
+      hms: { value: '0:19:50' },
+      hm: { value: '0:19' },
+      h: { value: '0.3 h' },
+      d: { value: '0.0 days' },
+    });
+    expect(metric.finalValues.get('date')!.formats!.iso!.value).toBe(
+      new Date(Date.UTC(2026, 4, 2)).toLocaleDateString('sv'),
     );
+    expect(Object.keys(metric.finalValues.get('start')!.formats!)).toEqual(['24h', '12h']);
+    // A wider box for the longer format.
+    const box = (format: 'hms' | 'd') =>
+      lastFrame({
+        widgets: [
+          { kind: 'metric', metric: 'time', label: 'off', format, x: 50, y: 50, size: 100 },
+        ],
+      }).overlayBoxes().widgets[0]!.width;
+    expect(box('d')).toBeGreaterThan(box('hms'));
+
+    const imperial = lastFrame({ units: 'imperial' }).finalValues;
+    expect(imperial.get('distance')!.value).toBe('3.3 mi');
+    expect(imperial.get('avg-speed')!.value).toMatch(/ \/mi$/);
   });
 
-  it('sits in the middle row, away from the edges', () => {
-    const renderer = createRenderer(
-      [route()],
-      chronologicalTimeline([5_000], { duration: 1 }),
-      (w, h) => createCanvas(w, h) as unknown as CanvasLike,
-      {
-        width,
-        height,
-        fps: 10,
-        overlay: 'single',
-        title: 'Morning',
-        metrics: [],
-        titlePosition: 'middle-left',
-      },
-    );
-    for (let f = 0; f < renderer.frameCount; f++) renderer.renderFrame(f);
-
-    expect(textPixels(renderer.canvas, 0, height * 0.4, width / 2, height * 0.6)).toBeGreaterThan(
-      20,
-    );
-    expect(textPixels(renderer.canvas, 0, 0, width, height * 0.2)).toBe(0);
-    expect(textPixels(renderer.canvas, 0, height * 0.8, width, height)).toBe(0);
-  });
-
-  it('sits in the middle of an edge', () => {
-    const frame = lastFrame({ titlePosition: 'bottom-center' });
-
-    // Centered text reaches into both halves of the frame.
-    expect(frame.bottomLeft).toBeGreaterThan(5);
-    expect(frame.bottomRight).toBeGreaterThan(5);
-    expect(frame.topLeft + frame.topRight).toBe(0);
-  });
-
-  it('stacks with a metrics card it would meet on the same edge', () => {
-    const titleAlone = lastFrame({ titlePosition: 'bottom-center' });
-    const cardAlone = lastFrame({ title: undefined, metrics: ['time'] });
-    const both = lastFrame({ titlePosition: 'bottom-center', metrics: ['time'] });
-    const sum = (f: typeof both) => f.bottomLeft + f.bottomRight;
-
-    expect(sum(both)).toBeGreaterThanOrEqual(Math.round((sum(titleAlone) + sum(cardAlone)) * 0.95));
-  });
-
-  it('stacks with the metrics card in the same corner instead of overlapping it', () => {
-    const titleAlone = lastFrame({ titlePosition: 'bottom-left' }).bottomLeft;
-    const cardAlone = lastFrame({ title: undefined, metrics: ['time'] }).bottomLeft;
-    const both = lastFrame({ titlePosition: 'bottom-left', metrics: ['time'] }).bottomLeft;
-
-    // Overlapping text would light up fewer pixels than the two apart.
-    expect(both).toBeGreaterThanOrEqual(Math.round((titleAlone + cardAlone) * 0.95));
+  it('starts with the title, the values and the chart when none are given', () => {
+    const renderer = lastFrame({ watermark: true });
+    expect(
+      renderer.widgets.map((widget) => (widget.kind === 'metric' ? widget.metric : widget.kind)),
+    ).toEqual(['text', 'distance', 'time', 'climb', 'chart']);
+    const [title, distance, time] = renderer.overlayBoxes().widgets.map((box) => edges(box!));
+    // The title at the top in the middle; the first value large at the bottom left, the
+    // others smaller in a row under it.
+    expect((title!.left + title!.right) / 2).toBeCloseTo(135, 0);
+    expect(title!.top).toBeLessThan(height * 0.1);
+    expect(Math.abs(distance!.left - width * 0.07)).toBeLessThan(1);
+    expect(time!.top).toBeGreaterThan(distance!.bottom);
+    expect(time!.bottom - time!.top).toBeLessThan(distance!.bottom - distance!.top);
+    expect(renderer.overlayBoxes().watermark!.x).toBeCloseTo(0.03, 2);
   });
 });
 
@@ -635,7 +889,7 @@ describe('the watermark', () => {
       [route()],
       chronologicalTimeline([5_000], { duration: 1 }),
       (w, h) => createCanvas(w, h) as unknown as CanvasLike,
-      { width, height, fps: 10, overlay: 'single', metrics: [], watermark },
+      { width, height, fps: 10, overlay: 'single', widgets: [], watermark },
     );
     for (let f = 0; f < renderer.frameCount; f++) renderer.renderFrame(f);
     const { data } = (renderer.canvas.getContext('2d') as Context2DLike).getImageData(
@@ -668,14 +922,17 @@ describe('the elevation profile', () => {
     return track;
   }
 
-  /** Orange pixels in the band above the map credit, halfway through the activity. */
-  function orangeAtTheBottom(track: Track, elevationProfile: boolean): number {
+  /**
+   * Orange pixels in the band above the map credit, halfway through the activity, with the
+   * widgets a video starts with or none.
+   */
+  function orangeAtTheBottom(track: Track, widgets?: Widget[]): number {
     const fps = 10;
     const renderer = createRenderer(
       [track],
       chronologicalTimeline([5_000], { duration: 2 }),
       (w, h) => createCanvas(w, h) as unknown as CanvasLike,
-      { width, height, fps, overlay: 'single', metrics: [], elevationProfile },
+      { width, height, fps, overlay: 'single', widgets },
     );
     for (let f = 0; f < fps; f++) renderer.renderFrame(f);
     const { data } = (renderer.canvas.getContext('2d') as Context2DLike).getImageData(
@@ -690,9 +947,82 @@ describe('the elevation profile', () => {
     return count;
   }
 
-  it('shows under a single activity with elevation, when asked', () => {
-    expect(orangeAtTheBottom(hill(true), true)).toBeGreaterThan(200);
-    expect(orangeAtTheBottom(hill(true), false)).toBe(0);
+  it('draws the heart rate chart in red, and only for an activity that recorded it', () => {
+    const chart: Widget[] = [{ kind: 'chart', chart: 'heart-rate', x: 50, y: 93, size: 100 }];
+    const beating = hill(true);
+    const count = beating.points.length / STRIDE;
+    beating.sensors = { heartRate: Float32Array.from({ length: count }, (_, i) => 110 + i) };
+    expect(orangeAtTheBottom(beating, chart)).toBeGreaterThan(200);
+    expect(orangeAtTheBottom(hill(true), chart)).toBe(0);
+  });
+
+  it("draws a chart's icon at its left end when asked, in the chart's color", () => {
+    const at = (icon: boolean) => {
+      const renderer = createRenderer(
+        [hill(true)],
+        chronologicalTimeline([5_000], { duration: 2 }),
+        (w, h) => createCanvas(w, h) as unknown as CanvasLike,
+        {
+          width,
+          height,
+          fps: 10,
+          overlay: 'single',
+          // White, which the pixels counted are.
+          widgets: [
+            { kind: 'chart', chart: 'elevation', color: 'white', icon, x: 50, y: 93, size: 100 },
+          ],
+        },
+      );
+      for (let f = 0; f < 10; f++) renderer.renderFrame(f);
+      const box = renderer.overlayBoxes().widgets[0]!;
+      const [left, top, bottom] = [box.x * width, box.y * height, (box.y + box.height) * height];
+      // The left end of the chart, as wide as the icon would be.
+      return textPixels(
+        renderer.canvas,
+        Math.round(left),
+        Math.round(top),
+        Math.round(left + (bottom - top) * 0.5),
+        Math.round(bottom),
+      );
+    };
+    expect(at(true)).toBeGreaterThan(at(false) + 10);
+  });
+
+  it('draws a chart as wide and as high as set apart', () => {
+    const box = (size: number, chartHeight?: number) => {
+      const renderer = createRenderer(
+        [hill(true)],
+        chronologicalTimeline([5_000], { duration: 2 }),
+        (w, h) => createCanvas(w, h) as unknown as CanvasLike,
+        {
+          width,
+          height,
+          fps: 10,
+          overlay: 'single',
+          widgets: [
+            {
+              kind: 'chart',
+              chart: 'elevation',
+              x: 50,
+              y: 80,
+              size,
+              ...(chartHeight ? { height: chartHeight } : {}),
+            },
+          ],
+        },
+      );
+      renderer.renderFrame(0);
+      return renderer.overlayBoxes().widgets[0]!;
+    };
+    const even = box(80);
+    const tall = box(80, 160);
+    expect(tall.width).toBeCloseTo(even.width);
+    expect(tall.height).toBeCloseTo(even.height * 2);
+  });
+
+  it('shows under a single activity with elevation, unless the widgets leave it out', () => {
+    expect(orangeAtTheBottom(hill(true))).toBeGreaterThan(200);
+    expect(orangeAtTheBottom(hill(true), [])).toBe(0);
   });
 
   /** Orange pixels in the profile's band of the last frame, for a video made by `prepareReplay`. */
@@ -719,36 +1049,46 @@ describe('the elevation profile', () => {
   /** The hill a day later, so two activities make a trip. */
   const nextDay = (): Track => ({ ...hill(true), id: 'next', startTime: Date.UTC(2026, 4, 3) });
 
-  it('is on by default for one activity, off for several unless switched on', async () => {
-    const quiet = { metrics: false, title: '', watermark: false };
+  it('is on at first for one activity, off for several unless added', async () => {
+    const quiet = { title: '', watermark: false };
     expect(await profileOrange([hill(true)], quiet)).toBeGreaterThan(200);
-    expect(await profileOrange([hill(true)], { ...quiet, 'elevation-profile': false })).toBe(0);
+    expect(await profileOrange([hill(true)], { ...quiet, widgets: '' })).toBe(0);
     const trip = [hill(true), nextDay()];
     expect(await profileOrange(trip, quiet)).toBe(0);
-    expect(await profileOrange(trip, { ...quiet, 'elevation-profile': true })).toBeGreaterThan(200);
+    expect(
+      await profileOrange(trip, { ...quiet, widgets: 'elevation-chart@50,93' }),
+    ).toBeGreaterThan(200);
   });
 
   it('is left out for an activity without elevation', () => {
-    expect(orangeAtTheBottom(hill(false), true)).toBe(0);
+    expect(orangeAtTheBottom(hill(false))).toBe(0);
+    expect(
+      orangeAtTheBottom(hill(false), [
+        { kind: 'chart', chart: 'elevation', x: 50, y: 93, size: 100 },
+      ]),
+    ).toBe(0);
   });
 
-  it('lifts the metrics card above it', () => {
-    // Landscape, where the card would otherwise reach down to the profile.
-    const [w, h] = [480, 270];
-    /** The highest row of white text in the lower half of the last frame: the large value. */
-    const cardTop = (elevationProfile: boolean) => {
+  it('keeps the values clear of it, in a frame of any shape', () => {
+    for (const [w, h] of [
+      [270, 480],
+      [480, 270],
+      [360, 360],
+    ] as const) {
       const renderer = createRenderer(
         [hill(true)],
         chronologicalTimeline([5_000], { duration: 1 }),
         (cw, ch) => createCanvas(cw, ch) as unknown as CanvasLike,
-        { width: w, height: h, fps: 10, overlay: 'single', elevationProfile },
+        { width: w, height: h, fps: 10, overlay: 'single' },
       );
-      for (let f = 0; f < renderer.replayFrames; f++) renderer.renderFrame(f);
-      for (let y = h / 2; y < h; y++)
-        if (textPixels(renderer.canvas, 0, y, w / 2, y + 1) > 0) return y;
-      return h;
-    };
-    expect(cardTop(true)).toBeLessThan(cardTop(false) - 15);
+      renderer.renderFrame(0);
+      const boxes = renderer.overlayBoxes().widgets.map((box) => box!);
+      const chart = boxes[renderer.widgets.findIndex((widget) => widget.kind === 'chart')]!;
+      renderer.widgets.forEach((widget, k) => {
+        if (widget.kind === 'metric')
+          expect(boxes[k]!.y + boxes[k]!.height, `${w}x${h}`).toBeLessThan(chart.y);
+      });
+    }
   });
 });
 
@@ -766,7 +1106,7 @@ describe('the totals card', () => {
         { duration: 2 },
       ),
       (w, h) => createCanvas(w, h) as unknown as CanvasLike,
-      { width, height, fps, metrics: [], ...options },
+      { width, height, fps, widgets: [], ...options },
     );
 
   it('adds its seconds after the replay, before the end card', () => {
@@ -777,10 +1117,19 @@ describe('the totals card', () => {
     expect(withTotals.frameCount).toBe(plain.frameCount + Math.round(3.4 * fps));
   });
 
-  it('is left out for a single activity', () => {
+  it('is shown for a single activity too, with its distance, moving time and climb', () => {
     const single = make([route()], { overlay: 'single', totalsCard: true });
-
-    expect(single.frameCount).toBe(single.replayFrames);
+    expect(single.frameCount).toBe(single.replayFrames + Math.round(3.4 * fps));
+    const { widgets, values } = single.totalsCard();
+    expect(widgets.map((w) => (w.kind === 'metric' ? w.metric : w.kind))).toEqual([
+      'distance',
+      'moving',
+      'climb',
+    ]);
+    // Named as one activity's, and without the values that are for several.
+    expect(values.get('distance')!.name).toBe('Distance');
+    expect(values.has('count')).toBe(false);
+    expect(values.has('avg-distance')).toBe(false);
   });
 
   it('shows the totals over the dimmed map, then the end card fades from it', () => {

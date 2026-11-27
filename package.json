@@ -13,7 +13,7 @@
   },
   "scripts": {
     "build": "tsc -b && tsc -p tsconfig.tests.json && npm run build -w @wornways/web",
-    "test": "TZ=UTC vitest run",
+    "test": "vitest run",
     "lint": "eslint . && prettier --check .",
     "format": "prettier --write .",
     "cli": "node --conditions=source --import tsx apps/cli/src/main.ts",

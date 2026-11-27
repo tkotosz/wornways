@@ -83,7 +83,9 @@ const suggestFrom = computed(() => placeSettings(choice.value, new Date()));
 <template>
   <div class="filters">
     <div class="filter">
-      <span class="label">Period</span>
+      <span class="label">{{
+        choice.period === null ? 'Which activities? Pick a period.' : 'Period'
+      }}</span>
       <div class="chips">
         <button
           v-for="p in periods"
@@ -110,59 +112,62 @@ const suggestFrom = computed(() => placeSettings(choice.value, new Date()));
       </div>
     </div>
 
-    <div class="filter">
-      <span class="label">Sports</span>
-      <div class="chips">
-        <button
-          type="button"
-          class="chip"
-          :aria-pressed="choice.sports === null"
-          @click="update({ sports: null })"
-        >
-          All
-        </button>
-        <button
-          v-for="s in sports"
-          :key="s"
-          type="button"
-          class="chip"
-          :aria-pressed="sportPicked(choice, s)"
-          @click="toggleSport(s)"
-        >
-          {{ sportText(s) }}
-        </button>
+    <!-- The other filters narrow a period down, so they come once one is picked. -->
+    <template v-if="choice.period !== null">
+      <div class="filter">
+        <span class="label">Sports</span>
+        <div class="chips">
+          <button
+            type="button"
+            class="chip"
+            :aria-pressed="choice.sports === null"
+            @click="update({ sports: null })"
+          >
+            All
+          </button>
+          <button
+            v-for="s in sports"
+            :key="s"
+            type="button"
+            class="chip"
+            :aria-pressed="sportPicked(choice, s)"
+            @click="toggleSport(s)"
+          >
+            {{ sportText(s) }}
+          </button>
+        </div>
       </div>
-    </div>
 
-    <div class="filter">
-      <span id="distance-label" class="label">Distance</span>
-      <DistanceFilter :choice="choice" :scale="distanceScale" @update="update" />
-    </div>
+      <div class="filter">
+        <span id="distance-label" class="label">Distance</span>
+        <DistanceFilter :choice="choice" :scale="distanceScale" @update="update" />
+      </div>
 
-    <div class="filter">
-      <span class="label">Places</span>
-      <div class="places">
-        <template v-for="end in ['start', 'end'] as const" :key="end">
-          <label class="check">
-            <input
-              type="checkbox"
-              :checked="choice[key(end)].on"
-              @change="toggleNear(end, ($event.target as HTMLInputElement).checked)"
+      <div class="filter">
+        <span class="label">Places</span>
+        <div class="places">
+          <template v-for="end in ['start', 'end'] as const" :key="end">
+            <label class="check">
+              <input
+                type="checkbox"
+                :checked="choice[key(end)].on"
+                @change="toggleNear(end, ($event.target as HTMLInputElement).checked)"
+              />
+              {{ end === 'start' ? 'Starts near a place' : 'Ends near a place' }}
+            </label>
+            <NearPlacePanel
+              v-if="choice[key(end)].on"
+              :model-value="choice[key(end)]"
+              :engine="engine"
+              :end="end"
+              :suggest-from="suggestFrom"
+              :source-loaded="!strava || library.length > 0"
+              @update:model-value="update({ [key(end)]: $event })"
             />
-            {{ end === 'start' ? 'Starts near a place' : 'Ends near a place' }}
-          </label>
-          <NearPlacePanel
-            v-if="choice[key(end)].on"
-            :model-value="choice[key(end)]"
-            :engine="engine"
-            :end="end"
-            :suggest-from="suggestFrom"
-            :source-loaded="!strava || library.length > 0"
-            @update:model-value="update({ [key(end)]: $event })"
-          />
-        </template>
+          </template>
+        </div>
       </div>
-    </div>
+    </template>
   </div>
 </template>
 

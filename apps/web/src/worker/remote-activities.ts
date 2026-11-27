@@ -1,6 +1,6 @@
 // The activities of a connected service (Strava, Ride with GPS) while it is the source: the
 // list in memory, the filters over it, and the tracks, fetched only when needed. The newest
-// few are fetched ahead, ticked ones move to the front, and leaving the Activities step
+// few are fetched ahead, ticked ones move to the front, and taking them to the editor
 // fetches the rest of the chosen ones, a few at a time. Each service says how to fetch one
 // track (`TrackLoader`) and fills the list itself.
 

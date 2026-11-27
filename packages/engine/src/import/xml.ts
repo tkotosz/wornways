@@ -102,12 +102,13 @@ export function parseGpx(data: Uint8Array): ParsedActivity | null {
       continue;
     const ele = inner(m[2], 'ele');
     rows.push(lo, la, ele === null ? NaN : Number(ele), ms);
-    // Garmin's TrackPointExtension (hr, cad, atemp), and the power some apps add.
+    // Garmin's TrackPointExtension (hr, cad, atemp, speed), and the power some apps add.
     readings.push({
       heartRate: anyNamespace(m[2], 'hr'),
       cadence: anyNamespace(m[2], 'cad'),
       power: anyNamespace(m[2], 'power'),
       temperature: anyNamespace(m[2], 'atemp'),
+      speed: anyNamespace(m[2], 'speed'),
     });
   }
   const parsed = build(sport, rows, readings);
@@ -135,7 +136,8 @@ export function parseTcx(data: Uint8Array): ParsedActivity | null {
     if (!Number.isFinite(ms) || !validPosition(la, lo)) continue;
     const ele = inner(m[1], 'AltitudeMeters');
     rows.push(lo, la, ele === null ? NaN : Number(ele), ms);
-    // Cadence for rides, RunCadence (in the TPX extension) on foot; power as Watts.
+    // Cadence for rides, RunCadence (in the TPX extension) on foot; power as Watts; Speed in
+    // the TPX extension.
     const cadence = anyNamespace(m[1], 'Cadence');
     readings.push({
       heartRate: anyNamespace(
@@ -145,6 +147,7 @@ export function parseTcx(data: Uint8Array): ParsedActivity | null {
       cadence: Number.isNaN(cadence) ? anyNamespace(m[1], 'RunCadence') : cadence,
       power: anyNamespace(m[1], 'Watts'),
       temperature: NaN,
+      speed: anyNamespace(m[1], 'Speed'),
     });
   }
   const parsed = build(sport, rows, readings);

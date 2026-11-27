@@ -138,7 +138,8 @@ const ROUTE_BOUNDS = [44, 164, 424, 162] as const;
 
 /**
  * The small mark and name of the watermark: the route without its tile, then the name,
- * starting at `left` and sitting on `baseline`, a little faint.
+ * starting at `left` and sitting on `baseline`, a little faint. Returns how wide it is and
+ * how far it reaches above the baseline.
  */
 export function drawWatermark(
   ctx: Context2DLike,
@@ -146,7 +147,7 @@ export function drawWatermark(
   baseline: number,
   unit: number,
   fontFamily: string,
-): void {
+): { width: number; height: number } {
   const fontSize = 28 * unit;
   const routeHeight = 19 * unit;
   const gap = 9 * unit;
@@ -170,4 +171,6 @@ export function drawWatermark(
   drawDot(ctx, at(MARK.route[0]), MARK.dotRadius * scale, MARK.light);
   drawDot(ctx, at(MARK.route[MARK.route.length - 1]), MARK.dotRadius * scale, MARK.deep);
   ctx.globalAlpha = 1;
+  // From the left edge to the name's end, and up from the baseline to the letters' tops.
+  return { width: bw * scale + gap + nameWidth, height: fontSize * 0.75 };
 }

@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { defaultActivityName } from '../../src/import/default-name.ts';
 
-// The tests run with TZ=UTC, so local time is UTC here.
-const at = (time: string) => Date.parse(`2026-05-02T${time}:00Z`);
+/** A moment on 2 May 2026 at `time` ("HH:MM") in local time, as the names go by. */
+const at = (time: string) => {
+  const [hours, minutes] = time.split(':').map(Number) as [number, number];
+  return new Date(2026, 4, 2, hours, minutes).getTime();
+};
 
 describe('defaultActivityName', () => {
   it('names the part of the day the activity started in', () => {

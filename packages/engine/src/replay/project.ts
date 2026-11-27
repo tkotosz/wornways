@@ -16,10 +16,16 @@ export type Projected = {
   descent: Float64Array;
   /** The highest elevation reached up to each point; zero when the track has no elevation. */
   top: Float64Array;
+  /** The lowest elevation reached up to each point; zero when the track has no elevation. */
+  bottom: Float64Array;
+  /** The elevation at each point, the last one known where a point has none; zero before any. */
+  elevation: Float64Array;
   /** Cumulative seconds moving at each point (see `MOVING_SPEED`). */
   moving: Float64Array;
   /** The top speed reached up to each point, in meters per second (see `TOP_SPEED_WINDOW_S`). */
   fastest: Float64Array;
+  /** The speed at each point, in meters per second: over the window that ends there. */
+  speed: Float64Array;
   /** Running sums of each sensor channel the track recorded (see `SensorSums`). */
   sensors: Partial<Record<SensorChannel, SensorSums>>;
   /** Whether the track recorded elevation. */
@@ -29,11 +35,18 @@ export type Projected = {
 
 /**
  * A sensor channel up to each point: the values weighed by the seconds they lasted, added up
- * (`total`), those seconds (`time`), so `total / time` is the average over time, and the
- * highest value (`max`). A stretch counts when either end has a value; cadence leaves out
+ * (`total`), those seconds (`time`), so `total / time` is the average over time, the highest
+ * and the lowest value (`max`, `min`), and the value at the point (`now`, the last one known
+ * where the point has none). A stretch counts when either end has a value; cadence leaves out
  * stretches at zero, such as coasting.
  */
-export type SensorSums = { total: Float64Array; time: Float64Array; max: Float64Array };
+export type SensorSums = {
+  total: Float64Array;
+  time: Float64Array;
+  max: Float64Array;
+  min: Float64Array;
+  now: Float64Array;
+};
 
 /** A rise or fall smaller than this, in metres, is taken for noise in the elevation. */
 const CLIMB_STEP_M = 3;
@@ -60,24 +73,41 @@ export function projectTrack(
   const climb: number[] = [];
   const descent: number[] = [];
   const top: number[] = [];
+  const bottom: number[] = [];
+  const elevation: number[] = [];
   const moving: number[] = [];
   const fastest: number[] = [];
-  const channels = SENSOR_CHANNELS.filter((channel) => track.sensors?.[channel]);
+  const speed: number[] = [];
+  // The speed recorded is for the speed chart: the speed values go by the points.
+  const channels = SENSOR_CHANNELS.filter(
+    (channel) => channel !== 'speed' && track.sensors?.[channel],
+  );
   const sums = channels.map(() => ({
     total: [] as number[],
     time: [] as number[],
     max: [] as number[],
+    min: [] as number[],
+    now: [] as number[],
   }));
-  const running = channels.map(() => ({ total: 0, time: 0, max: -Infinity }));
+  const running = channels.map(() => ({
+    total: 0,
+    time: 0,
+    max: -Infinity,
+    min: Infinity,
+    now: NaN,
+  }));
   /** Every point's seconds and cumulative meters, for the top speed's window. */
   const seconds = new Float64Array(n);
   const reached = new Float64Array(n);
   let windowStart = 0;
   let topSpeed = 0;
+  let speedNow = 0;
   let metres = 0;
   let climbed = 0;
   let descended = 0;
   let highest = -Infinity;
+  let lowest = Infinity;
+  let elevationNow = NaN;
   let movingSeconds = 0;
   /** Elevation the next rise or fall is measured from; NaN until a point has elevation. */
   let level = NaN;
@@ -97,7 +127,11 @@ export function projectTrack(
       const values = track.sensors![channel]!;
       const now = values[i];
       const sum = running[c];
-      if (!Number.isNaN(now)) sum.max = Math.max(sum.max, now);
+      if (!Number.isNaN(now)) {
+        sum.max = Math.max(sum.max, now);
+        sum.min = Math.min(sum.min, now);
+        sum.now = now;
+      }
       if (i === 0) return;
       const before = values[i - 1];
       const value = Number.isNaN(before) ? now : Number.isNaN(now) ? before : (before + now) / 2;
@@ -110,11 +144,13 @@ export function projectTrack(
     while (windowStart + 1 < i && seconds[i] - seconds[windowStart + 1] >= TOP_SPEED_WINDOW_S)
       windowStart++;
     const span = seconds[i] - seconds[windowStart];
-    if (span >= TOP_SPEED_WINDOW_S)
-      topSpeed = Math.max(topSpeed, (metres - reached[windowStart]) / span);
+    if (span > 0) speedNow = (metres - reached[windowStart]) / span;
+    if (span >= TOP_SPEED_WINDOW_S) topSpeed = Math.max(topSpeed, speedNow);
     const ele = p[o + 2];
     if (Number.isFinite(ele)) {
       highest = Math.max(highest, ele);
+      lowest = Math.min(lowest, ele);
+      elevationNow = ele;
       if (Number.isNaN(level)) level = ele;
       else if (ele - level >= CLIMB_STEP_M) {
         climbed += ele - level;
@@ -134,12 +170,17 @@ export function projectTrack(
     climb.push(climbed);
     descent.push(descended);
     top.push(Number.isFinite(highest) ? highest : 0);
+    bottom.push(Number.isFinite(lowest) ? lowest : 0);
+    elevation.push(Number.isNaN(elevationNow) ? 0 : elevationNow);
     moving.push(movingSeconds);
     fastest.push(topSpeed);
+    speed.push(speedNow);
     running.forEach((sum, c) => {
       sums[c].total.push(sum.total);
       sums[c].time.push(sum.time);
       sums[c].max.push(Number.isFinite(sum.max) ? sum.max : 0);
+      sums[c].min.push(Number.isFinite(sum.min) ? sum.min : 0);
+      sums[c].now.push(Number.isNaN(sum.now) ? 0 : sum.now);
     });
   }
   return {
@@ -149,8 +190,11 @@ export function projectTrack(
     climb: new Float64Array(climb),
     descent: new Float64Array(descent),
     top: new Float64Array(top),
+    bottom: new Float64Array(bottom),
+    elevation: new Float64Array(elevation),
     moving: new Float64Array(moving),
     fastest: new Float64Array(fastest),
+    speed: new Float64Array(speed),
     sensors: Object.fromEntries(
       channels.map((channel, c) => [
         channel,
@@ -158,6 +202,8 @@ export function projectTrack(
           total: new Float64Array(sums[c].total),
           time: new Float64Array(sums[c].time),
           max: new Float64Array(sums[c].max),
+          min: new Float64Array(sums[c].min),
+          now: new Float64Array(sums[c].now),
         },
       ]),
     ),

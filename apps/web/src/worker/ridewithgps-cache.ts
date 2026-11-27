@@ -3,7 +3,8 @@
 // trip's version (when it last changed); a track of another version is not used. Clearing
 // happens on disconnect. Storing is optional: when the browser refuses, tracks are fetched.
 // Each track also carries what the list says of its trip (name, date, sport, distance), so
-// the Source step can show what is kept without asking Ride with GPS.
+// the list of sources and the connection's popup can show what is kept without asking Ride
+// with GPS.
 
 import type { Track } from '@wornways/engine';
 import type { ActivitySummary } from '../messages.ts';

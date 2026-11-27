@@ -57,6 +57,10 @@ export type PrepareOptions = {
    * `renderer.skipTo` and `renderer.renderFrame` of `renderer.replayFrames - 1`.
    */
   lastFrameOnly?: boolean;
+  /** Leave the widgets off the picture (see `RenderOptions.hideWidgets`). */
+  hideWidgets?: boolean;
+  /** Leave the totals card's widgets off it (see `RenderOptions.hideTotalsWidgets`). */
+  hideTotalsWidgets?: boolean;
 };
 
 /** Nouns for the counter and the verb for activities under way, by the one sport shown. */
@@ -164,19 +168,18 @@ export async function prepareReplay(
     countLabel: words.count,
     movingLabel: words.moving,
     overlay: single ? 'single' : undefined,
-    metrics: settings.metrics ? (settings.metricsFields ?? undefined) : [],
-    metricsPosition: settings.metricsPosition,
-    // Text already scales with the frame size; these are the settings on top.
-    titlePosition: settings.titlePosition,
-    titleScale: settings.titleSize / 100,
-    metricsScale: settings.metricsSize / 100,
+    byDay: !single && settings.group === 'day',
+    widgets: settings.widgets ?? undefined,
+    hideWidgets: options.hideWidgets,
     endPause: settings.endPause,
     endCard: settings.endCard,
     totalsCard: settings.totalsCard,
-    totalsFields: settings.totalsFields ?? undefined,
+    totalsWidgets: settings.totalsWidgets ?? undefined,
+    hideTotalsWidgets: options.hideTotalsWidgets,
     watermark: settings.watermark,
-    // Left to the video: on for a single activity, off for several.
-    elevationProfile: settings.elevationProfile ?? tracks.length === 1,
+    units: settings.units,
+    layout: settings.layout,
+    totalsLayout: settings.totalsLayout,
     onlyFrame,
   });
   return { renderer, plan, title, width, height, fps, camera, cameraMode, map };

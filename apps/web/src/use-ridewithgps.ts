@@ -124,7 +124,7 @@ export function useRideWithGps(engine: EngineClient, onEnd: () => void) {
 
   /**
    * Makes Ride with GPS the source and lists the account's trips. It is the source at once,
-   * so the Activities step can show the list loading; false when the list could not be read,
+   * so the activities popup can show the list loading; false when the list could not be read,
    * and it is not the source then.
    */
   async function open(): Promise<boolean> {

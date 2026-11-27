@@ -2,18 +2,22 @@
 export const STRIDE = 4;
 
 /** A value some devices record at every point, besides position, elevation and time. */
-export type SensorChannel = 'heartRate' | 'power' | 'cadence' | 'temperature';
+export type SensorChannel = 'heartRate' | 'power' | 'cadence' | 'temperature' | 'speed';
+/** Speed comes last, so the channels' order stays the one stored records were written in. */
 export const SENSOR_CHANNELS: readonly SensorChannel[] = [
   'heartRate',
   'power',
   'cadence',
   'temperature',
+  'speed',
 ];
 /**
  * The channels an activity recorded, each with one value per point (NaN where a point has
  * none): heart rate in beats per minute, power in watts, cadence in rotations per minute
- * (one leg's strides on foot, as FIT, TCX and Strava give it) and temperature in degrees
- * Celsius.
+ * (one leg's strides on foot, as FIT, TCX and Strava give it), temperature in degrees
+ * Celsius, and speed in meters per second as the device measured it (a wheel sensor, or its
+ * own reading of GPS); only the speed chart takes the speed, the speed values take the
+ * distance between points.
  */
 export type Sensors = Partial<Record<SensorChannel, Float32Array>>;
 

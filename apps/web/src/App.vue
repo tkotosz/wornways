@@ -1,35 +1,50 @@
 <script setup lang="ts">
-// The app's frame: the header, the step bar and the current step. It holds what the steps
-// share: the library, the choice of activities, and which activities that choice matches.
+// The app: one screen, the editor, under a top bar. Everything set up around the video happens
+// in popups over it: picking the source, connecting it, what it keeps on this device, choosing
+// the activities, the preset, and making the video. On the way in, each leads to the next
+// (flow.ts); after that, the top bar opens any of them. The app holds what they share: the
+// library, the choice of activities and which activities that choice matches.
 import { SETTINGS, type SettingsInput } from '@wornways/engine';
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { missingSupport } from './browser-support.ts';
 import {
+  PRESET_LABELS,
   adjustSettings,
   countOf,
   loadAdjustments,
+  presetOf,
   saveAdjustments,
+  withoutWidgets,
+  type ActivityCount,
   type Adjustments,
+  type Section,
 } from './adjust.ts';
 import {
-  NO_CHOICE,
+  ALL_ACTIVITIES,
   choiceSettings,
   distanceRange,
   placeMissing,
   placeSettings,
   type Choice,
 } from './choice.ts';
+import AppMenu from './components/AppMenu.vue';
+import AppPopup from './components/AppPopup.vue';
 import DownloadDialog from './components/DownloadDialog.vue';
-import ModalPanel from './components/ModalPanel.vue';
+import LoadingStatus from './components/LoadingStatus.vue';
+import TopBar from './components/TopBar.vue';
+import VideoEditor from './VideoEditor.vue';
 import type { EngineClient } from './engine-client.ts';
+import { afterSource, asksPreset, type Popup } from './flow.ts';
 import { install, installOffer, showsAppleInstallHelp } from './install.ts';
 import type { MadeVideo } from './made-video.ts';
 import type { ActivitySummary, MatchReport, PlanReport, Source } from './messages.ts';
-import ActivitiesStep from './steps/ActivitiesStep.vue';
-import AppearanceStep from './steps/AppearanceStep.vue';
-import ExportStep from './steps/ExportStep.vue';
-import ImportStep from './steps/ImportStep.vue';
-import PlaybackStep from './steps/PlaybackStep.vue';
+import ActivitiesPopup from './popups/ActivitiesPopup.vue';
+import ConnectPopup from './popups/ConnectPopup.vue';
+import PresetPopup from './popups/PresetPopup.vue';
+import RenderPopup from './popups/RenderPopup.vue';
+import SourcesPopup from './popups/SourcesPopup.vue';
+import StorePopup from './popups/StorePopup.vue';
+import { useBackGesture } from './use-back-gesture.ts';
 import { useDemo } from './use-demo.ts';
 import { useMatches } from './use-matches.ts';
 import { useRideWithGps } from './use-ridewithgps.ts';
@@ -37,31 +52,81 @@ import { useStrava } from './use-strava.ts';
 
 const props = defineProps<{ engine: EngineClient }>();
 
-type Step = 'import' | 'activities' | 'playback' | 'appearance' | 'export';
-const steps: { id: Step; label: string }[] = [
-  { id: 'import', label: 'Source' },
-  { id: 'activities', label: 'Activities' },
-  { id: 'playback', label: 'Playback' },
-  { id: 'appearance', label: 'Appearance' },
-  { id: 'export', label: 'Export' },
-];
-const stepIndex = computed(() => steps.findIndex((s) => s.id === step.value));
-
 const unsupported = missingSupport();
 const version = WORNWAYS_VERSION;
-const step = ref<Step>('import');
 const loaded = ref(false);
 const libraryError = ref('');
 const library = ref<ActivitySummary[]>([]);
 const fileAdjustments = ref<Adjustments>(loadAdjustments());
 const stravaAdjustments = ref<Adjustments>({});
-const fileChoice = ref<Choice>({ ...NO_CHOICE });
+/** The key the files' choice is remembered under, for the next visit. */
+const FILE_CHOICE = 'wornways-file-choice';
+
+/** The choice of files made on an earlier visit; null when none is remembered. */
+function rememberedFileChoice(): Choice | null {
+  try {
+    const saved = localStorage.getItem(FILE_CHOICE);
+    return saved ? { ...ALL_ACTIVITIES, ...(JSON.parse(saved) as Partial<Choice>) } : null;
+  } catch {
+    return null;
+  }
+}
+
+const savedFileChoice = rememberedFileChoice();
+const fileChoice = ref<Choice>(savedFileChoice ?? { ...ALL_ACTIVITIES });
+watch(fileChoice, (choice) => {
+  try {
+    localStorage.setItem(FILE_CHOICE, JSON.stringify(choice));
+  } catch {
+    // Remembering is optional when browser storage is blocked or full.
+  }
+});
 const { matches: fileMatches, matching: fileMatching } = useMatches(
   props.engine,
   'files',
   fileChoice,
   library,
 );
+
+/** The popup open over the editor, if any. */
+const popup = ref<Popup | null>(null);
+/** The menu, over the editor or a popup. */
+const menuOpen = ref(false);
+/** A page opened from the menu, over everything. */
+const page = ref<'about' | 'install' | null>(null);
+/** The preset popup asked for a new selection, which closes only with a choice. */
+const presetForced = ref(false);
+/**
+ * The kind of selection the editor is set up for: one activity or several; null until
+ * activities are chosen. Remembered for each source for the next visit (the demo starts
+ * fresh), so the preset is asked again only for a new kind of selection.
+ */
+const editedCount = ref<ActivityCount | null>(null);
+const KIND = (source: Source) => `wornways-kind-${source}`;
+
+function rememberedKind(source: Source): ActivityCount | null {
+  if (source === 'demo') return null;
+  try {
+    const saved = localStorage.getItem(KIND(source));
+    return saved === 'one' || saved === 'several' ? saved : null;
+  } catch {
+    return null;
+  }
+}
+
+function rememberKind(source: Source, kind: ActivityCount): void {
+  if (source === 'demo') return;
+  try {
+    localStorage.setItem(KIND(source), kind);
+  } catch {
+    // Remembering is optional when browser storage is blocked or full.
+  }
+}
+/** Whether the activities were taken to the editor, with their tracks on this device. */
+const selected = ref(false);
+/** The editor's open section, kept while the app is open. */
+const section = ref<Section>('frame');
+
 const demo = useDemo(props.engine);
 const {
   active: strava,
@@ -87,31 +152,47 @@ const {
 } = useStrava(
   props.engine,
   stravaAdjustments,
+  // The connection ended: Strava, while it is the source, needs connecting again.
   () => {
-    step.value = 'import';
     video.value = null;
     stravaAdjustments.value = {};
+    if (chosen.value === 'strava') {
+      selected.value = false;
+      popup.value = 'connect';
+    }
   },
+  // An activity changed on Strava: the activities are chosen again.
   () => {
-    if (step.value !== 'import') step.value = 'activities';
     video.value = null;
+    if (chosen.value === 'strava' && selected.value) {
+      selected.value = false;
+      popup.value = 'activities';
+    }
   },
 );
 
 const rwgps = useRideWithGps(props.engine, () => {
-  step.value = 'import';
   video.value = null;
+  if (chosen.value === 'rwgps') {
+    selected.value = false;
+    popup.value = 'connect';
+  }
 });
 
+// A short message over everything, popups too (the top layer, as a popover).
 const toast = ref('');
-/** iPhone and iPad install only from Safari's Share menu; the Install button explains how. */
-const appleInstallHelp = showsAppleInstallHelp();
+const toastBox = ref<HTMLElement | null>(null);
 let toastTimer: ReturnType<typeof setTimeout> | undefined;
 
 function showToast(text: string): void {
   toast.value = text;
+  toastBox.value?.hidePopover?.();
+  toastBox.value?.showPopover?.();
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => (toast.value = ''), 5000);
+  toastTimer = setTimeout(() => {
+    toast.value = '';
+    toastBox.value?.hidePopover?.();
+  }, 5000);
 }
 
 async function disconnectStrava(): Promise<void> {
@@ -125,6 +206,9 @@ async function disconnectRideWithGps(): Promise<void> {
 }
 
 onBeforeUnmount(() => clearTimeout(toastTimer));
+
+/** iPhone and iPad install only from Safari's Share menu; Install app explains how. */
+const appleInstallHelp = showsAppleInstallHelp();
 
 /** The key the chosen source is remembered under, for the next visit. */
 const CHOSEN = 'wornways-source';
@@ -151,33 +235,20 @@ watch(chosen, (id) => {
   }
 });
 
-/** Whether the chosen source has activities to go on with. */
-const usable = computed(() => {
-  switch (chosen.value) {
-    case 'files':
-      return library.value.length > 0;
-    case 'strava':
-      return strava.value;
-    case 'rwgps':
-      return rwgps.active.value;
-    case 'demo':
-      return demo.active.value;
-    default:
-      return false;
-  }
-});
+/** Whether this browser is connected to Strava, also while another source is chosen. */
+const stravaConnected = computed(() => !!stravaUntil.value && stravaUntil.value > Date.now());
 
 /** Where the activities come from: Strava, Ride with GPS or the demo while open, else this device. */
 const source = computed<Source>(() =>
   strava.value ? 'strava' : rwgps.active.value ? 'rwgps' : demo.active.value ? 'demo' : 'files',
 );
-/** The tracks being downloaded before going on from the Activities step, if any. */
+/** The tracks being downloaded before the activities go to the editor, if any. */
 const download = computed(() =>
   source.value === 'strava'
     ? { service: 'Strava', progress: stravaDownload.value }
     : { service: 'Ride with GPS', progress: rwgps.download.value },
 );
-/** Whether a connected service is the source: its tracks are fetched before going on. */
+/** Whether a connected service is the source: its tracks are fetched before editing. */
 const remote = computed(() => source.value === 'strava' || source.value === 'rwgps');
 /** What each source keeps of its own: its activities, choice, matches and adjustments. */
 const current = computed(() => {
@@ -249,7 +320,16 @@ const chosenIds = computed(() => {
   return matched.value.ids.filter((id) => !excluded.has(id));
 });
 
-// What was set in the Video and Text steps, kept for the next visit.
+/** Whether there is a video to edit: activities taken to the editor, and some still chosen. */
+const editing = computed(() => selected.value && chosenIds.value.length > 0);
+/** The editor shows, except while the activities it shows are being chosen again. */
+const showsEditor = computed(() => editing.value && popup.value !== 'activities');
+/** A popup closes once there is something to go back to, the preset only with a choice. */
+const popupClosable = computed(
+  () => editing.value && !(popup.value === 'preset' && presetForced.value),
+);
+
+// What was set in the editor, kept for the next visit.
 const adjustments = computed({
   get: () => current.value.adjustments.value,
   set: (after: Adjustments) => (current.value.adjustments.value = after),
@@ -277,7 +357,7 @@ const planningSettings = computed(() => {
   );
 });
 watch(
-  [() => stepIndex.value >= 2, () => JSON.stringify(planningSettings.value), source],
+  [showsEditor, () => JSON.stringify(planningSettings.value), source],
   async ([show, key], _, onCleanup) => {
     plan.value = null;
     planError.value = '';
@@ -293,8 +373,8 @@ watch(
   },
 );
 
-// The last video made, in memory only. It stays while what it shows stays the same, so going
-// back and forward shows it again; any change to the settings or the library discards it.
+// The last video made, in memory only. It stays while what it shows stays the same, so Render
+// shows it again; any change to the settings or the library discards it.
 const video = ref<MadeVideo | null>(null);
 watch(video, (_, before) => {
   if (before) URL.revokeObjectURL(before.url);
@@ -304,38 +384,162 @@ watch(settings, () => {
 });
 watch([library, source], () => (video.value = null));
 
-/** Whether a step can be opened: later steps need the chosen source ready, and a choice. */
-function reachable(id: Step): boolean {
-  if (id === 'import') return true;
-  if (!usable.value) return false;
-  return (
-    id === 'activities' ||
-    (chosenIds.value.length > 0 &&
-      !awaitingPlace.value &&
-      !stravaBusy.value &&
-      !rwgps.busy.value &&
-      !matching.value)
-  );
+/** The top bar: the preset in use. */
+const presetName = computed(() =>
+  editing.value
+    ? PRESET_LABELS[presetOf(adjustments.value, countOf(chosenIds.value.length))]
+    : null,
+);
+/** Whether the service in use is connected; one that is not opens connecting again. */
+const serviceConnected = computed(
+  () =>
+    (chosen.value === 'strava' && stravaConnected.value) ||
+    (chosen.value === 'rwgps' && rwgps.connected.value),
+);
+/** From the activities popup: managing the files, or a connection still open. */
+const manage = computed(() => {
+  if (chosen.value === 'files') return 'Manage files';
+  return serviceConnected.value ? 'Manage connection' : null;
+});
+
+// The choice as it was when the activities popup opened: closing it without taking the
+// activities to the editor puts it back, also from what the source keeps, opened from it.
+let choiceBefore: Choice | null = null;
+/** What the source keeps was opened from the activities popup, and goes back to it. */
+const storeFromActivities = ref(false);
+watch(popup, (now, before) => {
+  if (now === 'activities' && before !== 'store')
+    choiceBefore = editing.value ? choice.value : null;
+  else if (now !== 'activities' && now !== 'store') choiceBefore = null;
+  if (now !== 'store') storeFromActivities.value = false;
+});
+
+/**
+ * The source's page, from the top bar's Source (or Manage in the activities popup): what it
+ * keeps on this device, and Switch source. A service's connection that ended opens connecting
+ * again; before any source, the list of sources.
+ */
+function openStore(fromActivities: boolean): void {
+  if (chosen.value === null) {
+    popup.value = 'source';
+    return;
+  }
+  if ((chosen.value === 'strava' || chosen.value === 'rwgps') && !serviceConnected.value) {
+    popup.value = 'connect';
+    return;
+  }
+  popup.value = 'store';
+  storeFromActivities.value = fromActivities;
 }
 
-async function navigate(id: Step): Promise<void> {
-  if (!reachable(id)) return;
-  if (remote.value && step.value === 'activities' && id !== 'activities' && id !== 'import') {
+/** Closes the popup, when it can close: the editor is as it was. */
+function closePopup(): void {
+  if (!popupClosable.value) return;
+  if (choiceBefore) choice.value = choiceBefore;
+  popup.value = null;
+}
+
+// The back gesture closes the menu's page, the menu, then the popup.
+const layers = computed(
+  () => (popup.value ? 1 : 0) + (menuOpen.value ? 1 : 0) + (page.value ? 1 : 0),
+);
+useBackGesture(layers, () => {
+  if (page.value) page.value = null;
+  else if (menuOpen.value) menuOpen.value = false;
+  else closePopup();
+});
+
+/** Lets go of every source but the one given: they are never mixed. */
+async function release(keep: Source | null): Promise<void> {
+  // Strava's connection stays for its two hours, as Ride with GPS's does for its 30 days.
+  if (keep !== 'strava') await closeStrava();
+  if (keep !== 'rwgps') await rwgps.close();
+  if (keep !== 'demo') await demo.close();
+}
+
+/**
+ * Opens the chosen source, and the popup it needs next: connecting it, adding files, or
+ * choosing the activities. Strava and Ride with GPS open from what is stored in this browser;
+ * a connection that ended asks to connect again.
+ */
+async function enterSource(): Promise<void> {
+  const id = chosen.value;
+  if (!id) {
+    popup.value = 'source';
+    return;
+  }
+  editedCount.value = rememberedKind(id);
+  if (id === 'demo' && !demo.active.value && !(await demo.open())) {
+    popup.value = 'source';
+    return;
+  }
+  if (id === 'strava' && !strava.value) await connectStrava(fileAdjustments.value);
+  if (id === 'rwgps' && !rwgps.active.value && rwgps.connected.value) {
+    // Its trips load in the activities popup; a connection no longer accepted asks again.
+    popup.value = 'activities';
+    if (!(await rwgps.open())) popup.value = 'connect';
+    return;
+  }
+  popup.value = afterSource(id, {
+    connected: id === 'strava' ? strava.value : rwgps.active.value,
+    files: library.value.length,
+  });
+}
+
+/** A source picked: the same one goes straight to its activities, another one starts over. */
+async function choose(id: Source): Promise<void> {
+  if (id === chosen.value && editing.value) {
+    popup.value = 'activities';
+    return;
+  }
+  chosen.value = id;
+  selected.value = false;
+  await release(id);
+  await enterSource();
+}
+
+/**
+ * The activities ticked go to the editor, once their tracks are on this device. The preset
+ * is asked when the editor was not set up for this kind of selection yet.
+ */
+async function useActivities(): Promise<void> {
+  if (remote.value) {
     const ids = chosenIds.value.join(',');
     const prepare = strava.value ? prepareStrava : rwgps.prepare;
     if (!(await prepare(chosenIds.value))) return;
-    if (step.value !== 'activities' || ids !== chosenIds.value.join(',')) return;
+    if (popup.value !== 'activities' || ids !== chosenIds.value.join(',')) return;
   }
-  if (remote.value && step.value === 'import' && id !== 'activities' && id !== 'import') {
-    // Returning from the source picker can use a selection edited in Activities.
-    step.value = 'activities';
-    await navigate(id);
-    return;
-  }
-  step.value = id;
+  const kind = countOf(chosenIds.value.length);
+  const ask = asksPreset(editedCount.value, kind);
+  // A change of kind without asking (to one activity, which has a single preset): its preset
+  // is taken as picked, and the widgets start again from the ones that suit it. The first
+  // selection of a visit keeps the widgets arranged before.
+  if (!ask && editedCount.value !== null && editedCount.value !== kind)
+    adjustments.value = withoutWidgets(adjustments.value);
+  editedCount.value = kind;
+  rememberKind(source.value, kind);
+  selected.value = true;
+  presetForced.value = ask;
+  popup.value = ask ? 'preset' : null;
 }
 
-// The top bar's height, for whatever else sticks to the top of the window below it.
+function presetChosen(): void {
+  presetForced.value = false;
+  popup.value = null;
+}
+
+function openPreset(): void {
+  presetForced.value = false;
+  popup.value = 'preset';
+}
+
+function openPage(name: 'about' | 'install'): void {
+  menuOpen.value = false;
+  if (name === 'install' && installOffer.value) void install();
+  else page.value = name;
+}
+
+// The top bar's height, for the editor's preview on wide screens, which stays under it.
 const topBar = ref<HTMLElement | null>(null);
 const topBarSize = new ResizeObserver(([entry]) => {
   const height = entry?.target.getBoundingClientRect().height ?? 0;
@@ -347,68 +551,17 @@ watch(topBar, (bar) => {
 });
 onBeforeUnmount(() => topBarSize.disconnect());
 
-/** Lets go of every source but the one given: they are never mixed. */
-async function release(keep: Source | null): Promise<void> {
-  // Strava's connection stays for its two hours, as Ride with GPS's does for its 30 days.
-  if (keep !== 'strava') await closeStrava();
-  if (keep !== 'rwgps') await rwgps.close();
-  if (keep !== 'demo') await demo.close();
-}
-
 /**
- * Makes a source the chosen one and shows its screen, from what is stored on this device:
- * nothing is asked of Strava or Ride with GPS until Continue. The demo loads its activities,
- * which ship with the app, to show them.
+ * On a visit with files and the choice made last time, its activities go straight to the
+ * editor once they are matched, without asking anything again.
  */
-async function choose(id: Source): Promise<void> {
-  chosen.value = id;
-  await release(id);
-  if (id === 'demo' && !demo.active.value) await demo.open();
-}
-
-/** Whether Continue can go on: the chosen source is ready, or a service is connected. */
-const startable = computed(() => {
-  if (usable.value) return true;
-  switch (chosen.value) {
-    case 'demo':
-      return !demo.busy.value;
-    case 'strava':
-      return !!stravaUntil.value && stravaUntil.value > Date.now();
-    case 'rwgps':
-      return rwgps.connected.value;
-    default:
-      return false;
-  }
+let resuming = savedFileChoice !== null;
+watch([popup, matching], () => {
+  if (!resuming || popup.value !== 'activities' || matching.value) return;
+  resuming = false;
+  if (source.value === 'files' && chosenIds.value.length && !awaitingPlace.value)
+    void useActivities();
 });
-
-/** Opens Ride with GPS on the Activities step, where its trips load; back here on failure. */
-async function openRideWithGps(): Promise<void> {
-  const opening = rwgps.open();
-  step.value = 'activities';
-  if (!(await opening)) step.value = 'import';
-}
-
-/**
- * "Change source": no source is chosen any more, so the Source step lists them all and the
- * later steps wait for a new choice. Connections stay as they are.
- */
-async function changeSource(): Promise<void> {
-  chosen.value = null;
-  step.value = 'import';
-  await release(null);
-}
-
-/** Continue on the Source step: opens the chosen source; its list loads on the next step. */
-async function continueFromSource(): Promise<void> {
-  if (chosen.value === 'demo' && !demo.active.value && !(await demo.open())) return;
-  if (chosen.value === 'strava' && !strava.value && !(await connectStrava(fileAdjustments.value)))
-    return;
-  if (chosen.value === 'rwgps' && !rwgps.active.value) return openRideWithGps();
-  await navigate('activities');
-}
-
-// Each step starts at the top of the page.
-watch(step, () => window.scrollTo({ top: 0 }));
 
 async function loadLibrary(): Promise<void> {
   libraryError.value = '';
@@ -419,13 +572,13 @@ async function loadLibrary(): Promise<void> {
     // Coming back from connecting a service chooses it.
     if (rwgpsJustConnected) chosen.value = 'rwgps';
     else if (stravaReturning) chosen.value = 'strava';
-    // Only the chosen source opens, and its list loads on the Activities step; the other
-    // connections stay as they are.
-    if (chosen.value === 'strava') await connectStrava(fileAdjustments.value);
-    else if (stravaKept) await props.engine.keepStrava(stravaKept).catch(() => {});
-    if (chosen.value === 'demo') await demo.open();
-    if (chosen.value === 'rwgps' && rwgps.connected.value) await openRideWithGps();
-    else if (usable.value) step.value = 'activities';
+    // Only the chosen source opens; the other connections stay as they are.
+    if (chosen.value !== 'strava' && stravaKept)
+      await props.engine.keepStrava(stravaKept).catch(() => {});
+    if (chosen.value !== 'files') resuming = false;
+    await enterSource();
+    // Only straight from the start: files to add first, say, are a visit of their own.
+    if (popup.value !== 'activities') resuming = false;
   } catch (error) {
     libraryError.value = error instanceof Error ? error.message : String(error);
   }
@@ -438,185 +591,178 @@ onMounted(() => {
 </script>
 
 <template>
-  <!-- The header and the step bar stay at the top of the window while a step scrolls. -->
-  <div ref="topBar" class="top-bar">
-    <header class="header">
-      <span class="brand">
-        <img class="mark" src="/icons/route.svg" alt="" />
-        <span class="name">
-          <span class="wordmark"><b>worn</b>ways</span>
-          <span class="version" data-testid="version" :title="version">{{ version }}</span>
-        </span>
-      </span>
-      <span class="aside">
-        <span class="muted promise">Your files stay on this device</span>
-        <ModalPanel title="About Wornways">
-          <template #trigger="{ open }">
-            <button type="button" class="link about-trigger" aria-haspopup="dialog" @click="open">
-              About
-            </button>
-          </template>
-          <p class="about-copy">
-            Wornways turns GPS activities into short videos that show your routes on a map. It makes
-            videos in your browser. Activities you import from files stay on this device.
-          </p>
-          <p class="about-copy">Wornways is open source under the MIT License.</p>
-          <nav class="about-links" aria-label="Project links">
-            <a class="link" href="/privacy.html" target="_blank" rel="noopener">Privacy Policy</a>
-            <a
-              class="link"
-              href="https://github.com/tkotosz/wornways"
-              target="_blank"
-              rel="noopener"
-            >
-              Source on GitHub
-            </a>
-            <a class="link" href="/licenses.txt" target="_blank" rel="noopener">Licenses</a>
-          </nav>
-        </ModalPanel>
-        <button v-if="installOffer" type="button" class="secondary install" @click="install">
-          Install app
-        </button>
-        <ModalPanel v-else-if="appleInstallHelp" title="Install Wornways">
-          <template #trigger="{ open }">
-            <button type="button" class="secondary install" aria-haspopup="dialog" @click="open">
-              Install app
-            </button>
-          </template>
-          <ol class="install-steps">
-            <li>Tap <b>Share</b> (the square with an arrow) in the browser's toolbar.</li>
-            <li>
-              Choose <b>Add to Home Screen</b>. You may need to scroll down, or tap <b>More</b>, to
-              see it.
-            </li>
-            <li>Tap <b>Add</b>. Wornways then opens from your Home Screen like an app.</li>
-          </ol>
-        </ModalPanel>
-      </span>
-    </header>
-    <nav v-if="!unsupported && loaded" class="steps-row" aria-label="Steps">
-      <!-- Wide screens: a pill per step, a tick on the steps behind. -->
-      <ol class="steps">
-        <li v-for="(s, i) in steps" :key="s.id">
-          <button
-            type="button"
-            :class="{ current: s.id === step, done: i < stepIndex }"
-            :aria-current="s.id === step ? 'step' : undefined"
-            :aria-label="s.label"
-            :disabled="!reachable(s.id)"
-            @click="navigate(s.id)"
-          >
-            <span class="symbol" aria-hidden="true">{{ i < stepIndex ? '✓' : i + 1 }}</span>
-            {{ s.label }}
-          </button>
-        </li>
-      </ol>
-      <!-- Phones: which step of how many, over a bar with a segment per step. -->
-      <div class="stepper">
-        <div class="stepper-row">
-          <strong>Step {{ stepIndex + 1 }} of {{ steps.length }}</strong>
-          <span class="muted">{{ steps[stepIndex]?.label }}</span>
-        </div>
-        <div class="segments">
-          <button
-            v-for="(s, i) in steps"
-            :key="s.id"
-            type="button"
-            :class="{ current: s.id === step, done: i < stepIndex }"
-            :aria-label="`Go to ${s.label}`"
-            :disabled="!reachable(s.id)"
-            @click="navigate(s.id)"
-          />
-        </div>
+  <div class="app" :class="{ editing: showsEditor }">
+    <div ref="topBar" class="bar">
+      <TopBar
+        :source="chosen"
+        :activities="editing ? chosenIds.length : null"
+        :preset="presetName"
+        :can-render="editing"
+        @menu="menuOpen = true"
+        @activities="popup = 'activities'"
+        @source="openStore(false)"
+        @preset="openPreset"
+        @render="popup = 'render'"
+      />
+    </div>
+
+    <main class="main">
+      <p v-if="unsupported" class="error" role="alert">{{ unsupported }}</p>
+      <div v-else-if="libraryError">
+        <p class="error" role="alert">{{ libraryError }}</p>
+        <button type="button" class="secondary" @click="loadLibrary">Try again</button>
       </div>
-    </nav>
+      <VideoEditor
+        v-else-if="showsEditor"
+        v-model="adjustments"
+        v-model:section="section"
+        :engine="engine"
+        :settings="settings"
+        :activities="chosenIds.length"
+        :plan="plan"
+      />
+      <LoadingStatus
+        v-else-if="!loaded || (!popup && stravaBusy)"
+        :text="stravaBusy || 'Loading…'"
+      />
+      <p v-else class="muted empty">Choose activities to make a video of them.</p>
+    </main>
   </div>
 
-  <main class="main">
-    <p v-if="unsupported" class="error" role="alert">{{ unsupported }}</p>
-    <div v-else-if="libraryError">
-      <p class="error" role="alert">{{ libraryError }}</p>
-      <button type="button" class="secondary" @click="loadLibrary">Try again</button>
-    </div>
-    <template v-else-if="loaded">
-      <ImportStep
-        v-if="step === 'import'"
-        :engine="engine"
-        :library="library"
-        :chosen="chosen"
-        :ready="startable"
-        :strava-url="stravaUrl"
-        :strava-active="strava"
-        :strava-until="stravaUntil"
-        :strava-error="stravaError"
-        :strava-busy="stravaBusy"
-        :strava-unanswered="stravaUnanswered"
-        :rwgps="{
-          available: rwgps.available.value,
-          connected: rwgps.connected.value,
-          active: rwgps.active.value,
-          busy: rwgps.busy.value,
-          error: rwgps.error.value,
-        }"
-        :demo-busy="demo.busy.value"
-        :demo-error="demo.error.value"
-        :demo-rows="demo.rows.value"
-        @changed="library = $event"
-        @choose="choose"
-        @change-source="changeSource()"
-        @disconnect="disconnectStrava"
-        @disconnect-ride-with-gps="disconnectRideWithGps()"
-        @next="continueFromSource()"
-      />
-      <ActivitiesStep
-        v-else-if="step === 'activities'"
-        v-model="choice"
-        :engine="engine"
-        :library="sourceRows"
-        :matched="matched"
-        :distance-scale="distanceScale"
-        :strava="strava"
-        :source="source"
-        :busy="source === 'rwgps' ? rwgps.busy.value : stravaBusy"
-        :matching="matching"
-        :notice="source === 'rwgps' ? rwgps.notice.value : stravaNotice"
-        :can-retry="strava && (!stravaReady || sourceRows.length === 0)"
-        @back="navigate('import')"
-        @next="navigate('playback')"
-        @change-source="changeSource()"
-        @retry="retryStrava()"
-      />
-      <PlaybackStep
-        v-else-if="step === 'playback'"
-        v-model="adjustments"
-        :engine="engine"
-        :settings="settings"
-        :activities="chosenIds.length"
-        :plan="plan"
-        @back="step = 'activities'"
-        @next="step = 'appearance'"
-      />
-      <AppearanceStep
-        v-else-if="step === 'appearance'"
-        v-model="adjustments"
-        :engine="engine"
-        :settings="settings"
-        :activities="chosenIds.length"
-        :plan="plan"
-        @back="step = 'playback'"
-        @next="step = 'export'"
-      />
-      <ExportStep
-        v-else
-        v-model:video="video"
-        :engine="engine"
-        :settings="settings"
-        :plan="plan"
-        :plan-error="planError"
-        @back="step = 'appearance'"
-      />
-    </template>
-  </main>
+  <template v-if="loaded">
+    <SourcesPopup
+      v-if="popup === 'source'"
+      :engine="engine"
+      :closable="popupClosable"
+      :chosen="chosen"
+      :files="library.length"
+      :strava="{ offered: !!stravaUrl, until: stravaUntil }"
+      :rwgps="{ available: rwgps.available.value, connected: rwgps.connected.value }"
+      :busy="demo.busy.value"
+      :error="demo.error.value || rwgps.error.value"
+      @close="closePopup"
+      @menu="menuOpen = true"
+      @choose="choose"
+    />
+    <ConnectPopup
+      v-else-if="popup === 'connect' && (chosen === 'strava' || chosen === 'rwgps')"
+      :source="chosen"
+      :closable="popupClosable"
+      :strava-url="stravaUrl"
+      :strava-unanswered="stravaUnanswered"
+      :busy="chosen === 'strava' ? stravaBusy : rwgps.busy.value"
+      :error="chosen === 'strava' ? stravaError : rwgps.error.value"
+      @close="closePopup"
+      @menu="menuOpen = true"
+      @switch="popup = 'source'"
+      @files="choose('files')"
+    />
+    <StorePopup
+      v-else-if="
+        popup === 'store' &&
+        (chosen === 'files' || chosen === 'demo' || chosen === 'strava' || chosen === 'rwgps')
+      "
+      :engine="engine"
+      :source="chosen"
+      :closable="popupClosable"
+      :flow="!editing || storeFromActivities"
+      :library="chosen === 'demo' ? demo.rows.value : library"
+      :strava-until="stravaUntil"
+      :busy="chosen === 'strava' ? stravaBusy : chosen === 'rwgps' ? rwgps.busy.value : ''"
+      @close="closePopup"
+      @menu="menuOpen = true"
+      @next="popup = 'activities'"
+      @changed="library = $event"
+      @switch="popup = 'source'"
+      @disconnect="chosen === 'strava' ? disconnectStrava() : disconnectRideWithGps()"
+    />
+    <ActivitiesPopup
+      v-else-if="popup === 'activities'"
+      v-model="choice"
+      :engine="engine"
+      :closable="popupClosable"
+      :library="sourceRows"
+      :matched="matched"
+      :distance-scale="distanceScale"
+      :strava="strava"
+      :source="source"
+      :busy="source === 'rwgps' ? rwgps.busy.value : stravaBusy"
+      :matching="matching"
+      :notice="source === 'rwgps' ? rwgps.notice.value : stravaNotice"
+      :can-retry="strava && (!stravaReady || sourceRows.length === 0)"
+      :manage="manage"
+      @close="closePopup"
+      @menu="menuOpen = true"
+      @switch="popup = 'source'"
+      @store="openStore(true)"
+      @next="useActivities"
+      @retry="retryStrava()"
+    />
+    <PresetPopup
+      v-else-if="popup === 'preset' && editing"
+      v-model="adjustments"
+      :activities="chosenIds.length"
+      :closable="popupClosable"
+      @chosen="presetChosen"
+      @close="closePopup"
+      @menu="menuOpen = true"
+    />
+    <RenderPopup
+      v-else-if="popup === 'render' && editing"
+      v-model:video="video"
+      :engine="engine"
+      :settings="settings"
+      :plan="plan"
+      :plan-error="planError"
+      @close="closePopup"
+    />
+  </template>
+
+  <AppMenu
+    v-if="menuOpen"
+    :version="version"
+    :install="!!installOffer || appleInstallHelp"
+    @close="menuOpen = false"
+    @about="openPage('about')"
+    @install="openPage('install')"
+  />
+
+  <AppPopup
+    v-if="page === 'about'"
+    title="About Wornways"
+    :closable="true"
+    narrow
+    @close="page = null"
+  >
+    <p class="about-copy">
+      Wornways turns GPS activities into short videos that show your routes on a map. It makes
+      videos in your browser. Activities you import from files stay on this device.
+    </p>
+    <p class="about-copy">Wornways is open source under the MIT License.</p>
+    <nav class="about-links" aria-label="Project links">
+      <a class="link" href="/privacy.html" target="_blank" rel="noopener">Privacy Policy</a>
+      <a class="link" href="https://github.com/tkotosz/wornways" target="_blank" rel="noopener">
+        Source on GitHub
+      </a>
+      <a class="link" href="/licenses.txt" target="_blank" rel="noopener">Licenses</a>
+    </nav>
+  </AppPopup>
+  <AppPopup
+    v-else-if="page === 'install'"
+    title="Install Wornways"
+    :closable="true"
+    narrow
+    @close="page = null"
+  >
+    <ol class="install-steps">
+      <li>Tap <b>Share</b> (the square with an arrow) in the browser's toolbar.</li>
+      <li>
+        Choose <b>Add to Home Screen</b>. You may need to scroll down, or tap <b>More</b>, to see
+        it.
+      </li>
+      <li>Tap <b>Add</b>. Wornways then opens from your Home Screen like an app.</li>
+    </ol>
+  </AppPopup>
 
   <DownloadDialog
     v-if="download.progress"
@@ -624,90 +770,62 @@ onMounted(() => {
     :progress="download.progress"
   />
 
-  <div class="toast-region" aria-live="polite" aria-atomic="true">
+  <div ref="toastBox" class="toast-region" popover="manual" aria-live="polite" aria-atomic="true">
     <p v-if="toast" class="toast">{{ toast }}</p>
   </div>
 </template>
 
 <style scoped>
-.top-bar {
+.app {
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+}
+
+/* The top bar stays at the top of the window while the editor's page scrolls. */
+.bar {
   position: sticky;
   top: 0;
   z-index: 10;
-  background: var(--background);
-  border-bottom: 1px solid var(--line);
 }
 
-.header {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: space-between;
-  align-items: center;
-  gap: 0.6rem 1rem;
-  padding: 1rem 1.5rem;
-  border-bottom: 1px solid var(--line);
-  font-size: 0.85rem;
+.main {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 820px;
+  margin: 0 auto;
+  padding: 1.5rem;
 }
 
-.brand {
-  display: flex;
-  min-width: 0;
-  align-items: center;
-  gap: 0.55rem;
+.empty {
+  margin: 3rem 0;
+  text-align: center;
 }
 
-/* As tall as the name and the version together, so the three read as one block. */
-.mark {
-  height: 2.25rem;
-}
-
-/* The version in small type under the name, so the header grows only a little. Line
-   heights of whole pixels keep the header a whole number of pixels tall: a fraction makes
-   the Back and Next bar shift by a pixel while the page scrolls. */
-.name {
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-}
-
-.name .wordmark {
-  line-height: 1.5rem;
-}
-
-.version {
+/* The editor is a screen that does not scroll; the top bar and it share the window. */
+.app.editing {
+  height: 100dvh;
   overflow: hidden;
-  color: var(--muted);
-  font-size: 0.7rem;
-  font-weight: 500;
-  line-height: 0.75rem;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
-.aside {
+.app.editing .main {
   display: flex;
-  flex-shrink: 0;
-  align-items: center;
-  gap: 1rem;
-}
-
-.about-trigger {
-  min-height: 1.5rem;
+  flex: 1;
+  flex-direction: column;
+  max-width: none;
+  min-height: 0;
+  padding: 0;
 }
 
 .about-copy {
   margin: 0 0 0.85rem;
+  line-height: 1.55;
 }
 
 .about-links {
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem 1.15rem;
-}
-
-.install {
-  padding: 0.35rem 0.8rem;
-  font-size: 0.85rem;
 }
 
 .install-steps {
@@ -718,169 +836,29 @@ onMounted(() => {
   line-height: 1.5;
 }
 
-/* Phones: one row. The first step says that files stay on the device, and a long version
-   ends in … rather than moving About to a row of its own. */
-@media (max-width: 560px) {
-  .header {
-    flex-wrap: nowrap;
-  }
-
-  .promise {
-    display: none;
-  }
-}
-
-/* The name in the mark's orange gradient, over the whole word. */
-.wordmark {
-  font-size: 1.35rem;
-  font-weight: 300;
-  background: linear-gradient(90deg, #ffab1f, #ff5a1f);
-  background-clip: text;
-  color: transparent;
-}
-
-.wordmark b {
-  font-weight: 700;
-}
-
-.main {
-  max-width: 820px;
-  margin: 0 auto;
-  /* No padding at the bottom: the Back and Next bar ends the page, so the place it sticks
-     to while scrolling is the place it ends up at, and it does not move at the end. */
-  padding: 1.5rem 1.5rem 0;
-}
-
+/* The toast: a popover in the top layer, over popups too, at the top right. */
 .toast-region {
-  position: fixed;
+  inset: auto;
   top: calc(var(--top-bar-height, 0px) + 1rem);
   right: 1rem;
-  left: 1rem;
-  z-index: 15;
-  display: flex;
-  justify-content: flex-end;
+  left: auto;
+  max-width: min(24rem, calc(100% - 2rem));
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
   pointer-events: none;
 }
 
 .toast {
-  max-width: 24rem;
   margin: 0;
   padding: 0.75rem 1rem;
   border: 1px solid var(--line);
   border-radius: 10px;
+  color: var(--text);
   background: var(--panel);
   box-shadow: 0 6px 20px rgb(0 0 0 / 40%);
   font-size: 0.85rem;
   line-height: 1.4;
-}
-
-.steps-row {
-  max-width: 820px;
-  margin: 0 auto;
-  padding: 1rem 1.5rem;
-}
-
-.steps {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 0.55rem;
-  list-style: none;
-  padding: 0;
-  margin: 0;
-}
-
-.steps button {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  padding: 0.45rem 0.95rem;
-  color: var(--muted);
-  background: transparent;
-  font-size: 0.85rem;
-}
-
-.steps .symbol {
-  min-width: 0.9rem;
-  font-size: 0.75rem;
-  text-align: center;
-}
-
-.steps button:not(:disabled):hover {
-  color: var(--text);
-  border-color: var(--muted);
-}
-
-.steps button.done {
-  color: var(--text);
-}
-
-.steps button.done .symbol {
-  color: var(--accent);
-  font-weight: 900;
-}
-
-.steps button.current {
-  color: var(--text);
-  border-color: var(--accent);
-  background: rgba(255, 138, 42, 0.1);
-  font-weight: 600;
-}
-
-.steps button.current .symbol {
-  color: var(--accent);
-}
-
-.steps button:disabled {
-  opacity: 0.4;
-  cursor: default;
-}
-
-/* Phones: which step of how many, and a segment per step. */
-.stepper {
-  display: none;
-}
-
-@media (max-width: 700px) {
-  .steps {
-    display: none;
-  }
-
-  .stepper {
-    display: block;
-  }
-
-  .stepper-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 0.5rem;
-    margin-bottom: 0.5rem;
-    font-size: 0.8rem;
-  }
-
-  .segments {
-    display: grid;
-    grid-template-columns: repeat(5, 1fr);
-    gap: 0.3rem;
-  }
-
-  .segments button {
-    height: 5px;
-    padding: 0;
-    border: 0;
-    border-radius: 99px;
-    background: var(--line);
-  }
-
-  .segments button.done {
-    background: #a45b2e;
-  }
-
-  .segments button.current {
-    background: var(--accent);
-  }
 }
 </style>

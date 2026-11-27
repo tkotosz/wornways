@@ -3,27 +3,57 @@
 // engine's settings table, so they offer the same settings as the command-line tool.
 
 import {
+  CARD_LAYOUT_NAMES,
+  LAYOUT_NAMES,
   PRESETS,
   PRESET_NAMES,
   SETTINGS,
+  defaultFormat,
+  type ChartColor,
+  type ChartKind,
+  type CardLayoutName,
+  type LabelMode,
+  type OverlayLayoutName,
+  type Metric,
+  type MetricValue,
   type Preset,
   type SettingDefinition,
   type SettingGroup,
   type SettingsInput,
+  type ValueFormat,
+  type Widget,
 } from '@wornways/engine';
-import type { PlanReport } from './messages.ts';
 
-/** What the person changed in the Video and Overlay steps, by setting name; the rest keeps its default. */
+/** What the person changed in the editor, by setting name; the rest keeps its default. */
 export type Adjustments = Record<string, string | boolean>;
 
-/**
- * Whether the title is shown, kept apart from the title's text so that a title written
- * comes back when it is switched on again. Not a setting of its own: off means no title.
- */
-export const SHOW_TITLE = 'show-title';
-
-/** The panels of Fine-tune playback, on the Playback step. */
+/** The panels of Fine-tune playback, in the Playback section. */
 export const PLAYBACK_PANELS: Panel[] = ['timing', 'camera'];
+
+/**
+ * The sections of the editor, in the order things are decided: where the video will be
+ * posted, how the routes play, the map, what is drawn over the replay, and what comes after
+ * it. Frame and Playback have controls of their own; the others are panels.
+ */
+export type Section = 'frame' | 'playback' | 'map' | 'overlay' | 'ending';
+export const SECTIONS: { id: Section; label: string; panels: Panel[] }[] = [
+  { id: 'frame', label: 'Frame', panels: [] },
+  { id: 'playback', label: 'Playback', panels: [] },
+  { id: 'map', label: 'Map', panels: ['map', 'privacy'] },
+  {
+    id: 'overlay',
+    label: 'Overlay',
+    // The widgets are arranged on the still (WidgetEditor) and listed above the units and
+    // the watermark.
+    panels: ['units', 'watermark'],
+  },
+  {
+    id: 'ending',
+    label: 'Ending',
+    // The units again, for the totals card's values.
+    panels: ['pause', 'totals', 'units', 'end-card'],
+  },
+];
 
 /** The preset picked, or Custom: the settings as set under Fine-tune. */
 export type PresetChoice = Preset | 'custom';
@@ -35,8 +65,10 @@ export const countOf = (activities: number): ActivityCount =>
 
 /** Where the preset is kept: a single activity and several remember their own. */
 const presetKey = (count: ActivityCount) => (count === 'one' ? 'preset-one' : 'preset');
+// The end pause is set in the Ending section, outside the playback a preset decides.
 const PLAYBACK_SETTINGS = SETTINGS.filter(
-  ({ group, name }) => (group === 'timing' && name !== 'preset') || name === 'camera',
+  ({ group, name }) =>
+    (group === 'timing' && name !== 'preset' && name !== 'end-pause') || name === 'camera',
 ).map(({ name }) => name);
 const adjustmentKey = (name: string, count: ActivityCount) =>
   count === 'one' && PLAYBACK_SETTINGS.includes(name) ? `one-${name}` : name;
@@ -81,7 +113,7 @@ const presetPlayback = (preset: PresetChoice): Adjustments =>
 
 /**
  * The preset's values of other settings, such as the totals card: where they start, until
- * the person sets them on the Appearance step.
+ * the person sets them in the editor.
  */
 const presetStarting = (preset: PresetChoice): Adjustments =>
   Object.fromEntries(
@@ -89,19 +121,15 @@ const presetStarting = (preset: PresetChoice): Adjustments =>
   );
 
 /**
- * Where a setting of the Appearance step starts until it is set: the current preset's value,
- * or the elevation profile's, which the engine leaves to the video (on for one activity,
- * off for several); undefined: its default.
+ * Where a setting outside playback starts until it is set: the current preset's value;
+ * undefined: its default.
  */
 export function startingValue(
   adjustments: Adjustments,
   count: ActivityCount,
   name: string,
 ): string | boolean | undefined {
-  const fromPreset = presetStarting(presetOf(adjustments, count))[name];
-  if (fromPreset !== undefined) return fromPreset;
-  if (name === 'elevation-profile') return count === 'one';
-  return undefined;
+  return presetStarting(presetOf(adjustments, count))[name];
 }
 
 /** The settings shown under Fine-tune, with the current preset's values applied. */
@@ -117,32 +145,77 @@ export const playbackAdjustments = (
   return { ...values, ...presetPlayback(presetOf(adjustments, count)) };
 };
 
-/** Picks a preset for this selection size. */
+/** The settings that hold the widgets: over the replay, and on the totals card. */
+const WIDGET_SETTINGS = ['widgets', 'totals-widgets', 'layout', 'totals-layout'];
+
+/** The layout the widgets are arranged in: the one picked, else the preset's, else Classic. */
+export function layoutOf(adjustments: Adjustments, count: ActivityCount): OverlayLayoutName {
+  const picked = adjustments['layout'] ?? startingValue(adjustments, count, 'layout');
+  return LAYOUT_NAMES.includes(picked as OverlayLayoutName)
+    ? (picked as OverlayLayoutName)
+    : 'classic';
+}
+
+/** The layout the totals card's values are arranged in: the one picked, else 2 × 2. */
+export function cardLayoutOf(adjustments: Adjustments): CardLayoutName {
+  const picked = adjustments['totals-layout'];
+  return CARD_LAYOUT_NAMES.includes(picked as CardLayoutName)
+    ? (picked as CardLayoutName)
+    : 'grid-2x2';
+}
+
+/** The adjustments without widgets: the video starts from the ones that suit it. */
+export const withoutWidgets = (adjustments: Adjustments): Adjustments =>
+  Object.fromEntries(
+    Object.entries(adjustments).filter(([name]) => !WIDGET_SETTINGS.includes(name)),
+  );
+
+/**
+ * Picks a preset for this selection size, which starts the playback over from it: what was
+ * fine-tuned for this size goes. Another preset sets the widgets too: they start again from
+ * the ones that suit the video it makes; the preset in use, picked again, keeps them. Custom
+ * (the playback kept as set) keeps everything.
+ */
 export function withPreset(
   adjustments: Adjustments,
   preset: PresetChoice,
   count: ActivityCount,
 ): Adjustments {
   const key = presetKey(count);
-  return { ...adjustments, [key]: preset };
+  if (preset === 'custom') return { ...adjustments, [key]: preset };
+  const tuned = new Set(PLAYBACK_SETTINGS.map((name) => adjustmentKey(name, count)));
+  const picked = {
+    ...Object.fromEntries(Object.entries(adjustments).filter(([name]) => !tuned.has(name))),
+    [key]: preset,
+  };
+  return preset === presetOf(adjustments, count) ? picked : withoutWidgets(picked);
 }
 
 /**
- * Back to the default playback for this selection size: its first preset (see
- * `presetChoices`), with nothing fine-tuned.
+ * The adjustments put back as `preset` starts them: its playback, and the widgets, the layout
+ * and its other settings (the totals card) its own again. The person's other choices stay: the
+ * frame, the units, the map, the privacy trim, the watermark, the end pause and the end card.
  */
-export function resetPlayback(adjustments: Adjustments, count: ActivityCount): Adjustments {
-  const names = new Set([
-    presetKey(count),
-    ...PLAYBACK_SETTINGS.map((name) => adjustmentKey(name, count)),
-  ]);
-  return Object.fromEntries(Object.entries(adjustments).filter(([name]) => !names.has(name)));
+export function resetToPreset(
+  adjustments: Adjustments,
+  preset: Preset,
+  count: ActivityCount,
+): Adjustments {
+  // The settings the preset starts, and the totals card's switch, which one preset sets.
+  const own = [...Object.keys(presetStarting(preset)), 'totals-card'];
+  return withoutWidgets(
+    Object.fromEntries(
+      Object.entries(withPreset(adjustments, preset, count)).filter(
+        ([name]) => !own.includes(name),
+      ),
+    ),
+  );
 }
 
 /**
  * The adjustments after editing the effective values under Fine-tune. Changing a setting the preset sets turns
- * the preset into Custom, starting from its values (also those of other steps, such as the
- * totals card, where the person has not set them); any other change keeps the preset.
+ * the preset into Custom, starting from its values (also those of other sections, such as
+ * the totals card, where the person has not set them); any other change keeps the preset.
  */
 export function fineTuned(
   before: Adjustments,
@@ -166,44 +239,14 @@ export function fineTuned(
   return Object.fromEntries(tuned);
 }
 
-/** The panels of the Appearance step, after its Frame panel. */
-export const APPEARANCE_PANELS: Panel[] = [
-  'privacy',
-  'title',
-  'metrics',
-  'elevation',
-  'map',
-  'totals',
-  'brand',
-];
-/** Every group the two steps offer. Which activities are chosen in the step before them. */
-const ADJUST_GROUPS: SettingGroup[] = ['timing', 'privacy', 'look', 'title', 'metrics', 'brand'];
+/** Every group the editor offers. Which activities are chosen in a popup of their own. */
+const ADJUST_GROUPS: SettingGroup[] = ['timing', 'privacy', 'look', 'brand'];
 
 /** Shorter labels for the screen than the settings table's. */
 const LABELS: Record<string, string> = {
   duration: 'Video duration',
   size: 'Size',
   map: 'Street map',
-  title: 'Text',
-  'title-position': 'Position',
-  'title-size': 'Size',
-  metrics: 'Show metrics',
-  'metrics-fields': 'Metrics',
-  'totals-fields': 'Values',
-  'metrics-position': 'Position',
-  'metrics-size': 'Size',
-};
-
-const POSITION_LABELS = {
-  'top-left': 'Top left',
-  'top-center': 'Top middle',
-  'top-right': 'Top right',
-  'middle-left': 'Middle left',
-  'middle-center': 'Center',
-  'middle-right': 'Middle right',
-  'bottom-left': 'Bottom left',
-  'bottom-center': 'Bottom middle',
-  'bottom-right': 'Bottom right',
 };
 
 /** The words shown for a choice's values. */
@@ -220,8 +263,7 @@ const CHOICE_LABELS: Record<string, Record<string, string>> = {
   'group-pace': { fit: 'Fit to the group', real: 'Real pace' },
   pace: { time: 'As recorded', distance: 'Even speed' },
   camera: { zoom: 'Zooms out', fixed: 'Fixed', follow: 'Follows' },
-  'title-position': POSITION_LABELS,
-  'metrics-position': POSITION_LABELS,
+  units: { metric: 'Metric', imperial: 'Imperial' },
 };
 
 /** One line of explanation under a few settings. */
@@ -252,11 +294,10 @@ const HINTS: Record<string, string> = {
     'How long the finished picture stays on screen at the end, before the totals and the ' +
     'end card. Added to the video’s length.',
   'trim-radius': 'Hide the route within this radius of each activity’s start and finish.',
-  'metrics-fields': 'In the order picked; the first is shown large.',
-  'totals-fields': 'In the order picked.',
-  'elevation-profile':
-    'The climb profile along the bottom of the video, with a dot that follows the activity. ' +
-    'For several activities, they are laid end to end; off unless switched on.',
+  units:
+    'Metric: km, m, km/h, min/km and °C. Imperial: mi, ft, mph, min/mi and °F. For the values ' +
+    'over the replay and on the totals card; heart rate, power, cadence and calories stay ' +
+    'as they are.',
   'totals-card':
     'After the replay, a few seconds of totals: activities, kilometers, hours moving and ' +
     'meters climbed. On for Recap.',
@@ -268,8 +309,6 @@ const STEPS: Record<string, number> = {
   overlap: 10,
   'end-pause': 0.5,
   'trim-radius': 50,
-  'title-size': 10,
-  'metrics-size': 10,
 };
 
 export const settingLabel = (setting: SettingDefinition) => LABELS[setting.name] ?? setting.label;
@@ -283,42 +322,31 @@ export const settingHint = (setting: string, count: ActivityCount) =>
 
 export const sliderStep = (setting: string) => STEPS[setting] ?? 1;
 
-/** A panel of settings on the Video and Text steps. */
+/** A panel of settings in the editor's sections. */
 export type Panel =
-  'timing' | 'camera' | 'privacy' | 'map' | 'title' | 'metrics' | 'elevation' | 'totals' | 'brand';
+  'timing' | 'camera' | 'privacy' | 'map' | 'units' | 'watermark' | 'pause' | 'totals' | 'end-card';
 
 /** The settings of each panel on the screens, in order: mostly the settings table's groups. */
 const PANELS: Record<Panel, string[]> = {
   // The video's length has a control of its own above Fine-tune playback.
-  timing: ['group', 'share', 'group-pace', 'overlap', 'pace', 'end-pause'],
+  timing: ['group', 'share', 'group-pace', 'overlap', 'pace'],
   camera: ['camera'],
   privacy: ['trim-radius'],
   map: ['map'],
-  title: ['title', 'title-position', 'title-size'],
-  metrics: ['metrics', 'metrics-fields', 'metrics-position', 'metrics-size'],
-  elevation: ['elevation-profile'],
-  totals: ['totals-card', 'totals-fields'],
-  brand: ['end-card', 'watermark'],
+  units: ['units'],
+  watermark: ['watermark'],
+  pause: ['end-pause'],
+  totals: ['totals-card'],
+  'end-card': ['end-card'],
 };
 
-/**
- * Whether a panel has something to set for this video: the elevation profile only when an
- * activity recorded elevation, the totals card only for several activities. Until the plan
- * is known, the totals card shows; the elevation profile waits for it.
- */
-export function panelOffered(panel: Panel, plan: PlanReport | null | undefined): boolean {
-  if (panel === 'elevation') return !!plan && plan.hasElevation;
-  if (panel === 'totals') return !plan || plan.activities > 1;
-  return true;
-}
-
-/** The frame rates offered on the Appearance step, from the settings table. */
+/** The frame rates offered in the Frame section, from the settings table. */
 export const FRAME_RATES: readonly string[] = (() => {
   const kind = SETTINGS.find((s) => s.name === 'fps')!.kind;
   return kind.type === 'choice' ? kind.choices : ['30'];
 })();
 
-/** The frame sizes offered on the Appearance step, by name. */
+/** The frame sizes offered in the Frame section, by name. */
 export const SIZE_LABELS: Record<string, string> = {
   story: 'Story 9:16',
   square: 'Square 1:1',
@@ -349,7 +377,7 @@ export function valueOf(
 }
 
 /**
- * The settings the adjustments stand for: only the ones the steps offer, so something
+ * The settings the adjustments stand for: only the ones the editor offers, so something
  * remembered from an earlier version of the app (such as a mode) does not get in the way.
  */
 export function adjustSettings(adjustments: Adjustments, count: ActivityCount): SettingsInput {
@@ -363,8 +391,6 @@ export function adjustSettings(adjustments: Adjustments, count: ActivityCount): 
     if (ADJUST_GROUPS.includes(setting.group)) settings[setting.name] = value;
   }
   if (preset !== 'custom') settings['preset'] = preset;
-  // The title switched off is an empty title; the text written stays for switching it on.
-  if (adjustments[SHOW_TITLE] === false) settings['title'] = '';
   return settings;
 }
 
@@ -372,32 +398,24 @@ const STORAGE_KEY = 'wornways-adjustments';
 
 /** The adjustments made on an earlier visit; none when there are none or storage is off. */
 export function loadAdjustments(): Adjustments {
+  let stored: unknown = {};
   try {
-    const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '{}') as unknown;
-    return stored && typeof stored === 'object' ? fromEarlierVersions(stored as Adjustments) : {};
+    stored = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '{}');
   } catch {
-    return {};
+    // Unreadable, or no storage: a fresh start.
   }
+  return fromEarlierVersions(stored && typeof stored === 'object' ? (stored as Adjustments) : {});
 }
-/** Marks adjustments saved by the app with its five steps. */
-const SAVED_WITH = 'saved-with';
-const FIVE_STEPS = 'five-steps';
-const SEPARATE_PLAYBACK = 'separate-playback';
-
 /**
- * Older drafts share playback settings across selection sizes. Copy those values into
- * both sets to preserve how each one plays.
+ * Marks the adjustments saved by this version of the app. Adjustments saved by an earlier one
+ * are not carried over: the app starts afresh instead, as its settings have changed.
  */
+const SAVED_WITH = 'saved-with';
+const THIS_VERSION = 'label-positions';
+
+/** The adjustments as stored, when this version saved them; else a fresh start. */
 export function fromEarlierVersions(adjustments: Adjustments): Adjustments {
-  if (adjustments[SAVED_WITH] === SEPARATE_PLAYBACK) return adjustments;
-  const migrated: Adjustments = { ...adjustments, [SAVED_WITH]: SEPARATE_PLAYBACK };
-  if (adjustments[SAVED_WITH] !== FIVE_STEPS) {
-    delete migrated['preset-one'];
-    delete migrated.preset;
-  }
-  for (const name of PLAYBACK_SETTINGS)
-    if (adjustments[name] !== undefined) migrated[adjustmentKey(name, 'one')] = adjustments[name];
-  return migrated;
+  return adjustments[SAVED_WITH] === THIS_VERSION ? adjustments : { [SAVED_WITH]: THIS_VERSION };
 }
 export function saveAdjustments(adjustments: Adjustments): void {
   try {
@@ -406,3 +424,161 @@ export function saveAdjustments(adjustments: Adjustments): void {
     // Without storage the adjustments last until the page is closed.
   }
 }
+
+/** A value's name: its metric's, or a few words where the name alone would be unclear. */
+/**
+ * A value's name when the video does not give one (its value is not known yet): the video's
+ * own names say more, as "Total distance" for several activities or "Race time" in a race.
+ */
+const METRIC_NAMES: Partial<Record<Metric, string>> = {
+  moving: 'Moving time',
+  'avg-time': 'Avg time per activity',
+  'max-time': 'Max time per activity',
+  'min-time': 'Min time per activity',
+  start: 'Start time',
+  'time-of-day': 'Time of day',
+  'avg-distance': 'Avg distance per activity',
+  'max-distance': 'Max distance per activity',
+  'min-distance': 'Min distance per activity',
+  'avg-speed': 'Avg speed',
+  'max-speed': 'Max speed',
+  'speed-now': 'Current speed',
+  'avg-climb': 'Avg climb per activity',
+  'max-climb': 'Max climb per activity',
+  'min-climb': 'Min climb per activity',
+  'max-elevation': 'Max elevation',
+  'min-elevation': 'Min elevation',
+  'elevation-now': 'Current elevation',
+  'avg-heart-rate': 'Avg heart rate',
+  'max-heart-rate': 'Max heart rate',
+  'min-heart-rate': 'Min heart rate',
+  'heart-rate-now': 'Current heart rate',
+  'avg-power': 'Avg power',
+  'max-power': 'Max power',
+  'power-now': 'Current power',
+  'avg-cadence': 'Avg cadence',
+  'max-cadence': 'Max cadence',
+  'cadence-now': 'Current cadence',
+  'avg-temperature': 'Avg temperature',
+  'min-temperature': 'Min temperature',
+  'max-temperature': 'Max temperature',
+  'temperature-now': 'Current temperature',
+  'avg-calories': 'Avg calories per activity',
+  'max-calories': 'Max calories per activity',
+  'min-calories': 'Min calories per activity',
+  count: 'Activities',
+  days: 'Days',
+  'moving-days': 'Moving days',
+};
+/** A value's name: the one the video gives it, else its usual one. */
+export const metricName = (metric: Metric, values?: Map<Metric, MetricValue>) =>
+  values?.get(metric)?.name ??
+  METRIC_NAMES[metric] ??
+  metric.charAt(0).toUpperCase() + metric.slice(1);
+
+/**
+ * The values by what they measure, as the Stats sheet groups them: each group's values side
+ * by side (the average, the highest, the value as one activity plays…).
+ */
+export const METRIC_GROUPS: { name: string; metrics: Metric[] }[] = [
+  {
+    name: 'Time',
+    metrics: ['time', 'moving', 'avg-time', 'max-time', 'min-time', 'start', 'time-of-day'],
+  },
+  { name: 'Distance', metrics: ['distance', 'avg-distance', 'max-distance', 'min-distance'] },
+  { name: 'Speed', metrics: ['avg-speed', 'max-speed', 'speed-now'] },
+  {
+    name: 'Elevation',
+    metrics: [
+      'climb',
+      'descent',
+      'avg-climb',
+      'max-climb',
+      'min-climb',
+      'max-elevation',
+      'min-elevation',
+      'elevation-now',
+    ],
+  },
+  {
+    name: 'Heart rate',
+    metrics: ['avg-heart-rate', 'max-heart-rate', 'min-heart-rate', 'heart-rate-now'],
+  },
+  { name: 'Power', metrics: ['avg-power', 'max-power', 'power-now'] },
+  { name: 'Cadence', metrics: ['avg-cadence', 'max-cadence', 'cadence-now'] },
+  {
+    name: 'Temperature',
+    metrics: ['avg-temperature', 'min-temperature', 'max-temperature', 'temperature-now'],
+  },
+  { name: 'Calories', metrics: ['calories', 'avg-calories', 'max-calories', 'min-calories'] },
+  { name: 'Activities', metrics: ['count', 'days', 'moving-days', 'date'] },
+];
+
+/** How a value's label modes are named: in the strip's chip and its sheet. */
+export const LABEL_MODE_NAMES: Record<LabelMode, string> = {
+  off: 'Off',
+  before: 'Before',
+  after: 'After',
+  above: 'Above',
+  under: 'Under',
+};
+
+/** A part of a widget's settings that a chip of the strip opens on its own. */
+export type WidgetPart = 'size' | 'label' | 'words' | 'unit' | 'format' | 'color';
+/** Each part's name, as its chip and its sheet say it. */
+export const WIDGET_PART_NAMES: Record<WidgetPart, string> = {
+  size: 'Size',
+  label: 'Label position',
+  words: 'Label text',
+  unit: 'Unit',
+  format: 'Format',
+  color: 'Color',
+};
+
+/** The names of the colors a chart can take. */
+export const COLOR_NAMES: Record<ChartColor, string> = {
+  orange: 'Orange',
+  red: 'Red',
+  yellow: 'Yellow',
+  green: 'Green',
+  blue: 'Blue',
+  purple: 'Purple',
+  pink: 'Pink',
+  white: 'White',
+};
+
+/** The names of the ways a time, a date or a clock time can be written. */
+export const FORMAT_NAMES: Record<ValueFormat, string> = {
+  hms: 'h:mm:ss',
+  hm: 'h:mm',
+  h: 'Hours',
+  d: 'Days',
+  dmy: 'Day month year',
+  dm: 'Day month',
+  wdm: 'With weekday',
+  mdy: 'Month day, year',
+  iso: 'Numeric',
+  '24h': '24-hour',
+  '12h': '12-hour',
+};
+
+/** The format a value widget is written in: its own, else the value's usual one. */
+export const formatOf = (widget: Widget, card: boolean): ValueFormat | null =>
+  widget.kind === 'metric' ? (widget.format ?? defaultFormat(widget.metric, card)) : null;
+
+/** Each chart's name. */
+export const CHART_NAMES: Record<ChartKind, string> = {
+  elevation: 'Elevation chart',
+  'heart-rate': 'Heart rate chart',
+  power: 'Power chart',
+  speed: 'Speed chart',
+  cadence: 'Cadence chart',
+};
+
+/** A widget's name in the list: "Text", a value's name, or its chart's ("Elevation chart"). */
+export const widgetLabel = (widget: Widget, values?: Map<Metric, MetricValue>) =>
+  widget.kind === 'text'
+    ? 'Text'
+    : widget.kind === 'metric'
+      ? metricName(widget.metric, values)
+      : CHART_NAMES[widget.chart];

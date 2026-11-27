@@ -7,6 +7,8 @@ import type {
   ImportReport,
   MatchReport,
   PlanReport,
+  Poster,
+  PosterScene,
   Progress,
   Reply,
   Request,
@@ -35,7 +37,7 @@ export type DownloadProgress = { done: number; total: number; cancel: () => void
 
 export class EngineClient {
   private nextId = 1;
-  /** Where the activities of the steps after Activities come from. */
+  /** Where the activities chosen for the editor come from. */
   private source: Source = 'files';
   private readonly pending = new Map<number, Pending>();
 
@@ -258,15 +260,30 @@ export class EngineClient {
     };
   }
 
-  /** Draws the last frame of the video, small, as a preview; `cancel` stops it. */
-  makePoster(settings: SettingsInput): { result: Promise<Blob>; cancel: () => void } {
+  /**
+   * Draws a still of the video, small, as a preview: its last frame, or its ending (see
+   * `PosterScene`), with where the last frame's blocks were drawn; `cancel` stops it.
+   */
+  makePoster(
+    settings: SettingsInput,
+    scene: PosterScene = 'replay',
+    bare = false,
+  ): { result: Promise<Poster>; cancel: () => void } {
     const id = this.nextId++;
-    const result = this.send({ type: 'make-poster', id, settings, source: this.source }).then(
-      (reply) => {
-        if (reply.type === 'poster-made') return reply.image;
-        throw this.errorFor(reply);
-      },
-    );
+    const result = this.send({
+      type: 'make-poster',
+      id,
+      settings,
+      source: this.source,
+      scene,
+      bare,
+    }).then((reply) => {
+      if (reply.type === 'poster-made') {
+        const { type: _, id: __, ...poster } = reply;
+        return poster;
+      }
+      throw this.errorFor(reply);
+    });
     return {
       result,
       cancel: () => this.worker.postMessage({ type: 'cancel', id } satisfies Request),

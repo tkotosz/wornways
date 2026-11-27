@@ -1,4 +1,4 @@
-// What the person chose in the Choose step, and the settings it stands for.
+// What the person chose in the activities popup, and the settings it stands for.
 
 import { parseDistanceKm, parseSettings, type SettingsInput } from '@wornways/engine';
 
@@ -33,7 +33,8 @@ export type NearChoice = {
 };
 
 export type Choice = {
-  period: Period;
+  /** The period; null while none is picked. */
+  period: Period | null;
   /** The custom period's first and last day, YYYY-MM-DD; empty when not set. */
   customFrom: string;
   customTo: string;
@@ -51,7 +52,7 @@ export type Choice = {
 };
 
 export const NO_CHOICE: Choice = {
-  period: 'all',
+  period: null,
   customFrom: '',
   customTo: '',
   sports: null,
@@ -61,6 +62,9 @@ export const NO_CHOICE: Choice = {
   endNear: { on: false, place: '', radius: 1000 },
   excluded: [],
 };
+
+/** Where files and the demo start: every activity of all time, all ticked. */
+export const ALL_ACTIVITIES: Choice = { ...NO_CHOICE, period: 'all' };
 
 const day = (d: Date) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -74,6 +78,7 @@ const month = (year: number, monthIndex: number) => {
 export function periodBounds(choice: Choice, today: Date): { from?: string; to?: string } {
   const year = today.getFullYear();
   switch (choice.period) {
+    case null:
     case 'all':
       return {};
     case 'today':

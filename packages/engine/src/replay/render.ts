@@ -1,11 +1,54 @@
 import { drawBasemap, type Basemap, type MapLabel, type Tile } from '../map/basemap.ts';
 import { levelsFor, mapLevelViews, type CameraPath, type LevelWindow } from './camera.ts';
-import { drawElevationProfile, elevationProfile } from './elevation-profile.ts';
-import { drawEndCard, endCardFrames } from './end-card.ts';
-import { drawTotalsCard, totalsCardFrames, type Totals, type TotalsField } from './totals-card.ts';
+import {
+  CHART_ICON,
+  CHART_ICON_GAP,
+  chartColors,
+  chartIcon,
+  chartProfile,
+  chartProfiles,
+  defaultChartColor,
+  drawChart,
+  type ChartKind,
+  type ChartProfile,
+} from './charts.ts';
+import { WIDGET_SIZE, defaultLabel, valueLines, type Widget } from './widgets.ts';
+import { fillTabular, tabularWidth } from './tabular.ts';
+import { arrangeInLayout, layoutSlots, type LayoutName } from './layouts.ts';
+import { END_CARD_S, drawEndCard, endCardFrames } from './end-card.ts';
+import {
+  AUTOMATIC_TOTALS,
+  AUTOMATIC_TOTALS_ONE,
+  totalsWidgetHeight,
+  TOTALS_CARD_S,
+  drawTotalsCard,
+  totalsCardFrames,
+  totalsEntries,
+  totalsValues,
+  type Totals,
+} from './totals-card.ts';
 import { drawWatermark } from './mark.ts';
 import { averagePace, isOnFoot, topSpeed } from './pace.ts';
-import { dateRange } from './plans.ts';
+import { sensorValueText } from './sensor-text.ts';
+import { numberOf, type Metric, type MetricText, type MetricValue } from './metrics.ts';
+import { calendarDay } from './plans.ts';
+import { drawIcon, drawIconBefore, iconOf, iconRoom } from './icons.ts';
+import {
+  CLOCK_FORMATS,
+  DATE_FORMATS,
+  TIME_FORMATS,
+  clockTimeText,
+  dateSpan,
+  dayText,
+  distanceUnit,
+  durationText,
+  heightUnit,
+  inDistanceUnits,
+  inHeightUnits,
+  type DateFormat,
+  type Units,
+  type ValueFormat,
+} from './formats.ts';
 import { composeHeat, createHeatRamp, decodeHeat, heatStyle, saturationFromHeat } from './heat.ts';
 import { projectTrack, type Projected, type SensorSums } from './project.ts';
 import type { Timeline } from './timeline.ts';
@@ -29,11 +72,16 @@ export interface Context2DLike {
   font: string;
   textAlign: string;
   textBaseline: string;
+  shadowColor: string;
+  shadowBlur: number;
+  shadowOffsetX: number;
+  shadowOffsetY: number;
   setTransform(a: number, b: number, c: number, d: number, e: number, f: number): void;
   beginPath(): void;
   closePath(): void;
   moveTo(x: number, y: number): void;
   lineTo(x: number, y: number): void;
+  bezierCurveTo(c1x: number, c1y: number, c2x: number, c2y: number, x: number, y: number): void;
   arc(x: number, y: number, radius: number, startAngle: number, endAngle: number): void;
   stroke(): void;
   fill(): void;
@@ -69,78 +117,16 @@ export interface CanvasLike {
 
 export type CanvasFactory = (width: number, height: number) => CanvasLike;
 
-/** A value the metrics card can show. */
-/**
- * A value the metrics card can show: the time so far (stops included) or moving, the
- * distance, the average pace, the top speed so far, the meters climbed or descended, the
- * highest point so far, the date, the start time (one activity), how many activities, the
- * days with an activity, or the longest activity so far.
- */
-export type Metric =
-  | 'time'
-  | 'moving'
-  | 'distance'
-  | 'pace'
-  | 'top-speed'
-  | 'elevation'
-  | 'descent'
-  | 'highest'
-  | 'date'
-  | 'start'
-  | 'count'
-  | 'days'
-  | 'longest'
-  | 'heart-rate'
-  | 'max-heart-rate'
-  | 'power'
-  | 'cadence'
-  | 'temperature'
-  | 'calories';
-export const METRICS: readonly Metric[] = [
-  'time',
-  'moving',
-  'distance',
-  'pace',
-  'top-speed',
-  'elevation',
-  'descent',
-  'highest',
-  'date',
-  'start',
-  'count',
-  'days',
-  'longest',
-  'heart-rate',
-  'max-heart-rate',
-  'power',
-  'cadence',
-  'temperature',
-  'calories',
-];
+export { METRICS, SINGLE_ONLY, type Metric, type MetricValue } from './metrics.ts';
 
-/** Where on the frame a block of text sits: an edge, then the side or the middle. */
-export type Position =
-  | 'top-left'
-  | 'top-center'
-  | 'top-right'
-  | 'middle-left'
-  | 'middle-center'
-  | 'middle-right'
-  | 'bottom-left'
-  | 'bottom-center'
-  | 'bottom-right';
-/** Every position, row by row: the top, the middle and the bottom of the frame. */
-export const POSITIONS: readonly Position[] = [
-  'top-left',
-  'top-center',
-  'top-right',
-  'middle-left',
-  'middle-center',
-  'middle-right',
-  'bottom-left',
-  'bottom-center',
-  'bottom-right',
-];
+/** A box of the frame, in fractions of its width and height, 0 to 1. */
+export type FrameBox = { x: number; y: number; width: number; height: number };
+
+/**
+ * Where the last frame drew each widget over the replay, in the order of the widgets (null
+ * for one with nothing to show), and the watermark.
+ */
+export type OverlayBoxes = { widgets: (FrameBox | null)[]; watermark?: FrameBox };
 
 export type RenderOptions = {
   width: number;
@@ -174,21 +160,19 @@ export type RenderOptions = {
   movingLabel?: string;
   /** "single": one activity with its own elapsed time and distance as live stats. */
   overlay?: 'auto' | 'single';
+  /** Several activities grouped by day, as on a trip: they start with the day's values. */
+  byDay?: boolean;
   /**
-   * The values of the metrics card in order, the first one large; empty: no card. A value
-   * the video cannot show is left out: pace exists for a single activity only, count for
-   * several activities only, the date not when all play at once, elevation only when
-   * recorded. Default: what suits the video (see `defaultMetrics`).
+   * What is drawn over the replay (see widgets.ts). Without it, the title at the top, the
+   * values that suit the video at the bottom left (see `defaultMetrics`; a value the video
+   * cannot show is left out), and for a single activity the elevation chart along the bottom.
    */
-  metrics?: Metric[];
-  /** Where the metrics card sits; default bottom-left. */
-  metricsPosition?: Position;
-  /** Where the title sits; default top-center. */
-  titlePosition?: Position;
-  /** Scales the title; default 1. */
-  titleScale?: number;
-  /** Scales the metrics card; default 1. */
-  metricsScale?: number;
+  widgets?: Widget[];
+  /**
+   * Lay the widgets out and report where they go, but leave them off the picture: for an
+   * editor that draws them over the still itself, so they move without a redraw.
+   */
+  hideWidgets?: boolean;
   /**
    * The one frame of the replay that will be drawn, after `skipTo` it: the zoom levels it
    * does not show are not set up, and drawing any other frame is an error.
@@ -206,19 +190,19 @@ export type RenderOptions = {
    * before the end card. Default false.
    */
   totalsCard?: boolean;
-  /** The totals card's values in order; default every one (see totals-card.ts). */
-  totalsFields?: readonly TotalsField[];
+  /** What the totals card shows; default `startingTotalsWidgets` (see totals-card.ts). */
+  totalsWidgets?: Widget[];
+  /** Lay out the totals card's widgets but leave them off it, as `hideWidgets` does. */
+  hideTotalsWidgets?: boolean;
   /** Draw the small Wornways mark on the map credit's line. Default false. */
   watermark?: boolean;
-  /**
-   * The activities' climb profile along the bottom, end to end, with a dot moving along
-   * each one being drawn; left out when none has elevation. Text at the bottom goes above
-   * it. Default false.
-   */
-  elevationProfile?: boolean;
   fontFamily?: string;
-  /** BCP 47 locale for the date counter. */
-  locale?: string;
+  /** Distances, heights, speeds and temperatures in metric or imperial units. Default metric. */
+  units?: Units;
+  /** Where the widgets start when none are set (see layouts.ts). Default classic. */
+  layout?: LayoutName;
+  /** Where the totals card's values start when none are set. Default grid-2x2. */
+  totalsLayout?: LayoutName;
 };
 
 export type Renderer = {
@@ -238,10 +222,55 @@ export type Renderer = {
    * if every frame before it had been drawn. Used to show a single moment, such as the end.
    */
   skipTo(index: number): void;
+  /**
+   * Draws a card as it stands once finished, over the frame drawn last (the replay's last
+   * frame), for a still of the video's ending: the totals card with every value counted up,
+   * or the end card with its mark and name.
+   */
+  drawFinishedCard(card: 'totals' | 'end'): void;
+  /** Where the replay frame drawn last put each widget and the watermark. */
+  overlayBoxes(): OverlayBoxes;
+  /** The widgets drawn: the ones given, or the ones the other options describe. */
+  readonly widgets: Widget[];
+  /**
+   * The totals card's widgets (the ones given, or the ones it starts with) and each value it
+   * can show, for arranging them.
+   */
+  totalsCard(): { widgets: Widget[]; values: Map<Metric, MetricValue> };
+  /** Each value this video can show, as it stands at the end of the replay. */
+  readonly finalValues: Map<Metric, MetricValue>;
+  /**
+   * The shape of each chart the activities can show, for drawing it elsewhere: `samples`
+   * values from 0 (its lowest) to 1 (its highest).
+   */
+  profileShapes(samples: number): Partial<Record<ChartKind, number[]>>;
 };
 
+/** Where an activity stands, for the values: as drawn so far, or at the end. */
+type MetricState = Pick<
+  Prepared,
+  | 'start'
+  | 'day'
+  | 'hasElevation'
+  | 'started'
+  | 'done'
+  | 'metres'
+  | 'climbed'
+  | 'descended'
+  | 'highest'
+  | 'lowest'
+  | 'elevationNow'
+  | 'moved'
+  | 'topSpeed'
+  | 'speedNow'
+  | 'sensorsNow'
+>;
+
 type Prepared = Projected & {
-  date: string;
+  /** When the activity started, in milliseconds since 1970. */
+  start: number;
+  /** The calendar day the activity started on, as a day count, to count the days between. */
+  day: number;
   // Drawing state
   /** Index of the last point the head has passed. */
   idx: number;
@@ -254,34 +283,68 @@ type Prepared = Projected & {
   descended: number;
   /** The highest elevation reached so far. */
   highest: number;
+  /** The lowest elevation reached so far. */
+  lowest: number;
+  /** The elevation where the head is. */
+  elevationNow: number;
   /** Seconds moving so far. */
   moved: number;
   /** The top speed so far, in meters per second. */
   topSpeed: number;
+  /** The speed where the head is, in meters per second. */
+  speedNow: number;
   /** Each recorded sensor channel's running sums so far (see `SensorSums`). */
-  sensorsNow: Partial<Record<SensorChannel, { total: number; time: number; max: number }>>;
+  sensorsNow: Partial<Record<SensorChannel, SensorNow>>;
   started: boolean;
   done: boolean;
   /** Video time at which the track finished drawing. */
   doneAt: number;
 };
 
+/** A sensor channel so far: its sums, highest and lowest, and the value where the head is. */
+type SensorNow = { total: number; time: number; max: number; min: number; now: number };
+
+/** A sensor channel's sums at point `i`. */
+const sensorAt = (sums: SensorSums, i: number): SensorNow => ({
+  total: sums.total[i]!,
+  time: sums.time[i]!,
+  max: sums.max[i]!,
+  min: sums.min[i]!,
+  now: sums.now[i]!,
+});
+
 /** A track's recorded sensor channels with their running sums. */
 const sensorEntries = (projected: Projected) =>
   Object.entries(projected.sensors) as [SensorChannel, SensorSums][];
 
-/**
- * A sensor channel's text: heart rate, power, cadence (doubled into steps on foot) or
- * temperature, from its average over time or its highest value.
- */
-function sensorText(metric: Metric, value: number, onFoot: boolean): string {
-  const whole = Math.round(value);
-  if (metric === 'heart-rate') return `${whole} bpm avg`;
-  if (metric === 'max-heart-rate') return `${whole} bpm max`;
-  if (metric === 'power') return `${whole} W avg`;
-  if (metric === 'cadence') return onFoot ? `${Math.round(value * 2)} spm avg` : `${whole} rpm avg`;
-  return `${whole} °C avg`;
-}
+/** What each sensor value is: its channel, and which of its values. */
+const SENSOR_METRICS: [Metric, SensorChannel, 'avg' | 'max' | 'min' | 'now'][] = [
+  ['avg-heart-rate', 'heartRate', 'avg'],
+  ['max-heart-rate', 'heartRate', 'max'],
+  ['min-heart-rate', 'heartRate', 'min'],
+  ['heart-rate-now', 'heartRate', 'now'],
+  ['avg-power', 'power', 'avg'],
+  ['max-power', 'power', 'max'],
+  ['power-now', 'power', 'now'],
+  ['avg-cadence', 'cadence', 'avg'],
+  ['max-cadence', 'cadence', 'max'],
+  ['cadence-now', 'cadence', 'now'],
+  ['avg-temperature', 'temperature', 'avg'],
+  ['min-temperature', 'temperature', 'min'],
+  ['max-temperature', 'temperature', 'max'],
+  ['temperature-now', 'temperature', 'now'],
+];
+const SENSOR_WORDS: Record<SensorChannel, string> = {
+  heartRate: 'heart rate',
+  power: 'power',
+  cadence: 'cadence',
+  temperature: 'temperature',
+  speed: 'speed',
+};
+
+/** A sensor value's name: "Avg heart rate", "Max power", "Current cadence". */
+const sensorName = (channel: SensorChannel, which: 'avg' | 'max' | 'min' | 'now') =>
+  `${{ avg: 'Avg', max: 'Max', min: 'Min', now: 'Current' }[which]} ${SENSOR_WORDS[channel]}`;
 
 type Rect = { x0: number; y0: number; x1: number; y1: number };
 type RoutePiece = Rect & { xy: number[] };
@@ -307,15 +370,7 @@ type Level = {
 };
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
-const clockText = (s: number) =>
-  `${Math.floor(s / 3600)}:${String(Math.floor((s % 3600) / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
 const smoothstep = (f: number) => f * f * (3 - 2 * f);
-/** The horizontal part of a position: the side it is on, or the middle. */
-const sideOf = (position: Position) =>
-  position.endsWith('left') ? 'left' : position.endsWith('right') ? 'right' : 'center';
-/** The vertical part of a position: the frame's top, middle or bottom. */
-const rowOf = (position: Position) =>
-  position.startsWith('top') ? 'top' : position.startsWith('middle') ? 'middle' : 'bottom';
 const wholeNumber = (n: number) => Math.round(n).toLocaleString('en-US');
 
 /** Points of a route closer together than this, in pixels as drawn, add nothing to the line. */
@@ -343,22 +398,28 @@ function tracePoints(c: Context2DLike, xy: ArrayLike<number>, count: number, gap
 }
 
 /** Average pace ("5:32 /km") or, off foot, speed ("24.3 km/h") over the distance so far. */
-function paceText(onFoot: boolean, seconds: number, metres: number): string {
-  const { value, unit } = averagePace(onFoot, seconds, metres);
+function paceText(onFoot: boolean, seconds: number, metres: number, units: Units): string {
+  const { value, unit } = averagePace(onFoot, seconds, metres, units);
   return `${value} ${unit}`;
 }
 
 /**
- * What the overlay describes: one activity, a race of every activity on one clock, or
- * groups of activities one after another.
+ * What the overlay describes: one activity, a race of every activity on one clock, groups of
+ * activities one after another, or a trip, one day after another.
  */
-export type OverlayKind = 'single' | 'race' | 'groups';
+export type OverlayKind = 'single' | 'race' | 'groups' | 'days';
 
-/** The metrics a video shows when none are asked for, the first one large. */
+/**
+ * The metrics a video starts with, the first one large: one activity's distance, time and
+ * climb; a race's clock, who is still out and the distance; a recap's date, activities,
+ * distance and climb; a trip's day, distance, climb and time moving. A value the video
+ * cannot show (a climb without elevation) is left out.
+ */
 export function defaultMetrics(kind: OverlayKind): Metric[] {
-  if (kind === 'single') return ['time', 'distance', 'date'];
+  if (kind === 'single') return ['distance', 'time', 'climb'];
   if (kind === 'race') return ['time', 'count', 'distance'];
-  return ['date', 'count', 'distance'];
+  if (kind === 'days') return ['date', 'distance', 'climb', 'moving'];
+  return ['date', 'count', 'distance', 'climb'];
 }
 
 export function createRenderer(
@@ -376,34 +437,26 @@ export function createRenderer(
   const [singular, plural] = options.countLabel ?? ['activity', 'activities'];
   const movingLabel = options.movingLabel ?? 'moving';
   const kind: OverlayKind =
-    options.overlay === 'single' ? 'single' : timeline.clock ? 'race' : 'groups';
-  const metrics = options.metrics ?? defaultMetrics(kind);
-  const corner = options.metricsPosition ?? 'bottom-left';
-  const titleCorner = options.titlePosition ?? 'top-center';
-  const titleScale = options.titleScale ?? 1;
-  const metricsScale = options.metricsScale ?? 1;
+    options.overlay === 'single'
+      ? 'single'
+      : timeline.clock
+        ? 'race'
+        : options.byDay
+          ? 'days'
+          : 'groups';
   const unit = Math.min(W, H) / 1080; // scales strokes and type with the output size
   const withCalories = tracks.some((track) => track.calories !== undefined);
   // Pace is in minutes per kilometer only when every activity is on foot.
   const onFoot = tracks.every((track) => isOnFoot(track.sport));
+  const units = options.units ?? 'metric';
   const starts = tracks.map((track) => track.startTime);
-  /** The days the activities span: "18–22 Apr 2026", or one day. */
-  const datesSpanned = dateRange(Math.min(...starts), Math.max(...starts));
-  /** The time of day an activity started, e.g. "06:42", in this device's time zone. */
-  const timeFormat = new Intl.DateTimeFormat(options.locale ?? 'en-GB', {
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  });
-  const dateFormat = new Intl.DateTimeFormat(options.locale ?? 'en-GB', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  });
+  /** The first and the last start: the days the activities span. */
+  const firstStart = Math.min(...starts);
+  const lastStart = Math.max(...starts);
   const replayFrames = Math.round(timeline.duration * fps);
   const pauseFrames = Math.round((options.endPause ?? 0) * fps);
   // The totals card is for several activities only.
-  const totalsFrames = options.totalsCard && kind !== 'single' ? totalsCardFrames(fps) : 0;
+  const totalsFrames = options.totalsCard ? totalsCardFrames(fps) : 0;
   const frameCount =
     replayFrames + pauseFrames + totalsFrames + (options.endCard ? endCardFrames(fps) : 0);
   if (camera && camera.zoom.length < replayFrames)
@@ -426,7 +479,8 @@ export function createRenderer(
   const levelGap = (k: number) => (options.preserveRoutePoints ? 0 : MIN_GAP_PX / k);
   const prepared: Prepared[] = tracks.map((track) => ({
     ...projectTrack(track, view, minGapPx),
-    date: dateFormat.format(track.startTime),
+    start: track.startTime,
+    day: calendarDay(track.startTime),
     idx: 0,
     headX: 0,
     headY: 0,
@@ -434,8 +488,11 @@ export function createRenderer(
     climbed: 0,
     descended: 0,
     highest: 0,
+    lowest: 0,
+    elevationNow: 0,
     moved: 0,
     topSpeed: 0,
+    speedNow: 0,
     sensorsNow: {},
     started: false,
     done: false,
@@ -611,56 +668,72 @@ export function createRenderer(
 
   const frame = createCanvas(W, H);
   const ctx = frame.getContext('2d') as Context2DLike;
-  // Gradients that darken the map behind the counters and the title.
+  // A gradient that darkens the map at the bottom, behind the map credit.
   const bottomShade = ctx.createLinearGradient(0, H * 0.76, 0, H * 0.9);
   bottomShade.addColorStop(0, 'rgba(5, 6, 9, 0)');
   bottomShade.addColorStop(1, 'rgba(5, 6, 9, 0.88)');
-  const topShade = ctx.createLinearGradient(0, 0, 0, H * 0.12);
-  topShade.addColorStop(0, 'rgba(5, 6, 9, 0.88)');
-  topShade.addColorStop(1, 'rgba(5, 6, 9, 0)');
 
-  // Title and metrics card
+  // The widgets over the replay (see widgets.ts). Their sizes at 100%, in pixels.
   const margin = W * 0.07;
-  /** Where text with this alignment starts. */
-  const xOf = (side: 'left' | 'center' | 'right') =>
-    side === 'left' ? margin : side === 'right' ? W - margin : W / 2;
-  const titleFont = `600 ${Math.round(44 * unit * titleScale)}px ${fontFamily}`;
-  const headlineFont = `600 ${Math.round(60 * unit * metricsScale)}px ${fontFamily}`;
-  const statusFont = `400 ${Math.round(32 * unit * metricsScale)}px ${fontFamily}`;
-  const statusGap = 50 * unit * metricsScale; // from the large value down to the first line under it
-  const statusStep = 42 * unit * metricsScale; // between the lines under it
-  const cardRow = rowOf(corner);
-  const cardOnTop = cardRow === 'top';
-  const cardSide = sideOf(corner);
-  const titleRow = rowOf(titleCorner);
-  const titleOnTop = titleRow === 'top';
-  const titleSide = sideOf(titleCorner);
-  /**
-   * Whether the title and the card would meet: in the same row, on the same side or with
-   * either in the middle. Then they stack, the title first.
-   */
-  const stacked =
-    !!options.title &&
-    cardRow === titleRow &&
-    (cardSide === titleSide || cardSide === 'center' || titleSide === 'center');
+  const TEXT_SIZE = 44 * unit; // a text widget's letters
+  const VALUE_SIZE = 52 * unit; // a value's number
+  const LABEL_SIZE = 24 * unit; // the words under a value
+  const CHART_HEIGHT = 80 * unit;
+  const fontOf = (weight: number, px: number) => `${weight} ${Math.round(px)}px ${fontFamily}`;
   const hasElevation = prepared.some((tr) => tr.hasElevation);
 
-  // The climb profile: across the frame between the margins, just above the map credit.
-  const profileHeight = 80 * unit;
-  const profileBox = {
-    x: margin,
-    y: H - H * 0.012 - 34 * unit - profileHeight,
-    width: W - 2 * margin,
-    height: profileHeight,
-  };
-  const profile = options.elevationProfile
-    ? elevationProfile(
-        tracks,
-        Math.round(Math.min(600, Math.max(50, profileBox.width / (3 * unit)))),
-      )
-    : null;
-  /** The lowest baseline text in the bottom row may take: above the profile when it shows. */
-  const textFloor = profile ? profileBox.y - 30 * unit : H * 0.955;
+  /** Each value widget's line at its widest, in its font. */
+  const widestLines = new Map<Widget, number>();
+  /** Each value as it stands at the end of the replay, for laying widgets out. */
+  const finalValues = metricValues(timeline.duration, finished());
+  const startValues = metricValues(0);
+  /**
+   * The widgets set, else the ones a video starts with, arranged in its layout: the title, the
+   * values that suit it (each with its icon), and for one activity with heights the elevation
+   * chart.
+   */
+  const widgets: Widget[] =
+    options.widgets ??
+    arrangeInLayout(
+      [
+        ...(options.title ? [{ kind: 'text', text: null, x: 50, y: 50, size: 100 } as Widget] : []),
+        ...defaultMetrics(kind)
+          .filter((m) => finalValues.has(m))
+          .map((metric): Widget => ({
+            kind: 'metric',
+            metric,
+            label: defaultLabel(metric),
+            icon: true,
+            x: 50,
+            y: 50,
+            size: 100,
+          })),
+        ...(kind === 'single' && hasElevation
+          ? [{ kind: 'chart', chart: 'elevation', x: 50, y: 50, size: 100 } as Widget]
+          : []),
+      ],
+      layoutSlots(options.layout ?? 'classic', { width: W, height: H }),
+      // As wide as a value gets: at the finish, or at the start for one that shrinks, such as
+      // a race's "25 still moving", which ends as "all finished".
+      (widget) => {
+        const end = widgetPixels(widget, finalValues);
+        const start = widgetPixels(widget, startValues);
+        return { width: Math.max(end.width, start.width) / W, height: end.height / H };
+      },
+    ).map((widget) => ({
+      ...widget,
+      size: clamp(Math.round(widget.size), WIDGET_SIZE.min, WIDGET_SIZE.max),
+      ...(widget.kind === 'chart' && widget.height !== undefined
+        ? { height: clamp(Math.round(widget.height), WIDGET_SIZE.min, WIDGET_SIZE.max) }
+        : {}),
+    }));
+  // The charts' profiles, each sampled for the widest a chart is drawn; null for one the
+  // activities have nothing for.
+  const chartSamples = Math.round(Math.min(600, Math.max(50, (W - 2 * margin) / (3 * unit))));
+  const profiles = new Map<ChartKind, ChartProfile | null>();
+  for (const widget of widgets)
+    if (widget.kind === 'chart' && !profiles.has(widget.chart))
+      profiles.set(widget.chart, chartProfile(tracks, chartSamples, widget.chart));
 
   const headFade = 0.35; // seconds a head dot lingers after its track finishes
   const headRadius = 15 * unit;
@@ -737,13 +810,18 @@ export function createRenderer(
         tr.climbed = between(tr.climb);
         tr.descended = between(tr.descent);
         tr.highest = between(tr.top);
+        tr.lowest = between(tr.bottom);
+        tr.elevationNow = between(tr.elevation);
         tr.moved = between(tr.moving);
         tr.topSpeed = between(tr.fastest);
+        tr.speedNow = between(tr.speed);
         for (const [channel, sums] of sensorEntries(tr))
           tr.sensorsNow[channel] = {
             total: between(sums.total),
             time: between(sums.time),
             max: between(sums.max),
+            min: between(sums.min),
+            now: between(sums.now),
           };
         piece.push(tr.headX, tr.headY);
       } else {
@@ -753,10 +831,12 @@ export function createRenderer(
         tr.climbed = tr.climb[i];
         tr.descended = tr.descent[i];
         tr.highest = tr.top[i];
+        tr.lowest = tr.bottom[i];
+        tr.elevationNow = tr.elevation[i];
         tr.moved = tr.moving[i];
         tr.topSpeed = tr.fastest[i];
-        for (const [channel, sums] of sensorEntries(tr))
-          tr.sensorsNow[channel] = { total: sums.total[i], time: sums.time[i], max: sums.max[i] };
+        tr.speedNow = tr.speed[i];
+        for (const [channel, sums] of sensorEntries(tr)) tr.sensorsNow[channel] = sensorAt(sums, i);
         tr.done = true;
         tr.doneAt = t;
       }
@@ -821,231 +901,425 @@ export function createRenderer(
   }
 
   /** The text of every metric this video can show, at video time `t`. */
-  function metricTexts(t: number): Map<Metric, string> {
+  /**
+   * Each value at video time `t`: its number and the words under it. `state` is where every
+   * activity stands: as drawn so far, or at the end (`finished`).
+   */
+  function metricValues(t: number, state: MetricState[] = prepared): Map<Metric, MetricValue> {
+    const several = kind !== 'single';
     let started = 0;
     let moving = 0;
     let metres = 0;
     let climbed = 0;
     let descended = 0;
     let highest = -Infinity;
+    let lowest = Infinity;
     let moved = 0;
-    let longest = 0;
     let fastest = 0;
-    const days = new Set<string>();
-    let date = prepared[0].date;
-    for (const tr of prepared) {
+    const days = new Set<number>();
+    let firstDay = Infinity;
+    let lastDay = -Infinity;
+    /** The start of the last activity started so far. */
+    let latest = state[0]!.start;
+    for (const tr of state) {
       if (!tr.done) moving++;
       if (!tr.started) continue;
       started++;
       metres += tr.metres;
       climbed += tr.climbed;
       descended += tr.descended;
-      if (tr.hasElevation) highest = Math.max(highest, tr.highest);
+      if (tr.hasElevation) {
+        highest = Math.max(highest, tr.highest);
+        lowest = Math.min(lowest, tr.lowest);
+      }
       moved += tr.moved;
-      longest = Math.max(longest, tr.metres);
       fastest = Math.max(fastest, tr.topSpeed);
-      days.add(tr.date);
-      date = tr.date;
+      days.add(tr.day);
+      firstDay = Math.min(firstDay, tr.day);
+      lastDay = Math.max(lastDay, tr.day);
+      latest = tr.start;
     }
     const lastSecond = (track: Track) => track.points[track.points.length - 1];
-    /** The activities' recorded time so far, added up. */
-    const secondsSoFar = () =>
-      tracks.reduce((sum, track, k) => sum + lastSecond(track) * timeline.progress(k, t), 0);
-    const texts = new Map<Metric, string>();
-    if (kind === 'single') {
-      // One activity: its own elapsed time and distance so far.
-      const elapsed = Math.floor(lastSecond(tracks[0]) * timeline.progress(0, t));
-      texts.set('time', clockText(elapsed));
-      texts.set('distance', `${(metres / 1000).toFixed(1)} km`);
-      texts.set('pace', paceText(onFoot, elapsed, metres));
-      texts.set('date', prepared[0].date);
-      texts.set('start', `${timeFormat.format(tracks[0].startTime)} start`);
-    } else if (timeline.clock) {
-      // All at once: one shared clock, and how many are still out.
-      texts.set('time', clockText(Math.floor(timeline.clock(t))));
-      texts.set('count', moving > 0 ? `${moving} still ${movingLabel}` : 'all finished');
-      texts.set('distance', `${wholeNumber(metres / 1000)} km`);
-      texts.set('date', datesSpanned);
-      if (metrics.includes('pace')) texts.set('pace', paceText(onFoot, secondsSoFar(), metres));
-    } else {
-      if (metrics.includes('time') || metrics.includes('pace')) {
-        const seconds = secondsSoFar();
-        texts.set('time', clockText(Math.floor(seconds)));
-        texts.set('pace', paceText(onFoot, seconds, metres));
+    /** Each activity's recorded time so far. */
+    const secondsOf = (k: number) => lastSecond(tracks[k]!) * timeline.progress(k, t);
+    /** Each activity's calories so far, its share as it plays. */
+    const caloriesOf = (k: number) => (tracks[k]!.calories ?? 0) * timeline.progress(k, t);
+    const texts = new Map<Metric, MetricValue>();
+    /** A value with its name; its words are the name in lower case unless given. */
+    const set = (metric: Metric, value: string, name: string, label = name.toLowerCase()) =>
+      texts.set(metric, { value, number: numberOf(metric, value), name, label });
+    /** A value written in each of `formats`, the first its usual way, with its name. */
+    const setFormats = <F extends ValueFormat>(
+      metric: Metric,
+      name: string,
+      formats: readonly F[],
+      text: (format: F) => Omit<MetricText, 'number'>,
+    ) => {
+      const all: Partial<Record<ValueFormat, MetricText>> = {};
+      for (const format of formats) {
+        const shown = text(format);
+        all[format] = { ...shown, number: numberOf(metric, shown.value) };
       }
-      texts.set('date', timeline.label?.(t) ?? date);
-      texts.set('count', `${started} ${started === 1 ? singular : plural}`);
-      texts.set('distance', `${wholeNumber(metres / 1000)} km`);
-    }
-    texts.set('moving', `${clockText(Math.floor(moved))} moving`);
-    // Sensor channels: averages over time, the highest heart rate, and calories so far.
-    const sensorSums = new Map<SensorChannel, { total: number; time: number; max: number }>();
-    for (const tr of prepared) {
-      if (!tr.started) continue;
-      for (const [channel, now] of Object.entries(tr.sensorsNow) as [
-        SensorChannel,
-        { total: number; time: number; max: number },
-      ][]) {
-        const sum = sensorSums.get(channel) ?? { total: 0, time: 0, max: 0 };
-        sensorSums.set(channel, {
-          total: sum.total + now.total,
-          time: sum.time + now.time,
-          max: Math.max(sum.max, now.max),
-        });
-      }
-    }
-    const averages: [Metric, SensorChannel][] = [
-      ['heart-rate', 'heartRate'],
-      ['power', 'power'],
-      ['cadence', 'cadence'],
-      ['temperature', 'temperature'],
-    ];
-    for (const [metric, channel] of averages) {
-      const sum = sensorSums.get(channel);
-      if (sum && sum.time > 0) texts.set(metric, sensorText(metric, sum.total / sum.time, onFoot));
-    }
-    const heart = sensorSums.get('heartRate');
-    if (heart && heart.max > 0)
-      texts.set('max-heart-rate', sensorText('max-heart-rate', heart.max, onFoot));
-    if (withCalories)
-      texts.set(
-        'calories',
-        `${wholeNumber(tracks.reduce((sum, track, k) => sum + (track.calories ?? 0) * timeline.progress(k, t), 0))} kcal`,
+      texts.set(metric, { ...all[formats[0]!]!, name, formats: all });
+    };
+    /** A length of time in each time format. */
+    const setTime = (metric: Metric, seconds: number, name: string, label = name.toLowerCase()) =>
+      setFormats(metric, name, TIME_FORMATS, (format) => ({
+        value: durationText(seconds, format),
+        label,
+      }));
+    /** For several activities a plain value is their total: "Total distance". */
+    const total = (name: string) => (several ? `Total ${name.toLowerCase()}` : name);
+    /** A distance in kilometers or miles, whole or to a tenth. */
+    const distanceText = (meters: number, tenths: boolean) => {
+      const value = inDistanceUnits(meters, units);
+      return `${tenths ? value.toFixed(1) : wholeNumber(value)} ${distanceUnit(units)}`;
+    };
+    /** A height in meters or feet. */
+    const heightText = (meters: number) =>
+      `${wholeNumber(inHeightUnits(meters, units))} ${heightUnit(units)}`;
+
+    // Time.
+    if (kind === 'single') setTime('time', secondsOf(0), 'Time');
+    else if (timeline.clock) setTime('time', timeline.clock(t), 'Race time');
+    else
+      setTime(
+        'time',
+        tracks.reduce((sum, _, k) => sum + secondsOf(k), 0),
+        'Total time',
       );
-    const top = topSpeed(onFoot, fastest);
-    texts.set('top-speed', top.unit === '/km' ? `best ${top.value} /km` : `max ${top.value} km/h`);
-    if (kind !== 'single') {
-      texts.set('days', `${days.size} ${days.size === 1 ? 'day' : 'days'} out`);
-      texts.set('longest', `longest ${wholeNumber(longest / 1000)} km`);
+    setTime('moving', moved, total('Moving time'));
+    set('distance', distanceText(metres, !several), total('Distance'));
+    if (several) {
+      // Distance, time, climb and calories per activity: the average of the ones started so
+      // far, the most of any, and the least of the ones finished (of the ones started until
+      // one has).
+      const shown = state.flatMap((tr, k) => (tr.started ? [k] : []));
+      const finished = shown.filter((k) => state[k]!.done);
+      const counted = finished.length ? finished : shown;
+      const perActivity = (
+        metric: 'time' | 'distance' | 'climb' | 'calories',
+        of: (k: number) => number,
+        text: ((value: number) => string) | 'time',
+      ) => {
+        if (!shown.length) return;
+        const values = shown.map(of);
+        const words = `${metric} per ${singular}`;
+        const name = `${metric} per activity`;
+        const put = (which: 'avg' | 'max' | 'min', value: number) => {
+          const id = `${which}-${metric}` as const;
+          const named = `${which[0]!.toUpperCase()}${which.slice(1)} ${name}`;
+          if (text === 'time') setTime(id, value, named, `${which} ${words}`);
+          else set(id, text(value), named, `${which} ${words}`);
+        };
+        put('avg', values.reduce((sum, v) => sum + v, 0) / values.length);
+        put('max', Math.max(...values));
+        put('min', Math.min(...counted.map(of)));
+      };
+      perActivity('time', secondsOf, 'time');
+      perActivity(
+        'distance',
+        (k) => state[k]!.metres,
+        (v) => distanceText(v, true),
+      );
+      if (hasElevation) perActivity('climb', (k) => state[k]!.climbed, heightText);
+      if (withCalories) perActivity('calories', caloriesOf, (v) => `${wholeNumber(v)} kcal`);
+    } else {
+      // One activity: when it started, and where it is now.
+      const track = tracks[0]!;
+      const now = state[0]!;
+      setFormats('start', 'Start time', CLOCK_FORMATS, (format) => ({
+        value: clockTimeText(track.startTime, format),
+        label: 'start time',
+      }));
+      // The clock time as it plays: by the recorded clock, stops included.
+      const recorded = (track.elapsedSeconds ?? lastSecond(track)) * timeline.progress(0, t);
+      setFormats('time-of-day', 'Time of day', CLOCK_FORMATS, (format) => ({
+        value: clockTimeText(track.startTime + recorded * 1000, format),
+        label: 'time of day',
+      }));
+      const speed = topSpeed(onFoot, now.started ? now.speedNow : 0, units);
+      set('speed-now', `${speed.value} ${speed.unit}`, onFoot ? 'Current pace' : 'Current speed');
+      if (now.hasElevation) set('elevation-now', heightText(now.elevationNow), 'Current elevation');
     }
+
+    // Speed: the average while moving, as Strava and the totals card give it, and the fastest.
+    const pace = paceText(onFoot, moved, metres, units);
+    set('avg-speed', pace, onFoot ? 'Avg pace' : 'Avg speed');
+    const top = topSpeed(onFoot, fastest, units);
+    const topText = `${top.value} ${top.unit}`;
+    set('max-speed', topText, onFoot ? 'Max pace' : 'Max speed');
+
+    // Elevation.
     if (hasElevation) {
-      texts.set('elevation', `↑${wholeNumber(climbed)} m`);
-      texts.set('descent', `↓${wholeNumber(descended)} m`);
-      if (Number.isFinite(highest)) texts.set('highest', `top ${wholeNumber(highest)} m`);
+      const m = heightText;
+      set('climb', m(climbed), total('Climb'));
+      set('descent', m(descended), total('Descent'));
+      if (Number.isFinite(highest)) set('max-elevation', m(highest), 'Max elevation');
+      if (Number.isFinite(lowest)) set('min-elevation', m(lowest), 'Min elevation');
+    }
+
+    // The sensors: averages over time, the highest and lowest, and as one activity plays.
+    const sensorSums = new Map<SensorChannel, SensorNow>();
+    for (const tr of state) {
+      if (!tr.started) continue;
+      for (const [channel, now] of Object.entries(tr.sensorsNow) as [SensorChannel, SensorNow][]) {
+        const sum = sensorSums.get(channel);
+        sensorSums.set(
+          channel,
+          sum
+            ? {
+                total: sum.total + now.total,
+                time: sum.time + now.time,
+                max: Math.max(sum.max, now.max),
+                min: Math.min(sum.min, now.min),
+                now: now.now,
+              }
+            : { ...now },
+        );
+      }
+    }
+    for (const [metric, channel, which] of SENSOR_METRICS) {
+      const sum = sensorSums.get(channel);
+      if (!sum || sum.time <= 0) continue;
+      if (which === 'now' && several) continue;
+      const value =
+        which === 'avg'
+          ? sum.total / sum.time
+          : which === 'max'
+            ? sum.max
+            : which === 'min'
+              ? sum.min
+              : sum.now;
+      const text = sensorValueText(channel, value, onFoot, units);
+      set(metric, text, sensorName(channel, which));
+    }
+
+    // Calories so far, each activity's share as it plays.
+    if (withCalories) {
+      const kcal = tracks.reduce((sum, _, k) => sum + caloriesOf(k), 0);
+      set('calories', `${wholeNumber(kcal)} kcal`, total('Calories'));
+    }
+
+    // The activities.
+    /** The date in each date format; it has no words. */
+    const setDate = (text: (format: DateFormat) => string) =>
+      setFormats('date', 'Date', DATE_FORMATS, (format) => ({ value: text(format), label: '' }));
+    if (kind === 'single') setDate((format) => dayText(state[0]!.start, format));
+    else if (timeline.clock) {
+      // A race: how many are still out.
+      if (moving > 0) set('count', String(moving), 'Still moving', `still ${movingLabel}`);
+      else set('count', 'all', 'Still moving', 'finished');
+      setDate((format) => dateSpan(firstStart, lastStart, format));
+    } else {
+      set('count', String(started), 'Total activities', started === 1 ? singular : plural);
+      const { label } = timeline;
+      setDate((format) => (label ? label(t, format) : dayText(latest, format)));
+    }
+    if (several) {
+      const spanned = started === 0 ? 0 : lastDay - firstDay + 1;
+      set('days', String(spanned), 'Days', spanned === 1 ? 'day' : 'days');
+      set(
+        'moving-days',
+        String(days.size),
+        'Moving days',
+        days.size === 1 ? 'moving day' : 'moving days',
+      );
     }
     return texts;
   }
 
-  type Card = {
-    /** The large value and the baseline it sits on. */
-    headline: string;
-    headlineY: number;
-    /** The other values, on as many lines as the frame's width needs. */
-    lines: string[];
-    /** Lowest pixel row the card reaches. */
-    bottom: number;
-  };
+  /** Where every activity stands once the replay has finished, for `metricValues`. */
+  function finished(): MetricState[] {
+    return prepared.map((tr) => {
+      const last = tr.count - 1;
+      const sensorsNow: MetricState['sensorsNow'] = {};
+      for (const [channel, sums] of sensorEntries(tr)) sensorsNow[channel] = sensorAt(sums, last);
+      return {
+        start: tr.start,
+        day: tr.day,
+        hasElevation: tr.hasElevation,
+        started: true,
+        done: true,
+        metres: tr.dist[last]!,
+        climbed: tr.climb[last]!,
+        descended: tr.descent[last]!,
+        highest: tr.top[last]!,
+        lowest: tr.bottom[last]!,
+        elevationNow: tr.elevation[last]!,
+        moved: tr.moving[last]!,
+        topSpeed: tr.fastest[last]!,
+        speedNow: tr.speed[last]!,
+        sensorsNow,
+      };
+    });
+  }
 
-  /** What the metrics card shows at video time `t` and where; null when there is no card. */
-  function layoutCard(t: number): Card | null {
-    const texts = metricTexts(t);
-    const shown = metrics.flatMap((metric) => texts.get(metric) ?? []);
-    if (shown.length === 0) return null;
-    const [headline, ...rest] = shown;
-
-    ctx.font = statusFont;
-    const lines: string[] = [];
-    for (const text of rest) {
-      const last = lines[lines.length - 1];
-      if (last === undefined) lines.push(text);
-      else if (ctx.measureText(`${last}  ·  ${text}`).width > W - 2 * margin) lines.push(text);
-      else lines[lines.length - 1] = `${last}  ·  ${text}`;
+  /** A widget's width and height in pixels, with the values it would show. */
+  function widgetPixels(
+    widget: Widget,
+    values: Map<Metric, MetricValue>,
+  ): { width: number; height: number } {
+    const scale = widget.size / 100;
+    if (widget.kind === 'chart')
+      return {
+        width: Math.min(W, (W - 2 * margin) * scale),
+        height: (CHART_HEIGHT * (widget.height ?? widget.size)) / 100,
+      };
+    if (widget.kind === 'text') {
+      const text = widget.text ?? options.title ?? '';
+      if (!text) return { width: 0, height: 0 };
+      ctx.font = fontOf(600, TEXT_SIZE * scale);
+      return { width: ctx.measureText(text).width, height: TEXT_SIZE * scale * 1.27 };
     }
-
-    const below = lines.length > 0 ? statusGap + (lines.length - 1) * statusStep : 0;
-    let headlineY: number;
-    if (cardOnTop) {
-      // Under the title when both are in the same corner.
-      const underTitle = stacked ? 78 * unit * titleScale : 0;
-      headlineY = H * 0.075 + underTitle;
-    } else if (cardRow === 'middle') {
-      // The large value and the lines under it, centred on the frame's middle.
-      headlineY = H * 0.5 - below / 2 + 22 * unit * metricsScale;
-    } else {
-      // Raised when it has more lines, to stay clear of the bottom edge and the profile.
-      headlineY = Math.min(H * 0.875, textFloor - below);
+    const value = values.get(widget.metric);
+    if (!value) return { width: 0, height: 0 };
+    const { above, line, under } = valueLines(
+      value,
+      widget.label,
+      widget.format,
+      widget.labelText,
+      widget.unit,
+    );
+    ctx.font = fontOf(600, VALUE_SIZE * scale);
+    // As wide as the line can get while its number counts, so the box keeps its size.
+    let width = widestLine(widget, line) + (widget.icon ? iconRoom(VALUE_SIZE * scale) : 0);
+    let height = VALUE_SIZE * scale * 1.1;
+    // The words above or under take a line of their own, smaller.
+    const words = above || under;
+    if (words) {
+      ctx.font = fontOf(400, LABEL_SIZE * scale);
+      width = Math.max(width, ctx.measureText(words).width);
+      height += LABEL_SIZE * scale * 1.3;
     }
-    return { headline, headlineY, lines, bottom: headlineY + below + 14 * unit * metricsScale };
+    return { width, height };
+  }
+
+  /** Where each widget sits at video time `t`, in pixels; null for one with nothing to show. */
+  function layoutWidgets(values: Map<Metric, MetricValue>): (Rect | null)[] {
+    return widgets.map((widget) => {
+      const { width, height } = widgetPixels(widget, values);
+      if (width === 0) return null;
+      const cx = (widget.x / 100) * W;
+      const cy = (widget.y / 100) * H;
+      return { x0: cx - width / 2, y0: cy - height / 2, x1: cx + width / 2, y1: cy + height / 2 };
+    });
   }
 
   /**
-   * The baseline the title sits on. At the top it keeps its place and a card in the same
-   * corner goes under it; at the bottom it goes above a card in the same corner.
+   * How wide a value widget's line gets, with tabular figures, the context's font set to its
+   * value's: at the start, at the end, or now, the widest (a count gains a digit, or loses one).
    */
-  function titleY(card: Card | null): number {
-    if (titleOnTop) return H * 0.075;
-    if (card && stacked) return card.headlineY - (60 * metricsScale + 30 * titleScale) * unit;
-    if (titleRow === 'middle') return H * 0.5 + 16 * unit * titleScale;
-    return Math.min(H * 0.93, textFloor);
+  function widestLine(widget: Widget & { kind: 'metric' }, line: string): number {
+    let known = widestLines.get(widget);
+    if (known === undefined) {
+      known = 0;
+      for (const values of [startValues, finalValues]) {
+        const value = values.get(widget.metric);
+        if (!value) continue;
+        const lines = valueLines(value, widget.label, widget.format, widget.labelText, widget.unit);
+        known = Math.max(known, tabularWidth(ctx, lines.line));
+      }
+      widestLines.set(widget, known);
+    }
+    return Math.max(known, tabularWidth(ctx, line));
   }
 
   /**
-   * The rows the title and the card take in the middle of the frame, with room for a shade
-   * around them; null when neither sits in the middle.
+   * Draws one widget in its box: text, a value with its words, or the climb profile. Text has
+   * a soft shadow around its letters, so it reads on a busy map without darkening the frame.
    */
-  function middleRows(
-    card: Card | null,
-    title: { y: number; top: number } | null,
-  ): { top: number; bottom: number } | null {
-    const rows: [number, number][] = [];
-    if (card && cardRow === 'middle')
-      rows.push([card.headlineY - 60 * unit * metricsScale, card.bottom]);
-    if (title && titleRow === 'middle') rows.push([title.top, title.y + 12 * unit * titleScale]);
-    if (rows.length === 0) return null;
-    const room = H * 0.06;
-    return {
-      top: Math.min(...rows.map(([top]) => top)) - room,
-      bottom: Math.max(...rows.map(([, bottom]) => bottom)) + room,
-    };
+  function drawWidget(widget: Widget, box: Rect, values: Map<Metric, MetricValue>, t: number) {
+    const scale = widget.size / 100;
+    const cx = (box.x0 + box.x1) / 2;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'alphabetic';
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.75)';
+    ctx.shadowBlur = 14 * unit * scale;
+    ctx.shadowOffsetX = 0;
+    ctx.shadowOffsetY = 2 * unit * scale;
+    if (widget.kind === 'text') {
+      ctx.font = fontOf(600, TEXT_SIZE * scale);
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.92)';
+      ctx.fillText(widget.text ?? options.title ?? '', cx, box.y0 + TEXT_SIZE * scale);
+    } else if (widget.kind === 'metric') {
+      const { above, line, under } = valueLines(
+        values.get(widget.metric)!,
+        widget.label,
+        widget.format,
+        widget.labelText,
+        widget.unit,
+      );
+      // Words above push the value down by their line.
+      const top = above ? box.y0 + LABEL_SIZE * scale * 1.3 : box.y0;
+      if (above) {
+        ctx.font = fontOf(400, LABEL_SIZE * scale);
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.66)';
+        ctx.fillText(above, cx, box.y0 + LABEL_SIZE * scale);
+      }
+      ctx.font = fontOf(600, VALUE_SIZE * scale);
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.94)';
+      const baseline = top + VALUE_SIZE * scale * 0.95;
+      // Its digits all as wide, as a counter's are, so the number keeps its width while it
+      // counts; the line set from a fixed place after the icon, by its widest, so neither
+      // moves, the unit right after the number.
+      const size = VALUE_SIZE * scale;
+      const room = widget.icon ? iconRoom(size) : 0;
+      let left = cx - (room + widestLine(widget, line)) / 2;
+      if (widget.icon) left = drawIconBefore(ctx, iconOf(widget.metric), left, baseline, size);
+      fillTabular(ctx, line, left, baseline);
+      if (under) {
+        ctx.font = fontOf(400, LABEL_SIZE * scale);
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.66)';
+        ctx.fillText(under, cx, box.y0 + VALUE_SIZE * scale * 1.1 + LABEL_SIZE * scale);
+      }
+    } else if (widget.kind === 'chart' && profiles.get(widget.chart)) {
+      const color = widget.color ?? defaultChartColor(widget.chart);
+      const height = box.y1 - box.y0;
+      // Its icon at its left end, in its color, the chart after it.
+      let left = box.x0;
+      if (widget.icon) {
+        const size = height * CHART_ICON;
+        ctx.fillStyle = `rgb(${chartColors(color).line})`;
+        drawIcon(ctx, chartIcon(widget.chart), left, box.y0 + (height - size) / 2, size);
+        left += size * (1 + CHART_ICON_GAP);
+      }
+      ctx.shadowColor = 'rgba(0, 0, 0, 0)';
+      drawChart(
+        ctx,
+        profiles.get(widget.chart)!,
+        color,
+        { x: left, y: box.y0, width: box.x1 - left, height },
+        prepared.map((tr) => ({
+          meters: tr.started ? tr.metres : 0,
+          // One activity keeps its dot, also at the finish; several show theirs while moving.
+          dot: kind === 'single' ? 1 : headAlpha(tr, t),
+        })),
+        // Lines and dots as thick as the narrower way the chart is sized.
+        unit * Math.min(scale, (widget.height ?? widget.size) / 100),
+      );
+    }
+    ctx.shadowColor = 'rgba(0, 0, 0, 0)';
+    ctx.shadowBlur = 0;
+    ctx.shadowOffsetY = 0;
   }
 
   const creditFont = `400 ${Math.round(19 * unit)}px ${fontFamily}`;
 
   function drawOverlay(t: number, zoom: number, tx: number, ty: number): void {
-    const card = layoutCard(t);
-    const title = options.title ? { y: titleY(card), top: 0 } : null;
-    if (title) title.top = title.y - 44 * unit * titleScale;
-    /**
-     * Where the shade at the bottom starts: higher when the title sits down there, or the
-     * card does above the profile.
-     */
-    let bottomStart =
-      title && titleRow === 'bottom' ? Math.min(H * 0.76, title.top - H * 0.06) : H * 0.76;
-    if (profile && card && cardRow === 'bottom')
-      bottomStart = Math.min(bottomStart, card.headlineY - 60 * unit * metricsScale - H * 0.06);
-    /** The rows text in the middle of the frame takes, with room around; null when none. */
-    const middleBand = middleRows(card, title);
+    const values = metricValues(t);
+    const layout = layoutWidgets(values);
+    /** Where text widgets sit, with room around: place names fade under them. */
+    const room = 10 * unit;
+    const textBoxes = layout.flatMap((box, k) =>
+      box && widgets[k]!.kind !== 'chart'
+        ? [{ x0: box.x0 - room, y0: box.y0 - room, x1: box.x1 + room, y1: box.y1 + room }]
+        : [],
+    );
     if (attribution !== undefined) {
-      if (bottomStart === H * 0.76) ctx.fillStyle = bottomShade;
-      else {
-        const shade = ctx.createLinearGradient(0, bottomStart, 0, bottomStart + H * 0.14);
-        shade.addColorStop(0, 'rgba(5, 6, 9, 0)');
-        shade.addColorStop(1, 'rgba(5, 6, 9, 0.88)');
-        ctx.fillStyle = shade;
-      }
-      ctx.fillRect(0, bottomStart, W, H - bottomStart);
-      if (card && cardOnTop) {
-        // Dark behind the whole card, fading out below it.
-        const shade = ctx.createLinearGradient(0, card.bottom, 0, card.bottom + H * 0.1);
-        shade.addColorStop(0, 'rgba(5, 6, 9, 0.88)');
-        shade.addColorStop(1, 'rgba(5, 6, 9, 0)');
-        ctx.fillStyle = shade;
-        ctx.fillRect(0, 0, W, card.bottom + H * 0.1);
-      } else if (title && titleOnTop) {
-        ctx.fillStyle = topShade;
-        ctx.fillRect(0, 0, W, H * 0.12);
-      }
-      if (middleBand) {
-        // Dark behind text in the middle, fading out above and below it.
-        const { top, bottom } = middleBand;
-        const shade = ctx.createLinearGradient(0, top, 0, bottom);
-        shade.addColorStop(0, 'rgba(5, 6, 9, 0)');
-        shade.addColorStop(0.3, 'rgba(5, 6, 9, 0.7)');
-        shade.addColorStop(0.7, 'rgba(5, 6, 9, 0.7)');
-        shade.addColorStop(1, 'rgba(5, 6, 9, 0)');
-        ctx.fillStyle = shade;
-        ctx.fillRect(0, top, W, bottom - top);
-      }
+      // Dark at the bottom, behind the map credit.
+      ctx.fillStyle = bottomShade;
+      ctx.fillRect(0, H * 0.76, W, H * 0.24);
       ctx.font = creditFont;
       ctx.textAlign = 'right';
       ctx.textBaseline = 'alphabetic';
@@ -1076,22 +1350,22 @@ export function createRenderer(
       ctx.lineWidth = 5 * unit;
       ctx.strokeStyle = 'rgba(6, 8, 12, 0.75)';
       ctx.fillStyle = 'rgba(214, 222, 236, 0.72)';
-      const topLimit =
-        card && cardOnTop ? card.bottom + H * 0.01 : H * (title && titleOnTop ? 0.09 : 0.02);
-      const bottomLimit = Math.min(H * 0.8, bottomStart + H * 0.04);
       for (const [text, label] of visible) {
-        // Fade names out before they reach the counters or the title.
-        const nearBottom = clamp((bottomLimit - label.y) / (H * 0.04), 0, 1);
-        const nearTop = clamp((label.y - topLimit) / (H * 0.03), 0, 1);
-        // Names under text in the middle fade out too.
-        const awayFromMiddle = middleBand
-          ? clamp(
-              Math.max(middleBand.top - label.y, label.y - middleBand.bottom) / (H * 0.03),
+        // Fade names out near the bottom, the top, and under text.
+        const nearBottom = clamp((H * 0.8 - label.y) / (H * 0.04), 0, 1);
+        const nearTop = clamp((label.y - H * 0.02) / (H * 0.03), 0, 1);
+        const awayFromText = Math.min(
+          1,
+          ...textBoxes.map((box) =>
+            clamp(
+              Math.max(box.y0 - label.y, label.y - box.y1, box.x0 - label.x, label.x - box.x1) /
+                (H * 0.02),
               0,
               1,
-            )
-          : 1;
-        const alpha = label.alpha * nearBottom * nearTop * awayFromMiddle;
+            ),
+          ),
+        );
+        const alpha = label.alpha * nearBottom * nearTop * awayFromText;
         if (alpha < 0.02) continue;
         ctx.globalAlpha = alpha;
         ctx.font = labelFont(label.size);
@@ -1119,44 +1393,34 @@ export function createRenderer(
     }
     ctx.globalCompositeOperation = 'source-over';
 
-    if (profile)
-      drawElevationProfile(
-        ctx,
-        profile,
-        profileBox,
-        prepared.map((tr) => ({
-          meters: tr.started ? tr.metres : 0,
-          // One activity keeps its dot, also at the finish; several show theirs while moving.
-          dot: kind === 'single' ? 1 : headAlpha(tr, t),
-        })),
-        unit,
-      );
-
-    ctx.textBaseline = 'alphabetic';
-    if (options.title && title) {
-      ctx.textAlign = titleSide;
-      ctx.font = titleFont;
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.92)';
-      ctx.fillText(options.title, xOf(titleSide), title.y);
-    }
-    if (card) {
-      const x = xOf(cardSide);
-      ctx.textAlign = cardSide;
-      ctx.font = headlineFont;
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.94)';
-      ctx.fillText(card.headline, x, card.headlineY);
-      ctx.font = statusFont;
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
-      card.lines.forEach((line, i) =>
-        ctx.fillText(line, x, card.headlineY + statusGap + i * statusStep),
-      );
-    }
+    /** A box in pixels as fractions of the frame. */
+    const frameBox = (box: Rect): FrameBox => ({
+      x: box.x0 / W,
+      y: box.y0 / H,
+      width: (box.x1 - box.x0) / W,
+      height: (box.y1 - box.y0) / H,
+    });
+    widgets.forEach((widget, k) => {
+      const box = layout[k];
+      if (box && !options.hideWidgets) drawWidget(widget, box, values, t);
+    });
+    boxes = { widgets: layout.map((box) => (box ? frameBox(box) : null)) };
     if (options.watermark) {
       // At the bottom left, on the map credit's line, as far from the edge as the credit
       // is on the right: the two never meet, whatever the credit's length.
-      drawWatermark(ctx, W * 0.03, H - H * 0.012, unit, fontFamily);
+      const left = W * 0.03;
+      const baseline = H - H * 0.012;
+      const mark = drawWatermark(ctx, left, baseline, unit, fontFamily);
+      boxes.watermark = frameBox({
+        x0: left,
+        y0: baseline - mark.height,
+        x1: left + mark.width,
+        y1: baseline,
+      });
     }
   }
+  /** Where `drawOverlay` put each widget and the watermark, for `overlayBoxes`. */
+  let boxes: OverlayBoxes = { widgets: [] };
 
   /** A copy of the replay's last frame, which the totals card is drawn over. */
   let lastReplayFrame: CanvasLike | null = null;
@@ -1175,8 +1439,8 @@ export function createRenderer(
     let climbed = 0;
     let descended = 0;
     let highest = -Infinity;
+    let lowest = Infinity;
     let moving = 0;
-    let longest = 0;
     let fastest = 0;
     for (const tr of prepared) {
       const last = tr.count - 1;
@@ -1184,31 +1448,40 @@ export function createRenderer(
       meters += tr.dist[last];
       climbed += tr.climb[last];
       descended += tr.descent[last];
-      if (tr.hasElevation) highest = Math.max(highest, tr.top[last]);
+      if (tr.hasElevation) {
+        highest = Math.max(highest, tr.top[last]);
+        lowest = Math.min(lowest, tr.bottom[last]);
+      }
       moving += tr.moving[last];
-      longest = Math.max(longest, tr.dist[last]);
     }
+    const elapsed = (track: Track) => track.elapsedSeconds ?? track.points[track.points.length - 1];
+    const dayCounts = prepared.map((tr) => tr.day);
     return {
       activities: tracks.length,
       meters,
       movingSeconds: moving,
-      totalSeconds: tracks.reduce(
-        (sum, track) => sum + (track.elapsedSeconds ?? track.points[track.points.length - 1]),
-        0,
-      ),
+      totalSeconds: tracks.reduce((sum, track) => sum + elapsed(track), 0),
       climbed: hasElevation ? climbed : null,
       descended: hasElevation ? descended : null,
       highest: hasElevation ? highest : null,
+      lowest: hasElevation ? lowest : null,
+      each: {
+        meters: prepared.map((tr) => tr.dist[tr.count - 1]!),
+        seconds: tracks.map(elapsed),
+        climbed: hasElevation ? prepared.map((tr) => tr.climb[tr.count - 1]!) : null,
+        calories: withCalories ? tracks.map((track) => track.calories ?? 0) : null,
+      },
       onFoot,
-      dates: datesSpanned,
-      days: new Set(prepared.map((tr) => tr.date)).size,
-      longest,
+      firstStart,
+      lastStart,
+      days: Math.max(...dayCounts) - Math.min(...dayCounts) + 1,
+      movingDays: new Set(dayCounts).size,
       topSpeed: fastest,
       ...sensorTotals(),
       calories: withCalories ? tracks.reduce((sum, track) => sum + (track.calories ?? 0), 0) : null,
     };
   };
-  /** Each sensor channel over every activity that recorded it: averages, highest heart rate. */
+  /** Each sensor channel over every activity that recorded it: averages, highest and lowest. */
   const sensorTotals = () => {
     const average = (channel: SensorChannel) => {
       let total = 0;
@@ -1221,19 +1494,56 @@ export function createRenderer(
       }
       return time > 0 ? total / time : null;
     };
-    const maxes = prepared.flatMap((tr) => {
-      const sums = tr.sensors.heartRate;
-      return sums ? [sums.max[tr.count - 1]] : [];
-    });
+    const extreme = (channel: SensorChannel, which: 'max' | 'min') => {
+      const values = prepared.flatMap((tr) => {
+        const sums = tr.sensors[channel];
+        return sums && sums.time[tr.count - 1]! > 0 ? [sums[which][tr.count - 1]!] : [];
+      });
+      if (!values.length) return null;
+      return which === 'max' ? Math.max(...values) : Math.min(...values);
+    };
     return {
       heartRate: average('heartRate'),
-      maxHeartRate: maxes.length ? Math.max(...maxes) : null,
+      maxHeartRate: extreme('heartRate', 'max'),
+      minHeartRate: extreme('heartRate', 'min'),
       power: average('power'),
+      maxPower: extreme('power', 'max'),
       cadence: average('cadence'),
+      maxCadence: extreme('cadence', 'max'),
       temperature: average('temperature'),
+      minTemperature: extreme('temperature', 'min'),
+      maxTemperature: extreme('temperature', 'max'),
     };
   };
   let totalsShown: Totals | null = null;
+  /**
+   * The totals card's widgets: the ones given, else the usual values without the title, which
+   * the map behind the card still shows.
+   */
+  let totalsLayout: Widget[] | null = null;
+  const totalsWidgets = (): Widget[] =>
+    (totalsLayout ??=
+      options.totalsWidgets ??
+      arrangeInLayout(
+        totalsEntries(
+          totals(),
+          1,
+          [singular, plural],
+          kind === 'single' ? AUTOMATIC_TOTALS_ONE : AUTOMATIC_TOTALS,
+          units,
+        ).map((entry): Widget => ({
+          kind: 'metric',
+          metric: entry.field,
+          label: 'under',
+          icon: true,
+          x: 50,
+          y: 50,
+          size: 100,
+        })),
+        layoutSlots(options.totalsLayout ?? 'grid-2x2', { width: W, height: H }),
+        // A value fits its slot by its height: its number shrinks to its column's width.
+        (widget) => ({ width: 0.001, height: totalsWidgetHeight(widget, unit) / H }),
+      ));
 
   return {
     canvas: frame,
@@ -1259,7 +1569,9 @@ export function createRenderer(
             fontFamily,
             title: options.title ?? '',
             countLabel: [singular, plural],
-            fields: options.totalsFields,
+            units,
+            widgets: totalsWidgets(),
+            hideWidgets: options.hideTotalsWidgets,
           });
           return;
         }
@@ -1279,6 +1591,39 @@ export function createRenderer(
         : [1, 0, 0];
       drawScene(index, zoom, tx, ty);
       drawOverlay(t, zoom, tx, ty);
+    },
+    drawFinishedCard(card: 'totals' | 'end'): void {
+      const base = copyFrame();
+      if (card === 'totals')
+        drawTotalsCard(ctx, base, TOTALS_CARD_S, totals(), {
+          width: W,
+          height: H,
+          fontFamily,
+          title: options.title ?? '',
+          countLabel: [singular, plural],
+          units,
+          widgets: totalsWidgets(),
+          hideWidgets: options.hideTotalsWidgets,
+        });
+      else drawEndCard(ctx, base, END_CARD_S, { width: W, height: H, fontFamily });
+    },
+    overlayBoxes: () => boxes,
+    widgets,
+    totalsCard: () => ({
+      widgets: totalsWidgets(),
+      values: totalsValues(totals(), [singular, plural], units) as Map<Metric, MetricValue>,
+    }),
+    finalValues,
+    profileShapes(samples: number) {
+      const shapes: Partial<Record<ChartKind, number[]>> = {};
+      for (const [chart, shape] of Object.entries(chartProfiles(tracks, samples)) as [
+        ChartKind,
+        ChartProfile,
+      ][]) {
+        const span = shape.high - shape.low || 1;
+        shapes[chart] = [...shape.values].map((value) => (value - shape.low) / span);
+      }
+      return shapes;
     },
     skipTo(index: number): void {
       // The end card is drawn over the replay's last frame, so it cannot be skipped to.

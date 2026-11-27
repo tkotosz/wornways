@@ -1,21 +1,21 @@
 import { ref } from 'vue';
 import type { Adjustments } from './adjust.ts';
-import { NO_CHOICE, type Choice } from './choice.ts';
+import { ALL_ACTIVITIES, type Choice } from './choice.ts';
 import type { EngineClient } from './engine-client.ts';
 import type { ActivitySummary } from './messages.ts';
 import { useMatches } from './use-matches.ts';
 
 /**
  * The demo source: made-up activities to try Wornways with, held in the worker's memory
- * while it is open. Its choice and adjustments start fresh each time and are never saved,
- * and it never touches the person's own library.
+ * while it is open. Its choice (all of its activities at first) and adjustments start fresh
+ * each time and are never saved, and it never touches the person's own library.
  */
 export function useDemo(engine: EngineClient) {
   const active = ref(false);
   const busy = ref('');
   const error = ref('');
   const rows = ref<ActivitySummary[]>([]);
-  const choice = ref<Choice>({ ...NO_CHOICE });
+  const choice = ref<Choice>({ ...ALL_ACTIVITIES });
   const adjustments = ref<Adjustments>({});
   const { matches, matching } = useMatches(engine, 'demo', choice, rows);
 
@@ -25,7 +25,7 @@ export function useDemo(engine: EngineClient) {
     error.value = '';
     try {
       rows.value = await engine.startDemo();
-      choice.value = { ...NO_CHOICE };
+      choice.value = { ...ALL_ACTIVITIES };
       adjustments.value = {};
       active.value = true;
       return true;

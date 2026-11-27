@@ -7,12 +7,13 @@ import {
   offered,
   presetChoices,
   presetOf,
-  resetPlayback,
+  resetToPreset,
   settingLabel,
   startingValue,
   valueOf,
   withPreset,
   fromEarlierVersions,
+  SECTIONS,
 } from '../src/adjust.ts';
 
 const definition = (name: string) => SETTINGS.find((s) => s.name === name)!;
@@ -28,25 +29,23 @@ describe('adjustSettings', () => {
     });
   });
 
-  it('passes on the title and the values from the Text step', () => {
+  it('passes on the widgets, over the replay and on the totals card', () => {
+    expect(
+      adjustSettings({ widgets: 'distance@20,88', 'totals-widgets': 'text@50,40' }, 'several'),
+    ).toEqual({
+      preset: 'all-at-once',
+      widgets: 'distance@20,88',
+      'totals-widgets': 'text@50,40',
+    });
+  });
+
+  it('leaves out settings of earlier versions', () => {
     expect(
       adjustSettings(
         { title: '', 'title-position': 'bottom-right', 'metrics-size': '120' },
         'several',
       ),
-    ).toEqual({
-      preset: 'all-at-once',
-      title: '',
-      'title-position': 'bottom-right',
-      'metrics-size': '120',
-    });
-  });
-
-  it('gives no title when the title is switched off, and keeps its text for later', () => {
-    expect(adjustSettings({ title: 'Spring', 'show-title': false }, 'several')).toMatchObject({
-      title: '',
-    });
-    expect(adjustSettings({ title: 'Spring' }, 'several')).toMatchObject({ title: 'Spring' });
+    ).toEqual({ preset: 'all-at-once' });
   });
 
   it('leaves out settings chosen elsewhere', () => {
@@ -57,29 +56,41 @@ describe('adjustSettings', () => {
 });
 
 describe('the settings offered', () => {
+  it('puts every panel in one section, in the order things are decided', () => {
+    expect(SECTIONS.map((s) => s.id)).toEqual(['frame', 'playback', 'map', 'overlay', 'ending']);
+    // Overlay's widgets are arranged on the still; the watermark stays a setting.
+    expect(SECTIONS.find((s) => s.id === 'overlay')!.panels).toEqual(['units', 'watermark']);
+    expect(SECTIONS.find((s) => s.id === 'ending')!.panels).toEqual([
+      'pause',
+      'totals',
+      'units',
+      'end-card',
+    ]);
+    // Each panel in one section, but the units, for the values over the replay and the card's.
+    const panels = SECTIONS.flatMap((s) => s.panels).filter((panel) => panel !== 'units');
+    expect(new Set(panels).size).toBe(panels.length);
+  });
+
+  it('keeps the end pause out of the playback a preset decides', () => {
+    // Picking a preset, which starts the playback over, leaves it, and one activity and
+    // several share it.
+    const paused = { preset: 'recap', 'end-pause': '3' };
+    expect(withPreset(paused, 'recap', 'several')).toEqual(paused);
+    expect(adjustSettings(paused, 'several')['end-pause']).toBe('3');
+    expect(adjustSettings(paused, 'one')['end-pause']).toBe('3');
+    expect(playbackAdjustments(paused, 'several')['end-pause']).toBeUndefined();
+  });
+
   it('offers the settings of a panel in order', () => {
     const names = (panel: Parameters<typeof offered>[0]) => offered(panel).map((s) => s.name);
 
-    expect(names('timing')).toEqual([
-      'group',
-      'share',
-      'group-pace',
-      'overlap',
-      'pace',
-      'end-pause',
-    ]);
+    expect(names('timing')).toEqual(['group', 'share', 'group-pace', 'overlap', 'pace']);
+    expect(names('pause')).toEqual(['end-pause']);
+    expect(names('watermark')).toEqual(['watermark']);
+    expect(names('end-card')).toEqual(['end-card']);
     expect(names('camera')).toEqual(['camera']);
     expect(names('map')).toEqual(['map']);
-    expect(names('totals')).toEqual(['totals-card', 'totals-fields']);
-  });
-
-  it('keeps the metrics panel to the metrics', () => {
-    expect(offered('metrics').map((s) => s.name)).toEqual([
-      'metrics',
-      'metrics-fields',
-      'metrics-position',
-      'metrics-size',
-    ]);
+    expect(names('totals')).toEqual(['totals-card']);
   });
 
   it('calls the video length its duration', () => {
@@ -136,35 +147,55 @@ describe('presets', () => {
     expect(adjustSettings(trip, 'several')).toEqual({ preset: 'multiday-trip', pace: 'distance' });
   });
 
-  it('picks a preset and keeps existing overrides', () => {
-    expect(withPreset({ preset: 'custom', duration: '20' }, 'all-at-once', 'several')).toEqual({
+  it('picks a preset, which starts the playback over from it', () => {
+    const tuned = { preset: 'custom', duration: '20', group: 'day', map: false };
+    expect(withPreset(tuned, 'all-at-once', 'several')).toEqual({
       preset: 'all-at-once',
-      duration: '20',
+      map: false,
     });
   });
 
+  it('starts the widgets again from the ones that suit another preset', () => {
+    const arranged = { widgets: 'count@50,70', 'totals-widgets': 'distance@50,40', map: false };
+    expect(withPreset(arranged, 'recap', 'several')).toEqual({ preset: 'recap', map: false });
+    // The preset in use, picked again, and the playback kept as set keep them.
+    const recap = { ...arranged, preset: 'recap' };
+    expect(withPreset(recap, 'recap', 'several')).toEqual(recap);
+    expect(withPreset(arranged, 'custom', 'several')).toEqual({ ...arranged, preset: 'custom' });
+  });
+
   it('keeps custom timing and camera settings independent for each selection size', () => {
+    // Custom starts from the preset's values, its layout too, which one and several share.
     const single = fineTuned({}, { ...playbackAdjustments({}, 'one'), camera: 'fixed' }, 'one');
-    expect(adjustSettings(single, 'one')).toEqual({ duration: '15', camera: 'fixed' });
-    expect(adjustSettings(single, 'several')).toEqual({ preset: 'all-at-once' });
+    expect(adjustSettings(single, 'one')).toEqual({
+      duration: '15',
+      camera: 'fixed',
+      layout: 'classic-pair',
+    });
+    expect(adjustSettings(single, 'several')).toEqual({
+      preset: 'all-at-once',
+      layout: 'classic-pair',
+    });
     const several = fineTuned(
       single,
       { ...playbackAdjustments(single, 'several'), duration: '22.5', camera: 'zoom' },
       'several',
     );
-    expect(adjustSettings(several, 'one')).toEqual({ duration: '15', camera: 'fixed' });
-    expect(adjustSettings(several, 'several')).toMatchObject({ duration: '22.5', camera: 'zoom' });
-    // A reset goes back to the first preset, with nothing fine-tuned, and only for its size.
-    const custom = withPreset(several, 'custom', 'several');
-    expect(presetOf(resetPlayback(custom, 'several'), 'several')).toBe('all-at-once');
-    expect(adjustSettings(resetPlayback(custom, 'several'), 'several')).toEqual({
-      preset: 'all-at-once',
-    });
-    expect(adjustSettings(resetPlayback(custom, 'several'), 'one')).toEqual({
+    expect(adjustSettings(several, 'one')).toEqual({
       duration: '15',
       camera: 'fixed',
+      layout: 'classic-pair',
     });
-    expect(adjustSettings(resetPlayback(single, 'one'), 'one')).toEqual({ preset: 'highlight' });
+    expect(adjustSettings(several, 'several')).toMatchObject({ duration: '22.5', camera: 'zoom' });
+    // A preset picked starts that size's playback over, with nothing fine-tuned.
+    const custom = withPreset(several, 'custom', 'several');
+    const picked = withPreset(custom, 'all-at-once', 'several');
+    expect(presetOf(picked, 'several')).toBe('all-at-once');
+    expect(adjustSettings(picked, 'several')).toEqual({ preset: 'all-at-once' });
+    expect(adjustSettings(picked, 'one')).toEqual({ duration: '15', camera: 'fixed' });
+    expect(adjustSettings(withPreset(single, 'highlight', 'one'), 'one')).toEqual({
+      preset: 'highlight',
+    });
   });
 
   it('turns Custom when Fine-tune changes a value the preset sets, and only then', () => {
@@ -177,8 +208,9 @@ describe('presets', () => {
       share: 'even',
       'group-pace': 'fit',
       duration: '30',
-      // Custom starts from all of Recap's values, its totals card too.
+      // Custom starts from all of Recap's values, its totals card and layout too.
       'totals-card': true,
+      layout: 'classic',
     });
     expect(fineTuned(recap, { ...effective, camera: 'fixed' }, 'several')).toEqual({
       ...recap,
@@ -213,19 +245,41 @@ describe('presets', () => {
     });
   });
 
-  it('starts settings saved by earlier versions again from the first preset', () => {
-    expect(
-      fromEarlierVersions({ preset: 'custom', 'preset-one': 'custom', camera: 'fixed' }),
-    ).toEqual({
-      camera: 'fixed',
-      'one-camera': 'fixed',
-      'saved-with': 'separate-playback',
+  it('resets to a preset: its playback, widgets, layout and totals card, the rest kept', () => {
+    const tuned = {
+      preset: 'recap',
+      duration: '20',
+      widgets: 'distance@50,50',
+      'totals-widgets': 'count@50,40',
+      layout: 'hero',
+      'totals-card': false,
+      units: 'imperial',
+      size: '1080x1080',
+      'end-pause': '2',
+    };
+    expect(resetToPreset(tuned, 'recap', 'several')).toEqual({
+      preset: 'recap',
+      units: 'imperial',
+      size: '1080x1080',
+      'end-pause': '2',
     });
-    const now = { preset: 'custom', camera: 'fixed', 'saved-with': 'five-steps' };
-    expect(fromEarlierVersions(now)).toEqual({
-      ...now,
-      'one-camera': 'fixed',
-      'saved-with': 'separate-playback',
+    // From Custom, to the preset picked.
+    expect(resetToPreset({ ...tuned, preset: 'custom' }, 'all-at-once', 'several')).toEqual({
+      preset: 'all-at-once',
+      units: 'imperial',
+      size: '1080x1080',
+      'end-pause': '2',
     });
+  });
+
+  it('starts afresh from settings saved by an earlier version, and keeps its own', () => {
+    expect(fromEarlierVersions({ preset: 'custom', camera: 'fixed' })).toEqual({
+      'saved-with': 'label-positions',
+    });
+    expect(fromEarlierVersions({ camera: 'fixed', 'saved-with': 'separate-playback' })).toEqual({
+      'saved-with': 'label-positions',
+    });
+    const now = { preset: 'custom', camera: 'fixed', 'saved-with': 'label-positions' };
+    expect(fromEarlierVersions(now)).toEqual(now);
   });
 });

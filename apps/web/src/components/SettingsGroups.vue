@@ -1,22 +1,11 @@
 <script setup lang="ts">
 // The controls of a few setting groups, built from the engine's settings table: buttons
 // for a choice, a slider for a number, a switch for on/off, and a few made to measure.
-import {
-  AUTOMATIC_TOTALS,
-  METRICS,
-  TOTALS_FIELDS,
-  defaultMetrics,
-  type Metric,
-  type SettingDefinition,
-  type SensorChannel,
-  type TotalsField,
-} from '@wornways/engine';
+import { type SettingDefinition } from '@wornways/engine';
 import { computed } from 'vue';
 import {
-  SHOW_TITLE,
   choiceLabel,
   offered,
-  panelOffered,
   startingValue,
   type ActivityCount,
   type Panel,
@@ -25,34 +14,36 @@ import {
   sliderStep,
   type Adjustments,
 } from '../adjust.ts';
-import type { PlanReport } from '../messages.ts';
 import ExactNumber from './ExactNumber.vue';
 
 const props = defineProps<{
   /** The groups to show, in order. */
   groups: Panel[];
   count: ActivityCount;
-  plan?: PlanReport | null;
+  /**
+   * Phones: `rows` lists the settings, a row each with its value, and `open` asks for one
+   * to be shown alone (`only`), in a sheet. Without either, a box per group.
+   */
+  view?: 'rows';
+  only?: string;
 }>();
 const adjustments = defineModel<Adjustments>({ required: true });
+const emit = defineEmits<{ open: [name: string, label: string] }>();
 
 const GROUP_TITLES: Record<Panel, string> = {
   timing: 'Timing',
   camera: 'Camera',
   privacy: 'Replay privacy',
   map: 'Map',
-  title: 'Title',
-  metrics: 'Metrics',
-  elevation: 'Elevation',
+  units: 'Units',
+  watermark: 'Watermark',
+  pause: 'End pause',
   totals: 'Totals card',
-  brand: 'Branding',
+  'end-card': 'End card',
 };
 
 const groups = computed(() =>
-  props.groups
-    .filter((group) => panelOffered(group, props.plan))
-    .map((group) => ({ group, main: offered(group) }))
-    .filter((g) => g.main.length > 0),
+  props.groups.map((group) => ({ group, main: offered(group) })).filter((g) => g.main.length > 0),
 );
 
 /** The value set, else where the preset starts it (the totals card under Recap), else the default. */
@@ -77,13 +68,6 @@ function sliderValue(setting: SettingDefinition): string {
   return `${current}${unit === '%' ? '%' : ` ${unit}`}`;
 }
 
-// Title: the automatic one unless the person wrote another; empty for none.
-const autoTitle = computed(() => props.plan?.title ?? '');
-const titleSet = computed(() => typeof adjustments.value['title'] === 'string');
-
-// Metrics: the values this video can show, and the ones picked, in order.
-const showsMetrics = computed(() => adjustments.value['metrics'] !== false);
-const showsTitle = computed(() => adjustments.value[SHOW_TITLE] !== false);
 /** Whether the totals card is on: set, or started by the preset (Recap). */
 const showsTotals = computed(
   () =>
@@ -91,161 +75,79 @@ const showsTotals = computed(
       startingValue(adjustments.value, props.count, 'totals-card')) === true,
 );
 
-/** Whether a setting's row shows: a group switched off shows only its switch. */
+/** Whether a setting's row shows: the totals card switched off shows only its switch. */
 const shown = (group: Panel, name: string) =>
-  (group !== 'title' || showsTitle.value) &&
-  (group !== 'metrics' || name === 'metrics' || showsMetrics.value) &&
-  (group !== 'totals' || name === 'totals-card' || showsTotals.value);
-/** What the metrics have to describe: one activity, all at once, or activities in turn. */
-const kind = computed(() => {
-  if (!props.plan) return null;
-  if (props.plan.activities === 1) return 'single';
-  return props.plan.groups?.race ? 'race' : 'groups';
-});
-const offeredMetrics = computed(() =>
-  METRICS.filter((m) => {
-    if (!kind.value) return false;
-    if (m === 'count' || m === 'days' || m === 'longest') return kind.value !== 'single';
-    if (m === 'start') return kind.value === 'single';
-    if (m === 'elevation' || m === 'descent' || m === 'highest') return props.plan?.hasElevation;
-    if (isSensorValue(m)) return hasSensorValue(m);
-    return true;
-  }),
-);
-const pickedMetrics = computed<Metric[]>(() => {
-  if (!kind.value) return [];
-  const set = adjustments.value['metrics-fields'];
-  const picked =
-    typeof set === 'string' ? (set.split(',') as Metric[]) : defaultMetrics(kind.value);
-  return picked.filter((m) => offeredMetrics.value.includes(m));
-});
-
-/** The values that need a sensor channel, or calories, that some selected activity recorded. */
-const SENSOR_VALUES: Record<string, SensorChannel | 'calories'> = {
-  'heart-rate': 'heartRate',
-  'max-heart-rate': 'heartRate',
-  power: 'power',
-  cadence: 'cadence',
-  temperature: 'temperature',
-  calories: 'calories',
-};
-const isSensorValue = (value: string) => Object.hasOwn(SENSOR_VALUES, value);
-const hasSensorValue = (value: string) => {
-  const needs = SENSOR_VALUES[value];
-  return needs === 'calories'
-    ? !!props.plan?.hasCalories
-    : !!props.plan?.sensors.includes(needs as SensorChannel);
-};
-
-/** A metric's chip: its name, or a few words where the name alone would be unclear. */
-const METRIC_LABELS: Partial<Record<Metric, string>> = {
-  moving: 'Moving time',
-  'top-speed': 'Top speed',
-  start: 'Start time',
-  highest: 'Highest point',
-  days: 'Days out',
-  longest: 'Longest activity',
-  'heart-rate': 'Heart rate',
-  'max-heart-rate': 'Max heart rate',
-};
-const metricLabel = (metric: Metric) =>
-  METRIC_LABELS[metric] ?? metric.charAt(0).toUpperCase() + metric.slice(1);
-
-function toggleMetric(metric: Metric): void {
-  const picked = pickedMetrics.value;
-  const next = picked.includes(metric) ? picked.filter((m) => m !== metric) : [...picked, metric];
-  if (next.length > 0) set('metrics-fields', next.join(','));
-}
-
-// Totals card: the values it can show (elevation only when recorded), and the ones picked, in order.
-const TOTALS_LABELS: Record<TotalsField, string> = {
-  count: 'Activities',
-  distance: 'Kilometers',
-  moving: 'Hours moving',
-  time: 'Hours in total',
-  elevation: 'Meters climbed',
-  descent: 'Meters descended',
-  highest: 'Highest point',
-  pace: 'Average pace',
-  'top-speed': 'Top speed',
-  date: 'Dates',
-  days: 'Days out',
-  longest: 'Longest activity',
-  'heart-rate': 'Average heart rate',
-  'max-heart-rate': 'Max heart rate',
-  power: 'Average power',
-  cadence: 'Average cadence',
-  temperature: 'Average temperature',
-  calories: 'Calories',
-};
-const ELEVATION_TOTALS: TotalsField[] = ['elevation', 'descent', 'highest'];
-const offeredTotals = computed(() =>
-  TOTALS_FIELDS.filter((field) => {
-    if (ELEVATION_TOTALS.includes(field)) return props.plan?.hasElevation;
-    if (isSensorValue(field)) return hasSensorValue(field);
-    return true;
-  }),
-);
-const pickedTotals = computed<TotalsField[]>(() => {
-  const set = adjustments.value['totals-fields'];
-  const picked = typeof set === 'string' ? (set.split(',') as TotalsField[]) : AUTOMATIC_TOTALS;
-  return picked.filter((field) => offeredTotals.value.includes(field));
-});
-
-function toggleTotal(field: TotalsField): void {
-  const picked = pickedTotals.value;
-  const next = picked.includes(field) ? picked.filter((f) => f !== field) : [...picked, field];
-  if (next.length > 0) set('totals-fields', next.join(','));
+  group !== 'totals' || name === 'totals-card' || showsTotals.value;
+/** A setting's value in words, for its row: "30 s", "Day", "Activities, Kilometers". */
+function valueText(setting: SettingDefinition): string {
+  if (setting.kind.type === 'number') return sliderValue(setting);
+  return choiceLabel(setting.name, String(value(setting)));
 }
 </script>
 
 <template>
-  <div class="groups">
+  <!-- Phones: a list, a row per setting with its value. A row opens the setting on its own
+       (`open`); a switch turns in place. The totals card switched off shows only its switch. -->
+  <div v-if="view === 'rows'" class="setting-rows">
     <template v-for="g in groups" :key="g.group">
-      <div v-if="g.main.length" class="group" :data-testid="`group-${g.group}`">
-        <h2 v-if="GROUP_TITLES[g.group]">{{ GROUP_TITLES[g.group] }}</h2>
-        <!-- The title's switch, like the metrics' one; off, the video has no title. -->
-        <div v-if="g.group === 'title'" class="setting">
-          <span class="label">Show title</span>
-          <label class="switch">
-            <input
-              type="checkbox"
-              role="switch"
-              aria-label="Show title"
-              :checked="showsTitle"
-              @change="
-                set(SHOW_TITLE, ($event.target as HTMLInputElement).checked ? undefined : false)
-              "
-            />
-            <span>{{ showsTitle ? 'On' : 'Off' }}</span>
-          </label>
-        </div>
-        <template v-for="setting in g.main" :key="setting.name">
-          <div v-if="shown(g.group, setting.name)" class="setting">
-            <span :id="`label-${setting.name}`" class="label">
-              {{ settingLabel(setting) }}
+      <h3 v-if="groups.length > 1" class="setting-rows-title" :data-group="g.group">
+        {{ GROUP_TITLES[g.group] }}
+      </h3>
+      <template v-for="setting in g.main" :key="setting.name">
+        <template v-if="shown(g.group, setting.name)">
+          <label v-if="setting.kind.type === 'switch'" class="setting-row">
+            <span>{{ settingLabel(setting) }}</span>
+            <span class="switch">
+              <input
+                type="checkbox"
+                role="switch"
+                :aria-label="settingLabel(setting)"
+                :checked="value(setting) === true"
+                @change="set(setting.name, ($event.target as HTMLInputElement).checked)"
+              />
             </span>
+          </label>
+          <button
+            v-else
+            type="button"
+            class="setting-row"
+            :aria-label="`${settingLabel(setting)}: ${valueText(setting)}`"
+            aria-haspopup="dialog"
+            @click="emit('open', setting.name, settingLabel(setting))"
+          >
+            <span>{{ settingLabel(setting) }}</span>
+            <span class="value">{{ valueText(setting) }}</span>
+          </button>
+        </template>
+      </template>
+    </template>
+  </div>
+
+  <!-- Wide screens: a box per group. One setting (`only`): its control alone, at full width,
+       with its explanation; the sheet around it says which. -->
+  <div v-else class="groups" :class="{ one: only }">
+    <template v-for="g in groups" :key="g.group">
+      <div
+        v-if="!only || g.main.some((setting) => setting.name === only)"
+        class="group"
+        :data-testid="`group-${g.group}`"
+      >
+        <h2 v-if="!only">{{ GROUP_TITLES[g.group] }}</h2>
+        <template v-for="setting in g.main" :key="setting.name">
+          <div v-if="only ? setting.name === only : shown(g.group, setting.name)" class="setting">
+            <span :id="`label-${setting.name}`" class="label">{{ settingLabel(setting) }}</span>
             <div class="control" :aria-labelledby="`label-${setting.name}`" role="group">
-              <!-- A choice: one button per option; a position as a picker of the frame's nine spots. -->
-              <div
-                v-if="setting.kind.type === 'choice'"
-                class="chips"
-                :class="{ corners: setting.name.endsWith('-position') }"
-              >
+              <!-- A choice: one button per option. -->
+              <div v-if="setting.kind.type === 'choice'" class="chips" :class="{ options: only }">
                 <button
                   v-for="option in setting.kind.type === 'choice' ? setting.kind.choices : []"
                   :key="option"
                   type="button"
                   class="chip"
                   :aria-pressed="value(setting) === option"
-                  :aria-label="
-                    setting.name.endsWith('-position')
-                      ? choiceLabel(setting.name, option)
-                      : undefined
-                  "
                   @click="set(setting.name, option)"
                 >
-                  {{ setting.name.endsWith('-position') ? '' : choiceLabel(setting.name, option) }}
+                  {{ choiceLabel(setting.name, option) }}
                 </button>
               </div>
 
@@ -287,83 +189,12 @@ function toggleTotal(field: TotalsField): void {
                 <span>{{ value(setting) === true ? 'On' : 'Off' }}</span>
               </label>
 
-              <!-- The title: the automatic one until the person writes another. -->
-              <div v-else-if="setting.name === 'title'" class="title">
-                <input
-                  type="text"
-                  aria-label="Title"
-                  placeholder="No title"
-                  :value="titleSet ? adjustments['title'] : autoTitle"
-                  @input="set('title', ($event.target as HTMLInputElement).value)"
-                />
-                <button
-                  v-if="titleSet && plan"
-                  type="button"
-                  class="link"
-                  @click="set('title', undefined)"
-                >
-                  Use "{{ autoTitle }}"
-                </button>
-              </div>
-
-              <!-- The metrics, in the order picked. -->
-              <div v-else-if="setting.name === 'metrics-fields'" class="chips">
-                <button
-                  v-for="metric in offeredMetrics"
-                  :key="metric"
-                  type="button"
-                  class="chip"
-                  :aria-pressed="pickedMetrics.includes(metric)"
-                  @click="toggleMetric(metric)"
-                >
-                  <span v-if="pickedMetrics.includes(metric)" class="order">{{
-                    pickedMetrics.indexOf(metric) + 1
-                  }}</span>
-                  {{ metricLabel(metric) }}
-                </button>
-                <button
-                  v-if="plan && adjustments['metrics-fields'] !== undefined"
-                  type="button"
-                  class="link"
-                  @click="set('metrics-fields', undefined)"
-                >
-                  Use automatic metrics
-                </button>
-              </div>
-
-              <!-- The totals card's values, in the order picked. -->
-              <div v-else-if="setting.name === 'totals-fields'" class="chips">
-                <button
-                  v-for="field in offeredTotals"
-                  :key="field"
-                  type="button"
-                  class="chip"
-                  :aria-pressed="pickedTotals.includes(field)"
-                  @click="toggleTotal(field)"
-                >
-                  <span v-if="pickedTotals.includes(field)" class="order">{{
-                    pickedTotals.indexOf(field) + 1
-                  }}</span>
-                  {{ TOTALS_LABELS[field] }}
-                </button>
-                <button
-                  v-if="adjustments['totals-fields'] !== undefined"
-                  type="button"
-                  class="link"
-                  @click="set('totals-fields', undefined)"
-                >
-                  Use automatic totals
-                </button>
-              </div>
-
               <p v-if="settingHint(setting.name, count)" class="hint muted">
                 {{ settingHint(setting.name, count) }}
               </p>
             </div>
           </div>
         </template>
-        <!-- Room for a step to add to a group, e.g. what the timing will play. -->
-        <slot :name="`after-${g.group}`" />
       </div>
     </template>
   </div>
@@ -373,17 +204,17 @@ function toggleTotal(field: TotalsField): void {
 .groups {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
   min-width: 0;
 }
 
+/* Wide screens: the groups one under another in the settings column, a line between them;
+   each setting's label over its control. */
 .group {
   display: flex;
   flex-direction: column;
   gap: 1rem;
-  padding: 1rem 1.2rem;
-  border-radius: 14px;
-  background: var(--panel);
+  padding: 1rem 0;
+  border-top: 1px solid var(--line);
 }
 
 .group h2 {
@@ -397,33 +228,13 @@ function toggleTotal(field: TotalsField): void {
 
 .setting {
   display: grid;
-  grid-template-columns: 9rem 1fr;
-  gap: 0.8rem;
-  align-items: start;
-}
-
-.label {
-  padding-top: 0.4rem;
+  gap: 0.4rem;
 }
 
 .chips {
   display: flex;
   flex-wrap: wrap;
   gap: 0.4rem;
-}
-
-/* The position picker: nine squares standing for the frame's top, middle and bottom rows,
-   each left, middle and right. */
-.corners {
-  display: grid;
-  grid-template-columns: repeat(3, 2.2rem);
-  gap: 0.3rem;
-}
-
-.corners .chip {
-  height: 2.2rem;
-  padding: 0;
-  border-radius: 6px;
 }
 
 .order {
@@ -448,13 +259,6 @@ function toggleTotal(field: TotalsField): void {
 .slider input[type='range'] {
   flex: 1;
   max-width: 22rem;
-}
-
-.switch {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding-top: 0.35rem;
 }
 
 .title {
@@ -485,43 +289,38 @@ function toggleTotal(field: TotalsField): void {
   font-size: 0.85rem;
 }
 
-/* An on/off switch: a pill with a knob that slides to the right when on. */
-.switch input {
-  appearance: none;
-  position: relative;
-  width: 2.6rem;
-  height: 1.5rem;
-  margin: 0;
-  border-radius: 999px;
-  background: var(--line);
-  cursor: pointer;
-  transition: background 0.15s;
+/* One setting alone, in a sheet that names it: no box, heading or label, the control at
+   full width with its explanation under it. */
+.groups.one .group {
+  padding: 0;
+  border: 0;
 }
 
-.switch input::after {
-  content: '';
-  position: absolute;
-  top: 0.2rem;
-  left: 0.2rem;
-  width: 1.1rem;
-  height: 1.1rem;
-  border-radius: 50%;
-  background: var(--text);
-  transition: transform 0.15s;
+.groups.one .label {
+  display: none;
 }
 
-.switch input:checked {
-  background: linear-gradient(90deg, var(--accent), var(--accent-strong));
+/* A choice alone: an option per row, across the sheet. */
+.groups.one .options {
+  flex-direction: column;
+  gap: 0.45rem;
 }
 
-.switch input:checked::after {
-  transform: translateX(1.1rem);
+.groups.one .options .chip {
+  padding: 0.7rem 0.9rem;
+  border-radius: 10px;
+  text-align: left;
 }
 
-@media (max-width: 600px) {
-  .setting {
-    grid-template-columns: 1fr;
-    gap: 0.4rem;
-  }
+.groups.one .title input {
+  max-width: none;
+}
+
+.groups.one .slider input[type='range'] {
+  max-width: none;
+}
+
+.setting-row .switch {
+  padding-top: 0;
 }
 </style>

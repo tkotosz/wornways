@@ -32,10 +32,15 @@ export function showsAppleInstallHelp(): boolean {
   const agent = navigator.userAgent;
   const appleMobile =
     /iPhone|iPad|iPod/.test(agent) || (/Macintosh/.test(agent) && navigator.maxTouchPoints > 1);
-  const installed =
+  return appleMobile && !isInstalled();
+}
+
+/** Whether the app runs installed, in a window of its own, rather than in a browser tab. */
+export function isInstalled(): boolean {
+  return (
     matchMedia('(display-mode: standalone)').matches ||
-    (navigator as Navigator & { standalone?: boolean }).standalone === true;
-  return appleMobile && !installed;
+    (navigator as Navigator & { standalone?: boolean }).standalone === true
+  );
 }
 
 export async function install(): Promise<void> {

@@ -1,6 +1,13 @@
 import { expect, test } from '@playwright/test';
 import { offlineMap } from './offline-map.ts';
-import { pickSource } from './sources.ts';
+import {
+  openDemo,
+  openSection,
+  pickPeriod,
+  pickPreset,
+  pickSource,
+  useActivities,
+} from './popups.ts';
 
 test('turns the totals card on for Recap, and leaves the switch to the person', async ({
   page,
@@ -8,26 +15,20 @@ test('turns the totals card on for Recap, and leaves the switch to the person', 
 }) => {
   page.setDefaultTimeout(15_000);
   await offlineMap(context);
-  await page.goto('/');
-  await pickSource(page, 'demo');
-  await expect(page.getByTestId('demo-count')).toHaveText('25 made-up activities');
-  await page.getByRole('button', { name: 'Continue' }).click(); // to Activities
-  await page.getByRole('button', { name: 'Continue' }).click(); // to Playback
+  await openDemo(page);
 
-  const presets = page.getByRole('radiogroup', { name: 'Preset' });
   const totals = page.getByTestId('group-totals').getByRole('switch', { name: 'Totals card' });
-  /** Goes to Appearance, where the switch is, and back. */
-  const toAppearance = () => page.getByRole('button', { name: 'Appearance', exact: true }).click();
-  const toPlayback = () => page.getByRole('button', { name: 'Playback', exact: true }).click();
+  /** Goes to Ending, where the switch is, and back to Playback. */
+  const toEnding = () => openSection(page, 'Ending');
+  const toPlayback = () => openSection(page, 'Playback');
 
   // All at once, the first preset: off.
-  await toAppearance();
+  await toEnding();
   await expect(totals).not.toBeChecked();
 
   // Recap: on.
-  await toPlayback();
-  await presets.getByRole('radio', { name: /Recap/ }).click();
-  await toAppearance();
+  await pickPreset(page, 'Recap');
+  await expect(totals).toBeChecked();
   await expect(totals).toBeChecked();
 
   // A change of length makes it Custom, which starts from Recap's values: still on.
@@ -35,101 +36,118 @@ test('turns the totals card on for Recap, and leaves the switch to the person', 
   await page.getByRole('spinbutton', { name: 'Exact video length in seconds' }).fill('20');
   await page.getByRole('spinbutton', { name: 'Exact video length in seconds' }).press('Enter');
   await expect(page.getByTestId('replay-summary')).toContainText('Custom playback');
-  await toAppearance();
+  await toEnding();
   await expect(totals).toBeChecked();
 
   // Switched off under Recap, it stays off.
-  await toPlayback();
-  await presets.getByRole('radio', { name: /Recap/ }).click();
-  await toAppearance();
+  await pickPreset(page, 'Recap');
   await totals.click();
   await expect(totals).not.toBeChecked();
   await toPlayback();
-  await toAppearance();
+  await toEnding();
   await expect(totals).not.toBeChecked();
 });
 
-test('picks the totals card values and their order', async ({ page, context }) => {
+test('arranges the totals card as widgets: the totals without the title, then more', async ({
+  page,
+  context,
+}) => {
   page.setDefaultTimeout(15_000);
   await offlineMap(context);
-  await page.goto('/');
-  await pickSource(page, 'demo');
-  await page.getByRole('button', { name: 'Continue' }).click(); // to Activities
-  await page.getByRole('button', { name: 'Continue' }).click(); // to Playback
-  await page
-    .getByRole('radiogroup', { name: 'Preset' })
-    .getByRole('radio', { name: /Recap/ })
-    .click();
-  await page.getByRole('button', { name: 'Appearance', exact: true }).click();
+  await openDemo(page, 'Recap');
+  await openSection(page, 'Ending');
 
-  const group = page.getByTestId('group-totals');
-  const chip = (name: string) => group.getByRole('button', { name: new RegExp(`${name}$`) });
-  const picked = () =>
-    group.locator('.chip[aria-pressed="true"]').evaluateAll((chips) =>
-      chips
-        .map(
-          (c) =>
-            [
-              Number(c.querySelector('.order')?.textContent),
-              c.textContent!.replace(/^\s*\d+\s*/, '').trim(),
-            ] as const,
-        )
-        .sort((a, b) => a[0] - b[0])
-        .map(([, name]) => name),
-    );
+  // The card starts with activities, distance, moving time and climb (the demo activities
+  // have heights), without the title, drawn by the page over the bare card.
+  const onCard = page.locator('[data-widget]');
+  await expect(onCard).toHaveCount(4);
+  await expect(page.getByTestId('widget-0')).toContainText('25');
+  await expect(page.getByTestId('widget-0')).toContainText('activities');
+  await expect(page.getByTestId('widget-3')).toContainText('15,423 m');
+  await expect(page.getByTestId('widget-3')).toContainText('total climb');
 
-  // Automatic: all four, in the usual order.
-  await expect.poll(picked).toEqual(['Activities', 'Kilometers', 'Hours moving', 'Meters climbed']);
-  await expect(group.getByRole('button', { name: 'Use automatic totals' })).toHaveCount(0);
+  // Its strip adds a text or a total; there is no chart and no watermark on the card.
+  await expect(page.getByRole('switch', { name: 'Elevation chart' })).toHaveCount(0);
+  await expect(page.getByRole('switch', { name: 'Show watermark' })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Add a total' }).click();
+  const totals = page.getByRole('dialog', { name: 'Totals' });
+  await expect(totals.getByRole('button', { name: / Total distance$/ })).toBeDisabled();
+  await totals.getByRole('button', { name: / Moving days$/ }).click();
+  await expect(onCard).toHaveCount(5);
+  await expect(page.getByTestId('widget-4')).toContainText('moving day');
+  // Picked, its settings open beside the picture: its words go where its label position puts
+  // them, in words of its own.
+  const picked = page.getByRole('dialog', { name: 'Moving days' });
+  const label = picked.getByRole('radiogroup', { name: 'Label position' });
+  await expect(label.getByRole('radio', { name: /^Under/ })).toBeChecked();
+  await label.getByRole('radio', { name: /^After/ }).click();
+  await expect(page.getByTestId('widget-4').locator('.words.beside.after')).toHaveText(
+    /moving days?/,
+  );
+  await label.getByRole('radio', { name: /^Above/ }).click();
+  await expect(page.getByTestId('widget-4').locator('.words.above')).toHaveText(/moving days?/);
+  await picked.getByRole('textbox', { name: 'Label text' }).fill('days on the bike');
+  await expect(page.getByTestId('widget-4')).toContainText('days on the bike');
+  await page.getByRole('button', { name: '✓ Done' }).click();
+  await page.getByRole('button', { name: 'Add a text' }).click();
+  await page.keyboard.type('What a spring');
+  await page.keyboard.press('Enter');
+  await expect(onCard).toHaveCount(6);
+  await expect(page.getByTestId('widget-5')).toContainText('What a spring');
 
-  // Unpicking renumbers the rest; picking again puts it last.
-  await chip('Activities').click();
-  await expect.poll(picked).toEqual(['Kilometers', 'Hours moving', 'Meters climbed']);
-  await chip('Activities').click();
-  await expect.poll(picked).toEqual(['Kilometers', 'Hours moving', 'Meters climbed', 'Activities']);
-  // The last one picked cannot be unpicked.
-  for (const name of ['Kilometers', 'Hours moving', 'Meters climbed']) await chip(name).click();
-  await expect.poll(picked).toEqual(['Activities']);
-  await chip('Activities').click();
-  await expect.poll(picked).toEqual(['Activities']);
+  // A picked one moves and goes with the keyboard, as over the replay.
+  const before = (await page.getByTestId('widget-0').boundingBox())!;
+  await page.getByTestId('widget-0').focus();
+  await page.keyboard.press('ArrowRight');
+  await expect
+    .poll(async () => (await page.getByTestId('widget-0').boundingBox())!.x)
+    .toBeGreaterThan(before.x);
+  await page.keyboard.press('Delete');
+  await expect(onCard).toHaveCount(5);
+  await expect(page.getByTestId('widget-0')).not.toContainText('activities');
 
-  // Every other total is offered too (the demo activities have heights).
-  for (const name of [
-    'Hours in total',
-    'Meters descended',
-    'Highest point',
-    'Average pace',
-    'Top speed',
-    'Dates',
-    'Days out',
-    'Longest activity',
-  ])
-    await expect(chip(name)).toHaveAttribute('aria-pressed', 'false');
-  // The pace and the dates are offered too, after the usual four.
-  await chip('Dates').click();
-  await chip('Average pace').click();
-  await expect.poll(picked).toEqual(['Activities', 'Dates', 'Average pace']);
-
-  // Back to automatic.
-  await group.getByRole('button', { name: 'Use automatic totals' }).click();
-  await expect.poll(picked).toEqual(['Activities', 'Kilometers', 'Hours moving', 'Meters climbed']);
-
-  // Switched off, the card's values hide.
-  await group.getByRole('switch', { name: 'Totals card' }).click();
-  await expect(chip('Activities')).toHaveCount(0);
+  // Switched off, the card and its widgets go.
+  await page.getByTestId('group-totals').getByRole('switch', { name: 'Totals card' }).click();
+  await expect(onCard).toHaveCount(0);
 });
 
-test('offers the totals card for several activities only', async ({ page, context }) => {
+test('offers the totals card for a single activity too, off until switched on', async ({
+  page,
+  context,
+}) => {
   page.setDefaultTimeout(15_000);
   await offlineMap(context);
   await page.goto('/');
   await pickSource(page, 'demo');
-  await expect(page.getByTestId('demo-count')).toHaveText('25 made-up activities');
-  await page.getByRole('button', { name: 'Continue' }).click();
+  await pickPeriod(page);
   await page.getByRole('checkbox', { name: 'Select all shown' }).click();
   await page.getByTestId('chosen').getByText('Easy run').click();
-  await page.getByRole('button', { name: 'Continue' }).click(); // to Playback
-  await page.getByRole('button', { name: 'Continue' }).click(); // to Appearance
-  await expect(page.getByTestId('group-metrics')).toBeVisible();
-  await expect(page.getByTestId('group-totals')).toHaveCount(0);
+  // One activity: a Highlight, without asking.
+  await useActivities(page);
+  await openSection(page, 'Ending');
+  await expect(page.getByTestId('group-end-card')).toBeVisible();
+  const totals = page.getByTestId('group-totals').getByRole('switch', { name: 'Totals card' });
+  await expect(totals).not.toBeChecked();
+  await totals.check();
+  // Its values are one activity's, arranged in the card's layout, which can be picked.
+  const onCard = page.locator('[data-widget]');
+  await expect(onCard.first()).toContainText('distance');
+  await expect(page.getByRole('button', { name: 'Layout: 2 × 2' })).toBeVisible();
+  await page.getByRole('button', { name: 'Layout: 2 × 2' }).click();
+  const sheet = page.getByRole('dialog', { name: 'Layout' });
+  await sheet.getByRole('radio', { name: 'Column' }).click();
+  await page.keyboard.press('Escape');
+  // Arrange, from the strip: one under another.
+  await page.getByRole('button', { name: 'Arrange the widgets in the layout' }).click();
+  await expect
+    .poll(async () => {
+      const xs = await onCard.evaluateAll((elements) =>
+        elements.map((element) => {
+          const box = element.getBoundingClientRect();
+          return Math.round(box.left + box.width / 2);
+        }),
+      );
+      return new Set(xs).size;
+    })
+    .toBe(1);
 });

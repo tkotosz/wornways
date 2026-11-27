@@ -1,7 +1,7 @@
 // The worker: does all the heavy work so the page never freezes. It keeps the library of
 // activities and answers the page's requests (see messages.ts).
 
-import { parseSettings, SettingsError, type RenderSettings } from '@wornways/engine';
+import { parseSettings, SettingsError, type RenderSettings, type Widget } from '@wornways/engine';
 import type { ActivitySummary, Reply, Request } from '../messages.ts';
 import { DemoUnavailable, openDemo } from './demo.ts';
 import { Library } from './library.ts';
@@ -215,14 +215,16 @@ async function answer(request: Exclude<Request, { type: 'cancel' }>, signal: Abo
         plan: planVideo(await tracks(), request.settings, source === 'strava'),
       });
     case 'make-poster': {
-      const image = await makePoster(
+      const poster = await makePoster(
         await tracks(),
         request.settings,
         renderSignal,
         remote?.loadTiles,
+        request.scene,
+        request.bare,
       );
       renderSignal.throwIfAborted();
-      return reply({ type: 'poster-made', id, image });
+      return reply({ type: 'poster-made', id, ...poster });
     }
     case 'make-video': {
       const { video, report } = await makeVideo(
@@ -266,10 +268,14 @@ async function handle(request: Request): Promise<void> {
 
 self.onmessage = (event: MessageEvent<Request>) => void handle(event.data);
 
-/** Whether the video shows calories: over the replay, or on the totals card. */
+/**
+ * Whether the video shows calories: in a widget over the replay, or on the totals card. The
+ * widgets a video starts with show none.
+ */
 function showsCalories(settings: RenderSettings): boolean {
-  return (
-    (settings.metrics && !!settings.metricsFields?.includes('calories')) ||
-    (settings.totalsCard && !!settings.totalsFields?.includes('calories'))
-  );
+  const calories = (widgets: Widget[] | null) =>
+    (widgets ?? []).some(
+      (widget) => widget.kind === 'metric' && widget.metric.includes('calories'),
+    );
+  return calories(settings.widgets) || (settings.totalsCard && calories(settings.totalsWidgets));
 }

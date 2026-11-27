@@ -41,19 +41,80 @@ export {
   type TimelineEntry,
 } from './replay/timeline.ts';
 export {
-  POSITIONS,
   METRICS,
+  SINGLE_ONLY,
   createRenderer,
   defaultMetrics,
+  type FrameBox,
+  type MetricValue,
+  type OverlayBoxes,
   type CanvasFactory,
   type CanvasLike,
   type Context2DLike,
-  type Position,
   type Metric,
   type OverlayKind,
   type RenderOptions,
   type Renderer,
 } from './replay/render.ts';
+export {
+  LABEL_MODES,
+  WIDGET_SIZE,
+  defaultLabel,
+  hasUnit,
+  labelTextOf,
+  parseWidgets,
+  valueLines,
+  widgetName,
+  widgetsText,
+  type LabelMode,
+  type Widget,
+} from './replay/widgets.ts';
+export {
+  CLOCK_FORMATS,
+  DATE_FORMATS,
+  TIME_FORMATS,
+  UNITS,
+  defaultFormat,
+  formatsOf,
+  type ClockFormat,
+  type DateFormat,
+  type TimeFormat,
+  type Units,
+  type ValueFormat,
+} from './replay/formats.ts';
+export {
+  ICONS,
+  ICON_GAP,
+  ICON_SIZE,
+  drawIcon,
+  iconOf,
+  type IconName,
+  type IconPart,
+} from './replay/icons.ts';
+export {
+  CARD_LAYOUT_NAMES,
+  LAYOUTS,
+  LAYOUT_NAMES,
+  arrangeInLayout,
+  layoutSlots,
+  type CardLayoutName,
+  type LayoutName,
+  type LayoutSlot,
+  type OverlayLayoutName,
+  type SlotKind,
+} from './replay/layouts.ts';
+export {
+  CHART_COLORS,
+  CHART_ICON,
+  CHART_ICON_GAP,
+  CHART_KINDS,
+  chartColors,
+  chartIcon,
+  chartsOf,
+  defaultChartColor,
+  type ChartColor,
+  type ChartKind,
+} from './replay/charts.ts';
 export { distanceM, mercatorX, mercatorY } from './track/geo.ts';
 export { MVT_LINE, decodeMvt, type MvtFeature, type MvtLayer } from './map/mvt.ts';
 export { fitView, trackArea, type View } from './replay/view.ts';

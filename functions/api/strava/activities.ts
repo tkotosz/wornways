@@ -11,7 +11,7 @@ function upstreamPath(query: URLSearchParams): string | null {
   const activity = query.get('activity');
   if (activity !== null) {
     if (query.size !== 1 || !activityId(activity)) return null;
-    return `/activities/${activity}/streams?keys=latlng,time,altitude,heartrate,cadence,watts,temp&key_by_type=true`;
+    return `/activities/${activity}/streams?keys=latlng,time,altitude,heartrate,cadence,watts,temp,velocity_smooth&key_by_type=true`;
   }
   // The detailed activity, for its calories only: one more request, made when a video shows them.
   const calories = query.get('calories');

@@ -12,19 +12,20 @@
     <p class="try">Things to try:</p>
     <ul>
       <li>
-        <strong>Recap:</strong> keep everything ticked and continue. The weeks play one after
-        another.
+        <strong>Recap:</strong> pick All time, keep everything ticked and pick Recap. The weeks play
+        one after another.
       </li>
       <li>
         <strong>Multiday trip:</strong> set the period to Custom, from 4 May to 8 May 2026, then
-        pick Multiday trip under Playback. The camera follows the tour day by day.
+        pick Multiday trip. The camera follows the tour day by day.
       </li>
       <li>
-        <strong>Highlight:</strong> untick everything with the box at the top of the list, then tick
-        only Sa Calobra (18 April, 104 km). A single activity plays as a 15-second clip.
+        <strong>Highlight:</strong> pick All time, untick everything with the box at the top of the
+        list, then tick only Sa Calobra (18 April, 104 km). A single activity plays as a 15-second
+        clip.
       </li>
       <li>
-        <strong>All at once:</strong> keep everything ticked and pick All at once under Playback.
+        <strong>All at once:</strong> pick All time, keep everything ticked and pick All at once.
         Every ride and run starts at the same moment.
       </li>
     </ul>

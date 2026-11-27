@@ -33,7 +33,7 @@ describe('cached track records', () => {
 describe('Strava streams', () => {
   const activity = { id: '1', name: 'Ride', sport: 'ride', startTime: 0, distanceM: 0 };
 
-  it('keep heart rate, cadence, power and temperature with their points', () => {
+  it('keep heart rate, cadence, power, temperature and speed with their points', () => {
     const track = trackFromStreams(activity, {
       latlng: {
         data: [
@@ -47,12 +47,14 @@ describe('Strava streams', () => {
       cadence: { data: [80, 81, 0] },
       watts: { data: [200, 0, 220] },
       temp: { data: [18, 18, 19] },
+      velocity_smooth: { data: [7.5, 8, 8.5] },
     })!;
     // The point with no valid position goes, its values with it.
     expect(Array.from(track.sensors!.heartRate!)).toEqual([120, 125]);
     expect(Array.from(track.sensors!.cadence!)).toEqual([80, 0]);
     expect(Array.from(track.sensors!.power!)).toEqual([200, 220]);
     expect(Array.from(track.sensors!.temperature!)).toEqual([18, 19]);
+    expect(Array.from(track.sensors!.speed!)).toEqual([7.5, 8.5]);
   });
 
   it('leave sensors out when no stream has values', () => {

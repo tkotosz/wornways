@@ -15,6 +15,9 @@
   --accent: #ff8a2a;
   --accent-strong: #ff5a1f;
   --danger: #ff8a80;
+  /* Wide screens: the editor's settings column, and a setting opened in its place. */
+  --inspector-width: clamp(18rem, 26vw, 24rem);
+  --studio-width: 100rem;
   color-scheme: dark;
   font-family: 'Inter', system-ui, sans-serif;
   background: var(--background);
@@ -122,20 +125,156 @@ button.link {
   background: rgba(255, 138, 42, 0.12);
 }
 
-/*
- * The Back and Next buttons at the bottom of a step. They stay pinned to the bottom of the
- * window while the step is taller than it, so the next step is always one click away.
- */
-.footer {
-  position: sticky;
-  bottom: 0;
-  z-index: 5;
+/* Read by screen readers, not drawn: a heading the layout shows otherwise, or the words that
+   make a short button say what it does. */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* Phones: a list of settings, a row each: its name at the left, its value at the right (cut
+   short with … when long). A row opens its setting; a switch turns in place. */
+.setting-rows {
+  display: flex;
+  flex-direction: column;
+}
+
+.setting-rows-title {
+  margin: 0.8rem 0 0.1rem;
+  color: var(--muted);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.setting-rows-title:first-child {
+  margin-top: 0.2rem;
+}
+
+.setting-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-top: 1.5rem;
-  /* The same gap above the buttons as between the header's line and the step bar. */
-  padding: 1.5rem 0 calc(1.5rem + env(safe-area-inset-bottom));
-  border-top: 1px solid var(--line);
-  background: var(--background);
+  gap: 1rem;
+  min-height: 2.9rem;
+  padding: 0;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  color: var(--text);
+  background: none;
+  font: inherit;
+  text-align: left;
+}
+
+.setting-row .value {
+  overflow: hidden;
+  color: var(--muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.setting-row .value::after {
+  content: ' ›';
+}
+
+/* An on/off switch: a pill with a knob that slides to the right when on; the settings and
+   the widgets' strip have them. */
+.switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding-top: 0.35rem;
+}
+
+.switch input {
+  appearance: none;
+  position: relative;
+  width: 2.6rem;
+  height: 1.5rem;
+  margin: 0;
+  border-radius: 999px;
+  background: var(--line);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.switch input::after {
+  content: '';
+  position: absolute;
+  top: 0.2rem;
+  left: 0.2rem;
+  width: 1.1rem;
+  height: 1.1rem;
+  border-radius: 50%;
+  background: var(--text);
+  transition: transform 0.15s;
+}
+
+.switch input:checked {
+  background: linear-gradient(90deg, var(--accent), var(--accent-strong));
+}
+
+.switch input:checked::after {
+  transform: translateX(1.1rem);
+}
+
+/* Phones, in the editor: the same rows as one strip of chips under the picture, which
+   scrolls sideways: a chip each, its name small over its value. A chip opens its setting; a
+   switch turns in place. The group titles are left out. */
+.setting-strip {
+  display: flex;
+  gap: 0.5rem;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+}
+
+.setting-strip::-webkit-scrollbar {
+  display: none;
+}
+
+.setting-strip .setting-rows {
+  display: contents;
+}
+
+.setting-strip .setting-rows-title {
+  display: none;
+}
+
+.setting-strip .setting-row {
+  flex: none;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 0.1rem;
+  min-height: 3.1rem;
+  margin: 0;
+  padding: 0.35rem 0.8rem 0.4rem;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel);
+}
+
+.setting-strip .setting-row > span:first-child {
+  color: var(--muted);
+  font-size: 0.7rem;
+}
+
+.setting-strip .setting-row .value {
+  max-width: 11rem;
+  color: var(--text);
+  font-weight: 600;
+}
+
+.setting-strip .setting-row .value::after {
+  content: none;
+}
+
+.setting-strip .setting-row .switch {
+  padding: 0;
 }

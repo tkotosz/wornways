@@ -1,10 +1,11 @@
-// How a video will be paced, worked out without drawing anything: for the Video step,
+// How a video will be paced, worked out without drawing anything: for the editor,
 // which tells what the chosen settings will actually play.
 
 import {
   SENSOR_CHANNELS,
   STRIDE,
   automaticTitle,
+  chartsOf,
   recorded,
   parseSettings,
   planReplay,
@@ -37,6 +38,7 @@ export function planVideo(
     hasElevation: selection.tracks.some((track) =>
       track.points.some((value, index) => index % STRIDE === 2 && Number.isFinite(value)),
     ),
+    charts: chartsOf(selection.tracks),
     sensors: SENSOR_CHANNELS.filter((channel) =>
       selection.tracks.some((track) => recorded(track.sensors, channel)),
     ),

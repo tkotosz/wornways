@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { METRICS } from '../../src/replay/metrics.ts';
 import { SETTINGS, SettingsError, parseSettings } from '../../src/replay/settings.ts';
 
 /** The error `parseSettings` throws for the input, as "setting: message". */
@@ -33,19 +34,16 @@ describe('parseSettings', () => {
       trimRadius: 0,
       camera: 'zoom',
       map: true,
-      elevationProfile: null,
       title: null,
       width: 1080,
       height: 1920,
       fps: 30,
-      metrics: true,
-      metricsFields: null,
-      metricsPosition: 'bottom-left',
-      titlePosition: 'top-center',
-      titleSize: 100,
-      metricsSize: 100,
+      widgets: null,
       totalsCard: false,
-      totalsFields: null,
+      totalsWidgets: null,
+      units: 'metric',
+      layout: 'classic',
+      totalsLayout: 'grid-2x2',
       endCard: true,
       watermark: true,
     });
@@ -56,16 +54,22 @@ describe('parseSettings', () => {
     expect(parseSettings({ duration: '45' }).duration).toBe(45);
   });
 
-  it('reads the totals card values in the order given', () => {
-    expect(parseSettings({ 'totals-fields': 'time, Count,time' }).totalsFields).toEqual([
-      'time',
-      'count',
+  it('reads the totals card widgets: text and totals, without the elevation chart', () => {
+    expect(
+      parseSettings({ 'totals-widgets': 'text@50,40;distance@30,50,120' }).totalsWidgets,
+    ).toEqual([
+      { kind: 'text', text: null, x: 50, y: 40, size: 100 },
+      { kind: 'metric', metric: 'distance', label: 'under', x: 30, y: 50, size: 120 },
     ]);
-    expect(parseSettings({ 'totals-fields': 'date,pace' }).totalsFields).toEqual(['date', 'pace']);
-    expect(() => parseSettings({ 'totals-fields': 'speed' })).toThrow(
-      'expects values from count, distance, moving, time, elevation, descent, highest, pace, top-speed, date, days, longest, heart-rate, max-heart-rate, power, cadence, temperature, calories, got "speed"',
+    expect(() => parseSettings({ 'totals-widgets': 'elevation-chart@50,90' })).toThrow(
+      '"elevation-chart" is not a widget: text, one of time, moving',
     );
-    expect(() => parseSettings({ 'totals-fields': '' })).toThrow('expects values from');
+    // A total has its words under it unless told otherwise; the start time is for a single
+    // activity.
+    expect(parseSettings({ 'totals-widgets': 'distance:off@30,50' }).totalsWidgets).toEqual([
+      { kind: 'metric', metric: 'distance', label: 'off', x: 30, y: 50, size: 100 },
+    ]);
+    expect(() => parseSettings({ 'totals-widgets': 'start@50,50' })).toThrow('is not a widget');
   });
 
   it('reads an end pause of 0 to 10 seconds, halves included', () => {
@@ -141,15 +145,13 @@ describe('parseSettings', () => {
     [{ fps: '25' }, 'fps: expects 24 or 30 or 60, got "25"'],
     [{ speed: '2000' }, 'speed: is not a setting'],
     [{ activity: ' , ' }, 'activity: expects activity ids separated by commas'],
+    [{ 'metrics-fields': 'time' }, 'metrics-fields: is not a setting'],
+    [{ 'title-position': 'top-left' }, 'title-position: is not a setting'],
+    [{ 'elevation-profile': true }, 'elevation-profile: is not a setting'],
     [
-      { 'metrics-fields': 'time,speed' },
-      'metrics-fields: expects values from time, moving, distance, pace, top-speed, elevation, descent, highest, date, start, count, days, longest, heart-rate, max-heart-rate, power, cadence, temperature, calories, got "speed"',
+      { widgets: 'speed@50,50' },
+      `widgets: "speed" is not a widget: text, elevation-chart, heart-rate-chart, power-chart, speed-chart, cadence-chart or one of ${METRICS.join(', ')} at character 12`,
     ],
-    [
-      { 'metrics-position': 'center' },
-      'metrics-position: expects top-left or top-center or top-right or middle-left or middle-center or middle-right or bottom-left or bottom-center or bottom-right, got "center"',
-    ],
-    [{ 'metrics-size': '300' }, 'metrics-size: expects a number from 50 to 200, got "300"'],
   ])('rejects %j', (input, message) => {
     expect(errorOf(input)).toBe(message);
   });
@@ -167,13 +169,6 @@ describe('parseSettings', () => {
       minDistanceKm: null,
       maxDistanceKm: 0,
     });
-  });
-
-  it('reads the metrics card values in the order given', () => {
-    const settings = parseSettings({ 'metrics-fields': 'Distance, time,distance', metrics: false });
-
-    expect(settings.metricsFields).toEqual(['distance', 'time']);
-    expect(settings.metrics).toBe(false);
   });
 
   it('takes a radius of up to 20 km around a place', () => {

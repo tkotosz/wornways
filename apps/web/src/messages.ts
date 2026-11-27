@@ -3,8 +3,13 @@
 // may send progress for it before that.
 
 import type {
+  ChartKind,
   FrequentPlace,
   Grouping,
+  Metric,
+  MetricValue,
+  OverlayBoxes,
+  Widget,
   SensorChannel,
   SettingsInput,
   TrackEnd,
@@ -66,8 +71,16 @@ export type Request =
   | { type: 'places'; id: number; settings: SettingsInput; end: TrackEnd; source: Source }
   /** The video; a draft is small and at a low frame rate, for the preview to play. */
   | { type: 'make-video'; id: number; settings: SettingsInput; source: Source; draft?: boolean }
-  /** The last frame of the video the settings describe, small, as a preview. */
-  | { type: 'make-poster'; id: number; settings: SettingsInput; source: Source }
+  /** A still of the video: its last frame, or how it ends (the finished totals or end card). */
+  | {
+      type: 'make-poster';
+      id: number;
+      settings: SettingsInput;
+      source: Source;
+      scene: PosterScene;
+      /** The picture without its widgets, for an editor that draws them itself. */
+      bare: boolean;
+    }
   /** How the video the settings describe will be paced, without drawing it. */
   | { type: 'plan'; id: number; settings: SettingsInput; source: Source }
   /** Stops the request with the given id; that request then replies "canceled". */
@@ -80,7 +93,11 @@ export type Reply =
   | { type: 'places'; id: number; places: FrequentPlace[] }
   | { type: 'progress'; id: number; progress: Progress }
   | { type: 'video-made'; id: number; video: ArrayBuffer; report: VideoReport }
-  | { type: 'poster-made'; id: number; image: Blob }
+  /**
+   * The still; for the last frame also where each widget was drawn, the widgets drawn, and
+   * each value this video can show.
+   */
+  | ({ type: 'poster-made'; id: number } & Poster)
   | { type: 'planned'; id: number; plan: PlanReport }
   | { type: 'strava-started' | 'strava-ended' | 'strava-closed' | 'strava-kept'; id: number }
   | { type: 'strava-listed'; id: number; activities: ActivitySummary[] }
@@ -139,12 +156,28 @@ export type Progress = {
 };
 
 /** How a video will be paced. */
+/** A still of the video, with what the editor needs to arrange the widgets on it. */
+export type Poster = {
+  image: Blob;
+  boxes: OverlayBoxes;
+  /** The widgets drawn: the ones set, or the ones the other settings describe. */
+  widgets: Widget[];
+  /** Each value this video can show, as it stands at the end. */
+  values: [Metric, MetricValue][];
+  /** The shape of each chart the activities can show, values from 0 to 1. */
+  profiles: Partial<Record<ChartKind, number[]>>;
+  /** For the ending, when the totals card shows: its widgets and each total it can show. */
+  totals: { widgets: Widget[]; values: [Metric, MetricValue][] } | null;
+};
+
 export type PlanReport = {
   activities: number;
   meters: number;
   privacyOmitted: number;
   title: string;
   hasElevation: boolean;
+  /** The charts the activities can show: the speed, and the ones some recorded. */
+  charts: ChartKind[];
   /** The sensor channels some selected activity recorded, such as heart rate. */
   sensors: SensorChannel[];
   /** Whether some selected activity gives its calories. */
@@ -183,3 +216,6 @@ export type VideoReport = {
   /** Why the map could not be drawn; null when it was, or when the settings leave it out. */
   mapError: string | null;
 };
+
+/** What a still shows: the replay's last frame, or the video's ending after it. */
+export type PosterScene = 'replay' | 'ending';

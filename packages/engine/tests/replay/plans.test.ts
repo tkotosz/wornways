@@ -39,7 +39,7 @@ describe('planReplay', () => {
       race: false,
     });
     expect(noOverlap(plan.timeline.windows!)).toBe(true);
-    expect(plan.timeline.label?.(1)).toBe('1 Aug 2026');
+    expect(plan.timeline.label?.(1, 'dmy')).toBe('1 Aug 2026');
   });
 
   it('holds the finished picture briefly when the totals card follows it', () => {
@@ -61,7 +61,7 @@ describe('planReplay', () => {
     // So each is on screen longer than without overlap (9.03 s).
     expect(a!.duration).toBeCloseTo(27.1 / 2.2, 2);
     expect(plan.note).toBe('3 activities at 12.32 s each, overlapping 40%');
-    expect(plan.timeline.label?.(a!.start + a!.duration * 0.7)).toBe('2 Aug 2026');
+    expect(plan.timeline.label?.(a!.start + a!.duration * 0.7, 'dmy')).toBe('2 Aug 2026');
   });
 
   it('keeps every overlapping group inside the duration, long ones first too', () => {
@@ -95,7 +95,7 @@ describe('planReplay', () => {
     // 28 activities (and 28 days) in 17.6 s are too fast; 5 weeks are not.
     expect(plan.groups).toMatchObject({ count: 5, unit: 'week' });
     expect(plan.timeline.duration).toBe(20);
-    expect(plan.timeline.label?.(0)).toBe('27 Jul – 2 Aug 2026');
+    expect(plan.timeline.label?.(0, 'dmy')).toBe('27 Jul – 2 Aug 2026');
   });
 
   it('starts the activities of one group together', () => {
@@ -112,7 +112,7 @@ describe('planReplay', () => {
     const plan = planReplay(august, parseSettings({ group: 'month', 'end-card': false }));
 
     expect(plan.note).toBe('1 month at 27.1 s each');
-    expect(plan.timeline.label?.(5)).toBe('August 2026');
+    expect(plan.timeline.label?.(5, 'dmy')).toBe('August 2026');
   });
 
   it('gives more time to longer groups when sharing by distance', () => {
@@ -143,7 +143,7 @@ describe('planReplay', () => {
     expect(plan.timeline.mode).toBe('chronological');
     expect(b).toEqual(a);
     expect(c).toEqual(a);
-    expect(plan.timeline.label?.(5)).toBe('1–4 Aug 2026');
+    expect(plan.timeline.label?.(5, 'dmy')).toBe('1–4 Aug 2026');
   });
 
   it('races each group at real pace when there are several', () => {

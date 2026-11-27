@@ -1,0 +1,355 @@
+import { expect, test, type Page } from '@playwright/test';
+import { offlineMap } from './offline-map.ts';
+import { openDemo, openSection } from './popups.ts';
+
+// A laptop's window: the preview fits under the top bar, so it is large enough to arrange on.
+test.use({ viewport: { width: 1280, height: 900 } });
+
+/** Opens the demo's editor on Overlay, where the widgets are arranged on the still. */
+async function openOverlay(page: Page) {
+  await openDemo(page, 'Recap');
+  await openSection(page, 'Overlay');
+  await expect(page.getByTestId('widget-0')).toBeVisible();
+  await expect(page.getByText('Drawing preview')).toHaveCount(0);
+}
+
+/** A widget's outline on the still, by its place in the list. */
+const outline = (page: Page, index: number) => page.getByTestId(`widget-${index}`);
+
+/** Drags from a point by (dx, dy) pixels, in steps, as a pointer would. */
+async function drag(page: Page, from: { x: number; y: number }, dx: number, dy: number) {
+  await page.mouse.move(from.x, from.y);
+  await page.mouse.down();
+  await page.mouse.move(from.x + dx, from.y + dy, { steps: 8 });
+}
+
+/** The middle of an element's top strip, clear of a neighbor's outline below it. */
+async function grip(page: Page, index: number) {
+  const box = (await outline(page, index).boundingBox())!;
+  return { x: box.x + box.width / 2, y: box.y + 6 };
+}
+
+test('moves a widget on the still at once, snapping it to the middle, without a redraw', async ({
+  page,
+  context,
+}) => {
+  page.setDefaultTimeout(15_000);
+  await offlineMap(context);
+  await openOverlay(page);
+  const still = page.getByRole('img', { name: 'Preview: the last frame of the video' });
+  const before = await still.getAttribute('src');
+  const frame = (await page.getByTestId('preview').locator('.frame').boundingBox())!;
+
+  // The title, dragged to near the middle of the frame, follows the pointer and snaps to it.
+  const start = await grip(page, 0);
+  const box = (await outline(page, 0).boundingBox())!;
+  await drag(
+    page,
+    start,
+    frame.x + frame.width / 2 - (box.x + box.width / 2) + 3,
+    frame.y + frame.height / 2 - (box.y + box.height / 2) - 2,
+  );
+  const middle = { x: frame.x + frame.width / 2, y: frame.y + frame.height / 2 };
+  const center = async () => {
+    const now = (await outline(page, 0).boundingBox())!;
+    return { x: now.x + now.width / 2, y: now.y + now.height / 2 };
+  };
+  expect(Math.abs((await center()).y - middle.y)).toBeLessThan(1);
+  await page.mouse.up();
+  expect(Math.abs((await center()).x - middle.x)).toBeLessThan(1);
+  expect(Math.abs((await center()).y - middle.y)).toBeLessThan(1);
+  // The still is not drawn again: the widgets are drawn over it by the page.
+  await page.waitForTimeout(800);
+  await expect(still).toHaveAttribute('src', before!);
+});
+
+test('removes a widget from its settings, and never by dragging it', async ({ page, context }) => {
+  page.setDefaultTimeout(15_000);
+  await offlineMap(context);
+  await openOverlay(page);
+  const rows = page.getByRole('button', {
+    name: /^(Text|Date|Total activities|Total distance|Total climb):/,
+  });
+  await expect(rows).toHaveCount(5);
+
+  // From its row, in its settings.
+  await page.getByRole('button', { name: /^Text: / }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Remove from the picture' }).click();
+  await expect(rows).toHaveCount(4);
+  await expect(page.getByRole('button', { name: /^Text: / })).toHaveCount(0);
+
+  // Let go at the middle of the picture's bottom edge, it stays, moved there.
+  await expect(outline(page, 0)).toBeVisible();
+  const frame = (await page.getByTestId('preview').locator('.frame').boundingBox())!;
+  const start = await grip(page, 0);
+  await drag(
+    page,
+    start,
+    frame.x + frame.width / 2 - start.x,
+    frame.y + frame.height - 30 - start.y,
+  );
+  await page.mouse.up();
+  await expect(rows).toHaveCount(4);
+  const moved = (await outline(page, 0).boundingBox())!;
+  expect(moved.y + moved.height).toBeGreaterThan(frame.y + frame.height * 0.85);
+});
+
+test('resizes a widget from its corner, and edits a text widget from a tap', async ({
+  page,
+  context,
+}) => {
+  page.setDefaultTimeout(15_000);
+  await offlineMap(context);
+  await openOverlay(page);
+  await outline(page, 0).click({ position: { x: 10, y: 6 } });
+  const corner = (await outline(page, 0).boundingBox())!;
+  const width = corner.width;
+  const handle = (await page.getByTestId('resize-0').boundingBox())!;
+  await drag(page, { x: handle.x + 5, y: handle.y + 5 }, 40, 20);
+  await page.mouse.up();
+  await expect
+    .poll(async () => (await outline(page, 0).boundingBox())!.width)
+    .toBeGreaterThan(width);
+  // It grew right and down, its top left corner in place.
+  const grown = (await outline(page, 0).boundingBox())!;
+  // Within a pixel or two: the letters do not grow quite in step with their size.
+  expect(Math.abs(grown.x - corner.x)).toBeLessThan(2.5);
+  expect(Math.abs(grown.y - corner.y)).toBeLessThan(2.5);
+
+  // A tap on the picked text widget writes its text over the whole screen; Enter finishes.
+  await outline(page, 0).click({ position: { x: 10, y: 6 } });
+  const writing = page.getByRole('dialog', { name: 'Write the text' });
+  await writing.getByRole('textbox', { name: 'Text' }).fill('Mallorca');
+  await page.keyboard.press('Enter');
+  await expect(writing).toBeHidden();
+  await expect(outline(page, 0)).toContainText('Mallorca');
+  await expect(page.getByRole('button', { name: /^Text: / })).toHaveAccessibleName(
+    'Text: Mallorca',
+  );
+});
+
+test('stretches a chart from its edges, the edge across in place, an edge snapping to a line', async ({
+  page,
+  context,
+}) => {
+  page.setDefaultTimeout(15_000);
+  await offlineMap(context);
+  await openOverlay(page);
+  await page.getByRole('button', { name: 'Add a chart' }).click();
+  await page
+    .getByRole('dialog', { name: 'Charts' })
+    .getByRole('button', { name: 'Elevation chart' })
+    .click();
+  const chart = page.getByRole('button', { name: /^Elevation chart on the picture/ });
+  const index = Number(await chart.getAttribute('data-widget'));
+  const before = (await chart.boundingBox())!;
+
+  // Its right edge: narrower, as high, its left edge in place.
+  const right = (await page.getByTestId(`resize-right-${index}`).boundingBox())!;
+  await drag(page, { x: right.x + 5, y: right.y + 5 }, -60, 0);
+  await page.mouse.up();
+  await expect.poll(async () => (await chart.boundingBox())!.width).toBeLessThan(before.width - 50);
+  expect((await chart.boundingBox())!.height).toBeCloseTo(before.height, 0);
+  expect((await chart.boundingBox())!.x).toBeCloseTo(before.x, 0);
+  // Its left edge, out again: its right edge in place.
+  const narrowed = (await chart.boundingBox())!;
+  const left = (await page.getByTestId(`resize-left-${index}`).boundingBox())!;
+  await drag(page, { x: left.x + 5, y: left.y + 5 }, -20, 0);
+  await page.mouse.up();
+  await expect.poll(async () => (await chart.boundingBox())!.x).toBeLessThan(narrowed.x - 15);
+  const widened = (await chart.boundingBox())!;
+  expect(widened.x + widened.width).toBeCloseTo(narrowed.x + narrowed.width, 0);
+  await expect(
+    page.getByRole('dialog', { name: 'Elevation chart' }).getByRole('slider', { name: 'Height' }),
+  ).toHaveValue('100');
+
+  // Its top edge, up to just below the frame's middle: it snaps onto it, with the line shown.
+  // Moved first to 56% down, clear of the other widgets.
+  await chart.focus();
+  for (let k = 0; k < 6; k++) await page.keyboard.press('Shift+ArrowUp');
+  for (let k = 0; k < 2; k++) await page.keyboard.press('ArrowUp');
+  const frame = (await page.locator('.layer').boundingBox())!;
+  const middle = frame.y + frame.height / 2;
+  await expect.poll(async () => (await chart.boundingBox())!.y).toBeGreaterThan(middle + 8);
+  const narrow = (await chart.boundingBox())!;
+  const top = (await page.getByTestId(`resize-top-${index}`).boundingBox())!;
+  await drag(page, { x: top.x + 5, y: top.y + 5 }, 0, middle + 3 - narrow.y);
+  await expect(page.locator('.line.down')).toBeVisible();
+  await page.mouse.up();
+  await expect(page.locator('.line.down')).toHaveCount(0);
+  const tall = (await chart.boundingBox())!;
+  expect(Math.abs(tall.y - middle)).toBeLessThan(1.5);
+  expect(tall.width).toBeCloseTo(narrow.width, 0);
+
+  // The bottom of the chart stayed where it was while its top went up.
+  expect(tall.y + tall.height).toBeCloseTo(narrow.y + narrow.height, 0);
+
+  // Its bottom edge, up: lower again, its top in place.
+  const bottom = (await page.getByTestId(`resize-bottom-${index}`).boundingBox())!;
+  await drag(page, { x: bottom.x + 5, y: bottom.y + 5 }, 0, -8);
+  await page.mouse.up();
+  await expect.poll(async () => (await chart.boundingBox())!.height).toBeLessThan(tall.height - 5);
+  expect((await chart.boundingBox())!.y).toBeCloseTo(tall.y, 0);
+  const taller = (await chart.boundingBox())!;
+
+  // Moved, it keeps its width and height.
+  await drag(page, { x: taller.x + taller.width / 3, y: taller.y + taller.height / 2 }, -20, -30);
+  await page.mouse.up();
+  await expect.poll(async () => (await chart.boundingBox())!.y).toBeLessThan(taller.y - 10);
+  const moved = (await chart.boundingBox())!;
+  expect(moved.width).toBeCloseTo(taller.width, 0);
+  expect(moved.height).toBeCloseTo(taller.height, 0);
+});
+
+test('shows a layout as guides, and arranges the widgets in it', async ({ page, context }) => {
+  page.setDefaultTimeout(15_000);
+  await offlineMap(context);
+  await openOverlay(page);
+  // Recap starts in its own layout, its slots shown on the picture.
+  const chip = page.getByRole('button', { name: /^Layout: / });
+  await expect(chip).toHaveAccessibleName('Layout: Classic');
+  await expect(page.locator('.slot.stat')).toHaveCount(4);
+  // Guides off hides them, on shows them again.
+  const guides = page.getByRole('switch', { name: 'Guides' });
+  await guides.uncheck();
+  await expect(page.locator('.slot')).toHaveCount(0);
+  await guides.check();
+  await expect(page.locator('.slot.stat')).toHaveCount(4);
+  // Another layout: its slots; Arrange puts the stats in them, side by side.
+  await chip.click();
+  const sheet = page.getByRole('dialog', { name: 'Layout' });
+  await sheet.getByRole('radio', { name: 'Bottom row' }).click();
+  await expect(page.locator('.slot.stat')).toHaveCount(4);
+  await sheet.getByRole('button', { name: 'Arrange the widgets in it' }).click();
+  await expect(sheet).toBeHidden();
+  await expect(chip).toHaveAccessibleName('Layout: Bottom row');
+  const slots = await page
+    .locator('.slot.stat')
+    .evaluateAll((elements) => elements.map((element) => element.getBoundingClientRect().top));
+  // The date and the stats in the row's slots: their middles at one height.
+  const middles = await Promise.all(
+    [1, 2, 3].map(async (k) => {
+      const box = (await outline(page, k).boundingBox())!;
+      return box.y + box.height / 2;
+    }),
+  );
+  expect(Math.max(...middles) - Math.min(...middles)).toBeLessThan(2);
+  expect(Math.min(...middles)).toBeGreaterThan(Math.min(...slots));
+});
+
+test('resets the video to its preset from the preset popup, asked once more', async ({
+  page,
+  context,
+}) => {
+  page.setDefaultTimeout(15_000);
+  await offlineMap(context);
+  await openOverlay(page);
+  const count = await page.locator('[data-widget]').count();
+  const start = (await outline(page, 1).boundingBox())!;
+  // Moved, and a stat removed.
+  await outline(page, 1).focus();
+  await page.keyboard.press('Shift+ArrowUp');
+  await outline(page, 2).focus();
+  await page.keyboard.press('Delete');
+  await expect(page.locator('[data-widget]')).toHaveCount(count - 1);
+
+  await page.getByRole('button', { name: /^Preset: / }).click();
+  const popup = page.getByRole('dialog', { name: 'How should it play?' });
+  await popup.getByRole('button', { name: 'Reset to Recap' }).click();
+  // Cancel leaves it; Reset puts it back.
+  await popup.getByRole('button', { name: 'Cancel' }).click();
+  await popup.getByRole('button', { name: 'Reset to Recap' }).click();
+  await expect(popup).toContainText('start over as Recap sets them');
+  await popup.getByRole('button', { name: 'Reset', exact: true }).click();
+  await expect(popup).toBeHidden();
+  await expect(page.locator('[data-widget]')).toHaveCount(count);
+  await expect.poll(async () => (await outline(page, 1).boundingBox())!.y).toBeCloseTo(start.y, 0);
+});
+
+test('moves, resizes and removes a picked widget with the keyboard', async ({ page, context }) => {
+  page.setDefaultTimeout(15_000);
+  await offlineMap(context);
+  await openOverlay(page);
+  await outline(page, 1).focus();
+  await page.keyboard.press('Shift+ArrowUp');
+  await page.keyboard.press('+');
+  // Picked, its settings are open beside the picture.
+  await expect(page.getByRole('dialog', { name: 'Date' }).getByRole('slider')).not.toHaveValue(
+    '100',
+  );
+  await page.getByRole('dialog', { name: 'Date' }).getByRole('button', { name: 'Done' }).click();
+  await outline(page, 1).focus();
+  await page.keyboard.press('Delete');
+  await expect(page.getByRole('button', { name: /^Date: / })).toHaveCount(0);
+});
+
+test('adds a widget clear of Play, and Play steps aside while a widget is picked', async ({
+  page,
+  context,
+}) => {
+  page.setDefaultTimeout(15_000);
+  await offlineMap(context);
+  await openOverlay(page);
+  const play = page.getByRole('button', { name: 'Play preview' });
+  await expect(play).toBeVisible();
+  await outline(page, 0).click({ position: { x: 10, y: 6 } });
+  await expect(play).toHaveCount(0);
+
+  await page.getByRole('button', { name: '✓ Done' }).click();
+  await page.getByRole('button', { name: 'Add a stat' }).click();
+  await page
+    .getByRole('dialog', { name: 'Stats' })
+    .getByRole('button', { name: / Max speed$/ })
+    .click();
+  await expect(outline(page, 4)).toBeVisible();
+  const frame = (await page.getByTestId('preview').locator('.frame').boundingBox())!;
+  const added = (await outline(page, 4).boundingBox())!;
+  // Clear of the middle, where Play sits in the other sections.
+  const middle = { x: frame.x + frame.width / 2, y: frame.y + frame.height / 2 };
+  const clear =
+    added.x > middle.x + 28 ||
+    added.x + added.width < middle.x - 28 ||
+    added.y > middle.y + 28 ||
+    added.y + added.height < middle.y - 28;
+  expect(clear).toBe(true);
+});
+
+test("keeps the browser's long-press menu off the picture", async ({ page, context }) => {
+  page.setDefaultTimeout(15_000);
+  await offlineMap(context);
+  await openOverlay(page);
+  // Run in the page; the tests are type-checked without the browser's own types.
+  const prevented = await outline(page, 1).evaluate((widget) => {
+    const { MouseEvent } = globalThis as unknown as {
+      MouseEvent: new (type: string, init: object) => Event & { defaultPrevented: boolean };
+    };
+    const event = new MouseEvent('contextmenu', { bubbles: true, cancelable: true });
+    widget.dispatchEvent(event);
+    return event.defaultPrevented;
+  });
+  expect(prevented).toBe(true);
+});
+
+test('lines a moving widget up with the edges of the others, with a line', async ({
+  page,
+  context,
+}) => {
+  page.setDefaultTimeout(15_000);
+  await offlineMap(context);
+  await openOverlay(page);
+  // The title, dragged down so its edges come 4 px off the date's.
+  const title = (await outline(page, 0).boundingBox())!;
+  const date = (await outline(page, 1).boundingBox())!;
+  const start = await grip(page, 0);
+  await drag(page, start, date.x + 4 - title.x, 120);
+  // The line it snapped to: the date's edge or middle, or one of the layout's slots.
+  const line = page.locator('.line.across');
+  await expect(line).toBeVisible();
+  const at = (await line.boundingBox())!;
+  await page.mouse.up();
+  const moved = (await outline(page, 0).boundingBox())!;
+  const edges = [moved.x, moved.x + moved.width / 2, moved.x + moved.width];
+  expect(Math.min(...edges.map((edge) => Math.abs(edge - (at.x + at.width / 2))))).toBeLessThan(
+    1.5,
+  );
+});

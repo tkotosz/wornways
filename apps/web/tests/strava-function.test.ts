@@ -160,7 +160,7 @@ describe('the Strava Pages Functions', () => {
     expect(track.headers.get('Cache-Control')).toBe('no-store');
     expect(await track.json()).toEqual({ latlng: { data: [[47, 19]] }, time: { data: [0] } });
     expect(upstream.mock.calls[1]?.[0]).toBe(
-      `https://www.strava.com/api/v3/activities/${athlete}/streams?keys=latlng,time,altitude,heartrate,cadence,watts,temp&key_by_type=true`,
+      `https://www.strava.com/api/v3/activities/${athlete}/streams?keys=latlng,time,altitude,heartrate,cadence,watts,temp,velocity_smooth&key_by_type=true`,
     );
     const rejected = await load(list, cookie);
     expect(rejected.status).toBe(401);
