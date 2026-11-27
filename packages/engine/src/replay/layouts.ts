@@ -11,7 +11,7 @@ import { WIDGET_SIZE, type Widget } from './widgets.ts';
 
 /** A layout over the replay. */
 export type OverlayLayoutName =
-  'classic' | 'bottom-row' | 'corner-grid' | 'hero' | 'side-column' | 'story-safe';
+  'classic' | 'bottom-row' | 'corner-grid' | 'hero' | 'hero-pair' | 'side-column' | 'story-safe';
 /** A layout of the totals card: its values as a grid, a column or a row, the title over them. */
 export type CardLayoutName = 'grid-2x2' | 'grid-2x3' | 'grid-2x4' | 'column' | 'row';
 export type LayoutName = OverlayLayoutName | CardLayoutName;
@@ -27,6 +27,7 @@ export const LAYOUT_NAMES: readonly OverlayLayoutName[] = [
   'bottom-row',
   'corner-grid',
   'hero',
+  'hero-pair',
   'side-column',
   'story-safe',
 ];
@@ -221,6 +222,17 @@ export const LAYOUTS: Record<LayoutName, { name: string; help: string; slots: Pl
       stat(22, 87.5, 26, 4.6, 'middle'),
       stat(50, 87.5, 26, 4.6, 'middle'),
       stat(78, 87.5, 26, 4.6, 'middle'),
+      bottomChart,
+    ],
+  },
+  'hero-pair': {
+    name: 'Hero pair',
+    help: 'The title at the top; one large stat in the middle at the bottom, two smaller under it; a chart along the bottom.',
+    slots: [
+      title,
+      stat(50, 79.5, 60, 7.5, 'middle'),
+      stat(35, 87.5, 28, 4.6, 'middle'),
+      stat(65, 87.5, 28, 4.6, 'middle'),
       bottomChart,
     ],
   },

@@ -17,7 +17,7 @@ export const PRESETS: Record<Preset, PresetDefinition> = {
   'all-at-once': {
     help: 'every activity starts at the same moment and moves at its real pace',
     activities: 'several',
-    settings: { group: 'all', 'group-pace': 'real', duration: '30', layout: 'hero' },
+    settings: { group: 'all', 'group-pace': 'real', duration: '30', layout: 'hero-pair' },
   },
   recap: {
     help:

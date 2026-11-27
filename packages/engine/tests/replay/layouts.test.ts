@@ -143,7 +143,7 @@ describe('presets', () => {
   it('each start the widgets in a layout of their own', () => {
     expect(parseSettings({}).layout).toBe('classic');
     expect(parseSettings({ preset: 'recap' }).layout).toBe('classic');
-    expect(parseSettings({ preset: 'all-at-once' }).layout).toBe('hero');
+    expect(parseSettings({ preset: 'all-at-once' }).layout).toBe('hero-pair');
     expect(parseSettings({ preset: 'recap', layout: 'story-safe' }).layout).toBe('story-safe');
   });
 });
