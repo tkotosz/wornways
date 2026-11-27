@@ -139,7 +139,7 @@ title, the stats and a chart; in the web app also guides while the widgets are a
 (never drawn in the video). Classic: a large stat at the bottom left, three under it, a chart
 along the bottom. Classic pair: the same with two under it. Bottom row: up to four stats side by side at the bottom, a chart over them.
 Corner grid: four stats two by two at the bottom left. Hero: a large stat in the middle at
-the bottom, three under it. Hero pair: the same with two under it. Side column: the stats down the left side. Story safe: the title,
+the bottom, three under it. Hero pair: the same with two under it, either side of the middle (whatever their widths, the gap between them is under the large stat's middle). Side column: the stats down the left side. Story safe: the title,
 a chart and the stats clear of what Instagram and TikTok cover on a story (the top 14%, the
 bottom 35%). The title goes in its slot at the top. The slots are planned on a story frame
 and keep their size in pixels on any other; a chart and the title keep their width. A stat is
