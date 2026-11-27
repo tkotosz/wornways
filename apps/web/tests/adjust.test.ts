@@ -170,9 +170,12 @@ describe('presets', () => {
     expect(adjustSettings(single, 'one')).toEqual({
       duration: '15',
       camera: 'fixed',
-      layout: 'classic',
+      layout: 'classic-pair',
     });
-    expect(adjustSettings(single, 'several')).toEqual({ preset: 'all-at-once', layout: 'classic' });
+    expect(adjustSettings(single, 'several')).toEqual({
+      preset: 'all-at-once',
+      layout: 'classic-pair',
+    });
     const several = fineTuned(
       single,
       { ...playbackAdjustments(single, 'several'), duration: '22.5', camera: 'zoom' },
@@ -181,7 +184,7 @@ describe('presets', () => {
     expect(adjustSettings(several, 'one')).toEqual({
       duration: '15',
       camera: 'fixed',
-      layout: 'classic',
+      layout: 'classic-pair',
     });
     expect(adjustSettings(several, 'several')).toMatchObject({ duration: '22.5', camera: 'zoom' });
     // A preset picked starts that size's playback over, with nothing fine-tuned.

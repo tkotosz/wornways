@@ -48,7 +48,7 @@ export const PRESETS: Record<Preset, PresetDefinition> = {
   highlight: {
     help: 'for one activity: a 15-second clip, the camera following the route',
     activities: 'one',
-    settings: { duration: '15', camera: 'follow', layout: 'classic' },
+    settings: { duration: '15', camera: 'follow', layout: 'classic-pair' },
   },
 };
 
